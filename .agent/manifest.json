@@ -1,0 +1,32 @@
+{
+  "name": "k3dge",
+  "version": "0.1.0",
+  "package_root": "src/k3dge",
+  "domains": {
+    "engine": {
+      "src": "src/k3dge/engine",
+      "spec": "docs/specs/engine/spec.md",
+      "tests": "tests/unit/engine",
+      "description": "门禁核心：diff / manifest / spec_schema / contract / evaluator"
+    },
+    "cli": {
+      "src": "src/k3dge/cli",
+      "spec": "docs/specs/cli/spec.md",
+      "tests": "tests/unit/cli",
+      "description": "本仓终端/CI + 对外 harness（DSH/Codex/Claude Code/OpenCode）的 MCP 注入"
+    },
+    "sync": {
+      "src": "src/k3dge/sync",
+      "spec": "docs/specs/sync/spec.md",
+      "tests": "tests/unit/sync",
+      "description": "spec 接口块与契约哈希回写；docs/reference 机器文档"
+    },
+    "templates": {
+      "src": "src/k3dge/templates",
+      "spec": "docs/specs/templates/spec.md",
+      "tests": "tests/unit/templates",
+      "description": "脚手架生成器（k3dge-init.sh）"
+    }
+  },
+  "ignore": []
+}

@@ -1,0 +1,15 @@
+repos:
+  - repo: local
+    hooks:
+      - id: k3dge-check
+        name: k3dge consistency gate
+        entry: scripts/gate.py
+        language: python
+        pass_filenames: false
+        always_run: true
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert]
