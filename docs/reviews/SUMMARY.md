@@ -148,3 +148,10 @@
 - **摘要**：5 项 P1 立即修复已合入（SEC-01 `diff` 仅 `R/C` 拆 `->`、SEC-02 `generator` `find` 防崩、`DSN-01` 跳过 `Unreleased`、CON-01 `archive` 阻断、CON-02 变量遮蔽），`R2` 无缺陷
 - **处置**：5 已修 / 3 有意留候选（SEC-03/PRF-01/PRF-02）
 
+## 2026-08-26 — k3dit 5-Pass 穿透（pipeline/HUMAN_CHECKPOINT/mcp sync 增量）
+
+- **报告**：[2026-08-26-k3dit-5pass-pipeline.md](2026-08-26-k3dit-5pass-pipeline.md)
+- **基线**：`86 passed / 1 skipped / 49 subtests / k3dge check --force-full PASS`
+- **范围**：`e0de18d..f987092`（pipeline.toml + HUMAN_CHECKPOINT + mcp sync + changelog 清单），经 `k3dit_run_audit` MCP 取透镜逐轮执行，报告经 `k3dit check_report` 校验通过
+- **摘要**：14 项待修（P1 四项：N1-01 `.mcp.json` 损坏覆盖、N1-02 tomllib py3.10 假成功、N1-03 非 dict TypeError、P4-01 seal changelog 双轨漂移；P2 七项：路径逃逸/DAG 缺边/降级断链/零测试/checkpoint 双编码等）+ 1 有意留（P2-03 pipeline 字节锁追赶成本）
+- **处置**：13 转 M2 tasks（`2026-08-26-M2-audit-*.md`）/ 1 有意留
