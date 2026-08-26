@@ -124,6 +124,123 @@ def cmd_version(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_doc(args: argparse.Namespace) -> int:
+    import subprocess
+
+    workspace = _find_workspace(Path.cwd())
+    if args.doc_action == "sync":
+        from k3dge.sync.generator import sync_all
+
+        changed, docs_updated = sync_all(workspace)
+        print(f"[DOC] sync: changed={changed} docs_updated={docs_updated}")
+        # Run generate-docs.sh if present
+        gen = workspace / "scripts" / "generate-docs.sh"
+        if gen.is_file():
+            try:
+                result = subprocess.run(["bash", str(gen)], cwd=workspace, capture_output=True, text=True, timeout=60)
+                print(result.stdout or "")
+                if result.stderr:
+                    print(result.stderr, file=sys.stderr)
+            except Exception as exc:
+                print(f"[DOC] generate-docs.sh failed: {exc}", file=sys.stderr)
+        # Verify SUMMARY index
+        summary = workspace / "docs" / "reviews" / "SUMMARY.md"
+        if summary.is_file():
+            print(f"[DOC] SUMMARY: {summary.relative_to(workspace)} exists")
+        _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc sync -> changed={changed}")
+        return 0
+    return 1
+
+
+def cmd_task(args: argparse.Namespace) -> int:
+    import datetime
+
+    workspace = _find_workspace(Path.cwd())
+    if args.task_action == "create":
+        from k3dge.engine.milestone import create_task
+
+        title = args.title
+        if not title:
+            print("[TASK] create requires a title", file=sys.stderr)
+            return 1
+        ok, msg, path = create_task(
+            workspace,
+            title,
+            typ=args.type,
+            slug=args.slug,
+            milestone=args.milestone,
+            priority=args.priority or "P2",
+        )
+        print(f"[TASK] {msg}", file=sys.stderr if not ok else sys.stdout)
+        _append_log(workspace, f"[{datetime.datetime.now().isoformat()}] task create -> {msg}")
+        return 0 if ok else 1
+    if args.task_action == "done":
+        from k3dge.engine.milestone import mark_task_done
+
+        raw_pat = args.task_id if args.task_id is not None else args.title
+        if not raw_pat:
+            print("[TASK] done requires path from 'task list' or unique filename substring", file=sys.stderr)
+            return 1
+        ok, msg, _ = mark_task_done(workspace, raw_pat)
+        print(f"[TASK] {msg}", file=sys.stderr if not ok else sys.stdout)
+        _append_log(workspace, f"[{datetime.datetime.now().isoformat()}] task done -> {msg}")
+        return 0 if ok else 1
+    if args.task_action == "list":
+        from k3dge.engine.milestone import list_tasks
+
+        rows = list_tasks(
+            workspace,
+            milestone_id=args.milestone,
+            status=getattr(args, "filter_status", None),
+        )
+        payload = {
+            "ok": True,
+            "count": len(rows),
+            "tasks": [
+                {
+                    "path": str(t.path.relative_to(workspace)).replace("\\", "/"),
+                    "title": t.title,
+                    "status": t.status,
+                    "milestone": t.milestone,
+                    "priority": t.priority,
+                }
+                for t in rows
+            ],
+        }
+        if getattr(args, "as_json", False):
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            for item in payload["tasks"]:
+                ms = item["milestone"] or "-"
+                pr = item["priority"] or "-"
+                name = Path(item["path"]).name
+                print(f"[{item['status']:11s}] {pr:3s} {ms:4s} {name}  {item['title']}")
+            print(f"[TASK] {len(rows)} listed")
+        _append_log(
+            workspace,
+            f"[{datetime.datetime.now().isoformat()}] task list -> count={len(rows)}",
+        )
+        return 0
+    return 1
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    from k3dge.sync.generator import sync_all
+    from k3dge.templates.scaffold import scaffold
+
+    target = Path(args.target).resolve()
+    scaffold(target, name=args.name)
+    # Generate initial contract hash for first domain
+    try:
+        sync_all(target)
+    except Exception:
+        pass
+    print(f"[INIT] Successfully initialized k3dge harness in {target}")
+    return 0
+
+
 def cmd_milestone(args: argparse.Namespace) -> int:
     from k3dge.engine.milestone import run_milestone_alignment, seal_milestone, scan_milestone_tasks
 
@@ -222,6 +339,32 @@ def build_parser() -> argparse.ArgumentParser:
     p_version.add_argument("--set", dest="set_version", default=None, help="set exact version (e.g., 1.2.3)")
     p_version.add_argument("-m", "--message", dest="message", default=None, help="changelog entry message")
     p_version.set_defaults(func=cmd_version, part="patch")
+
+    p_task = sub.add_parser("task", help="task intake")
+    p_task.add_argument("task_action", choices=["create", "done", "list"], help="task action")
+    p_task.add_argument("title", nargs="?", default=None, help="task title (for create) or task id substring (for done)")
+    p_task.add_argument("--type", dest="type", choices=["audit", "feat", "fix", "docs", "chore", "refactor"], default="fix", help="task type (create)")
+    p_task.add_argument("--slug", dest="slug", default=None, help="slug (default derived from title, _ separated)")
+    p_task.add_argument("--milestone", dest="milestone", default=None, help="milestone id (create: assign; list: filter)")
+    p_task.add_argument("--priority", dest="priority", choices=["P0", "P1", "P2", "P3"], default="P2", help="priority (create)")
+    p_task.add_argument("--status", dest="filter_status", default=None, help="status filter (list)")
+    p_task.add_argument("--json", dest="as_json", action="store_true", help="JSON index (list)")
+    p_task.add_argument("task_id", nargs="?", default=None, help="task id substring for done (alternative to title)")
+    p_task.set_defaults(func=cmd_task)
+
+    p_doc = sub.add_parser("doc", help="doc generation")
+    p_doc.add_argument("doc_action", choices=["sync"], help="doc action")
+    p_doc.set_defaults(func=lambda args: cmd_doc(args))
+
+    p_audit = sub.add_parser("audit", help="audit triage")
+    p_audit.add_argument("audit_action", choices=["triage"], help="audit action")
+    p_audit.add_argument("--review", dest="review", default=None, help="review file path (default latest)")
+    p_audit.set_defaults(func=lambda args: cmd_audit(args))
+
+    p_init = sub.add_parser("init", help="initialize k3dge harness in target directory")
+    p_init.add_argument("target", nargs="?", default=".", help="target directory (default: current working dir)")
+    p_init.add_argument("--name", dest="name", default=None, help="initial domain name (default: directory name)")
+    p_init.set_defaults(func=cmd_init)
 
     return parser
 

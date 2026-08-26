@@ -9,6 +9,9 @@
 cmd_check(args: argparse.Namespace) -> int
 cmd_sync(args: argparse.Namespace) -> int
 cmd_version(args: argparse.Namespace) -> int
+cmd_doc(args: argparse.Namespace) -> int
+cmd_task(args: argparse.Namespace) -> int
+cmd_init(args: argparse.Namespace) -> int
 cmd_milestone(args: argparse.Namespace) -> int
 build_parser() -> argparse.ArgumentParser
 main(argv: Optional[Sequence[str]]=None) -> int
@@ -21,6 +24,16 @@ k3dge_check(workspace_path: Optional[str]=None, with_tests: bool=False, force_fu
     # doc: Run k3dge consistency gate directly via ConsistencyEngine.
 k3dge_verify_domain_contract(domain: str, workspace_path: Optional[str]=None) -> str
     # doc: Verify single domain AST interface against spec using k3dge contract engine.
+k3dge_sync(domains: Optional[list[str]]=None, workspace_path: Optional[str]=None) -> str
+    # doc: Regenerate spec interface blocks and contract hashes. Same as CLI k3dge sync.
+k3dge_version(action: str='show', part: str='patch', set_version: Optional[str]=None, message: Optional[str]=None, workspace_path: Optional[str]=None) -> str
+    # doc: Show or bump project version (same as CLI k3dge version).
+k3dge_task_create(title: str, typ: str='fix', slug: Optional[str]=None, milestone_id: Optional[str]=None, priority: str='P2', workspace_path: Optional[str]=None) -> str
+    # doc: Create a living docs/tasks/ file. Same as CLI k3dge task create.
+k3dge_task_done(path: str, workspace_path: Optional[str]=None) -> str
+    # doc: Mark one task done. Prefer the path from k3dge_task_list.
+k3dge_task_list(milestone_id: Optional[str]=None, status: Optional[str]=None, workspace_path: Optional[str]=None) -> str
+    # doc: Index living docs/tasks/*.md (not archive). Returns title/status/milestone/priority, not bodies.
 k3dge_milestone_control(action: str, milestone_id: str, workspace_path: Optional[str]=None) -> str
     # doc: Control milestone state machine: status, align (full-matrix regression), seal (atomic compaction).
 k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str) -> str
@@ -74,6 +87,11 @@ class Manifest
     is_ignored(self, path: str) -> bool
     under_package_root(self, path: str) -> bool
 # milestone.py
+get_current_milestone(workspace: Path) -> str
+    # doc: Current milestone cursor, default M0; stored in .agent/milestone.
+set_current_milestone(workspace: Path, milestone_id: str) -> None
+bump_milestone(workspace: Path) -> str
+    # doc: M0 → M1 → M2 …; writes new cursor and returns it.
 scan_unfilled_guides(workspace: Path) -> List[str]
     # doc: Names of guide stubs in docs/guides/ still carrying `<!-- k3dge:guide-stub -->`.
 class MilestoneTask
@@ -81,7 +99,20 @@ class MilestoneTask
     slug: str
     status: str
     milestone: str
+class TaskIndex
+# doc: Top-level docs/tasks/*.md index row. Archive is out of scan horizon.
+    path: Path
+    title: str
+    status: str
+    milestone: str
+    priority: str
+list_tasks(workspace: Path, milestone_id: Optional[str]=None, status: Optional[str]=None) -> List[TaskIndex]
+    # doc: Index living task files (not archive/, not README). Filters are exact matches.
 scan_milestone_tasks(workspace: Path, milestone_id: str) -> List[MilestoneTask]
+create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=None, milestone: Optional[str]=None, priority: str='P2') -> Tuple[bool, str, Optional[Path]]
+    # doc: Write a living task file. Returns (ok, message, path).
+mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]
+    # doc: Mark one living task done. Prefer exact path from list_tasks; else unique filename substring.
 run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
 # models.py
@@ -111,7 +142,7 @@ get_version(workspace: Path) -> str | None
 validate_versions(workspace: Path) -> list[Violation]
     # doc: Ensure pyproject.toml (if present) ↔ .agent/manifest.json ↔ src/k3dge/__init__.py 必须同值.
 bump_version(workspace: Path, part: str='patch', set_version: str | None=None) -> str
-    # doc: Bump SemVer and mirror to all existing version files. Returns new version.
+    # doc: Bump SemVer and mirror to all existing version files atomically. Returns new version.
 append_changelog(workspace: Path, new_version: str, notes: str | None=None) -> Path
     # doc: Append entry to CHANGELOG.md (Keep a Changelog) and return path.
 ```
@@ -132,6 +163,6 @@ sync_all(workspace: Path, domains: Optional[Sequence[str]]=None) -> Tuple[List[s
 
 ```python
 # scaffold.py
-scaffold(target: Path) -> None
+scaffold(target: Path, name: str | None=None) -> None
 main(argv: Optional[Sequence[str]]=None) -> int
 ```

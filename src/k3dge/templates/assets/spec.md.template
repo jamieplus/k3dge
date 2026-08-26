@@ -1,9 +1,9 @@
-# Domain Specification: {domain}
+# Domain Specification: <domain>
 
 - **Status**: Active
-- **Module Path**: `src/{domain}`
+- **Module Path**: `src/<domain>`
 - **Contract Hash**:
-- **Last Updated**: {date}
+- **Last Updated**: 2026-08-20
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -17,16 +17,6 @@
 
 ## 3. State Machine & Invariants
 
-```mermaid
-stateDiagram-v2
-    [*] --> Clean
-    Clean --> Touched
-    Touched --> Pass
-    Touched --> Drift
-    Drift --> Sync
-    Sync --> Pass
-```
-
 ## 4. Verification Matrix
-| Scenario ID | Input Condition | Expected Outcome | Test File |
-| --- | --- | --- | --- |
+| Scenario ID | Level | Input Condition | Expected Outcome | Test File |
+| --- | --- | --- | --- | --- |

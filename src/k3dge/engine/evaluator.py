@@ -12,6 +12,7 @@ from k3dge.engine.contract import _ExtractError
 from k3dge.engine.diff import GitError
 from k3dge.engine.manifest import Manifest, ManifestError
 from k3dge.engine.models import GateReport, Violation
+from k3dge.engine.pairs import PAIRS
 
 _TEST_REF_RE = re.compile(r"`(tests/[^\s`]+)`")
 _VERIFICATION_MATRIX_RE = re.compile(r"^#{2,3}\s+.*Verification Matrix", re.MULTILINE)
@@ -129,20 +130,38 @@ class ConsistencyEngine:
             files = diff.get_changed_files(self.workspace_root)
         except GitError as exc:
             if not force_full:
+                git_vs: List[Violation] = [
+                    Violation(
+                        "GIT_UNAVAILABLE",
+                        f"git unavailable: {exc}",
+                    )
+                ]
+                if not manifest.domains:
+                    git_vs.insert(
+                        0,
+                        Violation(
+                            "NO_DOMAINS",
+                            "manifest.domains is empty; register at least one domain "
+                            "(src/spec/tests) so the gate can protect this repo",
+                        ),
+                    )
                 return GateReport(
                     passed=False,
                     changed_files=(),
                     modified_domains=(),
-                    violations=(
-                        Violation(
-                            "GIT_UNAVAILABLE",
-                            f"git unavailable: {exc}",
-                        ),
-                    ),
+                    violations=tuple(git_vs),
                 )
             files = ()
 
         violations: List[Violation] = []
+        if not manifest.domains:
+            violations.append(
+                Violation(
+                    "NO_DOMAINS",
+                    "manifest.domains is empty; register at least one domain "
+                    "(src/spec/tests) so the gate can protect this repo",
+                )
+            )
         modified_domains: Set[str] = set()
         specs_touched: Set[str] = set()
 
@@ -201,13 +220,66 @@ class ConsistencyEngine:
         for domain in sorted(touched):
             violations.extend(self._check_domain(domain, manifest))
 
-        # 版本一致性：pyproject.toml ↔ .agent/manifest.json ↔ src/k3dge/__init__.py 必须同值（单源 pyproject.toml）
+        # 版本一致性：pyproject.toml ↔ .agent/manifest.json ↔ src/k3dge/__init__.py 必须同值
         try:
             from k3dge.engine.version import validate_versions
 
             violations.extend(validate_versions(self.workspace_root))
-        except Exception:
-            pass
+        except Exception as exc:
+            violations.append(
+                Violation(
+                    "VERSION_MISMATCH",
+                    f"version validation failed: {exc}",
+                    file_path=str(self.workspace_root / "pyproject.toml"),
+                )
+            )
+
+        # 脚手架镜像漂移：assets ↔ 本仓文件必须一致（总是运行；仅自举仓，ADR 0018）
+        try:
+            assets_root = Path(__file__).resolve().parents[1] / "templates" / "assets"
+            # Only enforce in the k3dge source tree itself (self-hosting). Downstream
+            # workspaces (k3dit etc.) use the installed package's assets, which would
+            # always differ from their own AGENTS.md etc. — skip there (see task 2026-08-24-template-drift-self-host-only).
+            try:
+                is_self_host = assets_root.is_relative_to(self.workspace_root.resolve())
+            except AttributeError:
+                is_self_host = str(assets_root).startswith(str(self.workspace_root.resolve()) + "/")
+            # Fallback: also consider self-host when workspace itself contains src/k3dge/templates/assets
+            if not is_self_host and not (self.workspace_root / "src/k3dge/templates/assets").exists():
+                is_self_host = False
+            elif not is_self_host and (self.workspace_root / "src/k3dge/templates/assets").exists():
+                # Workspace has its own assets (k3dge source tree) but installed package is elsewhere (non-editable) — still compare using workspace's assets
+                assets_root = self.workspace_root / "src/k3dge/templates/assets"
+                is_self_host = True
+            if is_self_host:
+                for asset, rel in PAIRS:
+                    try:
+                        asset_path = assets_root / asset
+                        if not asset_path.is_file():
+                            continue
+                        asset_text = asset_path.read_text(encoding="utf-8").rstrip("\n")
+                        repo_path = self.workspace_root / rel
+                        if not repo_path.is_file():
+                            continue
+                        repo_text = repo_path.read_text(encoding="utf-8").rstrip("\n")
+                        if asset_text != repo_text:
+                            violations.append(
+                                Violation(
+                                    "TEMPLATE_DRIFT",
+                                    f"template drift: assets/{asset} != {rel}",
+                                    file_path=rel,
+                                )
+                            )
+                    except (OSError, UnicodeDecodeError):
+                        continue
+        except Exception as exc:
+            violations.append(
+                Violation(
+                    "TEMPLATE_DRIFT",
+                    f"template drift check failed: {exc}",
+                    file_path="src/k3dge/engine/pairs.py",
+                )
+            )
 
         return GateReport(
             passed=not violations,
@@ -241,7 +313,17 @@ class ConsistencyEngine:
                 )
             ]
 
-        content = spec_path.read_text(encoding="utf-8")
+        try:
+            content = spec_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            return [
+                Violation(
+                    "SPEC_DECODE_FAILED",
+                    f"spec is not UTF-8 for domain '{domain}': {exc}",
+                    domain=domain,
+                    file_path=str(spec_path),
+                )
+            ]
         for err in spec_schema.validate_structure(content):
             out.append(
                 Violation("SPEC_MISSING_SECTION", err, domain=domain, file_path=str(spec_path))

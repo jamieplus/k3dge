@@ -1,26 +1,10 @@
 import pathlib
 import unittest
 
+from k3dge.engine.pairs import PAIRS
+
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 ASSETS = ROOT / "src/k3dge/templates/assets"
-
-PAIRS = [
-    ("gate.py", "scripts/gate.py"),
-    ("gate.sh", "scripts/gate.sh"),
-    ("init.sh", "scripts/init.sh"),
-    ("generate-docs.sh", "scripts/generate-docs.sh"),
-    ("generate-docs.ps1", "scripts/generate-docs.ps1"),
-    ("gate.ps1", "scripts/gate.ps1"),
-    ("init.ps1", "scripts/init.ps1"),
-    ("k3dge-init-wrapper.sh", "k3dge-init.sh"),
-    ("k3dge-init-wrapper.ps1", "k3dge-init.ps1"),
-    ("agents.md", "AGENTS.md"),
-    ("agent-readme.md", ".agent/README.md"),
-    ("rules/00-core-discipline.md", ".agent/rules/00-core-discipline.md"),
-    ("rules/01-docs-structure.md", ".agent/rules/01-docs-structure.md"),
-    ("rules/02-simplification.md", ".agent/rules/02-simplification.md"),
-    ("rules/03-self-contained.md", ".agent/rules/03-self-contained.md"),
-]
 
 
 class TestTemplateSync(unittest.TestCase):
@@ -41,6 +25,9 @@ class TestTemplateSync(unittest.TestCase):
             "docs.toml.template",
             "architecture.md.template",
             "reviews-readme.md",
+            "mcp-bridge.md.template",
+            "downstream.md",
+            "gitignore.template",
             "tasks-readme.md",
             "branches-readme.md",
             "memo-readme.md",

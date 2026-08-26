@@ -16,3 +16,13 @@
 
 单条形态见 `docs/memo/README.md`，永不进门禁，不排期，仅备查。
 
+## 本仓门禁与 CI
+
+- 本地默认：`k3dge check`（git 触及域）。提交钩子同样是这条。
+- CI 与封板对齐：`k3dge check --force-full --with-tests`（见 `.github/workflows/ci.yml`），再 `pytest -q`。
+- 自举安装 `pip install -e ".[dev]"` 已含 MCP。配 MCP 剧本见 [`mcp-bridge.md`](mcp-bridge.md)。
+
+## 下游仓升级
+
+别的工程用 `K3DGE_SOURCE` 挂本 harness 时：闸和 `k3dge task list` 等工具在 `.venv` 的 k3dge 包里；`AGENTS.md` / `scripts/gate.*` 是 init 当时拷进去的。源更新后怎么升、再跑 init 会不会覆盖，见 [`downstream.md`](downstream.md)。
+

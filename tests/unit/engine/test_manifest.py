@@ -53,6 +53,18 @@ class TestManifest(unittest.TestCase):
         self.assertFalse(m.is_ignored("foo.py"))
         self.assertTrue(m.is_ignored("x.pyc"))
 
+    def test_empty_ignore_pattern_does_not_crash(self) -> None:
+        m = Manifest({"package_root": "src", "ignore": [""], "domains": {}})
+        self.assertFalse(m.is_ignored("foo.py"))
+
+    def test_rejects_windows_drive_path(self) -> None:
+        with self.assertRaises(ManifestError):
+            Manifest({"package_root": "src", "domains": {"core": {"src": r"C:\Windows"}}})
+
+    def test_rejects_nul_in_path(self) -> None:
+        with self.assertRaises(ManifestError):
+            Manifest({"package_root": "src", "domains": {"core": {"src": "src/co\x00re"}}})
+
 
 if __name__ == "__main__":
     unittest.main()

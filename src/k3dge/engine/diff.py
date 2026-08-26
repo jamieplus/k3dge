@@ -60,9 +60,10 @@ def _parse_porcelain(status: str) -> List[str]:
             continue
         # porcelain v1: XY<space>path, or XY<space>orig -> new for renames
         # handle quoted paths produced by core.quotepath
+        status_code = line[:2]
         raw = line[3:]
-        if " -> " in raw:
-            # take the destination of a rename/copy
+        if ("R" in status_code or "C" in status_code) and " -> " in raw:
+            # take the destination of a rename/copy only when status is rename/copy
             raw = raw.split(" -> ", 1)[1]
         path = _strip_quotes(raw.strip())
         if path:

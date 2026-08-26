@@ -1,13 +1,13 @@
 {
   "name": "k3dge",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "package_root": "src/k3dge",
   "domains": {
     "engine": {
       "src": "src/k3dge/engine",
       "spec": "docs/specs/engine/spec.md",
       "tests": "tests/unit/engine",
-      "description": "门禁核心：diff / manifest / spec_schema / contract / evaluator"
+      "description": "门禁核心：diff / manifest / spec_schema / contract / evaluator / milestone / version / TEMPLATE_DRIFT"
     },
     "cli": {
       "src": "src/k3dge/cli",

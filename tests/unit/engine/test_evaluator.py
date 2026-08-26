@@ -195,6 +195,40 @@ class TestEvaluator(unittest.TestCase):
         self.assertNotIn("other", selective.modified_domains)
         self.assertTrue(any(v.domain == "other" for v in full.violations))
 
+    def test_non_utf8_spec_is_violation(self) -> None:
+        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n")
+        (self.repo / "docs/specs/core/spec.md").write_bytes(b"\xff\xfe not utf-8")
+        _git(self.repo, "add", "-A")
+        _git(self.repo, "commit", "-m", "init")
+        report = ConsistencyEngine(self.repo).evaluate(force_full=True)
+        self.assertFalse(report.passed)
+        self.assertTrue(any(v.rule_id == "SPEC_DECODE_FAILED" for v in report.violations))
+
+    def test_engine_source_does_not_import_templates(self) -> None:
+        import ast
+
+        root = Path(__file__).resolve().parents[3] / "src" / "k3dge" / "engine"
+        for path in root.rglob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith(
+                    "k3dge.templates"
+                ):
+                    self.fail(f"{path.name} imports {node.module}")
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if alias.name.startswith("k3dge.templates"):
+                            self.fail(f"{path.name} imports {alias.name}")
+
+    def test_empty_domains_is_violation(self) -> None:
+        (self.repo / ".agent" / "manifest.json").write_text(
+            json.dumps({"package_root": "src", "domains": {}, "ignore": []}),
+            encoding="utf-8",
+        )
+        report = ConsistencyEngine(self.repo).evaluate(force_full=True)
+        self.assertFalse(report.passed)
+        self.assertTrue(any(v.rule_id == "NO_DOMAINS" for v in report.violations))
+
     def test_unregistered_domain_detected(self) -> None:
         (self.repo / "src" / "other").mkdir()
         (self.repo / "src" / "other" / "mod.py").write_text("def f() -> None:\n    pass\n")

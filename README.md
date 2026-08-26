@@ -15,7 +15,7 @@ Spec-gate harness：为 vibecoding agent 提供确定性的契约漂移检测与
 ./k3dge-init.sh
 ```
 
-自举安装：默认 `pip install -e ".[dev]"`（改完立刻用同一份代码，不走 PyPI）。
+自举安装：默认 `pip install -e ".[dev]"`（含 pytest、pre-commit、**mcp**；改完立刻用同一份代码，不走 PyPI）。
 
 初始化**另一个空目录**（不要手建 docs/.agent）：进入该目录，跑 **k3dge 仓里的** init：
 
@@ -30,18 +30,22 @@ mkdir k3dit && cd k3dit
 
 1. `git init`（`.git` 不存在时）
 2. 创建 `.venv`（Python 3.10+）
-3. 可编辑安装本仓及开发依赖（pre-commit、pytest）
-4. 生成 harness 目录结构（manifest / specs / AGENTS.md / 钩子脚本）
-5. 挂载 git pre-commit 钩子
+3. 可编辑安装：自举 `.[dev]`（含 mcp）；下游 `${K3DGE_SOURCE}[mcp]` + pre-commit、pytest
+4. 生成 harness 目录结构（manifest / 第一域 / specs / AGENTS.md / 钩子脚本）
+5. `k3dge sync`、挂载 pre-commit 与 commit-msg 钩子
 
 完成后即可直接开发，无需每次 `source activate`，也无需再手动安装任何东西。
 
 ## 日常流程
 
 ```bash
-k3dge check              # 运行一致性门禁（pre-commit 提交时也会自动跑）
+k3dge check              # 运行一致性门禁（pre-commit 提交时也会自动跑；默认证触及域）
+k3dge check --force-full --with-tests   # 与 CI / milestone align 同强度
 k3dge sync               # 修改公开接口后，同步 spec 契约哈希与接口块
+k3dge task list --json   # 顶层 tasks 索引（不含 archive、不含正文）
 ```
+
+下游仓源更新后怎么升：见 `docs/guides/downstream.md`。无 Milestone 的 `done` 任务在 `docs/tasks/archive/untagged/`。
 
 ## Agent 协议
 

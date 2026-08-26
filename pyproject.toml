@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "k3dge"
-version = "0.1.0"
+version = "0.1.2"
 description = "Spec-gate harness: deterministic contract drift detection for vibecoding agents"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -17,7 +17,7 @@ contract = [
     "tree-sitter-typescript>=0.21",
 ]
 mcp = ["mcp>=1.0"]
-dev = ["pytest>=8", "pre-commit>=3"]
+dev = ["pytest>=8", "pre-commit>=3", "mcp>=1.0"]
 
 [project.scripts]
 k3dge = "k3dge.cli.main:main"

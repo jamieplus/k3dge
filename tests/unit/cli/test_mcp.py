@@ -32,6 +32,94 @@ class TestMcp(unittest.TestCase):
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"], "DomainNotRegistered")
 
+    def test_verify_collects_once(self) -> None:
+        import unittest.mock as mock
+
+        from k3dge.engine import contract as contract_mod
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".agent").mkdir()
+            (root / ".agent" / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "package_root": "src",
+                        "domains": {
+                            "core": {
+                                "src": "src/core",
+                                "spec": "docs/specs/core/spec.md",
+                            }
+                        },
+                    }
+                )
+            )
+            (root / "src/core").mkdir(parents=True)
+            (root / "docs/specs/core").mkdir(parents=True)
+            (root / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n")
+            iface = contract_mod.collect_domain_interface(root / "src/core")
+            h = contract_mod.compute_hash(iface)
+            (root / "docs/specs/core/spec.md").write_text(
+                f"**Contract Hash**: `sha256:{h}`\n", encoding="utf-8"
+            )
+            calls = {"n": 0}
+            real = contract_mod.collect_domain_interface
+
+            def wrapped(*a, **k):
+                calls["n"] += 1
+                return real(*a, **k)
+
+            with mock.patch(
+                "k3dge.engine.contract.collect_domain_interface", side_effect=wrapped
+            ):
+                payload = json.loads(
+                    mcp.k3dge_verify_domain_contract("core", workspace_path=d)
+                )
+            self.assertTrue(payload["ok"])
+            self.assertEqual(calls["n"], 1)
+
+    def test_task_list_json(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".agent").mkdir()
+            (root / ".agent" / "manifest.json").write_text(
+                json.dumps({"package_root": "src", "domains": {}})
+            )
+            (root / "docs" / "tasks").mkdir(parents=True)
+            (root / "docs" / "tasks" / "open.md").write_text(
+                "# Open item\n- **Status**: deferred\n- **Priority**: P3\n",
+                encoding="utf-8",
+            )
+            payload = json.loads(mcp.k3dge_task_list(workspace_path=d, status="deferred"))
+            self.assertTrue(payload["ok"])
+            self.assertEqual(payload["count"], 1)
+            self.assertEqual(payload["tasks"][0]["title"], "Open item")
+            self.assertEqual(payload["tasks"][0]["priority"], "P3")
+            empty = json.loads(mcp.k3dge_task_list(workspace_path=d, milestone_id="M9"))
+            self.assertEqual(empty["count"], 0)
+
+    def test_sync_and_task_create_done(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".agent").mkdir()
+            (root / ".agent" / "manifest.json").write_text(
+                json.dumps({"package_root": "src", "domains": {}, "name": "t", "version": "0.1.0"})
+            )
+            (root / "docs" / "tasks").mkdir(parents=True)
+            sync_payload = json.loads(mcp.k3dge_sync(workspace_path=d))
+            self.assertTrue(sync_payload["ok"])
+            created = json.loads(
+                mcp.k3dge_task_create("Wire MCP sync", typ="feat", workspace_path=d)
+            )
+            self.assertTrue(created["ok"], created)
+            path = created["path"]
+            self.assertTrue((root / path).is_file())
+            done = json.loads(mcp.k3dge_task_done(path, workspace_path=d))
+            self.assertTrue(done["ok"], done)
+            self.assertTrue(str(done["path"]).endswith(".done.md"))
+            ver = json.loads(mcp.k3dge_version(action="show", workspace_path=d))
+            self.assertTrue(ver["ok"])
+            self.assertEqual(ver["version"], "0.1.0")
+
 
 if __name__ == "__main__":
     unittest.main()

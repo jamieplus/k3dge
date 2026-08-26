@@ -242,8 +242,16 @@ def collect_domain_interface(
     if not src_dir.exists():
         return ""
     chunks: List[str] = []
+    try:
+        src_resolved = src_dir.resolve()
+    except OSError:
+        src_resolved = src_dir
     for file_path in sorted(src_dir.rglob("*")):
-        if not file_path.is_file():
+        if file_path.is_symlink() or not file_path.is_file():
+            continue
+        try:
+            file_path.resolve().relative_to(src_resolved)
+        except (ValueError, OSError):
             continue
         if manifest is not None and workspace_root is not None:
             try:
@@ -257,7 +265,10 @@ def collect_domain_interface(
                 try:
                     iface = extractor.extract(file_path, include_doc=include_doc)
                     if iface and iface.strip():
-                        chunks.append(f"# {file_path.name}\n{iface}")
+                        if include_doc:
+                            chunks.append(f"# {file_path.name}\n{iface}")
+                        else:
+                            chunks.append(iface)
                 except ImportError:
                     pass
                 except (SyntaxError, UnicodeDecodeError, OSError) as exc:

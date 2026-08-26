@@ -58,8 +58,10 @@ class TestGenerator(unittest.TestCase):
             iface = contract.collect_domain_interface(root / "src" / "core")
             h = contract.compute_hash(iface)
             self.assertIn(f"sha256:{h}", content)
-            self.assertIn("# mod.py", content)
+            self.assertNotIn("# mod.py", content)
             self.assertIn("foo(x: int) -> int", content)
+            api = (root / "docs/reference/api.md").read_text()
+            self.assertIn("# mod.py", api)
 
     def test_render_readme_layout(self) -> None:
         with tempfile.TemporaryDirectory() as d:

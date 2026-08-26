@@ -50,7 +50,10 @@ def _replace_between_all(content: str, start: str, end: str, replacement: str) -
             break
         content = content[:s2] + content[e2 + len(end):]
         # do not advance s; keep scanning from first marker
-    e = content.index(end, s) + len(end)
+    e = content.find(end, s)
+    if e == -1:
+        return None
+    e += len(end)
     return content[:s] + replacement + content[e:]
 
 

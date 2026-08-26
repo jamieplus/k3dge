@@ -1,46 +1,40 @@
 # Architecture — 系统全貌（System Overview）
 
 > 人写常驻 + `k3dge sync` 聚合校验。域级契约在 `docs/specs/<domain>/spec.md`，本文件只讲**域间关系与全局不变量**。
-> 本文档遵循 **Diátaxis**（`guides`=教程/操作指南、`reference`=参考、`architecture` 本文件=`解释`）与 **C4-C1** 上下文视图。
 
 ## 0. C4-C1 系统上下文
 
 ```mermaid
 C4Context
-    title k3dge 在 Vibe Coding 链路中的位置
+    title Project in Vibe Coding
     Person(dev, "开发者/PM", "提自然语言需求")
-    System(k3dge, "k3dge Harness", "spec 契约 + 指纹门禁 + 一键脚手架")
-    System_Ext(agent, "Coding Agent<br/>Claude/Cursor/Cline", "读 AGENTS.md，受门禁约束")
+    System(harness, "Harness", "spec 契约 + 指纹门禁")
+    System_Ext(agent, "Coding Agent", "读 AGENTS.md，受门禁约束")
     System_Ext(git, "Git", "pre-commit/CI 拦截点")
-    Rel(dev, k3dge, "1. ./k3dge-init.sh 初始化", "shell")
+    Rel(dev, harness, "1. ./k3dge-init.sh 初始化", "shell")
     Rel(dev, agent, "2. 提需求", "自然语言")
-    Rel(agent, k3dge, "3. k3dge check/sync", "hash 比对")
-    Rel(k3dge, git, "4. 阻断或放行", "exit code")
+    Rel(agent, harness, "3. k3dge check/sync", "hash 比对")
+    Rel(harness, git, "4. 阻断或放行", "exit code")
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 ```
 
 ## 1. 域地图（事实源：`.agent/manifest.json`）
 
+> 新仓初始化时 `domains` 为空，下表随 `k3dge sync` 或首个域登记后由人写维护；不要复制本模板的示例行。
+
 | Domain | Source | Spec | Description |
 | --- | --- | --- | --- |
-| cli | `src/k3dge/cli` | `docs/specs/cli/spec.md` | check / sync 命令路由与终端输出 |
-| engine | `src/k3dge/engine` | `docs/specs/engine/spec.md` | 门禁核心：diff / manifest / spec_schema / contract / evaluator |
-| sync | `src/k3dge/sync` | `docs/specs/sync/spec.md` | spec 接口块与契约哈希回写；docs/reference 机器文档 |
-| templates | `src/k3dge/templates` | `docs/specs/templates/spec.md` | 脚手架生成器（k3dge-init.sh） |
+| _示例_ | `src/<domain>` | `docs/specs/<domain>/spec.md` | 按 `.agent/manifest.json` 填 |
 
 ## 2. 依赖方向
 
 ```mermaid
 graph TD
     templates --> engine
-    engine --> cli
-    sync --> engine
-    sync --> cli
 ```
 
 * `engine` 不依赖 `cli/sync/templates`（纯判定）。
-* `sync` 依赖 `engine.contract` 做接口提取与哈希。
-* `cli` 仅做路由与渲染，`templates` 仅做 scaffolding。
+* 依赖方向以 `.agent/manifest.json` 登记为准，本模板不硬编码四域。
 
 ## 3. 数据流（提交门禁）
 
@@ -57,9 +51,9 @@ flowchart LR
 
 ## 4. 全局不变量
 
-* `GateReport.passed ⇔ violations.is_empty`；`docs/` 根直放文件被 `DOCS_ROOT_DISALLOWED` 拦截。
+* `GateReport.passed ⇔ violations.is_empty`
 * `Contract Hash` 仅覆盖公开签名，函数体/注释不改哈希。
-* **文档语义边界**：`docs/reference/*` 是 manifest 投影，可随时重建，**永不作为一致性判据**；一致性判据仅 `docs/specs/*` 与本文件。看似冗余的成对产物，动前必查 `docs/adr/`（见 ADR 0002），无据则询问用户。
+* **文档语义边界**：`docs/reference/*` 是 manifest 投影，可随时重建，**永不作为一致性判据**；一致性判据仅 `docs/specs/*` 与本文件。
 
 ## 5. 已定案决策速查（do NOT re-litigate）
 
@@ -68,15 +62,3 @@ flowchart LR
 | 决策 | 结论 | 出处 |
 | --- | --- | --- |
 | 门禁时机 | 按 branch（merge-base 基准），不做同 commit 强绑 spec | ADR 0001 |
-| 契约范围 | 哈希只锚定公开接口签名；函数体/注释变更不触发 | ADR 0001 / engine spec §3 |
-| 自愈方式 | `k3dge sync` 确定性生成，Agent 审阅不发明 | ADR 0001 |
-| README 地位 | 人写常驻、收尾脚本刷新布局；脚手架不生成 README | 会话决议 2026-08-20 |
-| pre-commit 实现 | `language: python` + `scripts/gate.py`；不用 `additional_dependencies: ["."]` 自装 | 会话实测（pre-commit `.` 解析到占位仓库） |
-| 文档语义 | reference=投影 / architecture+specs=判据，禁止合并 | ADR 0002 |
-| Mermaid 选型 | 架构/状态机统一 mermaid 文本块；契约保持代码文本 | memo 2026-08-21-mermaid-uml-discussion |
-| L2 范围 | selective：只验矩阵×受影响域×CI 硬拦；不做全量本地硬拦 | 会话决议 2026-08-21 |
-| 质量闸归属 | 简洁性/全局优化不进 k3dge 门禁；走 `.agent/rules/02-simplification.md` 流程 + 外部质量 harness | memo 2026-08-21-code-quality-discussion |
-| `.agent/rules` | 协议切片，不是第二份协议；`AGENTS.md` 为准；init 写出完整 00–03（含 02） | ADR 0012 |
-| `.agent/` 目录 | 进程配置：AGENTS.md 广播怎么干，manifest 按路径管在哪干；不要浏览点目录 | ADR 0014（修正 0013） |
-| 断言证据链 | 对本仓的事实断言须有产物+消费者+到达方式；缺链不得下结论；不进 `k3dge check` | ADR 0015 |
-| 活文档接续 | 搬走/删除被点名的事实源时同轮改指针；memo 晋升目标消失则搬回顶层 | ADR 0016 |

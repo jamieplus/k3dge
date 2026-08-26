@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 MANIFEST_PATH = ".agent/manifest.json"
+
+# POSIX Path.is_absolute() is false for Windows drive paths; reject them anyway.
+_WINDOWS_ABS = re.compile(r"^[A-Za-z]:|^//")
 
 
 class ManifestError(ValueError):
@@ -15,11 +19,18 @@ class ManifestError(ValueError):
 
 
 def _require_relative_path(label: str, val: Any) -> str:
-    """Return a posix-relative path or raise ManifestError. Rejects abs and `..`."""
+    """Return a posix-relative path or raise ManifestError. Rejects abs, NUL, and `..`."""
     if not isinstance(val, str):
         raise ManifestError(f"{label} must be a string, got {type(val).__name__}")
+    if "\x00" in val:
+        raise ManifestError(f"{label} must not contain NUL")
     posix = val.replace("\\", "/")
-    if not posix or posix.startswith("/") or Path(posix).is_absolute():
+    if (
+        not posix
+        or posix.startswith("/")
+        or Path(posix).is_absolute()
+        or _WINDOWS_ABS.match(posix)
+    ):
         raise ManifestError(f"{label} must be relative, got '{val}'")
     if ".." in Path(posix).parts:
         raise ManifestError(f"{label} must not contain '..', got '{val}'")
@@ -94,6 +105,8 @@ class Manifest:
         p = Path(path_posix)
         p_name = p.name
         for pattern in self.ignore:
+            if not pattern:
+                continue
             pat = pattern.replace("\\", "/")
             if (
                 fnmatch.fnmatch(path_posix, pat)

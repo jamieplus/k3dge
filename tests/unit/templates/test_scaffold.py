@@ -30,6 +30,14 @@ class TestScaffold(unittest.TestCase):
 
         manifest = json.loads((self.target / ".agent" / "manifest.json").read_text())
         self.assertIn("domains", manifest)
+        self.assertIn("project", manifest["domains"])
+        self.assertTrue((self.target / "src" / "project" / "__init__.py").is_file())
+        self.assertTrue((self.target / "docs" / "specs" / "project" / "spec.md").is_file())
+        self.assertTrue((self.target / "docs" / "guides" / "mcp-bridge.md").is_file())
+        self.assertTrue((self.target / "docs" / "guides" / "downstream.md").is_file())
+        self.assertTrue((self.target / ".gitignore").is_file())
+        reviews = (self.target / "docs" / "reviews" / "README.md").read_text(encoding="utf-8")
+        self.assertNotIn("2026-08-25-pass1", reviews)
 
         readme = self.target / ".agent" / "README.md"
         self.assertTrue(readme.exists())
@@ -64,6 +72,27 @@ class TestScaffold(unittest.TestCase):
         agents.write_text("custom")
         scaffold(self.target)
         self.assertEqual(agents.read_text(), "custom")
+
+    def test_empty_manifest_upgraded_to_first_domain(self) -> None:
+        (self.target / ".agent").mkdir(parents=True)
+        (self.target / ".agent" / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "name": "project",
+                    "version": "0.1.0",
+                    "package_root": "src",
+                    "domains": {},
+                    "ignore": [],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        scaffold(self.target, name="k3dit")
+        data = json.loads((self.target / ".agent" / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["name"], "k3dit")
+        self.assertIn("k3dit", data["domains"])
+        self.assertTrue((self.target / "src" / "k3dit" / "__init__.py").is_file())
 
 
 if __name__ == "__main__":

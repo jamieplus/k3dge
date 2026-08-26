@@ -15,7 +15,11 @@ class TestCli(unittest.TestCase):
         self.assertIn("check", actions)
         self.assertIn("sync", actions)
         self.assertIn("milestone", actions)
-        self.assertNotIn("init", actions)
+        self.assertIn("init", actions)
+        self.assertIn("audit", actions)
+        task = parser._subparsers._group_actions[0].choices["task"]
+        action = next(a for a in task._actions if a.dest == "task_action")
+        self.assertIn("list", action.choices)
         check = parser._subparsers._group_actions[0].choices["check"]
         self.assertTrue(any(a.dest == "force_full" for a in check._actions))
 
@@ -94,6 +98,57 @@ class TestCli(unittest.TestCase):
             try:
                 os.chdir(repo)
                 self.assertEqual(main(["milestone", "status", "M1"]), 1)
+            finally:
+                os.chdir(old)
+
+    def test_task_list_json(self):
+        import os
+        import contextlib
+        import io
+
+        with tempfile.TemporaryDirectory() as d:
+            repo = Path(d) / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
+            (repo / ".agent").mkdir()
+            (repo / ".agent" / "manifest.json").write_text(
+                json.dumps({"package_root": "src", "domains": {}})
+            )
+            (repo / "docs" / "tasks").mkdir(parents=True)
+            (repo / "docs" / "tasks" / "2026-08-25-fix-foo.md").write_text(
+                "# Do foo\n\n- **Status**: idea\n- **Milestone**: M2\n- **Priority**: P1\n",
+                encoding="utf-8",
+            )
+            old = Path.cwd()
+            try:
+                os.chdir(repo)
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    code = main(["task", "list", "--json"])
+                self.assertEqual(code, 0)
+                data = json.loads(buf.getvalue())
+                self.assertTrue(data["ok"])
+                self.assertEqual(data["count"], 1)
+                self.assertEqual(data["tasks"][0]["title"], "Do foo")
+                self.assertEqual(data["tasks"][0]["status"], "idea")
+                self.assertEqual(data["tasks"][0]["milestone"], "M2")
+                self.assertEqual(data["tasks"][0]["priority"], "P1")
+            finally:
+                os.chdir(old)
+
+    def test_init_creates_harness(self):
+        import os
+
+        with tempfile.TemporaryDirectory() as d:
+            target = Path(d) / "proj"
+            old = Path.cwd()
+            try:
+                os.chdir(Path(d))
+                code = main(["init", str(target), "--name", "demo"])
+                self.assertEqual(code, 0)
+                self.assertTrue((target / ".agent" / "manifest.json").exists())
+                self.assertTrue((target / "docs" / "specs" / "demo" / "spec.md").exists())
+                self.assertTrue((target / "src" / "demo" / "__init__.py").exists())
             finally:
                 os.chdir(old)
 

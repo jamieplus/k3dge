@@ -6,7 +6,8 @@
 2. **暂无法落地**：方向明确但条件不具备（依赖/技术/时机）
 3. **弱相关闪念**：与本系统关系不大，纯存档
 
-不排期、不进门禁；成熟后晋升进 `docs/tasks/`（或已存在的 guide/PROTOCOL），原条目移入 `docs/memo/archive/`（扫描只看顶层）。晋升目标被删则同轮把 memo 搬回顶层（ADR 0016）。
+不排期、不进门禁；成熟后晋升进 `docs/tasks/`（Priority 在彼时赋值），**原条目移入
+`docs/memo/archive/`**——扫描只覆盖 `docs/memo/*.md` 顶层，archive 不再被关注。
 
 ## 触发（满足任一即记）
 
@@ -23,4 +24,9 @@
 - **念头**：...
 - **触发场景**：在聊什么时冒出的
 - **Date**: YYYY-MM-DD
+
 ```
+
+## 晋升
+
+成熟后：内容并入 `docs/tasks/<slug>.md`（或已存在的 guide/PROTOCOL），原文件 `mv` 至 `docs/memo/archive/`。扫描约定：只读 `memo/*.md` 顶层，不进 `archive/`。晋升目标必须已经在磁盘上；目标被删则同轮把 memo 搬回顶层（ADR 0016）。

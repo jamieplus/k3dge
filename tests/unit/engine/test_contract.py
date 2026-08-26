@@ -101,6 +101,39 @@ class TestContract(unittest.TestCase):
             self.assertNotIn("return x", iface)
             self.assertNotIn("skipped", iface)
 
+    def test_rename_preserves_hash(self):
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d)
+            (src / "foo.py").write_text("def foo() -> None:\n    pass\n", encoding="utf-8")
+            h1 = contract.compute_hash(contract.collect_domain_interface(src))
+            (src / "foo.py").rename(src / "bar.py")
+            h2 = contract.compute_hash(contract.collect_domain_interface(src))
+            self.assertEqual(h1, h2)
+
+    def test_symlink_outside_domain_not_hashed(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            src = root / "src"
+            src.mkdir()
+            (src / "ok.py").write_text("def foo() -> int:\n    return 1\n", encoding="utf-8")
+            outside = root / "outside.py"
+            outside.write_text("def leaked() -> int:\n    return 1\n", encoding="utf-8")
+            try:
+                (src / "evil.py").symlink_to(outside)
+            except OSError:
+                self.skipTest("symlinks not supported")
+            ext = root / "ext"
+            ext.mkdir()
+            (ext / "leaked2.py").write_text("def leaked2() -> None:\n    pass\n", encoding="utf-8")
+            try:
+                (src / "subdir").symlink_to(ext)
+            except OSError:
+                self.skipTest("symlinks not supported")
+            iface = contract.collect_domain_interface(src)
+            self.assertIn("foo", iface)
+            self.assertNotIn("leaked", iface)
+            self.assertNotIn("leaked2", iface)
+
     def test_verify_contract_missing_hash(self):
         with tempfile.TemporaryDirectory() as d:
             src = Path(d)

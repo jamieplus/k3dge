@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import stat
 from importlib import resources
 from pathlib import Path
@@ -46,6 +47,16 @@ ARCHITECTURE_TEMPLATE = _asset("architecture.md.template")
 
 REVIEWS_README_TEMPLATE = _asset("reviews-readme.md")
 
+MCP_BRIDGE_TEMPLATE = _asset("mcp-bridge.md.template")
+
+GITIGNORE_TEMPLATE = _asset("gitignore.template")
+
+REVIEWS_SUMMARY_TEMPLATE = _asset("reviews-summary.md.template")
+
+ADR_README_TEMPLATE = _asset("adr-readme.md.template")
+
+DOWNSTREAM_GUIDE_TEMPLATE = _asset("downstream.md")
+
 TASKS_README_TEMPLATE = _asset("tasks-readme.md")
 
 BRANCHES_README_TEMPLATE = _asset("branches-readme.md")
@@ -59,13 +70,31 @@ RULE_ASSETS = (
     "03-self-contained.md",
 )
 
-DEFAULT_MANIFEST = {
-    "name": "project",
-    "version": "0.1.0",
-    "package_root": "src",
-    "domains": {},
-    "ignore": [],
-}
+def _slug(raw: str) -> str:
+    s = re.sub(r"[^A-Za-z0-9_]+", "_", raw.strip()).strip("_").lower()
+    if not s:
+        s = "app"
+    if s[0].isdigit():
+        s = "p_" + s
+    return s
+
+
+def _first_domain_manifest(name: str) -> dict:
+    return {
+        "name": name,
+        "version": "0.1.0",
+        "package_root": "src",
+        "domains": {
+            name: {
+                "src": f"src/{name}",
+                "spec": f"docs/specs/{name}/spec.md",
+                "tests": f"tests/unit/{name}",
+                "description": name,
+            }
+        },
+        "ignore": [],
+    }
+
 
 def _write_if_missing(path: Path, content: str, executable: bool = False) -> bool:
     if path.exists():
@@ -77,23 +106,47 @@ def _write_if_missing(path: Path, content: str, executable: bool = False) -> boo
     return True
 
 
-def scaffold(target: Path) -> None:
+def _ensure_first_domain(target: Path, name: str, today: str) -> None:
+    """Write or upgrade an empty manifest so the gate has at least one domain."""
+    path = target / ".agent" / "manifest.json"
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            return
+        if isinstance(data, dict) and data.get("domains"):
+            return
+        data = _first_domain_manifest(name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    else:
+        _write_if_missing(path, json.dumps(_first_domain_manifest(name), indent=2) + "\n")
+    spec = SPEC_TEMPLATE.replace("<domain>", name)
+    spec = re.sub(r"(\*\*Last Updated\*\*:).*", rf"\1 {today}", spec)
+    _write_if_missing(target / "src" / name / "__init__.py", f'__version__ = "0.1.0"\n')
+    _write_if_missing(target / "docs" / "specs" / name / "spec.md", spec)
+    _write_if_missing(
+        target / "tests" / "unit" / name / "test_smoke.py",
+        'def test_smoke() -> None:\n    assert True\n',
+    )
+
+
+def scaffold(target: Path, name: str | None = None) -> None:
     import datetime
 
     target.mkdir(parents=True, exist_ok=True)
     today = datetime.date.today().isoformat()
+    slug = _slug(name or target.name)
 
     _write_if_missing(target / "AGENTS.md", AGENTS_TEMPLATE)
-    _write_if_missing(
-        target / ".agent" / "manifest.json",
-        json.dumps(DEFAULT_MANIFEST, indent=2) + "\n",
-    )
-    for name in RULE_ASSETS:
+    _ensure_first_domain(target, slug, today)
+    for rule_file in RULE_ASSETS:
         _write_if_missing(
-            target / ".agent" / "rules" / name,
-            _asset("rules", name),
+            target / ".agent" / "rules" / rule_file,
+            _asset("rules", rule_file),
         )
     _write_if_missing(target / ".agent" / "README.md", _asset("agent-readme.md"))
+    _write_if_missing(target / ".agent" / "milestone", "M0\n")
     _write_if_missing(
         target / "docs" / "specs" / "_template" / "spec.md",
         SPEC_TEMPLATE.format(domain="<domain>", date=today),
@@ -108,17 +161,20 @@ def scaffold(target: Path) -> None:
     _write_if_missing(target / "k3dge-init.ps1", K3DGE_INIT_PS1_WRAPPER)
 
     (target / "docs" / "adr").mkdir(parents=True, exist_ok=True)
+    _write_if_missing(target / "docs" / "adr" / "README.md", ADR_README_TEMPLATE)
     (target / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "tasks" / "README.md", TASKS_README_TEMPLATE)
     (target / "docs" / "guides").mkdir(parents=True, exist_ok=True)
+    _write_if_missing(target / "docs" / "guides" / "mcp-bridge.md", MCP_BRIDGE_TEMPLATE)
+    _write_if_missing(target / "docs" / "guides" / "downstream.md", DOWNSTREAM_GUIDE_TEMPLATE)
     (target / "docs" / "reference").mkdir(parents=True, exist_ok=True)
     (target / "docs" / "branches").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "branches" / "README.md", BRANCHES_README_TEMPLATE)
     (target / "logs").mkdir(parents=True, exist_ok=True)
-    (target / "docs" / "log").mkdir(parents=True, exist_ok=True)
-    _write_if_missing(target / "docs" / "log" / "README.md", "# Log — Harness 操作日志\n\n`k3dge check / sync` 的机器日志，append-only。\n")
     (target / "docs" / "reviews").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "reviews" / "README.md", REVIEWS_README_TEMPLATE)
+    _write_if_missing(target / "docs" / "reviews" / "SUMMARY.md", REVIEWS_SUMMARY_TEMPLATE)
+    _write_if_missing(target / ".gitignore", GITIGNORE_TEMPLATE)
     (target / "docs" / "memo").mkdir(parents=True, exist_ok=True)
     (target / "docs" / "memo" / "archive").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "memo" / "README.md", MEMO_README_TEMPLATE)
@@ -134,8 +190,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     parser = argparse.ArgumentParser(prog="k3dge.templates.scaffold")
     parser.add_argument("target", nargs="?", default=".", help="target project root")
+    parser.add_argument("--name", dest="name", default=None, help="project/domain slug (default: directory name)")
     args = parser.parse_args(argv)
-    scaffold(Path(args.target).resolve())
+    scaffold(Path(args.target).resolve(), name=args.name)
     return 0
 
 

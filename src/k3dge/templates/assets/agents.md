@@ -4,13 +4,16 @@ You are operating inside a strictly regulated codebase. The rules below are enfo
 mechanically by `k3dge check` at commit time, not just by this prompt. Follow them to
 avoid blocked commits.
 
-This design was settled stepwise with the user (see `docs/adr/`, especially 0001).
-Read those first and map the user's coarse intent onto them (ADR 0010). Do not make
-the user re-specify the architecture in fine grain, and do not invent a new protocol
-when an existing ADR already covers it. If it does not fit, ASK once.
-The point of k3dge is to keep later projects (this repo included) from drifting,
-hallucinating, and breaking the whole while fixing a part — the list is not exhaustive
-(ADR 0011). The gate plus this file stand in for that list.
+This design was settled stepwise with the user. Read **this repo's**
+`docs/architecture/overview.md` and `docs/adr/` first, and map the user's coarse
+intent onto them. If `docs/adr/` is empty, overview is the only settled map until
+the first project ADR. Do not make the user re-specify the architecture in fine
+grain, and do not invent a new protocol when an existing ADR **in this repo**
+already covers it. If it does not fit, ASK once.
+The harness's own ADR record lives in the k3dge checkout, not in every downstream
+repo. The point of this file is to keep the project from drifting, hallucinating,
+and breaking the whole while fixing a part. The gate plus this file stand in for
+that list.
 
 This file is the **only agent discovery surface** (harnesses auto-load it).
 It says **how** to work. `.agent/` says **where** (domain routing) and holds
@@ -40,7 +43,7 @@ or an intention is not a consumer.
 - Body-only or cosmetic changes do not alter the contract and need no spec update.
 
 ## 3. Atomic Task Lifecycle
-1. Read `.agent/manifest.json` (known path, not a directory to browse), the targeted `spec.md`, and scan `docs/tasks/` + `docs/branches/` for relevant context. Do not re-read `.agent/rules/00|01|03` as a competing source. When the work is simplification / dead-code / 拆冗余, read `.agent/rules/02-simplification.md` before deleting.
+1. Read `.agent/manifest.json` (known path, not a directory to browse), the targeted `spec.md`, and `k3dge task list --json` (only `read` matching files). Scan `docs/branches/` for relevant retries. Do not re-read `.agent/rules/00|01|03` as a competing source. When the work is simplification / dead-code / 拆冗余, read `.agent/rules/02-simplification.md` before deleting.
 2. Formulate a step-by-step diff plan; state the impact surface (who consumes your outputs, whose outputs you consume).
 3. Implement code; if public interfaces changed, run `k3dge sync`.
 4. Run `k3dge check` (and unit tests) to self-verify before committing.
@@ -52,8 +55,12 @@ or an intention is not a consumer.
 - NEVER use `git checkout .` — it silently destroys valid work including spec edits.
 
 ## 5. Task Intake Discipline (Agent 自忘防护)
-- User says "先记下来 / 放 tasks" → immediately write `docs/tasks/YYYY-MM-DD-<slug>.md` with **已确认意图 as title** (Status: idea), plus a self-contained retrievable summary, context, and entry point. Do not rely on chat memory.
-- At task start and when user later recalls with fuzzy description ("之前那个...") → scan `docs/tasks/` (read all files) and fuzzy-match, do not hallucinate.
+- User says "先记下来 / 放 tasks" → immediately write `docs/tasks/YYYY-MM-DD-<type>-<slug>.md` (`type` ∈ {audit, feat, fix, docs, chore, refactor}，`slug` 内用 `_` 分隔) with **已确认意图 as title** (Status: idea, Milestone: <current>), plus a self-contained retrievable summary, context, and entry point. Do not rely on chat memory.
+- 文件名仅区分终态：`Status: done` 时后缀 `.done.md`（如 `2026-08-24-audit-foo_bar.done.md`），非 `done` 不加后缀；`audit` 类型的 `done` 指 auditor 验证改动无误后才算终态（可 archive），非仅实现完成。
+- 里程碑编码（可选）：有 `Milestone: M1` 时文件名中加入 `M1`（如 `2026-08-24-M1-audit-foo_bar.md` 或 `2026-08-24-M1-audit-foo_bar.done.md`）。筛该里程碑用 `k3dge task list --json --milestone M1`，不要 `ls *M1*`。
+- 无 `Milestone` 的特殊任务不计入任何 `Milestone` 的 `align/seal` 计数，需人工清，需 `grep -l "Milestone:"` 兜底时亦跳过此类。
+- 快筛优先：`k3dge task list --json`（可选 `--milestone` / `--status`）。只返回 path/title/status/milestone/priority，不含正文。对命中文件再 `read`，禁止为召回把 `docs/tasks/*.md` 逐份读进上下文。归档目录不在扫描面。
+- At task start and when user later recalls with fuzzy description ("之前那个...") → 先 `k3dge task list --json`，再对命中文件 `read` 并 fuzzy-match, do not hallucinate.
 
 ## 6. Memo Discipline (灵光收件箱)
 - Memo collects three kinds of not-yet-actionable thoughts: fuzzy concepts (in-scope but no concrete plan yet), not-yet-landable ideas (blocked by dependency/tech/timing), and flashes weakly related to this system.
@@ -106,6 +113,7 @@ or an intention is not a consumer.
 | 用户说「先记下来 / 放 tasks」 | §5（仍要口令，因为尚未发生「任务完成」） |
 | 用户说「memo一下」 | §6（仍要口令或你提议后确认） |
 | 用户说「帮我配 MCP」或「接入 DSH/Codex/Claude Code/OpenCode」 | **只**走 `docs/guides/mcp-bridge.md` 的固定剧本，禁止自创 JSON/路径 |
+| k3dge 源更新了 / 下游要升 harness | 读 `docs/guides/downstream.md`：判定核用 `pip install -e "${K3DGE_SOURCE}[mcp]"`；**不要**用再跑 init 覆盖已有 `AGENTS.md` |
 | 用户要求简化 / 删死代码 / 拆冗余，或里程碑 C2 勾了深层嵌套 | 按 `.agent/rules/02-simplification.md` 举证后再动；不是门禁 |
 | 即将断言本仓事实（路径用途、谁消费、还能触发、没有设计问题） | §13：三条链齐了再说；缺链写「未核」或问，不许装成已核 |
 | 搬走或删除仍被点名为事实源/扫描入口的文件 | 同轮改所有指针；若是 memo 晋升目标且目标已不在，把 memo 搬回 `docs/memo/` 顶层（ADR 0016） |

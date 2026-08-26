@@ -118,10 +118,14 @@ def k3dge_verify_domain_contract(domain: str, workspace_path: Optional[str] = No
 
     spec_content = spec_path.read_text(encoding="utf-8")
     try:
-        ok, expected_hash, actual_hash = contract.verify_contract(src_dir, spec_content, manifest, ws)
         current_iface = contract.collect_domain_interface(src_dir, manifest, ws)
     except _ExtractError as exc:
         return _err("ContractExtractFailed", str(exc))
+    actual_hash = contract.compute_hash(current_iface)
+    from k3dge.engine import spec_schema
+
+    expected_hash = spec_schema.extract_contract_hash(spec_content)
+    ok = expected_hash is not None and expected_hash == actual_hash
 
     return json.dumps(
         {
@@ -130,7 +134,121 @@ def k3dge_verify_domain_contract(domain: str, workspace_path: Optional[str] = No
             "expected_hash": expected_hash,
             "actual_hash": actual_hash,
             "current_interface": current_iface,
-            "remediation": "Run 'k3dge sync' if public interface deliberately changed." if not ok else None,
+            "remediation": "Run k3dge_sync (or CLI 'k3dge sync') if public interface deliberately changed." if not ok else None,
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
+@mcp.tool()
+def k3dge_sync(
+    domains: Optional[list[str]] = None,
+    workspace_path: Optional[str] = None,
+) -> str:
+    """Regenerate spec interface blocks and contract hashes. Same as CLI k3dge sync."""
+    from k3dge.sync.generator import sync_all
+
+    ws = _find_workspace(workspace_path=workspace_path)
+    if isinstance(domains, str):
+        domains = [domains]
+    changed, docs_updated = sync_all(ws, domains=domains)
+    return json.dumps(
+        {
+            "ok": True,
+            "changed": list(changed),
+            "docs_updated": bool(docs_updated),
+            "up_to_date": not changed and not docs_updated,
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
+@mcp.tool()
+def k3dge_version(
+    action: str = "show",
+    part: str = "patch",
+    set_version: Optional[str] = None,
+    message: Optional[str] = None,
+    workspace_path: Optional[str] = None,
+) -> str:
+    """Show or bump project version (same as CLI k3dge version)."""
+    from k3dge.engine.version import append_changelog, bump_version, get_version
+
+    ws = _find_workspace(workspace_path=workspace_path)
+    act = action.lower().strip()
+    if act == "show":
+        v = get_version(ws)
+        return json.dumps({"ok": True, "version": v}, indent=2, ensure_ascii=False)
+    if act == "bump":
+        try:
+            new_v = bump_version(ws, part=part, set_version=set_version)
+        except Exception as exc:
+            return _err("VersionBumpFailed", str(exc))
+        notes = message or f"Bump version to {new_v}."
+        try:
+            append_changelog(ws, new_v, notes=notes)
+        except Exception as exc:
+            return json.dumps(
+                {"ok": True, "version": new_v, "changelog_failed": str(exc)},
+                indent=2,
+                ensure_ascii=False,
+            )
+        return json.dumps({"ok": True, "version": new_v}, indent=2, ensure_ascii=False)
+    return _err("InvalidAction", f"Invalid action '{action}'. Choose from: show, bump.")
+
+
+@mcp.tool()
+def k3dge_task_create(
+    title: str,
+    typ: str = "fix",
+    slug: Optional[str] = None,
+    milestone_id: Optional[str] = None,
+    priority: str = "P2",
+    workspace_path: Optional[str] = None,
+) -> str:
+    """Create a living docs/tasks/ file. Same as CLI k3dge task create."""
+    ws = _find_workspace(workspace_path=workspace_path)
+    ok, msg, path = milestone.create_task(
+        ws, title, typ=typ, slug=slug, milestone=milestone_id, priority=priority
+    )
+    rel = str(path.relative_to(ws)).replace("\\", "/") if path else None
+    return json.dumps({"ok": ok, "message": msg, "path": rel}, indent=2, ensure_ascii=False)
+
+
+@mcp.tool()
+def k3dge_task_done(path: str, workspace_path: Optional[str] = None) -> str:
+    """Mark one task done. Prefer the path from k3dge_task_list."""
+    ws = _find_workspace(workspace_path=workspace_path)
+    ok, msg, done_path = milestone.mark_task_done(ws, path)
+    rel = str(done_path.relative_to(ws)).replace("\\", "/") if done_path else None
+    return json.dumps({"ok": ok, "message": msg, "path": rel}, indent=2, ensure_ascii=False)
+
+
+@mcp.tool()
+def k3dge_task_list(
+    milestone_id: Optional[str] = None,
+    status: Optional[str] = None,
+    workspace_path: Optional[str] = None,
+) -> str:
+    """Index living docs/tasks/*.md (not archive). Returns title/status/milestone/priority, not bodies."""
+    ws = _find_workspace(workspace_path=workspace_path)
+    rows = milestone.list_tasks(ws, milestone_id=milestone_id, status=status)
+    return json.dumps(
+        {
+            "ok": True,
+            "count": len(rows),
+            "tasks": [
+                {
+                    "path": str(t.path.relative_to(ws)).replace("\\", "/"),
+                    "title": t.title,
+                    "status": t.status,
+                    "milestone": t.milestone,
+                    "priority": t.priority,
+                }
+                for t in rows
+            ],
         },
         indent=2,
         ensure_ascii=False,
@@ -177,15 +295,45 @@ def k3dge_milestone_control(
 
     if act == "seal":
         ok, msg = milestone.seal_milestone(ws, milestone_id)
-        return json.dumps(
-            {
-                "milestone_id": milestone_id,
-                "sealed": ok,
-                "message": msg,
-            },
-            indent=2,
-            ensure_ascii=False,
-        )
+        if not ok:
+            return json.dumps(
+                {
+                    "milestone_id": milestone_id,
+                    "sealed": False,
+                    "message": msg,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        # Auto-bump patch version to keep CLI and MCP seal semantics identical (U-04); bump failure does not rollback seal (see ADR 0017)
+        try:
+            from k3dge.engine.version import append_changelog, bump_version, get_version
+
+            prev = get_version(ws)
+            new_v = bump_version(ws, part="patch")
+            append_changelog(ws, new_v, notes=f"Seal milestone {milestone_id}.")
+            return json.dumps(
+                {
+                    "milestone_id": milestone_id,
+                    "sealed": True,
+                    "message": msg,
+                    "version": new_v,
+                    "previous_version": prev,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        except Exception as exc:
+            return json.dumps(
+                {
+                    "milestone_id": milestone_id,
+                    "sealed": True,
+                    "message": msg,
+                    "version_bump_failed": str(exc),
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
 
     return _err("InvalidAction", f"Invalid action '{action}'. Choose from: status, align, seal.")
 
@@ -194,8 +342,9 @@ def k3dge_milestone_control(
 def k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str) -> str:
     """Pointer to the independent audit harness. Lenses do not live in k3dge."""
     return (
-        "Audit protocol is NOT part of k3dge. Read sibling k3dit docs/guides/protocol.md "
-        f"and execute only Pass {pass_number}. Scope: {target_scope}.\n\n"
+        "Audit protocol is NOT part of k3dge. Read ../k3dit/docs/guides/protocol.md; "
+        "if missing, docs/memo/archive/2026-08-24-audit-harness-independence.md. "
+        f"Execute only Pass {pass_number}. Scope: {target_scope}.\n\n"
         f"```\n{context_snippet}\n```\n"
     )
 

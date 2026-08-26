@@ -44,15 +44,36 @@ if [ "$K3DGE_HOME" -ef "$TARGET" ]; then
   echo "[k3dge] pip install -e '.[dev]' (self)"
   .venv/bin/pip install -q -e ".[dev]"
 else
-  echo "[k3dge] pip install -e $K3DGE_HOME + pre-commit pytest"
-  .venv/bin/pip install -q -e "$K3DGE_HOME" pre-commit pytest
+  INSTALL_FLAGS=""
+  if [ -z "${K3DGE_SOURCE:-}" ] || [ "${K3DGE_SOURCE:-}" = "pypi" ]; then
+    INSTALL_TARGET="k3dge[mcp]"
+    echo "[k3dge] Installing from package index (PyPI)..."
+  elif [ -d "${K3DGE_SOURCE:-}" ]; then
+    INSTALL_TARGET="${K3DGE_SOURCE}[mcp]"
+    INSTALL_FLAGS="-e"
+    echo "[k3dge] Installing editable from local path: $K3DGE_SOURCE"
+  else
+    INSTALL_TARGET="${K3DGE_SOURCE}[mcp]"
+    echo "[k3dge] Installing from source/package: $K3DGE_SOURCE"
+  fi
+  # Fallback: downstream via /path/to/k3dge/k3dge-init.sh without K3DGE_SOURCE
+  if [ -z "${K3DGE_SOURCE:-}" ] && [ -n "${K3DGE_HOME:-}" ] && [ -d "$K3DGE_HOME/src/k3dge" ]; then
+    INSTALL_TARGET="${K3DGE_HOME}[mcp]"
+    INSTALL_FLAGS="-e"
+    echo "[k3dge] Installing editable from K3DGE_HOME: $K3DGE_HOME"
+  fi
+  .venv/bin/pip install -q ${INSTALL_FLAGS} "$INSTALL_TARGET" pre-commit pytest
 fi
 
 echo "[k3dge] generating harness scaffolding in $TARGET ..."
 .venv/bin/python -m k3dge.templates.scaffold "$TARGET"
 
+echo "[k3dge] k3dge sync"
+.venv/bin/k3dge sync
+
 echo "[k3dge] pre-commit install"
 .venv/bin/pre-commit install
+.venv/bin/pre-commit install --hook-type commit-msg
 
 echo ""
 echo "[k3dge] Initialization complete for $TARGET"
