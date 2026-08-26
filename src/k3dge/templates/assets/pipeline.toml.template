@@ -5,7 +5,7 @@
 enabled = true
 scope = "audit"
 provider = "mcp"
-mcp_tool = "k3dit_5pass_audit"
+mcp_tool = "k3dit_run_audit"
 timeout_seconds = 60
 on_failure = "fallback_to_cli"  # fallback_to_cli | skip
 cli_command = "python -m k3dit check-report"
