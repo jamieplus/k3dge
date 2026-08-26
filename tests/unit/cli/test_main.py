@@ -16,7 +16,7 @@ class TestCli(unittest.TestCase):
         self.assertIn("sync", actions)
         self.assertIn("milestone", actions)
         self.assertIn("init", actions)
-        self.assertIn("audit", actions)
+        self.assertNotIn("audit", actions)
         task = parser._subparsers._group_actions[0].choices["task"]
         action = next(a for a in task._actions if a.dest == "task_action")
         self.assertIn("list", action.choices)

@@ -356,11 +356,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_doc.add_argument("doc_action", choices=["sync"], help="doc action")
     p_doc.set_defaults(func=lambda args: cmd_doc(args))
 
-    p_audit = sub.add_parser("audit", help="audit triage")
-    p_audit.add_argument("audit_action", choices=["triage"], help="audit action")
-    p_audit.add_argument("--review", dest="review", default=None, help="review file path (default latest)")
-    p_audit.set_defaults(func=lambda args: cmd_audit(args))
-
     p_init = sub.add_parser("init", help="initialize k3dge harness in target directory")
     p_init.add_argument("target", nargs="?", default=".", help="target directory (default: current working dir)")
     p_init.add_argument("--name", dest="name", default=None, help="initial domain name (default: directory name)")
