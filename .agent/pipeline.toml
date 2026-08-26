@@ -1,0 +1,29 @@
+# k3dge harness pipeline — declarative hook chain + fallback
+# Peers are equal (ADR 0008), not plugins. k3dge only gates; lenses live in peers.
+
+[harnesses.k3dit]
+enabled = true
+scope = "audit"
+provider = "mcp"
+mcp_tool = "k3dit_5pass_audit"
+timeout_seconds = 60
+on_failure = "fallback_to_cli"  # fallback_to_cli | skip
+cli_command = "python -m k3dit check-report"
+manual_protocol = "docs/memo/2026-08-24-audit-harness-independence.md"
+log_level = "warn"
+
+[harnesses.k3che]
+enabled = true
+scope = "cache"
+provider = "mcp"
+mcp_tool = "k3che_search"
+timeout_seconds = 10
+on_failure = "skip"
+log_level = "info"
+
+[hooks]
+# on_align_success executes in order; each harness decides to skip or fallback per on_failure
+on_align_success = [
+  { harness = "k3che", action = "inject_summary" },
+  { harness = "k3dit", action = "run_audit", required = false },
+]

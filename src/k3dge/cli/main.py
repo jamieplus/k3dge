@@ -241,6 +241,37 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mcp(args: argparse.Namespace) -> int:
+    from k3dge.templates.scaffold import _ensure_mcp_config
+
+    workspace = _find_workspace(Path.cwd())
+    if args.mcp_action == "sync":
+        # Merge pipeline-enabled harnesses into .mcp.json (idempotent)
+        _ensure_mcp_config(workspace)
+        # Also merge peers from pipeline.toml if present
+        try:
+            from pathlib import Path as _P
+
+            import tomllib
+
+            cfg_path = workspace / ".agent" / "pipeline.toml"
+            if cfg_path.is_file():
+                cfg = tomllib.loads(cfg_path.read_text(encoding="utf-8"))
+                for hid, hcfg in cfg.get("harnesses", {}).items():
+                    if hid == "k3dge":
+                        continue
+                    if not hcfg.get("enabled", True):
+                        continue
+                    # For now, peers are expected to be siblings with `python -m <harness>.cli.mcp` or similar
+                    # We just ensure k3dge is present; peer-specific mcp entries are out of scope for minimal sync
+                    pass
+        except Exception:
+            pass
+        print(f"[MCP] synced {workspace / '.mcp.json'}")
+        return 0
+    return 1
+
+
 def cmd_milestone(args: argparse.Namespace) -> int:
     from k3dge.engine.milestone import run_milestone_alignment, seal_milestone, scan_milestone_tasks
 
@@ -279,7 +310,13 @@ def cmd_milestone(args: argparse.Namespace) -> int:
             from k3dge.engine.version import append_changelog, bump_version
 
             new_v = bump_version(workspace, part="patch")
-            notes = f"Seal milestone {m_id}."
+            archive_dir = workspace / "docs" / "tasks" / "archive" / m_id
+            if archive_dir.is_dir():
+                tasks = sorted(archive_dir.glob("*.md"))
+                task_list = "\n".join(f"- {p.stem}" for p in tasks)
+                notes = f"Seal milestone {m_id}.\n\n{task_list}" if task_list else f"Seal milestone {m_id}."
+            else:
+                notes = f"Seal milestone {m_id}."
             append_changelog(workspace, new_v, notes=notes)
             print(f"[VERSION] auto-bumped to {new_v} and updated CHANGELOG.md")
             _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] version auto-bump -> {new_v} milestone={m_id}")
@@ -360,6 +397,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_init.add_argument("target", nargs="?", default=".", help="target directory (default: current working dir)")
     p_init.add_argument("--name", dest="name", default=None, help="initial domain name (default: directory name)")
     p_init.set_defaults(func=cmd_init)
+
+    p_mcp = sub.add_parser("mcp", help="MCP config")
+    p_mcp.add_argument("mcp_action", choices=["sync"], help="mcp action")
+    p_mcp.set_defaults(func=cmd_mcp)
 
     return parser
 

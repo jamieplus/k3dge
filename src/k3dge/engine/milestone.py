@@ -340,7 +340,14 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
             + ", ".join(unfilled)
         )
 
-    return True, f"Milestone '{milestone_id}' aligned successfully. Review template: {review_file.relative_to(workspace)}.{note}", tasks
+    msg = (
+        f"[ALIGN] Full Matrix verification PASS for milestone '{milestone_id}'.\n"
+        f"  Created review scaffold: docs/reviews/{today}-{milestone_id}-align.md\n"
+        f"HUMAN_CHECKPOINT: Milestone {milestone_id} 全绿，是否执行 5-Pass 专项审计？(y/N, 60s 超时默认 N)"
+    )
+    if note:
+        msg += note
+    return True, msg, tasks
 
 
 def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:

@@ -282,16 +282,21 @@ def k3dge_milestone_control(
 
     if act == "align":
         ok, msg, tasks = milestone.run_milestone_alignment(ws, milestone_id)
-        return json.dumps(
-            {
-                "milestone_id": milestone_id,
-                "aligned": ok,
-                "message": msg,
-                "task_count": len(tasks),
-            },
-            indent=2,
-            ensure_ascii=False,
-        )
+        payload = {
+            "milestone_id": milestone_id,
+            "aligned": ok,
+            "message": msg,
+            "task_count": len(tasks),
+        }
+        if ok:
+            payload["checkpoint"] = {
+                "type": "HUMAN_CHECKPOINT",
+                "question": f"Milestone {milestone_id} 全绿，是否执行 5-Pass 专项审计？",
+                "options": ["y", "N"],
+                "default": "N",
+                "timeout_seconds": 60,
+            }
+        return json.dumps(payload, indent=2, ensure_ascii=False)
 
     if act == "seal":
         ok, msg = milestone.seal_milestone(ws, milestone_id)

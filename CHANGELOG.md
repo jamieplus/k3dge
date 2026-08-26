@@ -13,11 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.2] - 2026-08-25
 
-- Seal milestone M1.
+- Seal milestone M1 (14 tasks):
+  - P1-01/02/03/04/05/07/08 空 ignore/UTF-8/Windows/NUL/rglob/changelog/SemVer
+  - P2-DAG-01 engine→templates 逆 DAG, D-04 文件名哈希污染, P2-PUR-06 audit triage, P4-01/02/03 矩阵, P5-01 MCP 双 collect
 
 ## [0.1.1] - 2026-08-24
 
-- Seal milestone M0.
+- Seal milestone M0 (19 tasks): 本地安装、契约/MCP/封板闸、`.agent` 协议、version、脚手架 PAIRS 等
 
 ## [0.1.0] - 2026-08-23
 

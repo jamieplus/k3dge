@@ -12,6 +12,7 @@ cmd_version(args: argparse.Namespace) -> int
 cmd_doc(args: argparse.Namespace) -> int
 cmd_task(args: argparse.Namespace) -> int
 cmd_init(args: argparse.Namespace) -> int
+cmd_mcp(args: argparse.Namespace) -> int
 cmd_milestone(args: argparse.Namespace) -> int
 build_parser() -> argparse.ArgumentParser
 main(argv: Optional[Sequence[str]]=None) -> int

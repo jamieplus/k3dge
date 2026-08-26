@@ -105,8 +105,10 @@ or an intention is not a consumer.
 | 用户给出持久设计选择/澄清（哪怕随口） | 下一号 `docs/adr/NNNN-*.md`，并在 overview §5 加一行 |
 | 跨域不变量变化 | `docs/architecture/overview.md` |
 | 本任务做完 | 对应 `docs/tasks/*` 的 **Status: done** |
-| 某 `Milestone` 下顶层 tasks 全部 `done` | 立刻 `k3dge milestone align <id>` |
-| align 已成功且本轮能填验收 | 去掉 `align-stub`、保留 `align-pass`、更新 `docs/reviews/SUMMARY.md`；无 `guide-stub` 则立刻 `k3dge milestone seal <id>`；有 stub 则先填再 seal |
+| 某 `Milestone` 下顶层 tasks 全部 `done` | 立刻 `k3dge milestone align <id>`；成功后必须停下并 `HUMAN_CHECKPOINT: Milestone <id> 全绿，是否执行 5-Pass 专项审计？(y/N, 60s 超时默认 N)` |
+| 检查点分支 A（用户 `y`） | 立即创建 `docs/tasks/YYYY-MM-DD-<id>-audit-5pass.md`（`Status: in-progress`），跑 5 轮透镜，修完标 `done` 后再 `seal` |
+| 检查点分支 B（用户 `N` 或 60s 超时） | 去掉 `align-stub`、保留 `align-pass`、更新 `SUMMARY.md`，直接 `k3dge milestone seal <id>` |
+| `align` 成功后钩子链 | 读 `.agent/pipeline.toml` 的 `hooks.on_align_success` 按序调对等 `harnesses`（`k3che`/`k3dit` 等），`mcp→cli→manual` 三级降级，`skip` 亦 `logs/k3dge.log` 记 `HARNESS_SKIP` |
 | 改到的功能，其 guide 仍含 `<!-- k3dge:guide-stub -->` | 本轮填掉该 guide |
 | `k3dge check` 连续红两次还要再试 | 先写 `docs/branches/` 再 stash |
 | 做了审计 | `docs/reviews/` + SUMMARY |

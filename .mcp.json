@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "k3dge": {
+      "command": "python",
+      "args": [
+        "-m",
+        "k3dge.cli.mcp"
+      ],
+      "env": {
+        "PYTHONPATH": "src"
+      }
+    }
+  }
+}

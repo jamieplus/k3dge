@@ -37,6 +37,8 @@ INIT_PS1_TEMPLATE = _asset("init.ps1")
 
 DOCS_TOML_TEMPLATE = _asset("docs.toml.template")
 
+PIPELINE_TOML_TEMPLATE = _asset("pipeline.toml.template")
+
 GENERATE_DOCS_SH_TEMPLATE = _asset("generate-docs.sh")
 
 GENERATE_DOCS_PS1_TEMPLATE = _asset("generate-docs.ps1")
@@ -104,6 +106,36 @@ def _write_if_missing(path: Path, content: str, executable: bool = False) -> boo
     if executable:
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     return True
+
+
+def _ensure_mcp_config(target: Path) -> None:
+    """Idempotently merge k3dge (and pipeline-enabled peers) into .mcp.json."""
+    mcp_path = target / ".mcp.json"
+    # Load existing or start empty
+    data: dict = {}
+    if mcp_path.is_file():
+        try:
+            data = json.loads(mcp_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            data = {}
+    if "mcpServers" not in data or not isinstance(data["mcpServers"], dict):
+        data["mcpServers"] = {}
+    # k3dge is always present (framework)
+    if "k3dge" not in data["mcpServers"]:
+        # Heuristic: if target is inside a k3dge checkout (has src/k3dge), use PYTHONPATH mode
+        if (target / "src" / "k3dge").is_dir():
+            data["mcpServers"]["k3dge"] = {
+                "command": "python",
+                "args": ["-m", "k3dge.cli.mcp"],
+                "env": {"PYTHONPATH": "src"},
+            }
+        else:
+            data["mcpServers"]["k3dge"] = {
+                "command": "python",
+                "args": ["-m", "k3dge.cli.mcp"],
+            }
+        mcp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    # Peers from pipeline.toml are merged on demand via `k3dge mcp sync` (not scaffold time)
 
 
 def _ensure_first_domain(target: Path, name: str, today: str) -> None:
@@ -180,6 +212,8 @@ def scaffold(target: Path, name: str | None = None) -> None:
     _write_if_missing(target / "docs" / "memo" / "README.md", MEMO_README_TEMPLATE)
     _write_if_missing(target / "docs" / "architecture" / "overview.md", ARCHITECTURE_TEMPLATE)
     _write_if_missing(target / ".agent" / "docs.toml", DOCS_TOML_TEMPLATE)
+    _write_if_missing(target / ".agent" / "pipeline.toml", PIPELINE_TOML_TEMPLATE)
+    _ensure_mcp_config(target)
     _write_if_missing(target / "scripts" / "generate-docs.sh", GENERATE_DOCS_SH_TEMPLATE, executable=True)
     _write_if_missing(target / "scripts" / "generate-docs.ps1", GENERATE_DOCS_PS1_TEMPLATE)
 

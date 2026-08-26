@@ -33,6 +33,7 @@ PAIRS: list[tuple[str, str]] = [
     ("rules/02-simplification.md", ".agent/rules/02-simplification.md"),
     ("rules/03-self-contained.md", ".agent/rules/03-self-contained.md"),
     ("docs.toml.template", ".agent/docs.toml"),
+    ("pipeline.toml.template", ".agent/pipeline.toml"),
     ("spec.md.template", "docs/specs/_template/spec.md"),
     ("tasks-readme.md", "docs/tasks/README.md"),
     ("pre-commit.yaml.template", ".pre-commit-config.yaml"),

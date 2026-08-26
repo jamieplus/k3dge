@@ -23,6 +23,7 @@ class TestTemplateSync(unittest.TestCase):
             "spec.md.template",
             "pre-commit.yaml.template",
             "docs.toml.template",
+            "pipeline.toml.template",
             "architecture.md.template",
             "reviews-readme.md",
             "mcp-bridge.md.template",
