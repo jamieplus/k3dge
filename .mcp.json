@@ -9,6 +9,27 @@
       "env": {
         "PYTHONPATH": "src"
       }
+    },
+    "k3dit": {
+      "command": "python",
+      "args": [
+        "-m",
+        "k3dit.mcp"
+      ]
+    },
+    "k3che": {
+      "command": "python",
+      "args": [
+        "-m",
+        "k3che.mcp"
+      ]
+    },
+    "k3lity": {
+      "command": "python",
+      "args": [
+        "-m",
+        "k3lity.mcp"
+      ]
     }
   }
 }

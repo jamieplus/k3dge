@@ -1,6 +1,7 @@
 {
   "name": "k3dge",
-  "version": "0.1.2",
+  "version": "0.1.8",
+  "self_hosting": true,
   "package_root": "src/k3dge",
   "domains": {
     "engine": {
@@ -19,7 +20,7 @@
       "src": "src/k3dge/sync",
       "spec": "docs/specs/sync/spec.md",
       "tests": "tests/unit/sync",
-      "description": "spec 接口块与契约哈希回写；docs/reference 机器文档"
+      "description": "spec 接口块与契约哈希回写；docs/generated 机器文档"
     },
     "templates": {
       "src": "src/k3dge/templates",

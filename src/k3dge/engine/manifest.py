@@ -41,6 +41,9 @@ class Manifest:
     def __init__(self, data: Dict[str, Any]) -> None:
         self.data = data
         self.name: str = data.get("name", "project")
+        if "self_hosting" in data and not isinstance(data["self_hosting"], bool):
+            raise ManifestError("'self_hosting' must be a boolean")
+        self.self_hosting: bool = bool(data.get("self_hosting", False))
         package_root = data.get("package_root", "src")
         self.package_root: str = _require_relative_path("package_root", package_root)
         ignore = data.get("ignore", [])

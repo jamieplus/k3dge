@@ -6,13 +6,10 @@
 - **Date**: 2026-08-25
 
 ## 已确认意图
-`docs/specs/sync/spec.md` Verification Matrix 无 `Level` 列，与 `_template` 及 engine/cli/templates 不一致。`validate_structure` 不验列头，门禁不红。
+sync spec 矩阵缺 Level 列 — sync spec 矩阵缺 Level 列
 
-## 方案
-给现有 TC-SYNC 行补 `Level`（建议 L1）。哈希只锁接口块，改表头不必 sync，除非误改接口区。
+## 可检索摘要
+sync spec 矩阵缺 Level 列 位于 src/k3dge/**，需修复后经 `k3dge check --with-tests` 与 `k3dit` 审计验证。
 
-## 入口
-- `docs/specs/sync/spec.md` §4
-
-## 来源
-[docs/reviews/2026-08-25-pass4-consistency-alignment.md](../reviews/2026-08-25-pass4-consistency-alignment.md) P4-01
+## 上下文/切入点
+触发于 k3dit 5-Pass 审计，切入点 src/k3dge/**，关联任务 2026-08-25-M1-audit-P4_01_sync_Level.done.md

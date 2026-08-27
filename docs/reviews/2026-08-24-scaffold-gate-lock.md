@@ -2,7 +2,7 @@
 
 - **Date**: 2026-08-24
 - **基线**：`test_template_sync` 2 passed / 32 subtests；`k3dge check` 与 `k3dge check --with-tests` 均 PASS（touched: cli, engine, templates）
-- **审计人**：Agent（Grok）按 `docs/memo/2026-08-24-audit-harness-independence.md`。只审这次为「下游脚手架 vs 本体未对齐而 check 不红」做的修改，不重开 §5.1。
+- **审计人**：Agent（Grok）按 `docs/protocols/audit_default.md`。只审这次为「下游脚手架 vs 本体未对齐而 check 不红」做的修改，不重开 §5.1。
 - **改了什么（产物）**：
   - `tests/unit/templates/test_template_sync.py` `PAIRS` 增 `docs.toml` / `_template/spec.md` / `docs/tasks/README.md`
   - `scaffold.py` 不再创建 `docs/log/`（与 CLI 写 `logs/k3dge.log` 对齐）

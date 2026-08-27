@@ -66,6 +66,6 @@
 | Tool | `k3dge_task_create` | 写入 living task |
 | Tool | `k3dge_task_done` | 优先 list 返回的 path |
 | Tool | `k3dge_milestone_control` | status / align / seal |
-| Prompt | `k3dge_5pass_audit_prompt` | 只指路。透镜在本仓 `docs/guides/protocol.md`（若有），不在 k3dge 包内 |
+| Prompt | `k3dge_5pass_audit_prompt` | 优先 `../k3dit/docs/guides/protocol.md`，否则 `docs/protocols/audit_default.md` | 只指路；透镜在 k3dit 或本仓 `docs/protocols/audit_default.md`，不在 k3dge 包内 |
 
 公开签名变更后调 `k3dge_sync`（或 CLI `k3dge sync`）。

@@ -6,11 +6,10 @@
 - **Date**: 2026-08-24
 
 ## 已确认意图
-用户指出：号称给 Agent 用的 `.agent/`，Agent 却没能第一时间发现，说明目录没有按设计起作用。这是设计问题。
+`.agent/` 按实测改为机器配置，不再冒充 Agent 发现面 — `.agent/` 按实测改为机器配置，不再冒充 Agent 发现面
 
-## 方案（ADR 0014，修正 0013）
-发现面 = `AGENTS.md`。`.agent/` = 进程配置（manifest 仍不可省）。撤回「打开该目录即自说明」。
+## 可检索摘要
+`.agent/` 按实测改为机器配置，不再冒充 Agent 发现面 位于 src/k3dge/**，需修复后经 `k3dge check --with-tests` 与 `k3dit` 审计验证。
 
-## 入口
-- `docs/adr/0014-agent-dir-is-harness-config.md`
-- `.agent/README.md`、`AGENTS.md`
+## 上下文/切入点
+触发于 k3dit 5-Pass 审计，切入点 src/k3dge/**，关联任务 2026-08-24-fix-agent_dir_not_discovery_surface.done.md

@@ -64,4 +64,4 @@
 ## 自检
 
 - `k3dge check --force-full --with-tests` 本仓预检：`70 passed / 1 skipped / 44 subtests`（`pytest 5.5s`），`k3dge check --force-full` PASS，`k3dge sync` 幂等，未改公开签名无需重算
-- 本报告 9 列齐全；悬空发现已落到 task 文件或有意留理由，符合 `docs/memo/2026-08-24-audit-harness-independence.md` 唯一规程；未重提 `F-14/F-15/R3-1/R3-4` 主结论，仅增 P5-03 同类候选
+- 本报告 9 列齐全；悬空发现已落到 task 文件或有意留理由，符合 `docs/protocols/audit_default.md` 唯一规程；未重提 `F-14/F-15/R3-1/R3-4` 主结论，仅增 P5-03 同类候选

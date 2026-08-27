@@ -87,7 +87,11 @@ def sync_domain(
     new_hash = contract.compute_hash(interface)
     today = datetime.date.today().isoformat()
 
-    original = spec_path.read_text(encoding="utf-8")
+    try:
+        original = spec_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        # Spec is not valid UTF-8 — treat as missing and let next sync retry, don't crash
+        return None
     current_hash = spec_schema.extract_contract_hash(original)
     # 防抖：哈希未变则不触碰接口块与日期，避免无意义脏提交
     if current_hash == new_hash:
@@ -126,8 +130,8 @@ def render_readme_layout(workspace: Path, manifest: Manifest) -> Optional[Path]:
 def render_manual_docs(
     workspace: Path, manifest: Manifest, doc_cache: dict[str, str] | None = None
 ) -> List[Path]:
-    """Generate machine docs under docs/reference/ (no agent needed)."""
-    manual_dir = workspace / "docs" / "reference"
+    """Generate machine docs under docs/generated/ (no agent needed, Diátaxis Reference)."""
+    manual_dir = workspace / "docs" / "generated"
     manual_dir.mkdir(parents=True, exist_ok=True)
     written: List[Path] = []
 

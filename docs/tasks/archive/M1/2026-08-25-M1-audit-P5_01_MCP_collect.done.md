@@ -6,14 +6,10 @@
 - **Date**: 2026-08-25
 
 ## 已确认意图
-`k3dge_verify_domain_contract` 调 `verify_contract`（内部已 `collect_domain_interface`）再 `collect` 一次取展示接口。域小则毫秒级，但是重复。
+MCP verify 后再 collect，同一域解析两遍 — MCP verify 后再 collect，同一域解析两遍
 
-## 方案
-`verify_contract` 顺带返回 interface，或 MCP 只 collect 一次再本地哈希比对 spec。行为与现 JSON 字段兼容。补测调用次数。
+## 可检索摘要
+MCP verify 后再 collect，同一域解析两遍 位于 src/k3dge/**，需修复后经 `k3dge check --with-tests` 与 `k3dit` 审计验证。
 
-## 入口
-- `src/k3dge/cli/mcp.py` `k3dge_verify_domain_contract`
-- `src/k3dge/engine/contract.py` `verify_contract`（若改返回值须 sync）
-
-## 来源
-[docs/reviews/2026-08-25-pass5-simplicity-performance.md](../reviews/2026-08-25-pass5-simplicity-performance.md) P5-01
+## 上下文/切入点
+触发于 k3dit 5-Pass 审计，切入点 src/k3dge/**，关联任务 2026-08-25-M1-audit-P5_01_MCP_collect.done.md

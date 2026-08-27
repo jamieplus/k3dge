@@ -25,6 +25,11 @@ Agent 对本仓的代码审计/评审结果的**唯一存放地**。点时快照
 | 2026-08-25 | Pass 3 设计 | [2026-08-25-pass3-design-abstraction.md](2026-08-25-pass3-design-abstraction.md) | `D-04` 文件名哈希污染；其余抽象债有意留 | 12 | 1 转 tasks / 1 并入 / 10 有意留 |
 | 2026-08-25 | Pass 4 一致性 | [2026-08-25-pass4-consistency-alignment.md](2026-08-25-pass4-consistency-alignment.md) | 矩阵缺列/`VERSION_MISSING` 误引；P4-04 并入 D-04 | 9 | 3 转 tasks / 1 并入 / 4 有意留 / 1 通过 |
 | 2026-08-25 | Pass 5 简洁 | [2026-08-25-pass5-simplicity-performance.md](2026-08-25-pass5-simplicity-performance.md) | MCP 双取；其余规模阈值未到 | 8 | 1 转 tasks / 6 有意留 / 1 通过 |
+| 2026-08-26 | M2 对齐 | [2026-08-26-M2-align.md](2026-08-26-M2-align.md) | M2 3 项退化修复 Full Matrix PASS | 3 | 封板 |
+| 2026-08-26 | M3 对齐 | [2026-08-27-M3-align.md](2026-08-27-M3-align.md) | M3 13 项 Full Matrix PASS | 13 | 封板 |
+| 2026-08-27 | M4 对齐 | [2026-08-27-M4-align.md](2026-08-27-M4-align.md) | M4 2 项 Full Matrix PASS | 2 | 封板 |
+| 2026-08-27 | 5-Pass 全量 | [2026-08-27-5pass-full.md](2026-08-27-5pass-full.md) | P1-01 CHANGELOG 静默等 9 待修 + 2 有意留，4 项 M3 回归 | 12 | 8 转 M6 / 3 有意留 / 1 阻断 |
+| 2026-08-27 | k8d3e-a78 5-Pass 穿透 | [2026-08-27-k8d3e-a78-5pass.md](2026-08-27-k8d3e-a78-5pass.md) | 01-05 待修（AGENTS/07-audit/mcp-bridge/architecture/PAIRS）+ 06 有意留 | 6 | 5 已修 / 1 有意留 |
 
 > 新增报告时在此表与 `SUMMARY.md` 同步追加；Agent 先读 `SUMMARY.md` 定相关性，再按需读单篇。
 
@@ -54,5 +59,5 @@ Agent 对本仓的代码审计/评审结果的**唯一存放地**。点时快照
 - **处置三选一**：已修 / 转为 `docs/tasks/` 条目（链接回本文）/ 有意留（必须写否决理由）
 - 未修且未否决的发现不得只留在报告里——必须转 tasks，否则丢
 - 新一轮审计前先读本目录，避免重复报告同一问题或重提已被否决的项
-- **现行有意留的否决理由与失效条件**以 [`docs/architecture/overview.md`](../architecture/overview.md) §5.1 为唯一常驻表；`SUMMARY.md` 顶部有 ID 索引。单篇报告只保留当时的点时快照，不替代 §5.1
+- **现行有意留的否决理由与失效条件**以 [`docs/reviews/SUMMARY.md`](../reviews/SUMMARY.md) 顶部常驻表为唯一事实源（历史 `overview.md §5.1` 已迁移）；单篇报告只保留当时的点时快照，不替代常驻表
 - 本目录不进门禁、不要求 Status/Priority（它是证据档案，不是工作项）

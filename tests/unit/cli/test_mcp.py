@@ -120,6 +120,47 @@ class TestMcp(unittest.TestCase):
             self.assertTrue(ver["ok"])
             self.assertEqual(ver["version"], "0.1.0")
 
+    def test_align_checkpoint_payload(self) -> None:
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".agent").mkdir()
+            (root / ".agent" / "manifest.json").write_text(
+                json.dumps({"package_root": "src", "domains": {"k": {"src": "src/k", "spec": "docs/specs/k/spec.md", "tests": "tests/unit/k"}}}),
+            )
+            (root / "src/k").mkdir(parents=True)
+            (root / "docs/specs/k").mkdir(parents=True)
+            (root / "src/k/mod.py").write_text("def foo() -> int:\n    return 1\n")
+            from k3dge.engine import contract
+
+            iface = contract.collect_domain_interface(root / "src/k")
+            h = contract.compute_hash(iface)
+            (root / "docs/specs/k/spec.md").write_text(
+                f"# Domain Specification: k\n- **Status**: Active\n- **Module Path**: `src/k`\n- **Contract Hash**: `sha256:{h}`\n- **Last Updated**: 2026-08-25\n"
+                "## 1. Domain Boundary & Responsibilities\n## 2. Public Interfaces & Type Contracts\n"
+                "<!-- k3dge:interfaces-start -->\n```python\n" + iface + "\n```\n<!-- k3dge:interfaces-end -->\n"
+                "## 3. State Machine & Invariants\n## 4. Verification Matrix\n| TC-1 | L1 | x | y | `tests/unit/k/test_foo.py` |\n",
+                encoding="utf-8",
+            )
+            (root / "tests/unit/k").mkdir(parents=True)
+            (root / "tests/unit/k/test_foo.py").write_text("def test_foo():\n    assert True\n")
+            (root / "docs" / "tasks").mkdir(parents=True)
+            (root / "docs" / "tasks" / "2026-08-25-M9-audit-foo.md").write_text(
+                "# Foo\n- **Status**: done\n- **Milestone**: M9\n", encoding="utf-8"
+            )
+            (root / "docs" / "reviews").mkdir(parents=True)
+            subprocess.run(["git", "init", "-b", "main"], cwd=root, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=root, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "t"], cwd=root, capture_output=True)
+            subprocess.run(["git", "add", "-A"], cwd=root, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "init"], cwd=root, capture_output=True)
+            payload = json.loads(mcp.k3dge_milestone_control("align", "M9", workspace_path=d))
+            self.assertTrue(payload["aligned"], payload)
+            self.assertIn("checkpoint", payload)
+            self.assertEqual(payload["checkpoint"]["timeout_seconds"], 60)
+            self.assertEqual(payload["checkpoint"]["default"], "N")
+
 
 if __name__ == "__main__":
     unittest.main()

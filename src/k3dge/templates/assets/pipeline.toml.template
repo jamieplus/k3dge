@@ -8,8 +8,8 @@ provider = "mcp"
 mcp_tool = "k3dit_run_audit"
 timeout_seconds = 60
 on_failure = "fallback_to_cli"  # fallback_to_cli | skip
-cli_command = "python -m k3dit check-report"
-manual_protocol = "docs/memo/2026-08-24-audit-harness-independence.md"
+cli_command = "k3dit check-report"
+manual_protocol = "docs/protocols/audit_default.md"
 log_level = "warn"
 
 [harnesses.k3che]
@@ -21,9 +21,19 @@ timeout_seconds = 10
 on_failure = "skip"
 log_level = "info"
 
+[harnesses.k3lity]
+enabled = true
+scope = "quality"
+provider = "mcp"
+mcp_tool = "k3lity_score"
+timeout_seconds = 30
+on_failure = "skip"
+log_level = "info"
+
 [hooks]
 # on_align_success executes in order; each harness decides to skip or fallback per on_failure
 on_align_success = [
   { harness = "k3che", action = "inject_summary" },
+  { harness = "k3lity", action = "verify_benchmarks" },
   { harness = "k3dit", action = "run_audit", required = false },
 ]

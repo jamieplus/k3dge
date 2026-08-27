@@ -6,13 +6,10 @@
 - **Date**: 2026-08-25
 
 ## 已确认意图
-`_require_relative_path` 只拒 `/` 开头和 `Path.is_absolute()`。POSIX 上 `C:\\Windows` / `C:/Windows` 不是绝对路径，会写进 manifest。
+darwin 上 C:\\ 盘符被当成相对路径 — darwin 上 C:\\ 盘符被当成相对路径
 
-## 方案
-在现有校验后加盘符检测（如 `^[A-Za-z]:/`）。补测 darwin/linux 上 `C:\\Windows` 必须 `ManifestError`。
+## 可检索摘要
+darwin 上 C:\\ 盘符被当成相对路径 位于 src/k3dge/**，需修复后经 `k3dge check --with-tests` 与 `k3dit` 审计验证。
 
-## 入口
-- `src/k3dge/engine/manifest.py` `_require_relative_path`
-
-## 来源
-[docs/reviews/2026-08-25-pass1-robustness-security.md](../reviews/2026-08-25-pass1-robustness-security.md) P1-03
+## 上下文/切入点
+触发于 k3dit 5-Pass 审计，切入点 src/k3dge/**，关联任务 2026-08-25-M1-audit-P1_03_Windows.done.md

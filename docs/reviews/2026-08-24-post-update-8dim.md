@@ -2,7 +2,7 @@
 
 - **Date**: 2026-08-24
 - **基线**：`61 passed, 1 skipped`；`k3dge check --with-tests` PASS（本轮增量域为 templates）；`pyproject.toml` / manifest / `__init__.py` 均为 `0.1.0`
-- **审计人**：Agent（Grok）按 `docs/memo/2026-08-24-audit-harness-independence.md`。k3dit `docs/guides/protocol.md` 不存在。
+- **审计人**：Agent（Grok）按 `docs/protocols/audit_default.md`。k3dit `docs/guides/protocol.md` 不存在。
 - **范围**：更新后全仓；透镜叠 8 维。不重开 §5.1：A-11 / S-13 / F-14 / F-15 / R3-1 / R3-4。不重开已修的 A-01..A-12、S-01..S-12。
 - **结论**：有新发现，集中在后加的版本子系统和撞号 ADR。无 eval/密钥/SQL/XSS。
 - **回记（同日）**：U-01..U-07 已在代码中核过（见下表）。脚手架门控 G-01..G-04 **未**随本轮关闭。

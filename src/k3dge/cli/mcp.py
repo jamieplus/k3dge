@@ -71,7 +71,10 @@ def get_manifest_resource(workspace_path: Optional[str] = None) -> str:
 def get_domain_spec_resource(domain: str, workspace_path: Optional[str] = None) -> str:
     """Read docs/specs/<domain>/spec.md ground truth contract."""
     ws = _find_workspace(workspace_path=workspace_path)
-    manifest = Manifest.load(ws)
+    try:
+        manifest = Manifest.load(ws)
+    except Exception as exc:
+        return _err("ManifestInvalid", f"manifest load failed: {exc}", path=str(ws / ".agent" / "manifest.json"))
     spec_rel = manifest.spec_path(domain)
     if not spec_rel:
         return _err("DomainNotRegistered", f"Domain '{domain}' not registered in .agent/manifest.json")
@@ -104,7 +107,10 @@ def k3dge_check(
 def k3dge_verify_domain_contract(domain: str, workspace_path: Optional[str] = None) -> str:
     """Verify single domain AST interface against spec using k3dge contract engine."""
     ws = _find_workspace(workspace_path=workspace_path)
-    manifest = Manifest.load(ws)
+    try:
+        manifest = Manifest.load(ws)
+    except Exception as exc:
+        return _err("ManifestInvalid", f"manifest load failed: {exc}", path=str(ws / ".agent" / "manifest.json"))
     src_rel = manifest.src_path(domain)
     spec_rel = manifest.spec_path(domain)
 
@@ -152,7 +158,10 @@ def k3dge_sync(
     ws = _find_workspace(workspace_path=workspace_path)
     if isinstance(domains, str):
         domains = [domains]
-    changed, docs_updated = sync_all(ws, domains=domains)
+    try:
+        changed, docs_updated = sync_all(ws, domains=domains)
+    except Exception as exc:
+        return _err("SyncFailed", str(exc))
     return json.dumps(
         {
             "ok": True,
@@ -311,12 +320,15 @@ def k3dge_milestone_control(
                 ensure_ascii=False,
             )
         # Auto-bump patch version to keep CLI and MCP seal semantics identical (U-04); bump failure does not rollback seal (see ADR 0017)
+        # Both CLI and MCP now use consume_unreleased for identical changelog body (P3-01)
         try:
-            from k3dge.engine.version import append_changelog, bump_version, get_version
+            from k3dge.engine.version import append_changelog, bump_version, consume_unreleased, get_version
 
             prev = get_version(ws)
             new_v = bump_version(ws, part="patch")
-            append_changelog(ws, new_v, notes=f"Seal milestone {milestone_id}.")
+            body = consume_unreleased(ws)
+            notes = body if body else f"Seal milestone {milestone_id}."
+            append_changelog(ws, new_v, notes=notes)
             return json.dumps(
                 {
                     "milestone_id": milestone_id,
@@ -343,13 +355,75 @@ def k3dge_milestone_control(
     return _err("InvalidAction", f"Invalid action '{action}'. Choose from: status, align, seal.")
 
 
+def _audit_protocol_with_fallback(workspace_path: Optional[str] = None) -> tuple[str, bool, str]:
+    """Resolve audit protocol per Rule 07 with fallback detection.
+
+    Returns (protocol_path, used_fallback, reason). Highlights fallback to default.
+    Priority: ../k3dit/docs/guides/protocol.md → docs/protocols/audit_default.md (local docs/guides/protocol.md deprecated per Diátaxis)
+    Also checks .mcp.json for k3dit harness availability (required for actual k3dit_run_audit call).
+    """
+    import json
+
+    ws = _find_workspace(workspace_path=workspace_path)
+    candidates = [
+        (ws.parent / "k3dit" / "docs" / "guides" / "protocol.md", "k3dit"),
+        (ws / ".." / "k3dit" / "docs" / "guides" / "protocol.md", "k3dit alt"),
+    ]
+    fallback = ws / "docs" / "protocols" / "audit_default.md"
+    fell_back = True
+    reason = "no k3dit protocol found"
+    proto = str(fallback.relative_to(ws)) if fallback.is_relative_to(ws) else str(fallback)
+    for cand, label in candidates:
+        try:
+            if cand.is_file():
+                proto = str(cand.relative_to(ws)) if cand.is_relative_to(ws) else str(cand)
+                fell_back = False
+                reason = ""
+                break
+        except Exception:
+            if cand.is_file():
+                proto = str(cand)
+                fell_back = False
+                reason = ""
+                break
+    # Even if protocol file exists, check MCP harness availability for k3dit_run_audit
+    if not fell_back and "k3dit" in proto:
+        mcp_path = ws / ".mcp.json"
+        has_k3dit = False
+        try:
+            if mcp_path.is_file():
+                data = json.loads(mcp_path.read_text(encoding="utf-8"))
+                has_k3dit = isinstance(data, dict) and isinstance(data.get("mcpServers"), dict) and "k3dit" in data["mcpServers"]
+        except Exception:
+            has_k3dit = False
+        if not has_k3dit:
+            reason = ".mcp.json missing mcpServers.k3dit (harness not configured), k3dit_run_audit unavailable"
+            fell_back = True
+            proto = str(fallback.relative_to(ws)) if fallback.is_relative_to(ws) else str(fallback)
+    if fell_back and not reason:
+        reason = "protocol file not found"
+    return (proto, fell_back, reason)
+
+
 @mcp.prompt()
 def k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str) -> str:
     """Pointer to the independent audit harness. Lenses do not live in k3dge."""
+    proto, fell_back, reason = _audit_protocol_with_fallback()
+    # Highlighted fallback warning when external harness (k3dit) unavailable
+    banner = ""
+    if fell_back:
+        banner = (
+            "!!! \033[1;41m[WARN][HARNESS FALLBACK]\033[0m \033[1;33m"
+            f"k3dit audit harness unavailable ({reason}), "
+            "falling back to DEFAULT docs/protocols/audit_default.md (manual lens, no k3dit)\033[0m !!!\n"
+            "[WARN][HARNESS FALLBACK] k3dit not found → DEFAULT audit_default.md\n"
+            f"[WARN] Reason: {reason}\n\n"
+        )
     return (
-        "Audit protocol is NOT part of k3dge. Read ../k3dit/docs/guides/protocol.md; "
-        "if missing, docs/memo/archive/2026-08-24-audit-harness-independence.md. "
-        f"Execute only Pass {pass_number}. Scope: {target_scope}.\n\n"
+        banner
+        + f"Audit protocol is NOT part of k3dge. Read {proto}; "
+        + ("(DEFAULT fallback, no k3dit)" if fell_back else "(k3dit lens)")
+        + f" Execute only Pass {pass_number}. Scope: {target_scope}.\n\n"
         f"```\n{context_snippet}\n```\n"
     )
 

@@ -49,10 +49,10 @@ class TestGenerator(unittest.TestCase):
 
             changed, docs_updated = sync_all(root)
             self.assertEqual(changed, ["core"])
-            # manual docs are machine-generated under docs/reference/ (no agent needed)
+            # manual docs are machine-generated under docs/generated/ (no agent needed, Diátaxis Reference)
             self.assertTrue(docs_updated)
-            self.assertTrue((root / "docs/reference/api.md").exists())
-            self.assertTrue((root / "docs/reference/domains.md").exists())
+            self.assertTrue((root / "docs/generated/api.md").exists())
+            self.assertTrue((root / "docs/generated/domains.md").exists())
 
             content = spec.read_text()
             iface = contract.collect_domain_interface(root / "src" / "core")
@@ -60,7 +60,7 @@ class TestGenerator(unittest.TestCase):
             self.assertIn(f"sha256:{h}", content)
             self.assertNotIn("# mod.py", content)
             self.assertIn("foo(x: int) -> int", content)
-            api = (root / "docs/reference/api.md").read_text()
+            api = (root / "docs/generated/api.md").read_text()
             self.assertIn("# mod.py", api)
 
     def test_render_readme_layout(self) -> None:

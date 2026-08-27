@@ -55,7 +55,8 @@ k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: s
 | TC-CLI-01 | L1 | 门禁失败运行 `check` | 退出码非零 | `tests/unit/cli/test_main.py` |
 | TC-CLI-02 | L1 | `milestone status/align/seal` 路由 | 正确解析并分发至 `milestone` 引擎 | `tests/unit/engine/test_milestone.py` |
 | TC-CLI-03 | L1 | `check --force-full` / MCP `force_full` | 校验全部 `manifest.domains`，不限于 git 触及域 | `tests/unit/engine/test_evaluator.py` |
-| TC-CLI-04 | L1 | MCP 资源缺失 / 非法 action | 统一 `{"ok": false, "error": ...}` JSON | `tests/unit/cli/test_mcp.py` |
-| TC-CLI-05 | L1 | `version show|bump` 与 `seal` 自动 patch | 版本三件套镜像 + `CHANGELOG.md` 追加，原子回滚 | `tests/unit/engine/test_version.py` |
+| TC-CLI-04 | L1 | MCP 资源缺失 / 非法 action / `manifest` 损坏 | 统一 `{"ok": false, "error": ...}` JSON（`ManifestInvalid`） | `tests/unit/cli/test_mcp.py` |
+| TC-CLI-05 | L1 | `version show|bump` 与 `seal` 自动 patch（含 `consume_unreleased`） | 版本三件套镜像 + `CHANGELOG.md` 按 `Unreleased` 正文双轨一致、原子回滚 | `tests/unit/engine/test_version.py` |
 | TC-CLI-06 | L1 | `task list --json` / MCP `k3dge_task_list` | 顶层 tasks 索引，不含正文、不含 archive | `tests/unit/cli/test_main.py` |
 | TC-CLI-07 | L1 | MCP `k3dge_sync` / `k3dge_task_create` / `k3dge_task_done` | 与 CLI 同一套 engine/sync，done 优先精确 path | `tests/unit/cli/test_mcp.py` |
+| TC-CLI-08 | L1 | `mcp sync` 遇损坏 `.mcp.json`（非 dict/JSON 错误）或 `pipeline.toml` 损坏/缺解析器 | 损坏 `WARN` 不覆盖且 `0` 放行；`pipeline.toml` 解析失败 `1`；缺 `tomli` 跳过不假失败 | `tests/unit/templates/test_scaffold.py` + `tests/unit/cli/test_main.py` |

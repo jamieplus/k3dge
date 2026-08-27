@@ -24,7 +24,7 @@ class TestScaffold(unittest.TestCase):
         self.assertTrue((self.target / "docs" / "adr").is_dir())
         self.assertTrue((self.target / "docs" / "tasks").is_dir())
         self.assertTrue((self.target / "docs" / "guides").is_dir())
-        self.assertTrue((self.target / "docs" / "reference").is_dir())
+        self.assertTrue((self.target / "docs" / "generated").is_dir())
         self.assertTrue((self.target / "docs" / "tasks").is_dir())
         self.assertTrue((self.target / "docs" / "tasks" / "README.md").exists())
 

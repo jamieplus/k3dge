@@ -8,8 +8,8 @@
 # --- Core deliverables (enabled by default) ---
 readme = true            # README.md — 项目总览与布局（基础版本常驻，收尾时由 agent 刷新）
 user_guide = true        # docs/guides/user_guide.md — 面向最终用户的使用说明
-architecture = true      # docs/guides/architecture.md — 系统架构与模块关系（人可读版，区别于 docs/reference/ 机器版）
-api_guide = false        # docs/guides/api_guide.md — 面向集成方的 API 使用指南（与 docs/reference/api.md 机器版互补）
+architecture = true      # docs/guides/architecture.md — 系统架构与模块关系（人可读版，区别于 docs/generated/ 机器版）
+api_guide = false        # docs/guides/api_guide.md — 面向集成方的 API 使用指南（与 docs/generated/api.md 机器版互补）
 
 # --- Optional deliverables (enable as needed) ---
 deployment = false       # docs/guides/deployment.md — 部署与运维手册

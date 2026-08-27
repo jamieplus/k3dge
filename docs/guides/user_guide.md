@@ -4,7 +4,7 @@
 
 ## 概述
 
-本项目使用 `k3dge` harness 约束 AI 协作，`docs/guides/` 为人写导读，`docs/reference/` 机器生成。
+本项目使用 `k3dge` harness 约束 AI 协作，`docs/guides/` 为人写导读，`docs/generated/` 机器生成（Diátaxis Reference）。
 
 ## Memo 显式用法（灵光闪念）
 

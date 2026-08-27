@@ -5,7 +5,7 @@
 - **Deciders**: Core Maintainer
 
 ## 1. 上下文 (Context)
-`docs/memo/2026-08-24-audit-harness-independence.md` 按口令记下 8 维审计规程。同日写成 `harnesses/audit/PROTOCOL.md`，memo 标「已晋升」进 archive（§6：顶层扫描不再读 archive）。约 17 分钟后 ADR 0008 把 audit 迁出，删掉 PROTOCOL，本仓只留指向 k3dit 的指针。k3dit 随后被删、再空 init，没有 `docs/guides/protocol.md`。晋升目标没了，memo 仍在 archive。Agent 视界丢了现行透镜。README / MCP prompt 还指向已删路径。
+`docs/protocols/audit_default.md` 按口令记下 8 维审计规程。同日写成 `harnesses/audit/PROTOCOL.md`，memo 标「已晋升」进 archive（§6：顶层扫描不再读 archive）。约 17 分钟后 ADR 0008 把 audit 迁出，删掉 PROTOCOL，本仓只留指向 k3dit 的指针。k3dit 随后被删、再空 init，没有 `docs/guides/protocol.md`。晋升目标没了，memo 仍在 archive。Agent 视界丢了现行透镜。README / MCP prompt 还指向已删路径。
 
 §6 原来只写 memo → `docs/tasks/` → archive。这次晋升目标是 PROTOCOL，不是 task；也没有「目标被删则搬回顶层」。§12 没有「删仍被点名的文件」这一行。`k3dge check` 不解析 markdown 链接，拦不住。这是协议盲区，不是门禁盲区。
 

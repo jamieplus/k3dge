@@ -4,7 +4,9 @@
 
 ## 现行有意留（勿重开）
 
-否决理由与失效条件以 [`docs/architecture/overview.md`](../architecture/overview.md) **§5.1** 为准。下表只做 ID 索引：
+> 本表为唯一事实源（历史曾在 `docs/architecture/overview.md §5.1`，已迁移至此）。`overview.md §8` 仅作索引指针。
+
+否决理由与失效条件以本表为准：
 
 | ID | 一句话 | 报告 |
 | --- | --- | --- |
@@ -24,8 +26,14 @@
 | P4-06 | doc/task 薄路由；audit 见 P2-PUR-06 | 同上 |
 | P4-07 | 矩阵 ≠ L2 执行（ADR 0005） | 同上 |
 | P5-02..07 | 性能阈值未到 | [2026-08-25-pass5-simplicity-performance.md](2026-08-25-pass5-simplicity-performance.md) |
+| BV-01 | `bump_version` 跨三文件非原子：单文件 `tmp+replace` 原子，`kill -9` 半漂移由 `VERSION_MISMATCH` 暴露，已加内存回滚；引入跨文件原子需 `write-ahead log` 复杂度不值 | [2026-08-27-5pass-full.md](2026-08-27-5pass-full.md) |
+| T-01 | Meta-Gate vs Orchestrator：`k3dge` 仅元门禁，`pipeline.toml` `on_align_success` 单向 `skip/fallback_to_cli` 调度 `k3che/k3lity/k3dit`，外部挂死不阻断 `GateReport`（`_harness_fallback_warn` 高亮） | [2026-08-27-k8d3e-a79](#k8d3e-a79.1m) |
+| T-02 | Pure Evaluator vs Mutator：`engine/evaluator.py` 纯只读判定与 `engine/milestone.py`/`version.py` 物理副作用同域，`moved_records` 回滚已验，阈值未到不拆 `lifecycle` 子域 | 同上 |
+| T-03 | Self-Hosting 嗅探：`evaluator.py:240` 探 `src/k3dge/templates/assets` 决定 `TEMPLATE_DRIFT`，`PAIRS` 收敛 `engine`，`Manifest self_hosting` 显式化待规模化再 ADR | 同上 |
+| SEAL-01 | `seal` 不验 9 表悬空：仅 `align-pass`+`SUMMARY`，`k3dit check-report` 在 `hooks.on_align_success` 卡控（`ADR 0005/0018`） | 同上 |
+| AGENTS-SP-01 | `AGENTS.md` 51 行稀疏寻址无已读断言：以 `Gate` 红灯逼回读，非软提示 | 同上 |
 
-推翻某行 = 改 overview §5.1 并在本文件注明，不要只在新审计里再开一张单。
+推翻某行 = 改本表并在 `docs/architecture/overview.md §8` 同步指针，不要只在新审计里再开一张单。
 
 ## M1 — 08-25 审计落地封板（2026-08-25）
 
@@ -155,3 +163,81 @@
 - **范围**：`e0de18d..f987092`（pipeline.toml + HUMAN_CHECKPOINT + mcp sync + changelog 清单），经 `k3dit_run_audit` MCP 取透镜逐轮执行，报告经 `k3dit check_report` 校验通过
 - **摘要**：14 项待修（P1 四项：N1-01 `.mcp.json` 损坏覆盖、N1-02 tomllib py3.10 假成功、N1-03 非 dict TypeError、P4-01 seal changelog 双轨漂移；P2 七项：路径逃逸/DAG 缺边/降级断链/零测试/checkpoint 双编码等）+ 1 有意留（P2-03 pipeline 字节锁追赶成本）
 - **处置**：13 转 M2 tasks（`2026-08-26-M2-audit-*.md`）/ 1 有意留
+
+## 2026-08-26 — M2 对齐验收
+
+- **报告**：[2026-08-26-M2-align.md](2026-08-26-M2-align.md)
+- **基线**：`87 passed / 1 skipped / 49 subtests / k3dge check --force-full PASS`
+- **范围**：M2 14 条（mastra + 13 audit P1/P2）
+- **摘要**：Full Matrix PASS，HUMAN_CHECKPOINT 已确认，准予封板
+- **处置**：14 已修 / 0 有意留
+
+
+## 2026-08-26 — M3 追溯落盘（09-absorption 等 5 项）
+
+- **报告**：[2026-08-26-M3-align.md](2026-08-26-M3-align.md)
+- **基线**：`87 passed / 1 skipped / 49 subtests / k3dge check --force-full PASS`
+- **范围**：M3 5 条（09-absorption/pipeline/mcp.json/AGENTS 微内核/scaffold）
+- **摘要**：追溯 5 项直改落盘，Full Matrix PASS，准予封板
+- **处置**：5 已修
+
+
+## 2026-08-26 — k3dit 5-Pass 全量（pipeline/HUMAN_CHECKPOINT/mcp 增量）
+
+- **报告**：[2026-08-26-k3dit-5pass-full.md](2026-08-26-k3dit-5pass-full.md)
+- **基线**：`86 passed / 1 skipped / 49 subtests / k3dge check --force-full PASS`
+- **范围**：`e0de18d..M3` 全量增量（`pipeline.toml` + `HUMAN_CHECKPOINT` + `mcp sync`）
+- **摘要**：3 项 P1（`bump` 非原子/`M0/M1` 归档截断/`ADR 0019` 撞号）+ 5 项 P2 待修
+- **处置**：3 转 M3 tasks / 5 有意留
+
+
+## 2026-08-26 — M2 3 项退化修复
+
+- **报告**：[2026-08-26-M2-align.md](2026-08-26-M2-align.md)
+- **基线**：`87 passed / 1 skipped / 59 subtests / k3dge check --force-full PASS`
+- **范围**：M2 3 条（audit triage 截断/changelog stem/mcp seal 双轨）
+- **摘要**：3 项 P1 已修，Full Matrix PASS，准予封板
+- **处置**：3 已修
+
+## 2026-08-27 — M3 对齐验收
+
+- **报告**：[2026-08-27-M3-align.md](2026-08-27-M3-align.md)
+- **基线**：`87 passed / 1 skipped / 59 subtests / k3dge check --force-full PASS`
+- **范围**：M3 13 条（bump 原子/ADR 撞号/M0M1 归档/09-absorption/pipeline/AGENTS/mcp.json 等）
+- **摘要**：Full Matrix PASS，HUMAN_CHECKPOINT 已确认，准予封板
+- **处置**：13 已修 / 0 有意留
+
+## 2026-08-27 — M4 对齐验收
+
+- **报告**：[2026-08-27-M4-align.md](2026-08-27-M4-align.md)
+- **基线**：`87 passed / 1 skipped / 59 subtests / k3dge check --force-full PASS`
+- **范围**：M4 2 条（k3che GateReport 阈值/k3lity INC-REG B-T-D）
+- **摘要**：Full Matrix PASS，准予封板
+- **处置**：2 已修 / 0 有意留
+
+## 2026-08-27 — 5-Pass 全量审计（pipeline/HUMAN_CHECKPOINT/seal 双轨/版本/scaffold 增量）
+
+- **报告**：[2026-08-27-5pass-full.md](2026-08-27-5pass-full.md)
+- **基线**：`87 passed / 1 skipped / 59 subtests / k3dge check --force-full PASS / 4 域契约已同步`
+- **范围**：`M3 seal..HEAD` 增量全量 `src/k3dge/**` + `templates/assets` + `docs/**` + `tests/**` + `.agent/pipeline.toml`（5-Pass × 8 维，注意力隔离，不重提 §5.1 有意留）
+- **摘要**：1 项 P1 阻断（P1-01 CHANGELOG 静默丢日志，M3 回归）+ 8 项 P2/P3 待修（P1-02 死代码/P1-03 tomli 依赖/P1-04 损坏静默/P2-01 私有导入回归/P2-02 overview 互指悬空/P3-01 seal 双轨/P3-02 MCP ManifestError 穿透/P4-01 矩阵缺口）+ 1 有意留候选（P4-02 跨文件原子）+ 2 有意留（P5-01 规模阈值/R-INT 去重），M3 四项标记 done 未闭环为回归
+- **处置**：8 转 M6 tasks / 1 有意留候选 / 2 有意留 / 1 P1 阻断
+- **透镜**：手动 `audit_default.md` 5-Pass（非 `k3dit_run_audit`，见报告 `透镜来源`）；`k3dit` 未安装，`k3dit check-report` 仅 9 列自检
+- **回填**：2026-08-27 M6 已修 9 项（P1-01..P1-04/P2-01/P2-02/P3-01/P3-02/P4-01 已 `k3dge sync` 至 `engine:c42ed69/templates:a4ab9ea`；P4-02 转 `BV-01` 有意留），B-T-D 见 [`docs/branches/2026-08-27-M6-5pass-repro.md`](../branches/2026-08-27-M6-5pass-repro.md)，报告内 `回填` 小节已更新状态
+
+## 2026-08-27 — k8d3e-a78 5-Pass 穿透式代码与架构审计
+
+- **报告**：[2026-08-27-k8d3e-a78-5pass.md](2026-08-27-k8d3e-a78-5pass.md)
+- **基线**：`0.1.7` / `M6` `87 passed / 61 subtests / Gate SUCCESS --force-full` / `engine:c42ed69/templates:a4ab9ea`（`k3dge-audit` 快照）
+- **范围**：`k3dge-audit` 5-Pass 注意力隔离（Pass1 健壮/安全 · Pass2 架构边界 · Pass3 设计契约 · Pass4 一致性 · Pass5 简洁）
+- **摘要**：5 项待修（01 AGENTS 路由错位 · 02 07-audit 废弃路径 · 03 architecture 悬空 · 04 mcp-bridge 缺 ../ · 05 PAIRS 缺 protocols）+ 1 有意留（06 pipeline 回退 ADR-0008），`k3dit` 未在 `.mcp.json`，走 `DEFAULT audit_default.md`
+- **处置**：5 已修（`M6` `2026-08-27-M6-fix-*.done.md` 5 项，`align M6 PASS`）/ 1 有意留
+- **回填**：`AGENTS.md:20`/`07-audit.md:3`/`mcp-bridge.md:69`/`architecture.md:11`/`pairs.py:47` 已修，B-T-D 见 [`docs/incidents/INC-20260827-CON-k8d3e-a78-5pass.md`](../incidents/INC-20260827-CON-k8d3e-a78-5pass.md)（`docs/branches/2026-08-27-k8d3e-a78-repro.md` 为镜像）
+
+## 2026-08-27 — M6 对齐验收
+
+- **报告**：[2026-08-27-M6-align.md](2026-08-27-M6-align.md)
+- **基线**：`87 passed / 61 subtests / Gate SUCCESS --force-full` / `engine:c42ed69/templates:a4ab9ea`（`k3dge-audit` 快照 0.1.7/M6）
+- **范围**：M6 5 项（01 AGENTS 路由 · 02 07-audit 废弃路径 · 03 architecture 悬空 · 04 mcp-bridge 缺 ../ · 05 PAIRS 缺 protocols）+ 1 有意留（06 pipeline 回退）
+- **摘要**：Full Matrix PASS，`k8d3e-a78` 01-05 已修，`06` 有意留（`T-01..T-03/SEAL-01/AGENTS-SP-01` 已入有意留），`consume_unreleased` 时序已正交
+- **处置**：5 已修 / 1 有意留

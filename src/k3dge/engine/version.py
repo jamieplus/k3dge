@@ -28,18 +28,15 @@ def _init_path(workspace: Path) -> Path:
         from k3dge.engine.manifest import Manifest
 
         manifest = Manifest.load(workspace)
-        # package_root is the package directory itself (e.g. src/k3dge) for k3dge;
-        # downstream may be src or src/<project>
         candidate = workspace / manifest.package_root / "__init__.py"
         if candidate.is_file():
             return candidate
-        # Fallback: package_root may be a parent (e.g. src) → try src/<name>/__init__.py via manifest name
         name = manifest.data.get("name")
         if name and manifest.package_root.replace("\\", "/").rstrip("/") == "src":
             alt = workspace / "src" / name / "__init__.py"
             if alt.is_file():
                 return alt
-    except Exception:
+    except (OSError, ValueError, KeyError, json.JSONDecodeError):
         pass
     return workspace / "src" / "k3dge" / "__init__.py"
 
@@ -188,17 +185,16 @@ def bump_version(workspace: Path, part: str = "patch", set_version: str | None =
         if n2:
             updates.append((ip, inew))
 
-    # Atomic write with rollback on failure (U-05)
+    # Atomic write per file via tmp+replace, with cross-file rollback on failure
     originals: dict[Path, str] = {}
     try:
         for path, new_content in updates:
-            originals[path] = path.read_text(encoding="utf-8")
-            path.write_text(new_content, encoding="utf-8")
+            originals[path] = _read_utf8(path)
+            _atomic_write(path, new_content)
     except Exception:
-        # Rollback any already-written files
         for path, orig in originals.items():
             try:
-                path.write_text(orig, encoding="utf-8")
+                _atomic_write(path, orig)
             except Exception:
                 pass
         raise
@@ -206,16 +202,36 @@ def bump_version(workspace: Path, part: str = "patch", set_version: str | None =
     return new_version
 
 
-def append_changelog(workspace: Path, new_version: str, notes: str | None = None) -> Path:
+def append_changelog(workspace: Path, new_version: str, notes: str | None = None, change_type: str | None = None) -> Path:
     """Append entry to CHANGELOG.md (Keep a Changelog) and return path."""
     changelog = workspace / "CHANGELOG.md"
     today = datetime.date.today().isoformat()
     header = f"## [{new_version}] - {today}\n"
     body = notes.strip() if notes and notes.strip() else f"- Milestone sealed / version bump to {new_version}."
-    # Ensure body is a list
-    if not body.lstrip().startswith("-"):
+    # Infer change_type from Conventional Commits prefix if not explicitly given (commit → CHANGELOG mapping)
+    # Do this before adding "- " prefix, so "feat: ..." is correctly detected
+    if not change_type:
+        import re as _re_ct
+
+        m = _re_ct.match(r"^\s*(feat|fix|audit|docs|chore|refactor|perf|sec|security)(\(.+\))?\s*:\s*", body, re.IGNORECASE)
+        if m:
+            inferred = m.group(1).lower()
+            if inferred == "security":
+                inferred = "sec"
+            elif inferred == "perf":
+                inferred = "refactor"
+            change_type = inferred
+    # Ensure body is a list — but keep already-sectioned Unreleased body (### Added etc.) as-is
+    stripped = body.lstrip()
+    if not (stripped.startswith("-") or stripped.startswith("###")):
         body = f"- {body}"
-    entry = f"{header}\n{body}\n\n"
+    # Map change_type to Keep a Changelog subsection
+    type_map = {"feat": "Added", "fix": "Fixed", "audit": "Fixed", "docs": "Changed", "chore": "Changed", "refactor": "Changed", "sec": "Security"}
+    section = type_map.get((change_type or "").lower(), None)
+    if section:
+        entry = f"{header}\n### {section}\n{body}\n\n"
+    else:
+        entry = f"{header}\n{body}\n\n"
 
     if not changelog.exists():
         # Create with Keep a Changelog preamble
@@ -249,3 +265,35 @@ def append_changelog(workspace: Path, new_version: str, notes: str | None = None
             new_text = text + "\n" + entry
     _atomic_write(changelog, new_text)
     return changelog
+
+
+def consume_unreleased(workspace: Path) -> str:
+    """Extract ## [Unreleased] body and atomically clear it for next cycle.
+
+    Returns the stripped body (may be empty string). Keeps the header.
+    Used by both CLI and MCP seal to keep changelog generation identical.
+    """
+    changelog = workspace / "CHANGELOG.md"
+    if not changelog.is_file():
+        return ""
+    try:
+        text = _read_utf8(changelog)
+    except (OSError, ValueError):
+        return ""
+    unreleased = "## [Unreleased]"
+    idx = text.find(unreleased)
+    if idx == -1:
+        return ""
+    next_idx = text.find("## [", idx + len(unreleased))
+    end = next_idx if next_idx != -1 else len(text)
+    body = text[idx + len(unreleased):end].strip()
+    # Clear body for next cycle (keep header) — atomic via tmp+replace
+    new_text = text[: idx + len(unreleased)] + "\n\n" + text[end:].lstrip("\n")
+    try:
+        _atomic_write(changelog, new_text)
+    except Exception:
+        # Write failure is non-fatal for seal notes; return body anyway and warn
+        import sys
+
+        print(f"[WARN] consume_unreleased: failed to clear Unreleased in {changelog}", file=sys.stderr)
+    return body

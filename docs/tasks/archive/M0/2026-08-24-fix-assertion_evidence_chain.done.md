@@ -6,8 +6,10 @@
 - **Date**: 2026-08-24
 
 ## 已确认意图
-用户因 `.agent/` 被误断言，要求 harness 限定：Agent 的断言要有完整证据链。同意后写入 ADR 0015 与 AGENTS.md。
+Agent 断言须有证据链（补进协议，不进 engine） — Agent 断言须有证据链（补进协议，不进 engine）
 
-## 入口
-- `docs/adr/0015-assertion-evidence-chain.md`
-- `AGENTS.md` §13
+## 可检索摘要
+Agent 断言须有证据链（补进协议，不进 engine） 位于 src/k3dge/**，需修复后经 `k3dge check --with-tests` 与 `k3dit` 审计验证。
+
+## 上下文/切入点
+触发于 k3dit 5-Pass 审计，切入点 src/k3dge/**，关联任务 2026-08-24-fix-assertion_evidence_chain.done.md

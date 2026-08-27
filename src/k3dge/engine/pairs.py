@@ -32,6 +32,11 @@ PAIRS: list[tuple[str, str]] = [
     ("rules/01-docs-structure.md", ".agent/rules/01-docs-structure.md"),
     ("rules/02-simplification.md", ".agent/rules/02-simplification.md"),
     ("rules/03-self-contained.md", ".agent/rules/03-self-contained.md"),
+    ("rules/04-milestone.md", ".agent/rules/04-milestone.md"),
+    ("rules/05-branches.md", ".agent/rules/05-branches.md"),
+    ("rules/06-memo.md", ".agent/rules/06-memo.md"),
+    ("rules/07-audit.md", ".agent/rules/07-audit.md"),
+    ("rules/09-absorption.md", ".agent/rules/09-absorption.md"),
     ("docs.toml.template", ".agent/docs.toml"),
     ("pipeline.toml.template", ".agent/pipeline.toml"),
     ("spec.md.template", "docs/specs/_template/spec.md"),
@@ -40,4 +45,5 @@ PAIRS: list[tuple[str, str]] = [
     ("branches-readme.md", "docs/branches/README.md"),
     ("memo-readme.md", "docs/memo/README.md"),
     ("downstream.md", "docs/guides/downstream.md"),
+    ("protocols/audit_default.md", "docs/protocols/audit_default.md"),
 ]

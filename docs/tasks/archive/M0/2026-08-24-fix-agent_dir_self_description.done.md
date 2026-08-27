@@ -6,9 +6,10 @@
 - **Date**: 2026-08-24
 
 ## 已确认意图
-用户问 `.agent` 的初衷；指出 k3dge 应能自说明，这段信息却丢失了。写回目录自身 + ADR，不靠聊天。
+把 `.agent/` 目录级初衷写回磁盘 — 把 `.agent/` 目录级初衷写回磁盘
 
-## 入口
-- `.agent/README.md`
-- `docs/adr/0013-agent-dir-is-self-description.md`
-- init 资产 `src/k3dge/templates/assets/agent-readme.md`
+## 可检索摘要
+把 `.agent/` 目录级初衷写回磁盘 位于 src/k3dge/**，需修复后经 `k3dge check --with-tests` 与 `k3dit` 审计验证。
+
+## 上下文/切入点
+触发于 k3dit 5-Pass 审计，切入点 src/k3dge/**，关联任务 2026-08-24-fix-agent_dir_self_description.done.md

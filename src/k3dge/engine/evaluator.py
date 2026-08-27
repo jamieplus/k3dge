@@ -170,14 +170,14 @@ class ConsistencyEngine:
                 continue
             if path.endswith("__init__.py"):
                 continue
-            # 强制 docs/ 根下不直放文档，需置于细分目录（如 docs/reference/, docs/guides/）；无合适目录时 agent 可自建
+            # 强制 docs/ 根下不直放文档，需置于细分目录（如 docs/generated/, docs/guides/）；无合适目录时 agent 可自建
             if path.startswith("docs/") and "/" not in path[5:] and not path.endswith("/"):
                 name = path[5:]
                 if name and not name.startswith(".") and name != ".DS_Store":
                     violations.append(
                         Violation(
                             "DOCS_ROOT_DISALLOWED",
-                            f"docs root file '{path}' must be in a subdirectory (e.g. docs/reference/, docs/guides/); create a new subdirectory if none fits",
+                            f"docs root file '{path}' must be in a subdirectory (e.g. docs/generated/, docs/guides/); create a new subdirectory if none fits",
                             file_path=path,
                         )
                     )
@@ -234,24 +234,60 @@ class ConsistencyEngine:
                 )
             )
 
-        # 脚手架镜像漂移：assets ↔ 本仓文件必须一致（总是运行；仅自举仓，ADR 0018）
+        # 轻量 P3：任务手改 done 未进 CHANGELOG Unreleased 时 WARN（不硬卡，仅提示，避免漏记）
+        # 仅检查 living tasks（docs/tasks/*.md），不含 archive/（已封板，其标题已在版本化历史中）
         try:
-            assets_root = Path(__file__).resolve().parents[1] / "templates" / "assets"
-            # Only enforce in the k3dge source tree itself (self-hosting). Downstream
-            # workspaces (k3dit etc.) use the installed package's assets, which would
-            # always differ from their own AGENTS.md etc. — skip there (see task 2026-08-24-template-drift-self-host-only).
-            try:
-                is_self_host = assets_root.is_relative_to(self.workspace_root.resolve())
-            except AttributeError:
-                is_self_host = str(assets_root).startswith(str(self.workspace_root.resolve()) + "/")
-            # Fallback: also consider self-host when workspace itself contains src/k3dge/templates/assets
-            if not is_self_host and not (self.workspace_root / "src/k3dge/templates/assets").exists():
-                is_self_host = False
-            elif not is_self_host and (self.workspace_root / "src/k3dge/templates/assets").exists():
-                # Workspace has its own assets (k3dge source tree) but installed package is elsewhere (non-editable) — still compare using workspace's assets
-                assets_root = self.workspace_root / "src/k3dge/templates/assets"
-                is_self_host = True
+            from k3dge.engine.milestone import TITLE_RE as _MilestoneTitleRE, parse_frontmatter
+
+            changelog_path = self.workspace_root / "CHANGELOG.md"
+            if changelog_path.is_file():
+                changelog_text = changelog_path.read_text(encoding="utf-8")
+                unreleased_tag = "## [Unreleased]"
+                u_idx = changelog_text.find(unreleased_tag)
+                if u_idx != -1:
+                    u_next = changelog_text.find("## [", u_idx + len(unreleased_tag))
+                    unreleased_block = changelog_text[u_idx:u_next] if u_next != -1 else changelog_text[u_idx:]
+                    for p in files:
+                        if not p.startswith("docs/tasks/") or p.startswith("docs/tasks/archive/") or p.endswith("README.md"):
+                            continue
+                        task_path = self.workspace_root / p
+                        if not task_path.is_file():
+                            continue
+                        try:
+                            t_content = task_path.read_text(encoding="utf-8")
+                        except (OSError, UnicodeDecodeError):
+                            continue
+                        fm = parse_frontmatter(t_content)
+                        st = fm.get("status", "").lower() if fm else ""
+                        if not st:
+                            m = re.search(r"-\s+\*\*Status\*\*:\s*([\w-]+)", t_content, re.IGNORECASE)
+                            st = m.group(1).lower() if m else ""
+                        if st != "done":
+                            continue
+                        tm = _MilestoneTitleRE.search(t_content)
+                        title = tm.group(1).strip() if tm else task_path.stem
+                        if title and title not in unreleased_block:
+                            import sys
+
+                            print(
+                                f"[WARN][CHANGELOG] Task '{title}' marked done ({p}) not in CHANGELOG.md ## [Unreleased]; "
+                                f"run 'k3dge task done' or ensure _append_to_unreleased succeeded",
+                                file=sys.stderr,
+                            )
+        except Exception:
+            pass
+
+        # 脚手架镜像漂移：assets ↔ 本仓文件必须一致（仅 manifest.self_hosting=true 时，ADR 0018 显式声明）
+        try:
+            is_self_host = bool(getattr(manifest, "self_hosting", False))
             if is_self_host:
+                # Prefer installed package assets, fallback to workspace assets for editable install
+                try:
+                    assets_root = Path(__file__).resolve().parents[1] / "templates" / "assets"
+                    if not assets_root.is_dir():
+                        assets_root = self.workspace_root / "src/k3dge/templates/assets"
+                except Exception:
+                    assets_root = self.workspace_root / "src/k3dge/templates/assets"
                 for asset, rel in PAIRS:
                     try:
                         asset_path = assets_root / asset
@@ -272,6 +308,20 @@ class ConsistencyEngine:
                             )
                     except (OSError, UnicodeDecodeError):
                         continue
+                # Budget warning: AGENTS.md microkernel should stay <80 lines (self-host only, not a gate)
+                try:
+                    agent_tpl = assets_root / "agents.md"
+                    if agent_tpl.is_file():
+                        n_lines = len(agent_tpl.read_text(encoding="utf-8").splitlines())
+                        if n_lines > 80:
+                            import sys
+
+                            print(
+                                f"[WARN] AGENTS.md template exceeds micro-kernel budget: {n_lines} > 80 lines",
+                                file=sys.stderr,
+                            )
+                except Exception:
+                    pass
         except Exception as exc:
             violations.append(
                 Violation(

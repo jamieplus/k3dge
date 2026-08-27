@@ -12,7 +12,7 @@ ADR 0005 把 cli 写成「全部 I/O：终端 + MCP」，容易读成「MCP 是�
 - **CLI**（`k3dge.cli.main`）：本仓人/脚本的原生入口（shell、pre-commit、CI）。
 - **MCP**（`k3dge.cli.mcp`）：对外兼容层。只委托 `engine` / `sync` / `milestone`，零漂移。消费者是外部 harness，不是第二套交互设计。
 - 仍放在 `cli` 域（都是传输，不判定）。不新建 mcp 域。
-- 透镜审计仍在 `harnesses/audit/`；MCP prompt 只指路，不在桥里演进规程。
+- 透镜审计仍在 `docs/protocols/audit_default.md`；MCP prompt 只指路，不在桥里演进规程。
 - 本机 stdio：信任边界 = 调起该 MCP 的 OS 用户（S-13）。网络化后再重开鉴权。
 
 ## 3. 后果 (Consequences)

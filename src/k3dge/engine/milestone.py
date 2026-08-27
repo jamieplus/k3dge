@@ -16,6 +16,24 @@ MILESTONE_RE = re.compile(r"-\s+\*\*Milestone\*\*:\s*([^\n\r]+)", re.IGNORECASE)
 PRIORITY_RE = re.compile(r"-\s+\*\*Priority\*\*:\s*(\S+)", re.IGNORECASE)
 TITLE_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
 GUIDE_STUB_RE = re.compile(r"<!--\s*k3dge:guide-stub\s*-->", re.IGNORECASE)
+
+
+def parse_frontmatter(content: str) -> dict[str, str]:
+    """Strict frontmatter parser: only `---` block at start, YAML-like `key: value`.
+
+    Avoids `Markdown as Database` anti-pattern where body text containing
+    `- **Status**:` is mis-captured. Pure stdlib, no external dep.
+    """
+    meta: dict[str, str] = {}
+    lines = content.splitlines()
+    if len(lines) >= 2 and lines[0].strip() == "---":
+        for line in lines[1:]:
+            if line.strip() == "---":
+                break
+            if ":" in line:
+                k, v = line.split(":", 1)
+                meta[k.strip().lower()] = v.strip()
+    return meta
 _ALLOWED_STATUS = frozenset({"idea", "deferred", "in-progress", "done"})
 _TASK_TYPES = frozenset({"audit", "feat", "fix", "docs", "chore", "refactor"})
 _SAFE_MILESTONE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -73,6 +91,65 @@ def _validate_milestone_id(milestone_id: str) -> Optional[str]:
             "then letters, digits, '.', '_' or '-' only (no path separators)."
         )
     return None
+
+
+def _changelog_draft_path(workspace: Path) -> Path:
+    return workspace / ".agent" / "changelog_draft.md"
+
+
+def _append_to_unreleased(workspace: Path, task_path: Path) -> bool:
+    """Append task's title to CHANGELOG.md ## [Unreleased] under the correct Keep a Changelog subsection.
+
+    Returns True on success or no-op, False on failure (with stderr warning).
+    """
+    try:
+        changelog = workspace / "CHANGELOG.md"
+        if not changelog.is_file():
+            return True
+        content = task_path.read_text(encoding="utf-8") if task_path.is_file() else ""
+        title_m = TITLE_RE.search(content)
+        title = title_m.group(1).strip() if title_m else task_path.stem
+        # Map task type to Keep a Changelog section
+        type_m = re.search(r"docs/tasks/\d{4}-\d{2}-\d{2}-(?:M\d+-)?([a-z]+)-", str(task_path))
+        task_type = type_m.group(1) if type_m else "fix"
+        type_map = {"feat": "Added", "fix": "Fixed", "audit": "Fixed", "docs": "Changed", "chore": "Changed", "refactor": "Changed"}
+        section = type_map.get(task_type, "Fixed")
+        text = changelog.read_text(encoding="utf-8")
+        unreleased = "## [Unreleased]"
+        idx = text.find(unreleased)
+        if idx == -1:
+            return True
+        next_idx = text.find("## [", idx + len(unreleased))
+        unreleased_block = text[idx:next_idx] if next_idx != -1 else text[idx:]
+        if title in unreleased_block:
+            return True
+        # Find or create the subsection header within Unreleased
+        section_header = f"### {section}"
+        sec_idx = text.find(section_header, idx, next_idx if next_idx != -1 else len(text))
+        entry = f"- {title}\n"
+        if sec_idx != -1:
+            # Insert after the section header's next line
+            header_end = text.find("\n", sec_idx) + 1
+            # Find next section or next version
+            next_sec = text.find("### ", header_end)
+            next_ver = text.find("## [", header_end)
+            insert_at = next_sec if next_sec != -1 and (next_ver == -1 or next_sec < next_ver) else next_ver
+            if insert_at == -1 or (next_idx != -1 and insert_at > next_idx):
+                insert_at = next_idx if next_idx != -1 else len(text)
+            new_text = text[:insert_at] + entry + text[insert_at:]
+        else:
+            # Create new subsection after Unreleased header
+            header_end = text.find("\n", idx) + 1
+            if header_end == 0:
+                header_end = idx + len(unreleased) + 1
+            new_text = text[:header_end] + f"\n{section_header}\n{entry}" + text[header_end:]
+        changelog.write_text(new_text, encoding="utf-8")
+        return True
+    except Exception as exc:
+        import sys
+
+        print(f"[WARN] _append_to_unreleased failed for {task_path.name}: {exc}", file=sys.stderr)
+        return False
 
 
 def _has_milestone_token(text: str, milestone_id: str) -> bool:
@@ -146,18 +223,26 @@ def list_tasks(
             content = p.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        s_m = STATUS_RE.search(content)
-        m_m = MILESTONE_RE.search(content)
-        p_m = PRIORITY_RE.search(content)
-        t_m = TITLE_RE.search(content)
-        st = s_m.group(1).lower() if s_m else "unknown"
-        m_id = m_m.group(1).strip() if m_m else ""
+        fm = parse_frontmatter(content)
+        if fm:
+            st = fm.get("status", "unknown").lower()
+            m_id = fm.get("milestone", "").strip()
+            pri = fm.get("priority", "").strip()
+            t_m = TITLE_RE.search(content)
+            title = t_m.group(1).strip() if t_m else p.stem
+        else:
+            s_m = STATUS_RE.search(content)
+            m_m = MILESTONE_RE.search(content)
+            p_m = PRIORITY_RE.search(content)
+            t_m = TITLE_RE.search(content)
+            st = s_m.group(1).lower() if s_m else "unknown"
+            m_id = m_m.group(1).strip() if m_m else ""
+            pri = p_m.group(1).strip() if p_m else ""
+            title = t_m.group(1).strip() if t_m else p.stem
         if want_ms is not None and m_id != want_ms:
             continue
         if want_status is not None and st != want_status:
             continue
-        title = t_m.group(1).strip() if t_m else p.stem
-        pri = p_m.group(1).strip() if p_m else ""
         out.append(TaskIndex(path=p, title=title, status=st, milestone=m_id, priority=pri))
     return out
 
@@ -181,6 +266,10 @@ def create_task(
     """Write a living task file. Returns (ok, message, path)."""
     if typ not in _TASK_TYPES:
         return False, f"invalid type '{typ}'", None
+    if milestone is not None:
+        err = _validate_milestone_id(milestone)
+        if err:
+            return False, err, None
     raw_slug = (slug if slug is not None else title).strip()
     norm = re.sub(r"[^A-Za-z0-9]+", "_", raw_slug).strip("_")
     if not norm:
@@ -199,8 +288,17 @@ def create_task(
     if target.exists():
         return False, f"already exists: {target.relative_to(workspace)}", target
     target.parent.mkdir(parents=True, exist_ok=True)
+    # Frontmatter (strict) + human-readable body (backward compat)
+    fm_lines = ["---", f"status: idea"]
+    if milestone:
+        fm_lines.append(f"milestone: {milestone}")
+    fm_lines.append(f"priority: {priority}")
+    fm_lines.append(f"date: {date}")
+    fm_lines.append("---")
+    fm_block = "\n".join(fm_lines)
     milestone_line = f"- **Milestone**: {milestone}\n" if milestone else ""
     content = (
+        f"{fm_block}\n\n"
         f"# {title}\n\n"
         f"- **Status**: idea\n"
         f"{milestone_line}"
@@ -257,17 +355,36 @@ def mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Pat
         content = target.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         return False, str(exc), target
-    if re.search(r"-\s+\*\*Status\*\*:\s*done\b", content, re.IGNORECASE):
-        return True, f"already done: {target.name}", target
-    new_content = re.sub(r"-\s+\*\*Status\*\*:\s*[\w-]+", "- **Status**: done", content, count=1)
-    if new_content == content:
-        return False, f"no Status field in {target.name}", target
-    target.write_text(new_content, encoding="utf-8")
+    fm = parse_frontmatter(content)
+    if fm and "status" in fm:
+        # Strict frontmatter path
+        if fm.get("status", "").lower() == "done":
+            return True, f"already done: {target.name}", target
+        # Replace frontmatter status: done
+        new_content = re.sub(r"(?m)^status:\s*.*$", "status: done", content, count=1)
+        # Also keep body sync for human readability
+        new_content = re.sub(r"-\s+\*\*Status\*\*:\s*[\w-]+", "- **Status**: done", new_content, count=1)
+        if new_content == content:
+            return False, f"no Status field in {target.name}", target
+        target.write_text(new_content, encoding="utf-8")
+    else:
+        if re.search(r"-\s+\*\*Status\*\*:\s*done\b", content, re.IGNORECASE):
+            return True, f"already done: {target.name}", target
+        new_content = re.sub(r"-\s+\*\*Status\*\*:\s*[\w-]+", "- **Status**: done", content, count=1)
+        if new_content == content:
+            return False, f"no Status field in {target.name}", target
+        target.write_text(new_content, encoding="utf-8")
     if not target.name.endswith(".done.md"):
         new_path = target.parent / (target.name[:-3] + ".done.md")
         if not new_path.exists():
             target.rename(new_path)
             target = new_path
+    # Directly append human summary to CHANGELOG.md Unreleased (no separate draft file)
+    ok_append = _append_to_unreleased(workspace, target)
+    if not ok_append:
+        import sys
+
+        print(f"[WARN] mark_task_done: CHANGELOG update failed for {target.name}", file=sys.stderr)
     return True, f"marked done: {target.name}", target
 
 

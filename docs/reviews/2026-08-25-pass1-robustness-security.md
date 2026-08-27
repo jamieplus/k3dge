@@ -4,7 +4,7 @@
 - **基线**：`70 passed / 1 skipped / 44 subtests / k3dge check --with-tests PASS / 4 域契约已同步`
 - **审计人**：Agent（Grok）Pass 1 单透镜 + 人复核
 - **范围**：`src/k3dge/engine/*` `src/k3dge/cli/*` `src/k3dge/sync/*` `scripts/*` `tests/*` 全量，透镜仅开健壮性与安全
-- **输入**：`docs/memo/2026-08-24-audit-harness-independence.md` 8 维「安全性 + 数据输入」+ Vibe 特检
+- **输入**：`docs/protocols/audit_default.md` 8 维「安全性 + 数据输入」+ Vibe 特检
 
 ## 发现
 

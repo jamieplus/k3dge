@@ -4,7 +4,8 @@
 
 ## 写入时机
 
-`k3dge check` 红灯且将重试前 → 先归档再 `git stash` 重读 `spec`。
+- `k3dge check` 红灯且将重试前 → 先归档再 `git stash` 重读 `spec`。
+- 审计 `待修` 缺陷复现 → 先在 `docs/incidents/INC-YYYYMMDD-<TYPE>-<slug>.md` 留 B-T-D（`Baseline`/`Treatment`/`Design`，见 `docs/incidents/README.md` 命名与 Frontmatter）再修，否则视为未闭环；`docs/branches/` 仅为 `check` 红后试错分支，`docs/incident/` 单数已废弃。
 
 ## 单条模板（自包含，未来失忆的自己也能看懂）
 

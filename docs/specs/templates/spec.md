@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/templates`
-- **Contract Hash**: `sha256:08bbc4f3a7ebc7456be35c16ef571b8da23d3a7a5dbe4a0e7e702edc4b80b718`
-- **Last Updated**: 2026-08-25
+- **Contract Hash**: `sha256:a4ab9ea5a48acd5349a3344361560fd60cd1001f4020489108fd737b895a0b3a`
+- **Last Updated**: 2026-08-27
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -18,6 +18,7 @@
 ## 2. Public Interfaces & Type Contracts
 <!-- k3dge:interfaces-start -->
 ```python
+ensure_mcp_config(target: Path) -> bool
 scaffold(target: Path, name: str | None=None) -> None
 main(argv: Optional[Sequence[str]]=None) -> int
 ```

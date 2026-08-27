@@ -85,7 +85,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
     for domain in changed:
         print(f"[SYNC] Updated spec contract: {domain}")
     if docs_updated:
-        print("[SYNC] Updated generated docs (docs/reference/).")
+        print("[SYNC] Updated generated docs (docs/generated/).")
     _append_log(
         workspace,
         f"[{datetime.datetime.now().isoformat()}] sync -> updated domains={','.join(changed)} docs_updated={docs_updated}",
@@ -241,32 +241,98 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def _harness_fallback_warn(harness: str, reason: str, fallback: str) -> None:
+    """Highlighted warning when external harness fails and we fall back to default."""
+    msg = f"Harness '{harness}' failed ({reason}) → fallback to DEFAULT '{fallback}'"
+    # High-visibility: red background + yellow text + plain fallback for non-TTY
+    banner = f"\033[1;41m[WARN][HARNESS FALLBACK]\033[0m \033[1;33m{msg}\033[0m"
+    print(banner, file=sys.stderr)
+    print(f"[WARN][HARNESS FALLBACK] {msg}", file=sys.stderr)
+
+
 def cmd_mcp(args: argparse.Namespace) -> int:
-    from k3dge.templates.scaffold import _ensure_mcp_config
+    from k3dge.templates.scaffold import ensure_mcp_config
 
     workspace = _find_workspace(Path.cwd())
     if args.mcp_action == "sync":
-        # Merge pipeline-enabled harnesses into .mcp.json (idempotent)
-        _ensure_mcp_config(workspace)
-        # Also merge peers from pipeline.toml if present
+        ok_mcp = ensure_mcp_config(workspace)
+        if not ok_mcp:
+            print("[MCP] .mcp.json skipped due to corruption, see WARN above; not overwriting", file=sys.stderr)
+        # Peer merging from pipeline.toml is best-effort; report if pipeline is unreadable
+        # tomllib is 3.11+, tomli is fallback for 3.10; neither present → skip peer merging gracefully
         try:
-            from pathlib import Path as _P
+            tomllib_mod = None
+            try:
+                import tomllib as tomllib_mod  # py 3.11+
+            except ImportError:
+                try:
+                    import tomli as tomllib_mod  # type: ignore[import-not-found]
+                except ImportError:
+                    tomllib_mod = None
+            if tomllib_mod is None:
+                _harness_fallback_warn("pipeline", "tomllib/tomli not available (py<3.11 without tomli)", "skip peer merging, keep k3dge only")
+            else:
+                cfg_path = workspace / ".agent" / "pipeline.toml"
+                if cfg_path.is_file():
+                    try:
+                        cfg = tomllib_mod.loads(cfg_path.read_text(encoding="utf-8"))
+                    except Exception as exc:
+                        print(f"[MCP] pipeline.toml parse failed: {exc}", file=sys.stderr)
+                        return 1
+                    # Peer merging: ensure enabled harnesses have an .mcp.json entry if sibling exists
+                    import json as _json
 
-            import tomllib
-
-            cfg_path = workspace / ".agent" / "pipeline.toml"
-            if cfg_path.is_file():
-                cfg = tomllib.loads(cfg_path.read_text(encoding="utf-8"))
-                for hid, hcfg in cfg.get("harnesses", {}).items():
-                    if hid == "k3dge":
-                        continue
-                    if not hcfg.get("enabled", True):
-                        continue
-                    # For now, peers are expected to be siblings with `python -m <harness>.cli.mcp` or similar
-                    # We just ensure k3dge is present; peer-specific mcp entries are out of scope for minimal sync
-                    pass
-        except Exception:
-            pass
+                    mcp_path = workspace / ".mcp.json"
+                    try:
+                        data = _json.loads(mcp_path.read_text(encoding="utf-8")) if mcp_path.is_file() else {"mcpServers": {}}
+                        if not isinstance(data, dict):
+                            data = {"mcpServers": {}}
+                    except Exception:
+                        data = {"mcpServers": {}}
+                    if "mcpServers" not in data or not isinstance(data["mcpServers"], dict):
+                        data["mcpServers"] = {}
+                    changed = False
+                    for hid, hcfg in cfg.get("harnesses", {}).items():
+                        if hid == "k3dge":
+                            continue
+                        if not hcfg.get("enabled", True):
+                            continue
+                        if hid in data["mcpServers"]:
+                            continue
+                        # Probe sibling harness (e.g. ../k3dit, ../k3che, ../k3lity)
+                        sibling = workspace.parent / hid
+                        alt_sibling = workspace / hid
+                        probe = sibling if sibling.is_dir() else (alt_sibling if alt_sibling.is_dir() else None)
+                        # Deduce module: prefer <hid>.mcp, fallback to <hid>.cli.mcp
+                        mod = None
+                        if probe is not None:
+                            if (probe / "src" / hid / "mcp.py").is_file():
+                                mod = f"{hid}.mcp"
+                            elif (probe / "src" / hid / "cli" / "mcp.py").is_file():
+                                mod = f"{hid}.cli.mcp"
+                            elif (probe / "pyproject.toml").is_file():
+                                mod = f"{hid}.mcp"
+                        if probe is not None and mod is not None:
+                            # Auto-add peer entry (best-effort)
+                            data["mcpServers"][hid] = {"command": "python", "args": ["-m", mod]}
+                            changed = True
+                            print(f"[MCP] auto-added peer '{hid}' from sibling {probe} as python -m {mod}", file=sys.stderr)
+                        else:
+                            fallback = hcfg.get("manual_protocol", "docs/protocols/audit_default.md")
+                            _harness_fallback_warn(hid, f"sibling not found at {sibling} nor {alt_sibling} or no mcp module", fallback)
+                    if changed:
+                        try:
+                            tmp = mcp_path.with_suffix(".tmp")
+                            tmp.write_text(_json.dumps(data, indent=2) + "\n", encoding="utf-8")
+                            tmp.replace(mcp_path)
+                        except Exception as exc:
+                            print(f"[MCP] peer merge write failed: {exc}", file=sys.stderr)
+                            return 1
+                else:
+                    _harness_fallback_warn("pipeline", ".agent/pipeline.toml not found", "keep k3dge only")
+        except Exception as exc:
+            print(f"[MCP] pipeline handling failed: {exc}", file=sys.stderr)
+            return 1
         print(f"[MCP] synced {workspace / '.mcp.json'}")
         return 0
     return 1
@@ -295,6 +361,61 @@ def cmd_milestone(args: argparse.Namespace) -> int:
         ok, msg, _ = run_milestone_alignment(workspace, m_id)
         print(msg)
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone align -> {m_id} ok={ok}")
+        # Harness pipeline availability check: highlight fallback to default when external harness missing
+        if ok:
+            try:
+                import json as _js
+                tomllib_mod2 = None
+                try:
+                    import tomllib as tomllib_mod2
+                except ImportError:
+                    try:
+                        import tomli as tomllib_mod2
+                    except ImportError:
+                        tomllib_mod2 = None
+                if tomllib_mod2 is not None:
+                    cfg_path2 = workspace / ".agent" / "pipeline.toml"
+                    if cfg_path2.is_file():
+                        try:
+                            cfg2 = tomllib_mod2.loads(cfg_path2.read_text(encoding="utf-8"))
+                            mcp_path2 = workspace / ".mcp.json"
+                            try:
+                                data2 = _js.loads(mcp_path2.read_text(encoding="utf-8")) if mcp_path2.is_file() else {}
+                            except Exception:
+                                data2 = {}
+                            mcp_servers = data2.get("mcpServers", {}) if isinstance(data2, dict) else {}
+                            for hid, hcfg in cfg2.get("harnesses", {}).items():
+                                if not hcfg.get("enabled", True):
+                                    continue
+                                if hid == "k3dge":
+                                    continue
+                                if hid not in mcp_servers:
+                                    _harness_fallback_warn(hid, f"enabled in pipeline.toml but missing in .mcp.json (no sibling or not synced via 'k3dge mcp sync')", hcfg.get("manual_protocol", "audit_default.md"))
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+        if ok and "HUMAN_CHECKPOINT" in msg:
+            # Interactive checkpoint: only when stdin is a TTY; 60s timeout, default N
+            if sys.stdin.isatty():
+                try:
+                    import select
+
+                    print("HUMAN_CHECKPOINT: Milestone {} all green, run 5-Pass audit? (y/N, 60s timeout default N): ".format(m_id), end="", flush=True)
+                    rlist, _, _ = select.select([sys.stdin], [], [], 60)
+                    if rlist:
+                        ans = sys.stdin.readline().strip().lower()
+                        if ans in ("y", "yes"):
+                            print("[CHECKPOINT] User requested audit — create audit task and run k3dit")
+                        else:
+                            print("[CHECKPOINT] Skipped audit")
+                    else:
+                        print("\n[CHECKPOINT] Timeout (60s), default N — skipping audit")
+                except Exception:
+                    pass
+            else:
+                # Non-interactive (CI/tests): surface checkpoint as log, default N
+                print("[CHECKPOINT] Non-interactive, default N — skipping audit")
         return 0 if ok else 1
 
     if action == "seal":
@@ -307,16 +428,11 @@ def cmd_milestone(args: argparse.Namespace) -> int:
         if getattr(args, "no_version_bump", False):
             return 0
         try:
-            from k3dge.engine.version import append_changelog, bump_version
+            from k3dge.engine.version import append_changelog, bump_version, consume_unreleased
 
             new_v = bump_version(workspace, part="patch")
-            archive_dir = workspace / "docs" / "tasks" / "archive" / m_id
-            if archive_dir.is_dir():
-                tasks = sorted(archive_dir.glob("*.md"))
-                task_list = "\n".join(f"- {p.stem}" for p in tasks)
-                notes = f"Seal milestone {m_id}.\n\n{task_list}" if task_list else f"Seal milestone {m_id}."
-            else:
-                notes = f"Seal milestone {m_id}."
+            body = consume_unreleased(workspace)
+            notes = body if body else f"Seal milestone {m_id}."
             append_changelog(workspace, new_v, notes=notes)
             print(f"[VERSION] auto-bumped to {new_v} and updated CHANGELOG.md")
             _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] version auto-bump -> {new_v} milestone={m_id}")

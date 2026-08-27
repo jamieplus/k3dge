@@ -63,4 +63,4 @@
 ## 自检
 
 - `k3dge check --with-tests` 本仓预检：`python -m pytest -q`（局部）未全量跑，文件级静态复现已在 Verification 列给出；`k3dge check` 现场未阻塞（engine contract hash 未改，仅审计报告新增）
-- 本报告 9 列齐全；悬空发现已落到 task 文件或有意留理由，符合 `docs/memo/2026-08-24-audit-harness-independence.md` 唯一规程
+- 本报告 9 列齐全；悬空发现已落到 task 文件或有意留理由，符合 `docs/protocols/audit_default.md` 唯一规程

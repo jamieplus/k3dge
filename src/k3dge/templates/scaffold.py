@@ -59,6 +59,8 @@ ADR_README_TEMPLATE = _asset("adr-readme.md.template")
 
 DOWNSTREAM_GUIDE_TEMPLATE = _asset("downstream.md")
 
+PROTOCOL_TEMPLATE = _asset("protocols/audit_default.md")
+
 TASKS_README_TEMPLATE = _asset("tasks-readme.md")
 
 BRANCHES_README_TEMPLATE = _asset("branches-readme.md")
@@ -85,6 +87,7 @@ def _first_domain_manifest(name: str) -> dict:
     return {
         "name": name,
         "version": "0.1.0",
+        "self_hosting": False,
         "package_root": "src",
         "domains": {
             name: {
@@ -108,21 +111,32 @@ def _write_if_missing(path: Path, content: str, executable: bool = False) -> boo
     return True
 
 
-def _ensure_mcp_config(target: Path) -> None:
-    """Idempotently merge k3dge (and pipeline-enabled peers) into .mcp.json."""
+def ensure_mcp_config(target: Path) -> bool:
+    """Idempotently merge k3dge (and pipeline-enabled peers) into .mcp.json.
+
+    Returns True if config is valid/merged, False if existing file is corrupted (with stderr warning).
+    Public API for cli.mcp sync; templates spec contracts this symbol.
+    """
+    import sys
+
     mcp_path = target / ".mcp.json"
-    # Load existing or start empty
+    # Load existing or start empty; corrupted JSON or non-dict root must not silently destroy peers
     data: dict = {}
     if mcp_path.is_file():
         try:
-            data = json.loads(mcp_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-            data = {}
+            raw = mcp_path.read_text(encoding="utf-8")
+            loaded = json.loads(raw)
+            if not isinstance(loaded, dict):
+                print(f"[WARN] .mcp.json is not a JSON object ({mcp_path}), skipped to avoid overwriting peers", file=sys.stderr)
+                return False
+            data = loaded
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+            print(f"[WARN] .mcp.json corrupted ({mcp_path}): {exc}, skipped to avoid overwriting peers", file=sys.stderr)
+            return False
     if "mcpServers" not in data or not isinstance(data["mcpServers"], dict):
         data["mcpServers"] = {}
     # k3dge is always present (framework)
     if "k3dge" not in data["mcpServers"]:
-        # Heuristic: if target is inside a k3dge checkout (has src/k3dge), use PYTHONPATH mode
         if (target / "src" / "k3dge").is_dir():
             data["mcpServers"]["k3dge"] = {
                 "command": "python",
@@ -134,8 +148,18 @@ def _ensure_mcp_config(target: Path) -> None:
                 "command": "python",
                 "args": ["-m", "k3dge.cli.mcp"],
             }
-        mcp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        # Atomic write via temp file
+        tmp = mcp_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(mcp_path)
+        return True
+    return True
     # Peers from pipeline.toml are merged on demand via `k3dge mcp sync` (not scaffold time)
+
+
+def _ensure_mcp_config(target: Path) -> bool:
+    """Deprecated alias for ensure_mcp_config."""
+    return ensure_mcp_config(target)
 
 
 def _ensure_first_domain(target: Path, name: str, today: str) -> None:
@@ -199,7 +223,9 @@ def scaffold(target: Path, name: str | None = None) -> None:
     (target / "docs" / "guides").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "guides" / "mcp-bridge.md", MCP_BRIDGE_TEMPLATE)
     _write_if_missing(target / "docs" / "guides" / "downstream.md", DOWNSTREAM_GUIDE_TEMPLATE)
-    (target / "docs" / "reference").mkdir(parents=True, exist_ok=True)
+    (target / "docs" / "protocols").mkdir(parents=True, exist_ok=True)
+    _write_if_missing(target / "docs" / "protocols" / "audit_default.md", PROTOCOL_TEMPLATE)
+    (target / "docs" / "generated").mkdir(parents=True, exist_ok=True)
     (target / "docs" / "branches").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "branches" / "README.md", BRANCHES_README_TEMPLATE)
     (target / "logs").mkdir(parents=True, exist_ok=True)
@@ -213,7 +239,7 @@ def scaffold(target: Path, name: str | None = None) -> None:
     _write_if_missing(target / "docs" / "architecture" / "overview.md", ARCHITECTURE_TEMPLATE)
     _write_if_missing(target / ".agent" / "docs.toml", DOCS_TOML_TEMPLATE)
     _write_if_missing(target / ".agent" / "pipeline.toml", PIPELINE_TOML_TEMPLATE)
-    _ensure_mcp_config(target)
+    ensure_mcp_config(target)
     _write_if_missing(target / "scripts" / "generate-docs.sh", GENERATE_DOCS_SH_TEMPLATE, executable=True)
     _write_if_missing(target / "scripts" / "generate-docs.ps1", GENERATE_DOCS_PS1_TEMPLATE)
 

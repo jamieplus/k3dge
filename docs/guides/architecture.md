@@ -8,7 +8,8 @@ k3dge 是一致性门禁：`check` 比对公开签名哈希，`sync` 回写 spec
 
 ## 详细内容
 
-* 域与依赖：overview §1–2
-* 提交数据流：overview §3
-* 已定案决策与有意留：overview §5 / §5.1
+* 域与依赖：`docs/architecture/overview.md` §1–2
+* 提交数据流：`docs/architecture/overview.md` §3
+* 已定案决策：`docs/architecture/overview.md` §8 及 `docs/adr/README.md`
+* 有意留：`docs/reviews/SUMMARY.md` 顶部常驻表（`overview §8` 为索引）
 * 本地自用与职责切分：`docs/adr/0005-local-first-and-layer-cuts.md`

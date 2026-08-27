@@ -20,7 +20,7 @@ Spec-gate harness：为 vibecoding agent 提供确定性的契约漂移检测与
 初始化**另一个空目录**（不要手建 docs/.agent）：进入该目录，跑 **k3dge 仓里的** init：
 
 ```bash
-mkdir k3dit && cd k3dit
+mkdir my-audit-harness && cd my-audit-harness
 /path/to/k3dge/k3dge-init.sh
 ```
 
@@ -52,7 +52,7 @@ k3dge task list --json   # 顶层 tasks 索引（不含 archive、不含正文�
 Agent 行为协议见 `AGENTS.md`（唯一协议源，本 README 不再复制）。
 `.agent/` 是 k3dge 进程配置（`manifest.json` 给门禁）；Agent 不会靠逛隐藏目录发现它（ADR 0014）。
 
-审计透镜不在 k3dge 包内。k3dit 有 `docs/guides/protocol.md` 则读它；否则读 `docs/memo/2026-08-24-audit-harness-independence.md`。
+审计透镜不在 k3dge 包内。sibling audit harness 有 `../k3dit/docs/guides/protocol.md` 则读它；否则读 `docs/protocols/audit_default.md`。
 
 ## 布局
 
@@ -64,8 +64,8 @@ Agent 行为协议见 `AGENTS.md`（唯一协议源，本 README 不再复制）
 | Domain | Source | Spec | Description |
 | --- | --- | --- | --- |
 | cli | `src/k3dge/cli` | `docs/specs/cli/spec.md` | 本仓终端/CI + 对外 harness（DSH/Codex/Claude Code/OpenCode）的 MCP 注入 |
-| engine | `src/k3dge/engine` | `docs/specs/engine/spec.md` | 门禁核心：diff / manifest / spec_schema / contract / evaluator |
-| sync | `src/k3dge/sync` | `docs/specs/sync/spec.md` | spec 接口块与契约哈希回写；docs/reference 机器文档 |
+| engine | `src/k3dge/engine` | `docs/specs/engine/spec.md` | 门禁核心：diff / manifest / spec_schema / contract / evaluator / milestone / version / TEMPLATE_DRIFT |
+| sync | `src/k3dge/sync` | `docs/specs/sync/spec.md` | spec 接口块与契约哈希回写；`docs/generated/` 机器文档（Diátaxis Reference） |
 | templates | `src/k3dge/templates` | `docs/specs/templates/spec.md` | 脚手架生成器（k3dge-init.sh） |
 <!-- k3dge:layout-end -->
 

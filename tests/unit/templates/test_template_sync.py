@@ -36,7 +36,13 @@ class TestTemplateSync(unittest.TestCase):
             "rules/01-docs-structure.md",
             "rules/02-simplification.md",
             "rules/03-self-contained.md",
+            "rules/04-milestone.md",
+            "rules/05-branches.md",
+            "rules/06-memo.md",
+            "rules/07-audit.md",
+            "rules/09-absorption.md",
             "agent-readme.md",
+            "protocols/audit_default.md",
         ]
         for name in expected:
             with self.subTest(asset=name):

@@ -34,7 +34,7 @@ L1 锁的是 **Python 模块顶层公开函数/类签名**（含白名单装饰�
 seal 只拦 `docs/guides/*.md` 里的 `<!-- k3dge:guide-stub -->`。`generate-docs` 写该标记，不再写通用 `<!-- TODO -->`。正文里的 TODO 不挡封板。
 
 ### 2.6 审计独立 harness
-透镜规程不进 `src/k3dge`、不加 `k3dge audit`。本仓 `harnesses/audit/` 为本地审计 harness（PROTOCOL + 报告格式校验 CLI）。k3dge 只留 `docs/reviews/` 槽位与 seal 证据。MCP `k3dge_5pass_audit_prompt` 只指向该 PROTOCOL。
+透镜规程不进 `src/k3dge`、不加 `k3dge audit`。本仓 `docs/protocols/audit_default.md` 为本地审计 harness（PROTOCOL + 报告格式校验 CLI）。k3dge 只留 `docs/reviews/` 槽位与 seal 证据。MCP `k3dge_5pass_audit_prompt` 只指向该 PROTOCOL。
 
 ## 3. 后果 (Consequences)
 - **正**：本仓可直接 `./k3dge-init.sh`；align/check 测集不再分叉；封板无法用任意 md 冒充 align 产物；审计与一致性门禁解耦。

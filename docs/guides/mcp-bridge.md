@@ -66,7 +66,7 @@
 | Tool | `k3dge_task_create` | `milestone.create_task` | 写入 living task 文件 |
 | Tool | `k3dge_task_done` | `milestone.mark_task_done` | 优先 `list` 返回的 path |
 | Tool | `k3dge_milestone_control` | `milestone.(status|align|seal)` | `status` 查任务、`align` Full Matrix 回归、`seal` 三闸机原子归档 |
-| Prompt | `k3dge_5pass_audit_prompt` | 优先 `k3dit/docs/guides/protocol.md`，不存在时 `docs/memo/2026-08-24-audit-harness-independence.md` | 只指路，不在 k3dge 内维护透镜；MCP 仅注入事实源 |
+| Prompt | `k3dge_5pass_audit_prompt` | 优先 `../k3dit/docs/guides/protocol.md`，否则 `docs/protocols/audit_default.md` | 只指路，不在 k3dge 内维护透镜；MCP 仅注入事实源 |
 
 ## 路径解析
 

@@ -10,7 +10,7 @@
   - 从域源码提取公开接口并生成 spec 的接口代码块。
   - 计算契约哈希并回写 `**Contract Hash**` 字段。
   - 更新 `**Last Updated**` 日期。
-  - 生成 `docs/reference/` 机器文档（`api.md` / `domains.md`，无需 agent）。
+  - 生成 `docs/generated/` 机器文档（`api.md` / `domains.md`，Diátaxis Reference，无需 agent）。
   - 支持指定单个域或全部域同步。
 - **Out of Scope**:
   - 接口签名提取的底层实现（由 `engine.contract` 负责）。
@@ -34,4 +34,4 @@ sync_all(workspace: Path, domains: Optional[Sequence[str]]=None) -> Tuple[List[s
 | Scenario ID | Level | Input Condition | Expected Outcome | Test File |
 | --- | --- | --- | --- | --- |
 | TC-SYNC-01 | L1 | 代码接口变更后运行 sync | spec 哈希与代码一致 | `tests/unit/sync/test_generator.py` |
-| TC-SYNC-02 | L1 | `sync_all` 生成 `docs/reference/{api.md,domains.md}` | 两文件存在且幂等；README 布局不由 sync 负责 | `tests/unit/sync/test_generator.py` |
+| TC-SYNC-02 | L1 | `sync_all` 生成 `docs/generated/{api.md,domains.md}` | 两文件存在且幂等；README 布局不由 sync 负责 | `tests/unit/sync/test_generator.py` |

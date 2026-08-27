@@ -4,7 +4,7 @@
 - **基线**：`70 passed / 1 skipped / 44 subtests / k3dge check --with-tests PASS / 4 域契约已同步`
 - **审计人**：Agent（Grok）Pass 2 单透镜 + 人复核
 - **范围**：`.agent/manifest.json` `docs/architecture/overview.md` `docs/specs/*` `docs/adr/*` `src/k3dge/**` 导入
-- **输入**：`docs/memo/2026-08-24-audit-harness-independence.md` 8 维「规范 + 架构」
+- **输入**：`docs/protocols/audit_default.md` 8 维「规范 + 架构」
 
 ## 发现
 

@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:8070060eacdcfc186682b47a567d939a4b604e537c2949e1d3ccb8f34517a3e3`
-- **Last Updated**: 2026-08-25
+- **Contract Hash**: `sha256:c64bc0295cebe7b0725e6f32658d4d6ab7e19eb88198dad209346013a00376a6`
+- **Last Updated**: 2026-08-27
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -55,6 +55,7 @@ class Manifest
     spec_path(self, domain: str) -> Optional[str]
     is_ignored(self, path: str) -> bool
     under_package_root(self, path: str) -> bool
+parse_frontmatter(content: str) -> dict[str, str]
 get_current_milestone(workspace: Path) -> str
 set_current_milestone(workspace: Path, milestone_id: str) -> None
 bump_milestone(workspace: Path) -> str
@@ -98,7 +99,8 @@ get_init_version(workspace: Path) -> str | None
 get_version(workspace: Path) -> str | None
 validate_versions(workspace: Path) -> list[Violation]
 bump_version(workspace: Path, part: str='patch', set_version: str | None=None) -> str
-append_changelog(workspace: Path, new_version: str, notes: str | None=None) -> Path
+append_changelog(workspace: Path, new_version: str, notes: str | None=None, change_type: str | None=None) -> Path
+consume_unreleased(workspace: Path) -> str
 ```
 <!-- k3dge:interfaces-end -->
 
@@ -132,3 +134,6 @@ stateDiagram-v2
 | TC-ENG-05 | L1 | milestone 状态机扫描与归档 | 正确解析 `Status/Milestone` 并物理归档 | `tests/unit/engine/test_milestone.py` |
 | TC-ENG-06 | L1 | 版本三件套不一致 | 违反 `VERSION_MISMATCH`（canonical 全缺不阻断；无 `VERSION_MISSING`） | `tests/unit/engine/test_version.py` |
 | TC-ENG-07 | L1 | `manifest.domains` 为空 | 违反 `NO_DOMAINS` | `tests/unit/engine/test_evaluator.py` |
+| TC-ENG-08 | L1 | `docs/guides/*.md` 含 `<!-- k3dge:guide-stub -->` | seal 阻断，`scan_unfilled_guides` 非空 | `tests/unit/engine/test_milestone.py` |
+| TC-ENG-09 | L1 | `CHANGELOG.md ## [Unreleased]` 正文的追加与提取 | `mark_task_done` 追加 subsection、 `consume_unreleased` 原子提取并清空、失败时 WARN | `tests/unit/engine/test_milestone.py` + `tests/unit/engine/test_version.py` |
+| TC-ENG-10 | L1 | `pipeline.toml` 或 `.mcp.json` 损坏/缺解析器 | `.mcp.json` 损坏 WARN 不覆盖、 `pipeline.toml` 解析失败返回错、缺 `tomllib/tomli` 跳过 peer 合并不假失败 | `tests/unit/cli/test_main.py` + `tests/unit/templates/test_scaffold.py` |
