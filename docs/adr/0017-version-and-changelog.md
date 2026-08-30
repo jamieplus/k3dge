@@ -1,8 +1,10 @@
-# ADR 0017: 自动版本与变更日志
+---
+Status: Accepted
+Date: 2026-08-24
+Deciders: Core Maintainer
+---
 
-- **Status**: Accepted
-- **Date**: 2026-08-24
-- **Deciders**: Core Maintainer
+# ADR 0017: 自动版本与变更日志
 
 ## 1. 上下文 (Context)
 自举阶段以 `docs/adr/` 与 `docs/reviews/` 为记事，不维护独立版本号（`docs/guides/changelog.md` 原文）。用户提出需要**自动更新的版本号**与**更新说明文档**，且 `milestone seal` 已具备物理封板语义，天然适合触发版本递增。
@@ -18,7 +20,7 @@
 4. **不引入 hatch-vcs / setuptools_scm**：自举需改完立刻用同一份代码，`pip install -e` 已满足；`git describe` 派生版本等发行后再议.
 5. **失败语义**：`bump_version` 为原子事务；`seal` 后的自动 bump 若失败不回滚已归档的 `tasks`（归档已不可逆），仅在 `CLI` 打 `stderr` / `MCP` 返回 `version_bump_failed` 告警，禁止"归档成功、版本一半"被静默忽略
 
-## 3. 后果 (Consequences)
+## 3. 产生后果 (Consequences)
 - **正**：`seal` 即发版，`CHANGELOG.md` 自动沉淀，无需人肉改三处版本号
 - **负**：`seal` 默认 bump 可能与"只想归档不发版"冲突，需显式 `--no-version-bump`
 - **何时重开**：需 `git tag` 驱动或 PyPI 发布时，引入 `hatch-vcs` 动态版本

@@ -1,8 +1,10 @@
-# ADR 0015: Agent 对仓库的断言必须带证据链
+---
+Status: Accepted
+Date: 2026-08-24
+Deciders: Core Maintainer
+---
 
-- **Status**: Accepted
-- **Date**: 2026-08-24
-- **Deciders**: Core Maintainer
+# ADR 0015: Agent 对仓库的断言必须带证据链
 
 ## 1. 上下文 (Context)
 `.agent/` 曾被断言成「给 Agent 的发现面 / 自说明根」。制作 agent 与后续 agent 都写过这类句子。实证：主流 harness 自动加载的是 `AGENTS.md`，列目录工具默认不显示点目录，按协议干活可以整段不打开 `.agent/`。断言没有消费者、也没有「怎么到达消费者」这一环，只靠目录名和意图。
@@ -25,7 +27,7 @@
 
 缺链时写「未核」或问一句，禁止用完整陈述冒充已核。本条不增加 `k3dge check` 规则。
 
-## 3. 后果 (Consequences)
+## 3. 产生后果 (Consequences)
 
 - **正**：`.agent/` 那类「名字像给 Agent、实际无人加载」不能再当事实说出去。
 - **负**：Agent 可能啰嗦。用三条链卡住范围，禁止把每句闲聊都做成引用列表。

@@ -1,8 +1,10 @@
-# ADR 0018: TEMPLATE_DRIFT 锁在 engine，不 import templates
+---
+Status: Accepted
+Date: 2026-08-25
+Deciders: Core Maintainer
+---
 
-- **Status**: Accepted
-- **Date**: 2026-08-25
-- **Deciders**: Core Maintainer
+# ADR 0018: TEMPLATE_DRIFT 锁在 engine，不 import templates
 
 ## 1. 上下文 (Context)
 自举仓要把 `templates/assets` 与本仓成对文件字节锁进 `k3dge check`（G-01）。实现曾在 `ConsistencyEngine.evaluate` 里 `from k3dge.templates.pairs import PAIRS`，与 overview「templates 孤岛、engine 不依赖 templates」冲突（P2-DAG-01）。下游仓必须跳过，否则包装资产会误拦（G-01 后半）。
@@ -15,7 +17,7 @@
 4. **不拆第五域**，不把 TEMPLATE_DRIFT 挪到仅 `cli.cmd_check`（MCP check 与 `milestone align` 都走 `evaluate`，必须同一把锁）。
 5. **不加 `k3dge audit`**（ADR 0005 维持）。cli 已删 `audit` 子命令；透镜在 k3dit / memo。
 
-## 3. 后果 (Consequences)
+## 3. 产生后果 (Consequences)
 
 - **正**：DAG 与 overview 一致；自举锁仍在所有 `evaluate` 入口。
 - **负**：`pairs.py` 从 templates 目录搬走后，改脚手架成对物的人要记得改 `engine/pairs.py`。

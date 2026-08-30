@@ -72,3 +72,4 @@ L2 入场券须逐条确认：
 | 0020 | Pattern Absorption Protocol |
 | 0021 | Audit Report Schema v2 (12 columns) |
 | 0022 | Protocol Dispatch: Path-Routed Deterministic Load (Workshop/Helmet/Passphrase) |
+| 0023 | Managed Doc README-Anchor Governance |

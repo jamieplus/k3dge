@@ -1,8 +1,10 @@
-# ADR 0019: 下游 init 必须能被门禁咬住，协议包不得带本仓特化
+---
+Status: Accepted
+Date: 2026-08-25
+Deciders: Core Maintainer
+---
 
-- **Status**: Accepted
-- **Date**: 2026-08-25
-- **Deciders**: Core Maintainer
+# ADR 0019: 下游 init 必须能被门禁咬住，协议包不得带本仓特化
 
 ## 1. 上下文 (Context)
 自举生产级（ADR 0007）已立：本仓 `k3dge check` 能拦住契约漂移。下游工程生产级是另一条线：空仓 `k3dge-init` 之后，门禁必须保护**这个工程的代码**，Agent 协议不能指到不存在的 k3dge ADR / 本仓审计索引。
@@ -19,7 +21,7 @@
    - scaffold 写出 `docs/guides/mcp-bridge.md`、`docs/reviews/SUMMARY.md`、`docs/adr/README.md`、`.gitignore`。
    - `AGENTS.md` 仍与模板字节锁（不衰退），但正文改为读**本仓** overview/adr；harness 自身 ADR 留在 k3dge 检出。
 
-## 3. 后果 (Consequences)
+## 3. 产生后果 (Consequences)
 
 - **正**：新 init 的仓 `check --force-full` 有一域可验；Agent 能读到 mcp-bridge。
 - **负**：旧空壳仓下次跑 scaffold/init 会被写入第一域；不想要则先自己登记 domains。

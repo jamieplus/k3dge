@@ -1,8 +1,10 @@
-# ADR 0005: 本地自用、职责切分、审计独立 harness
+---
+Status: Accepted
+Date: 2026-08-24
+Deciders: Core Maintainer
+---
 
-- **Status**: Accepted
-- **Date**: 2026-08-24
-- **Deciders**: Core Maintainer
+# ADR 0005: 本地自用、职责切分、审计独立 harness
 
 ## 1. 上下文 (Context)
 k3dge 先在本仓自用，不按 PyPI 发行假设设计（阶段定义见 ADR 0007：自举开发）。同时收口六处未定设计：安装源、engine/cli 职责、契约覆盖面、封板证据、guides 桩与 seal 互打、审计透镜位置。
@@ -36,6 +38,6 @@ seal 只拦 `docs/guides/*.md` 里的 `<!-- k3dge:guide-stub -->`。`generate-do
 ### 2.6 审计独立 harness
 透镜规程不进 `src/k3dge`、不加 `k3dge audit`。本仓 `docs/protocols/audit_default.md` 为本地审计 harness（PROTOCOL + 报告格式校验 CLI）。k3dge 只留 `docs/reviews/` 槽位与 seal 证据。MCP `k3dge_5pass_audit_prompt` 只指向该 PROTOCOL。
 
-## 3. 后果 (Consequences)
+## 3. 产生后果 (Consequences)
 - **正**：本仓可直接 `./k3dge-init.sh`；align/check 测集不再分叉；封板无法用任意 md 冒充 align 产物；审计与一致性门禁解耦。
 - **负**：下游未设 `K3DGE_SOURCE` 时 editable 装的是下游自己；拆第五域的诉求被否决直到里程碑副作用再膨胀。

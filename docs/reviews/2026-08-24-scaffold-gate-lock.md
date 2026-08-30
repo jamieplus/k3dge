@@ -12,12 +12,12 @@
 
 ## 发现
 
-| ID | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| G-01 | 高 | P1 | 缺陷 | 对齐锁只在 pytest，check 不比 assets | `evaluator.py` 无 TEMPLATE 比对 | 部分修 | 本仓 `evaluate()` 总是跑 `TEMPLATE_DRIFT`。下游被误伤，转 [tasks/2026-08-24-template-drift-self-host-only.md](../tasks/2026-08-24-template-drift-self-host-only.md) | 本仓 check 绿；`cd k3dit && k3dge check` 5 条 TEMPLATE_DRIFT |
-| G-02 | 高 | P1 | 缺陷 | 只改目标文件不标 templates，`--with-tests` 也不跑锁 | `evaluator.py` 域路由 | 已修 | 比对不依赖 touched | 代码注释「总是运行，不依赖 touched」 |
-| G-03 | 中 | P1 | 规范 | PAIRS 漏 pre-commit/branches/memo/reviews | `pairs.py` | 已修 | 四对入 `k3dge.templates.pairs.PAIRS`，测试与 check 共用 | 本仓 21 对全部 SAME |
-| G-04 | 中 | P1 | 设计 | architecture 模板是 k3dge 四域假图 | `architecture.md.template` | 已修 | 空表示例行 + 「不要复制四域」；不进 PAIRS | 模板域表为 `_示例_` / `src/<domain>` |
+| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| G-01 | 2026-08-24 | 高 | P1 | 缺陷 | 对齐锁只在 pytest，check 不比 assets | `evaluator.py` 无 TEMPLATE 比对 | 部分修 | 本仓 `evaluate()` 总是跑 `TEMPLATE_DRIFT`。下游被误伤，转 [tasks/2026-08-24-template-drift-self-host-only.md](../tasks/2026-08-24-template-drift-self-host-only.md) | 本仓 check 绿；`cd k3dit && k3dge check` 5 条 TEMPLATE_DRIFT | 待复审 |  |
+| G-02 | 2026-08-24 | 高 | P1 | 缺陷 | 只改目标文件不标 templates，`--with-tests` 也不跑锁 | `evaluator.py` 域路由 | 已修 | 比对不依赖 touched | 代码注释「总是运行，不依赖 touched」 | 待复审 |  |
+| G-03 | 2026-08-24 | 中 | P1 | 规范 | PAIRS 漏 pre-commit/branches/memo/reviews | `pairs.py` | 已修 | 四对入 `k3dge.templates.pairs.PAIRS`，测试与 check 共用 | 本仓 21 对全部 SAME | 待复审 |  |
+| G-04 | 2026-08-24 | 中 | P1 | 设计 | architecture 模板是 k3dge 四域假图 | `architecture.md.template` | 已修 | 空表示例行 + 「不要复制四域」；不进 PAIRS | 模板域表为 `_示例_` / `src/<domain>` | 待复审 |  |
 
 ## 各轮
 

@@ -1,8 +1,10 @@
-# ADR 0012: `.agent/rules` 是协议切片，不是第二份协议
+---
+Status: Accepted
+Date: 2026-08-24
+Deciders: Core Maintainer
+---
 
-- **Status**: Accepted
-- **Date**: 2026-08-24
-- **Deciders**: Core Maintainer
+# ADR 0012: `.agent/rules` 是协议切片，不是第二份协议
 
 ## 1. 上下文 (Context)
 `.agent/` 里三样东西地位不同：`manifest.json` 是 `k3dge check/sync` 的事实源；`docs.toml` 只给 `generate-docs`；`rules/*.md` 没有消费者。Grok / Codex / Claude Code / Cursor 自动加载 `AGENTS.md`（或各自的 `.grok/.claude/.cursor/rules/`），**不扫** `.agent/rules/`。AGENTS.md §3 开工清单也不读它们。
@@ -19,7 +21,7 @@
 4. **init 必须写出完整 00–03**，内容与 `src/k3dge/templates/assets/rules/` 及本仓 `.agent/rules/` 相同（含 `02-simplification.md`）。禁止再写空标题。`_write_if_missing` 仍不覆盖已有文件。
 5. Agent 何时读 02：用户要求简化 / 删死代码 / 拆冗余，或里程碑 C2 勾了深层嵌套坏味道 → 先按 02 举证再动（写入 AGENTS.md §12）。00/01/03 不要求已加载 AGENTS.md 的 Agent 再读一遍。
 
-## 3. 后果 (Consequences)
+## 3. 产生后果 (Consequences)
 
 - **正**：k3dit `k3dge-init` 后有完整 Rule 02，overview 指针不再断；协议单一；成对物有据。
 - **负**：AGENTS.md 与四份 rule 仍可能手工漂。用 `test_template_sync` 锁「assets/rules ↔ `.agent/rules`」和「assets/agents.md ↔ AGENTS.md」。

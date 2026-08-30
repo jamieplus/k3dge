@@ -1,8 +1,10 @@
-# ADR 0008: 用自举级 k3dge 开发并列 harness（audit / quality / cache）
+---
+Status: Accepted
+Date: 2026-08-24
+Deciders: Core Maintainer
+---
 
-- **Status**: Accepted
-- **Date**: 2026-08-24
-- **Deciders**: Core Maintainer
+# ADR 0008: 用自举级 k3dge 开发并列 harness（audit / quality / cache）
 
 ## 1. 上下文 (Context)
 k3dge 已能作为本仓硬门禁（ADR 0007 自举）。下一步不是发行 PyPI，而是 **用 k3dge 去开发另外三套 harness**。它们必须和 k3dge 并联，不能长进 `src/k3dge`（质量不进本闸见 memo 2026-08-21；审计独立见 ADR 0005 §2.6）。
@@ -24,7 +26,7 @@ k3dge 是 **一致性元门禁**。下列三者各是独立仓（或即将拆出
 - **新仓 init 之后与自举 k3dge 同一套 Agent 协议**：写入的 `AGENTS.md` 即生产级模板（门控、§12 文档/里程碑触发、MCP 只走固定剧本）。`k3dge check` 在该仓 pre-commit 硬拦。脚手架幂等不覆盖已有 `AGENTS.md`/`scripts/init.sh`——协议升级要再同步这两份，不是 init 行为回退。
 - 给 Codex / Claude Code / OpenCode / DSH 用时：k3dge 走 MCP 注入（ADR 0006）；其它 harness 各自决定入口（CLI / 另一个 MCP），不要共用 k3dge 的工具名假装成一个进程。
 
-## 3. 后果 (Consequences)
+## 3. 产生后果 (Consequences)
 - **正**：自举范围从「开发 k3dge」扩成「用 k3dge 开发工具链」；层仍然干净。
 - **负**：三仓 + 本仓要记得 `K3DGE_SOURCE`；k3dge 契约一变，三个子仓都要 `k3dge sync`/`check`。
 - **下一步（未做）**：建三个工作区并 `K3DGE_SOURCE=<k3dge> k3dge-init`。未建仓前不要在本仓 `src/` 里预埋它们的实现。

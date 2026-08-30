@@ -12,3 +12,12 @@ venv/
 logs/
 .grok/
 harnesses/
+
+# protocol dispatch turnstile acks (ephemeral, per session)
+.protocol-ack/
+
+# local session receipt (attended_zones + epoch) — never commit; CI has no session to re-verify
+.agent/session.json
+
+# clean audit snapshot copy (temp-stripped working tree for kedge3 audit)
+k3dge-audit/

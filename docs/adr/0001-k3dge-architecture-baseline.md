@@ -1,15 +1,17 @@
-# ADR 0001: k3dge 架构设计与工程治理基线
+---
+Status: Accepted
+Date: 2026-08-19
+Deciders: Core Maintainer
+---
 
-- **Status**: Accepted
-- **Date**: 2026-08-19
-- **Deciders**: Core Maintainer
+# ADR 0001: k3dge 架构设计与工程治理基线
 
 ## 1. 上下文 (Context)
 在基于 LLM 的自主编码与 Vibe Coding 流程中，Agent 容易出现跨会话语义漂移、随意修改
 底层抽象以及"代码与文档脱节"的问题。现存方案多依赖 Soft Prompting 约束，缺乏机器
 层面的确定性硬门禁。
 
-## 2. 决策结论 (Decision)
+## 2. 决策 (Decision)
 构建 `k3dge`——一套基于 Python 3.10+ 标准库（核心零依赖，tree-sitter 为可选 extra）、
 支持"目录契约 + 双向一致性校验 + Git 门禁拦截"的轻量级工程治理 Harness。
 
@@ -29,7 +31,7 @@
 
 目的语言（减少漂移、幻觉、修局部坏整体等，不必穷举）见 ADR 0011；本 ADR 只定实现。
 
-## 3. 产生的后果 (Consequences)
+## 3. 产生后果 (Consequences)
 - **正面影响**：阻断 LLM 的无意识抽象破坏；跨会话状态下 100% 可追溯的规格说明书。
 - **负面影响 / 权衡**：变更公开接口需额外跑一次 `k3dge sync`；跨语言契约校验依赖
   可选 tree-sitter 依赖。

@@ -8,18 +8,18 @@
 
 ## 发现
 
-| ID | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| P2-DAG-01 | 中 | P1 | 设计 | `engine` 运行时 `import templates.pairs`，与 overview「templates 孤岛」冲突。不是崩闸 | `evaluator.py:220` | 待修 | [tasks/2026-08-25-M1-audit-P2_DAG_01_engine_import_templates_DAG.md](../tasks/2026-08-25-M1-audit-P2_DAG_01_engine_import_templates_DAG.md)（并入 DAG-02、PUR-01/02、ADR-01、D-05、META-01） | `from k3dge.templates.pairs import PAIRS` |
-| P2-DAG-02 | 低 | P2 | 规范 | overview 未写 version / TEMPLATE_DRIFT 两闸 | `overview.md` §2 | 待修 | 并入上条，改 overview 时补一句 | 文档落后 |
-| P2-PUR-01 | 低 | P2 | 规范 | engine spec In Scope 未写 version/TEMPLATE_DRIFT | `docs/specs/engine/spec.md:9-15` | 待修 | 并入 P2-DAG-01 | 同 DAG |
-| P2-PUR-02 | 低 | P2 | 规范 | 门禁读 templates 资产 vs Out of Scope | `engine/spec.md:16-19` | 待修 | 并入 P2-DAG-01 | 同 DAG |
-| P2-PUR-03 | 低 | P2 | 规范 | sync spec 仍写 `architecture.md`，代码是 `domains.md` | `docs/specs/sync/spec.md` | 待修 | 并入 [P4-03](../tasks/2026-08-25-M1-audit-P4_03_TC_SYNC_02_generate_docs.md) | generator 写 domains.md |
-| P2-PUR-04 | 低 | P3 | 冗余 | `render_readme_layout` 仍公开、sync_all 不再调用 | `sync/generator.py` | 有意留 | 有意留：generate-docs 仍调用。何时重开：该函数无任何调用方 | 公开符号；调用在 scripts |
-| P2-PUR-05 | 低 | P2 | 规范 | cli spec In Scope 未列 task/doc/audit/version | `docs/specs/cli/spec.md` | 待修 | 并入 [P2-PUR-06](../tasks/2026-08-25-M1-audit-P2_PUR_06_k3dge_audit_triage_cli_ADR.md)：留/删 audit 时一并改 In Scope | 接口已含 cmd_* |
-| P2-PUR-06 | 中 | P1 | 规范 | `k3dge audit triage` 违 ADR 0005 | `cli/main.py` `cmd_audit` | 待修 | [tasks/2026-08-25-M1-audit-P2_PUR_06_k3dge_audit_triage_cli_ADR.md](../tasks/2026-08-25-M1-audit-P2_PUR_06_k3dge_audit_triage_cli_ADR.md) | 命令存在 |
-| P2-ADR-01 | 低 | P2 | 规范 | TEMPLATE_DRIFT 无独立 ADR | evaluator / pairs | 待修 | 并入 P2-DAG-01 | 锁已存在，缺 ADR |
-| P2-META-01 | 低 | P3 | 规范 | manifest 引擎描述未写 milestone/version | `.agent/manifest.json` | 待修 | 并入 [P2-DAG-01](../tasks/2026-08-25-M1-audit-P2_DAG_01_engine_import_templates_DAG.md)：改 overview/spec 时顺手 | 描述字符串 |
+| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| P2-DAG-01 | 2026-08-25 | 中 | P1 | 设计 | `engine` 运行时 `import templates.pairs`，与 overview「templates 孤岛」冲突。不是崩闸 | `evaluator.py:220` | 待修 | [tasks/2026-08-25-M1-audit-P2_DAG_01_engine_import_templates_DAG.md](../tasks/2026-08-25-M1-audit-P2_DAG_01_engine_import_templates_DAG.md)（并入 DAG-02、PUR-01/02、ADR-01、D-05、META-01） | `from k3dge.templates.pairs import PAIRS` | 待复审 |  |
+| P2-DAG-02 | 2026-08-25 | 低 | P2 | 规范 | overview 未写 version / TEMPLATE_DRIFT 两闸 | `overview.md` §2 | 待修 | 并入上条，改 overview 时补一句 | 文档落后 | 待复审 |  |
+| P2-PUR-01 | 2026-08-25 | 低 | P2 | 规范 | engine spec In Scope 未写 version/TEMPLATE_DRIFT | `docs/specs/engine/spec.md:9-15` | 待修 | 并入 P2-DAG-01 | 同 DAG | 待复审 |  |
+| P2-PUR-02 | 2026-08-25 | 低 | P2 | 规范 | 门禁读 templates 资产 vs Out of Scope | `engine/spec.md:16-19` | 待修 | 并入 P2-DAG-01 | 同 DAG | 待复审 |  |
+| P2-PUR-03 | 2026-08-25 | 低 | P2 | 规范 | sync spec 仍写 `architecture.md`，代码是 `domains.md` | `docs/specs/sync/spec.md` | 待修 | 并入 [P4-03](../tasks/2026-08-25-M1-audit-P4_03_TC_SYNC_02_generate_docs.md) | generator 写 domains.md | 待复审 |  |
+| P2-PUR-04 | 2026-08-25 | 低 | P3 | 冗余 | `render_readme_layout` 仍公开、sync_all 不再调用 | `sync/generator.py` | 有意留 | 有意留：generate-docs 仍调用。何时重开：该函数无任何调用方 | 公开符号；调用在 scripts | 待复审 |  |
+| P2-PUR-05 | 2026-08-25 | 低 | P2 | 规范 | cli spec In Scope 未列 task/doc/audit/version | `docs/specs/cli/spec.md` | 待修 | 并入 [P2-PUR-06](../tasks/2026-08-25-M1-audit-P2_PUR_06_k3dge_audit_triage_cli_ADR.md)：留/删 audit 时一并改 In Scope | 接口已含 cmd_* | 待复审 |  |
+| P2-PUR-06 | 2026-08-25 | 中 | P1 | 规范 | `k3dge audit triage` 违 ADR 0005 | `cli/main.py` `cmd_audit` | 待修 | [tasks/2026-08-25-M1-audit-P2_PUR_06_k3dge_audit_triage_cli_ADR.md](../tasks/2026-08-25-M1-audit-P2_PUR_06_k3dge_audit_triage_cli_ADR.md) | 命令存在 | 待复审 |  |
+| P2-ADR-01 | 2026-08-25 | 低 | P2 | 规范 | TEMPLATE_DRIFT 无独立 ADR | evaluator / pairs | 待修 | 并入 P2-DAG-01 | 锁已存在，缺 ADR | 待复审 |  |
+| P2-META-01 | 2026-08-25 | 低 | P3 | 规范 | manifest 引擎描述未写 milestone/version | `.agent/manifest.json` | 待修 | 并入 [P2-DAG-01](../tasks/2026-08-25-M1-audit-P2_DAG_01_engine_import_templates_DAG.md)：改 overview/spec 时顺手 | 描述字符串 | 待复审 |  |
 
 > `DAG` 声明仅 `P2-DAG-01` 一处逆向，其余 `cli→engine` 等均验证通过；`templates` 零 `engine` 导入符合孤岛。
 

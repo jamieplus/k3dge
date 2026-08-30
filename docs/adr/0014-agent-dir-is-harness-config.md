@@ -1,8 +1,11 @@
+---
+Status: Accepted
+Date: 2026-08-24
+Deciders: Core Maintainer
+---
+
 # ADR 0014: `.agent/` 是 harness 机器配置，不是 Agent 的发现面
 
-- **Status**: Accepted
-- **Date**: 2026-08-24
-- **Deciders**: Core Maintainer
 - **Amends**: ADR 0013（保留三件套清单；撤回「Agent 打开这个目录即自说明」）
 
 ## 1. 上下文 (Context)
@@ -31,7 +34,7 @@ ADR 0013 把 `.agent/` 写成 Agent 自说明根：换会话打开这个目录�
 - `.agent/rules/*.md` 也是按路径直取的 **how 切片**（尤其 02），不是第二份 where。冲突仍以 AGENTS.md 为准（ADR 0012）。
 - 点前缀的**现行用法**：不要当普通目录去逛。真正读到它是因为 AGENTS.md 给了路径，不是因为 `ls` 看见了。点前缀的**来历**仍是旧名（对象曾被设想成 Agent + 学 `.git`）；0014 没有「为了防逛才改成点目录」这一步，目录本来就叫这个。
 
-## 3. 后果 (Consequences)
+## 3. 产生后果 (Consequences)
 
 - **正**：设计与实测一致；不再用「Agent 会发现隐藏目录」当自说明。
 - **负**：目录名 `.agent` 仍像给人看的。改名成本高、且不是本条范围。

@@ -1,8 +1,10 @@
-# ADR 0004: 里程碑生命周期治理（Milestone Lifecycle Governance）
+---
+Status: Accepted
+Date: 2026-08-23
+Deciders: Core Maintainer
+---
 
-- **Status**: Accepted
-- **Date**: 2026-08-23
-- **Deciders**: Core Maintainer
+# ADR 0004: 里程碑生命周期治理（Milestone Lifecycle Governance）
 
 ## 1. 上下文 (Context)
 `k3dge` 初始设计覆盖微观门禁（`k3dge check` 的 L0/L1 结构与契约校验）。随着
@@ -32,7 +34,7 @@
 `AGENTS.md §3` 的开工扫描仅覆盖顶层活跃文件，`archive/` 天然排除——实现
 Token 零浪费的上下文重置，且符合 `docs/tasks/archive/` 的 append-only 审计需求。
 
-## 3. 后果 (Consequences)
+## 3. 产生后果 (Consequences)
 - **正面**：确定性验收 + 防过度工程 + 上下文经济性闭环；`engine` 域由纯判定
   扩展为"门禁判定与生命周期治理核心"，职责边界在 `overview.md` 与 `engine/spec.md`
   中显式更新。

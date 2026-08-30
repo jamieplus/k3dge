@@ -9,15 +9,15 @@
 
 ## 发现
 
-| ID | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| U-01 | 中 | P1 | 规范 | 两份 ADR 同号 `0016` | `docs/adr/0016-*.md`；overview §5 | 已修 | 版本 ADR 改号 **0017**；overview 有独立一行 | 仅一份 `0016-living-doc-relocation.md`；`0017-version-and-changelog.md` |
-| U-02 | 高 | P1 | 缺陷 | `validate_versions` 被 `except pass` 吞掉；缺字段不算漂移 | `evaluator.py`；`version.py` | 已修 | 异常记 `VERSION_MISMATCH`；`mf_v != py_v` 含 None | `test_validate_missing_manifest_field_is_drift` |
-| U-03 | 中 | P1 | 规范 | version 零测试、矩阵无 TC | `tests/`；engine/cli spec §4 | 已修 | `test_version.py` + TC-ENG-06 / TC-CLI-05 | `11` 条 version 测；全套 `70 passed` |
-| U-04 | 中 | P1 | 规范 | MCP seal 不 bump | `cli/mcp.py` | 已修 | seal 成功后 `bump_version`；失败带 `version_bump_failed` | mcp.py 190–218 |
-| U-05 | 中 | P1 | 缺陷 | bump 非原子；seal 后 bump 失败仍 0 | `version.py` `bump_version` | 已修 | 先算全文再写、失败回滚；ADR 0017：归档不回滚、禁止静默 | `test_bump_is_atomic_on_failure` |
-| U-06 | 中 | P2 | 设计 | `_init_path` 写死 `src/k3dge` | `version.py` | 已修 | 走 `manifest.package_root`，`src`+name 回退 | `test_init_path_uses_manifest` |
-| U-07 | 低 | P2 | 规范 | MCP 审计 prompt 只指向缺失的 k3dit protocol | `cli/mcp.py`；mcp-bridge.md | 已修 | 与 AGENTS.md §9 同一回退句 | prompt 含 memo 路径 |
+| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| U-01 | 2026-08-24 | 中 | P1 | 规范 | 两份 ADR 同号 `0016` | `docs/adr/0016-*.md`；overview §5 | 已修 | 版本 ADR 改号 **0017**；overview 有独立一行 | 仅一份 `0016-living-doc-relocation.md`；`0017-version-and-changelog.md` | 待复审 |  |
+| U-02 | 2026-08-24 | 高 | P1 | 缺陷 | `validate_versions` 被 `except pass` 吞掉；缺字段不算漂移 | `evaluator.py`；`version.py` | 已修 | 异常记 `VERSION_MISMATCH`；`mf_v != py_v` 含 None | `test_validate_missing_manifest_field_is_drift` | 待复审 |  |
+| U-03 | 2026-08-24 | 中 | P1 | 规范 | version 零测试、矩阵无 TC | `tests/`；engine/cli spec §4 | 已修 | `test_version.py` + TC-ENG-06 / TC-CLI-05 | `11` 条 version 测；全套 `70 passed` | 待复审 |  |
+| U-04 | 2026-08-24 | 中 | P1 | 规范 | MCP seal 不 bump | `cli/mcp.py` | 已修 | seal 成功后 `bump_version`；失败带 `version_bump_failed` | mcp.py 190–218 | 待复审 |  |
+| U-05 | 2026-08-24 | 中 | P1 | 缺陷 | bump 非原子；seal 后 bump 失败仍 0 | `version.py` `bump_version` | 已修 | 先算全文再写、失败回滚；ADR 0017：归档不回滚、禁止静默 | `test_bump_is_atomic_on_failure` | 待复审 |  |
+| U-06 | 2026-08-24 | 中 | P2 | 设计 | `_init_path` 写死 `src/k3dge` | `version.py` | 已修 | 走 `manifest.package_root`，`src`+name 回退 | `test_init_path_uses_manifest` | 待复审 |  |
+| U-07 | 2026-08-24 | 低 | P2 | 规范 | MCP 审计 prompt 只指向缺失的 k3dit protocol | `cli/mcp.py`；mcp-bridge.md | 已修 | 与 AGENTS.md §9 同一回退句 | prompt 含 memo 路径 | 待复审 |  |
 
 ## 各轮摘要
 

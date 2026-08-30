@@ -1,8 +1,10 @@
-# ADR 0016: 活文档搬走或删除时，扫描入口和指针必须同轮接上
+---
+Status: Accepted
+Date: 2026-08-24
+Deciders: Core Maintainer
+---
 
-- **Status**: Accepted
-- **Date**: 2026-08-24
-- **Deciders**: Core Maintainer
+# ADR 0016: 活文档搬走或删除时，扫描入口和指针必须同轮接上
 
 ## 1. 上下文 (Context)
 `docs/protocols/audit_default.md` 按口令记下 8 维审计规程。同日写成 `harnesses/audit/PROTOCOL.md`，memo 标「已晋升」进 archive（§6：顶层扫描不再读 archive）。约 17 分钟后 ADR 0008 把 audit 迁出，删掉 PROTOCOL，本仓只留指向 k3dit 的指针。k3dit 随后被删、再空 init，没有 `docs/guides/protocol.md`。晋升目标没了，memo 仍在 archive。Agent 视界丢了现行透镜。README / MCP prompt 还指向已删路径。
@@ -19,7 +21,7 @@
 4. 不把「所有 md 链接是否 404」做成 `k3dge check` 规则。那是文档质量，进并列 harness 再说。本条只约束 Agent 在搬/删时的同轮接续。
 5. §8 成对物：归档 memo 与晋升后的 PROTOCOL 是成对物。删其一前必须看另一份是否还承担扫描入口。
 
-## 3. 后果 (Consequences)
+## 3. 产生后果 (Consequences)
 
 - **正**：再删 `PROTOCOL.md` 时必须把 8 维 memo 拉回顶层，或当时就写好 k3dit 的 protocol。
 - **负**：Agent 删文件前要搜谁点名了它，多一次 grep。

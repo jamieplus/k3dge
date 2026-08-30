@@ -1,8 +1,10 @@
-# ADR 0003: tasks 与 backlog 合并为单一 tasks 目录
+---
+Status: Accepted
+Date: 2026-08-21
+Deciders: Core Maintainer
+---
 
-- **Status**: Accepted
-- **Date**: 2026-08-21
-- **Deciders**: Core Maintainer
+# ADR 0003: tasks 与 backlog 合并为单一 tasks 目录
 
 ## 1. 上下文 (Context)
 `docs/backlog/`（想法收件箱）与 `docs/tasks/`（工作登记处）并存一个周期后，backlog
@@ -21,7 +23,7 @@
    AGENTS.md §5 Task Intake Discipline 与 `docs/tasks/README.md`，全部保留。
 4. memo（弱相关闪念）与 branches（已证伪分支）保持独立，语义不重叠。
 
-## 3. 后果 (Consequences)
+## 3. 产生后果 (Consequences)
 - **正面**：单一扫描目标（修复了 lifecycle 第 1 步漏扫 tasks 的不一致）；少一对
   需要辨析的成对物；Status 流转比目录迁移更轻。
 - **负面**：tasks 目录混合模糊想法与明确任务，靠 Status 区分——阅读时需多看一行。

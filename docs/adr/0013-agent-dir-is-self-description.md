@@ -1,8 +1,10 @@
-# ADR 0013: `.agent/` 是 Agent 自说明根，不是「只有 manifest.json」
+---
+Status: Amended by ADR-0014
+Date: 2026-08-24
+Deciders: Core Maintainer
+---
 
-- **Status**: Amended by ADR 0014
-- **Date**: 2026-08-24
-- **Deciders**: Core Maintainer
+# ADR 0013: `.agent/` 是 Agent 自说明根，不是「只有 manifest.json」
 
 > **修正**：ADR 0014 撤回「Agent 打开本目录即自说明」。三件套清单仍有效；发现面是 `AGENTS.md`。
 
@@ -24,7 +26,7 @@ ADR 0012 只裁定 rules vs AGENTS.md，不定义「`.agent/` 这个目录是什
 4. `k3dge-init` 必须写出 `.agent/README.md`，与本仓同一份（`templates/assets/agent-readme.md`），避免下游仓再次丢失。
 5. 不把 `AGENTS.md` 搬进 `.agent/`：那会让 Grok/Codex 不再自动加载。若将来主流 harness 改约定，再重开本 ADR。
 
-## 3. 后果 (Consequences)
+## 3. 产生后果 (Consequences)
 
 - **正**：换 Agent 打开 `.agent/` 不再需要上一轮聊天；目录名与内容重新对上。
 - **负**：又多一份要与 assets 对齐的 README（`test_template_sync` 锁）。

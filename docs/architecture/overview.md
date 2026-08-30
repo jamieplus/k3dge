@@ -108,7 +108,7 @@ sequenceDiagram
     Meta->>Quality: verify
     Quality-->>Meta: VERIFIED
     Meta->>Audit: run-audit (5-Pass)
-    Audit-->>Meta: 9 列报告
+    Audit-->>Meta: 12 列报告（含 日期/复审/验收）
     Meta->>Cache: inject_summary
     Cache-->>Meta: HARNESS_SKIP/OK
     Meta-->>Agent: HUMAN_CHECKPOINT y/N
