@@ -45,7 +45,6 @@ class TestTemplateSync(unittest.TestCase):
             "agent-readme.md",
             "protocols/audit_default.md",
             "protocols/verify_default.md",
-            "protocols/adr_default.md",
             "protocols/incident_default.md",
             "protocols/task_default.md",
             "protocols/meta_protocol.md",

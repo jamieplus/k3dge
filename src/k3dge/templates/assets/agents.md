@@ -27,7 +27,7 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 | --- | --- |
 | Public signature | `k3dge sync` |
 | New `src/` domain | `manifest` + `spec` + tests |
-| Persistent design | 解析目标路径协议（`k3dge protocol resolve --path <file>`）并遵循之；产物形态由对应协议（如 `adr`）决定 |
+| Persistent design | 解析目标路径协议（`k3dge protocol resolve --path <file>`）并遵循之；产物形态由对应协议（如 `incident`/`task`）决定 |
 | Task done | `Status: done` + `.done.md` |
 | Milestone all `done` | `k3dge milestone align` → `HUMAN_CHECKPOINT(60s/N)` → `audit` or `seal` |
 | `align` hook | `pipeline.toml` `pipelines.on_align_success` → `peers` `mcp→cli→manual`/`skip`；`pipelines.on_pre_seal` → `k3dit.actions.verify` |

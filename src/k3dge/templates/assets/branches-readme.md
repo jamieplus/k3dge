@@ -2,6 +2,12 @@
 
 与 `docs/tasks/`（后做）、`docs/memo/`（闪念）并列，专收**本任务内已证伪的尝试路径**，用于裁剪上下文与重置注意力。
 
+## 文档编撰规则 (Document Authoring Rules)
+
+- 文件名 `docs/branches/YYYY-MM-DD-<slug>.md`，单条自包含（尝试路径 / 为何失败 / 学到什么 / `Date`）。
+- 仅收 `k3dge check` 红后试错分支；复现缺陷先落 `docs/incidents/` 再修。
+- 重试前必读 `docs/branches/` 全量，避重蹈同一失败路径。
+
 ## 写入时机
 
 - `k3dge check` 红灯且将重试前 → 先归档再 `git stash` 重读 `spec`。

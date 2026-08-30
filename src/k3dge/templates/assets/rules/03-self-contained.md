@@ -12,7 +12,7 @@ memory) can understand it from the file alone.
   restating the essential facts.
 - For memos: list what was considered, what was decided, and the trigger for
   revisiting.
-- For ADRs: the authoring & governance contract lives in `docs/protocols/adr_default.md` (frontmatter schema, three-section Context / Decision / Consequences, anti-narrative lint). Read it via `k3dge protocol resolve adr` before writing one.
+- For ADRs: the authoring & governance rules live in `docs/adr/README.md` (`## 文档编撰规则`); read that section before writing one.
 - For specs: include In/Out of Scope and Verification Matrix.
 
 Violations are not blocked by `k3dge check` (hard to machine-verify), but are

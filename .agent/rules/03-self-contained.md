@@ -12,7 +12,7 @@ memory) can understand it from the file alone.
   restating the essential facts.
 - For memos: list what was considered, what was decided, and the trigger for
   revisiting.
-- For ADRs: include Context, Decision, and Consequences.
+- For ADRs: the authoring & governance rules live in `docs/adr/README.md` (`## 文档编撰规则`); read that section before writing one.
 - For specs: include In/Out of Scope and Verification Matrix.
 
 Violations are not blocked by `k3dge check` (hard to machine-verify), but are
