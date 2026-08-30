@@ -93,7 +93,7 @@ def main() -> int:
             print("[k3dge doc-gate] FAIL: README structure broken -> commit blocked")
             for e in errs:
                 print(f"  - {e}")
-            print("[k3dge doc-gate] add/fix the domain README (with anchor), then commit (or `git commit --no-verify`)")
+            print("[k3dge doc-gate] add/fix the domain README (with anchor), then commit")
             rc = 1
         else:
             print(f"[k3dge doc-gate] PASS: {len(doc_files)} managed doc(s) — README structure intact")
