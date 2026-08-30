@@ -31,15 +31,23 @@ WS = Path(__file__).resolve().parent.parent
 ANCHOR = "## 文档编撰规则 (Document Authoring Rules)"
 
 
-def staged_docs() -> list[str]:
+def staged_files() -> list[str]:
     out = subprocess.run(
         ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
         cwd=WS, capture_output=True, text=True,
     )
-    return [
-        p for p in out.stdout.splitlines()
-        if p.startswith("docs/") and p.endswith(".md") and not p.endswith("/README.md")
-    ]
+    return [p for p in out.stdout.splitlines()]
+
+
+# k3dge check only matters when code / spec / agent-config / templates change.
+_CHECK_PREFIXES = ("src/", "docs/specs/", ".agent/", "src/k3dge/templates/")
+_CHECK_SUFFIXES = (".py", "manifest.json", "pyproject.toml", ".toml")
+
+
+def relevant_for_check(files: list[str]) -> bool:
+    return any(
+        f.startswith(_CHECK_PREFIXES) or f.endswith(_CHECK_SUFFIXES) for f in files
+    )
 
 
 def check_one(rel: str) -> list[str]:
@@ -73,10 +81,13 @@ def main() -> int:
         return 0
 
     rc = 0
-    files = staged_docs()
-    if files:
+    files = staged_files()
+    doc_files = [f for f in files if f.startswith("docs/") and f.endswith(".md") and not f.endswith("/README.md")]
+
+    # doc-gate: only when docs actually changed
+    if doc_files:
         errs: list[str] = []
-        for f in files:
+        for f in doc_files:
             errs.extend(check_one(f))
         if errs:
             print("[k3dge doc-gate] FAIL: README structure broken -> commit blocked")
@@ -85,13 +96,18 @@ def main() -> int:
             print("[k3dge doc-gate] add/fix the domain README (with anchor), then commit (or `git commit --no-verify`)")
             rc = 1
         else:
-            print(f"[k3dge doc-gate] PASS: {len(files)} managed doc(s) — README structure intact")
+            print(f"[k3dge doc-gate] PASS: {len(doc_files)} managed doc(s) — README structure intact")
+    else:
+        print("[k3dge doc-gate] skipped (no docs changed in this commit)")
 
-    # consistency gate (k3dge check) — single unified pre-commit entrypoint
-    print("[k3dge check] running consistency gate...", flush=True)
-    check_rc = subprocess.call([sys.executable, str(WS / "scripts" / "gate.py")])
-    if check_rc != 0:
-        rc = check_rc
+    # consistency gate (k3dge check): only when code/spec/agent changed
+    if relevant_for_check(files):
+        print("[k3dge check] running consistency gate...", flush=True)
+        check_rc = subprocess.call([sys.executable, str(WS / "scripts" / "gate.py")])
+        if check_rc != 0:
+            rc = check_rc
+    else:
+        print("[k3dge check] skipped (no code/spec/agent changes in this commit)")
     return rc
 
 
