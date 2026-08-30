@@ -190,10 +190,10 @@ class ConsistencyEngine:
                 continue
             if path.endswith("__init__.py"):
                 continue
-            # 强制 docs/ 根下不直放文档，需置于细分目录（如 docs/generated/, docs/guides/）；无合适目录时 agent 可自建
+            # 强制 docs/ 根下不直放文档；唯一例外是 docs/README.md（根索引/治理总纲）。其余需置于细分目录
             if path.startswith("docs/") and "/" not in path[5:] and not path.endswith("/"):
                 name = path[5:]
-                if name and not name.startswith(".") and name != ".DS_Store":
+                if name and not name.startswith(".") and name not in (".DS_Store", "README.md"):
                     violations.append(
                         Violation(
                             "DOCS_ROOT_DISALLOWED",

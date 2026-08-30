@@ -15,11 +15,7 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 
 ## 路由 — 软规则 + 提交门禁
 
-受管文档的写法由**所在目录 README 的 `## 文档编撰规则 (Document Authoring Rules)` 段**约束，作为**软规则**：编辑时直接读该段并照办，**不注入、不强制**。
-
-提交门禁（结构-only）：`scripts/pre-commit`（已 `git config core.hooksPath scripts`）校验暂存文档所在目录的 README 是否含该锚定段；**破坏结构即拦提交，不验内容**。无 README 或 README 无该段 → 无规则（放行）。
-
-代码侧验证（`k3dge check`）维持不变，保证微观形式/结构正确。`.agent/rules/*` 仍按 ADR 0012 作为协议切片，由本文件点名路径读取。
+文档治理总则见 `docs/README.md`：**每个 `docs/` 子目录必须配备 `README.md`**，其 `## 文档编撰规则 (Document Authoring Rules)` 段约束该目录文档写法（软规则，编辑时直接读照办，不注入、不强制）。提交门禁在 `scripts/pre-commit`（已 `git config core.hooksPath scripts`）：缺 README 或锚定段即拦提交，不验内容。代码侧验证仍由 `k3dge check` 保证微观形式/结构；`.agent/rules/*` 按 ADR 0012 作协议切片，由本文件点名路径读取。
 
 ## 12. Triggers — do in same turn
 
