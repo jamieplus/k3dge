@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/cli`
-- **Contract Hash**: `sha256:ead2c9f9376e5e0f226d6d13dca6ac1a99b0f93374ccbb9c28bdb79a1dd4f534`
-- **Last Updated**: 2026-08-26
+- **Contract Hash**: `sha256:002f3948acbba0aeeedfd6bf4692afb07fe07e812c40ed0bcc0cb74bf2fdaab1`
+- **Last Updated**: 2026-08-29
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -11,6 +11,7 @@
   - 对外 harness 注入：`k3dge.cli.mcp` 把同一套 engine 事实以 MCP stdio 交给 DSH / Codex / Claude Code / OpenCode 等，禁止那些工具私有重实现门禁（ADR 0006）。
   - 不负责判定（engine）与透镜审计。不加 `k3dge audit`（ADR 0005 / 0018）。
   - `check` 支持 `--json` 机器可读输出，以及 `--with-tests`（selective L2）与 `--force-full`（全域 L0/L1）。
+  - `protocol` 子命令：`resolve --path <file>`（优先，按路径路由）或 `resolve <type>` 输出协议 Markdown、`challenge --path <file> --task-id <id>` 输出进车间动态口令、`ticket --path <file> [--ticket <json>]` 输出/校验 L2 结构化入场券、`verify --path <file> [--ticket <json>]` 软关卡（advisory verdict，不过硬拦截，附整改清单"劝返"）、`report --path <file> --detail <text>` 把持续偏离写入 `docs/incidents/` 供人可见、`list` 列出已注册 `task_type`，供上游 agent 在动手前固定调取（确定性操作规范注入，ADR 0012 / 0022）。
   - 从当前目录向上定位 workspace 根（含 `.git` 或 `.agent`）。
   - 将引擎返回的 `GateReport` 渲染为终端输出并映射退出码。
   - MCP 桥接（`k3dge.cli.mcp`）：资源读 spec、工具委托 `evaluate` / `verify_contract` / `sync` / `version` / `task` / `milestone`。零漂移，禁止外仓私有重写哈希。
@@ -26,9 +27,19 @@ cmd_sync(args: argparse.Namespace) -> int
 cmd_version(args: argparse.Namespace) -> int
 cmd_doc(args: argparse.Namespace) -> int
 cmd_task(args: argparse.Namespace) -> int
+cmd_protocol(args: argparse.Namespace) -> int
 cmd_init(args: argparse.Namespace) -> int
 cmd_mcp(args: argparse.Namespace) -> int
 cmd_milestone(args: argparse.Namespace) -> int
+cmd_get(args: argparse.Namespace) -> int
+cmd_search(args: argparse.Namespace) -> int
+cmd_where(args: argparse.Namespace) -> int
+cmd_edit(args: argparse.Namespace) -> int
+cmd_put(args: argparse.Namespace) -> int
+cmd_index(args: argparse.Namespace) -> int
+cmd_end(args: argparse.Namespace) -> int
+cmd_commit(args: argparse.Namespace) -> int
+cmd_incident(args: argparse.Namespace) -> int
 build_parser() -> argparse.ArgumentParser
 main(argv: Optional[Sequence[str]]=None) -> int
 get_manifest_resource(workspace_path: Optional[str]=None) -> str
@@ -40,8 +51,14 @@ k3dge_version(action: str='show', part: str='patch', set_version: Optional[str]=
 k3dge_task_create(title: str, typ: str='fix', slug: Optional[str]=None, milestone_id: Optional[str]=None, priority: str='P2', workspace_path: Optional[str]=None) -> str
 k3dge_task_done(path: str, workspace_path: Optional[str]=None) -> str
 k3dge_task_list(milestone_id: Optional[str]=None, status: Optional[str]=None, workspace_path: Optional[str]=None) -> str
+get_protocol_resource(task_type: str, workspace_path: Optional[str]=None) -> str
+k3dge_protocol_resolve(task_type: str='', path: Optional[str]=None, workspace_path: Optional[str]=None) -> str
 k3dge_milestone_control(action: str, milestone_id: str, workspace_path: Optional[str]=None) -> str
+k3dge_protocol_challenge(path: Optional[str]=None, task_type: str='', task_id: str='', workspace_path: Optional[str]=None) -> str
 k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str) -> str
+k3dge_protocol_ticket(path: Optional[str]=None, task_type: str='', task_id: str='', ticket: Optional[object]=None, workspace_path: Optional[str]=None) -> str
+k3dge_protocol_verify(path: Optional[str]=None, task_type: str='', task_id: str='', ticket: Optional[object]=None, workspace_path: Optional[str]=None) -> str
+k3dge_protocol_report(detail: str, path: Optional[str]=None, task_type: str='', task_id: str='', workspace_path: Optional[str]=None) -> str
 ```
 <!-- k3dge:interfaces-end -->
 

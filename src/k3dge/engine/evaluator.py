@@ -116,7 +116,24 @@ class ConsistencyEngine:
     def __init__(self, workspace_root: Path) -> None:
         self.workspace_root = workspace_root
 
-    def evaluate(self, run_tests: bool = False, force_full: bool = False) -> GateReport:
+    def _staged_files(self) -> List[str]:
+        import subprocess
+
+        try:
+            out = subprocess.run(
+                ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
+                cwd=self.workspace_root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return []
+        if out.returncode != 0:
+            return []
+        return [p.strip() for p in out.stdout.splitlines() if p.strip()]
+
+    def evaluate(self, run_tests: bool = False, force_full: bool = False, staged: bool = False) -> GateReport:
         try:
             manifest = Manifest.load(self.workspace_root)
         except ManifestError as exc:
@@ -126,32 +143,35 @@ class ConsistencyEngine:
                 modified_domains=(),
                 violations=(Violation("MANIFEST_INVALID", str(exc)),),
             )
-        try:
-            files = diff.get_changed_files(self.workspace_root)
-        except GitError as exc:
-            if not force_full:
-                git_vs: List[Violation] = [
-                    Violation(
-                        "GIT_UNAVAILABLE",
-                        f"git unavailable: {exc}",
-                    )
-                ]
-                if not manifest.domains:
-                    git_vs.insert(
-                        0,
+        if staged:
+            files = self._staged_files()
+        else:
+            try:
+                files = diff.get_changed_files(self.workspace_root)
+            except GitError as exc:
+                if not force_full:
+                    git_vs: List[Violation] = [
                         Violation(
-                            "NO_DOMAINS",
-                            "manifest.domains is empty; register at least one domain "
-                            "(src/spec/tests) so the gate can protect this repo",
-                        ),
+                            "GIT_UNAVAILABLE",
+                            f"git unavailable: {exc}",
+                        )
+                    ]
+                    if not manifest.domains:
+                        git_vs.insert(
+                            0,
+                            Violation(
+                                "NO_DOMAINS",
+                                "manifest.domains is empty; register at least one domain "
+                                "(src/spec/tests) so the gate can protect this repo",
+                            ),
+                        )
+                    return GateReport(
+                        passed=False,
+                        changed_files=(),
+                        modified_domains=(),
+                        violations=tuple(git_vs),
                     )
-                return GateReport(
-                    passed=False,
-                    changed_files=(),
-                    modified_domains=(),
-                    violations=tuple(git_vs),
-                )
-            files = ()
+                files = ()
 
         violations: List[Violation] = []
         if not manifest.domains:
@@ -328,6 +348,52 @@ class ConsistencyEngine:
                     "TEMPLATE_DRIFT",
                     f"template drift check failed: {exc}",
                     file_path="src/k3dge/engine/pairs.py",
+                )
+            )
+
+        # 生命周期总线治理：pipeline.toml 语义硬门控（纯静态；文件不存在则优雅跳过，存在则 100% 严格）
+        try:
+            from k3dge.engine.pipeline_schema import validate_pipeline_config
+
+            for code, msg in validate_pipeline_config(self.workspace_root):
+                violations.append(
+                    Violation(
+                        code,
+                        msg,
+                        domain="pipelines",
+                        file_path=".agent/pipeline.toml",
+                    )
+                )
+        except Exception as exc:
+            violations.append(
+                Violation(
+                    "PIPELINE_SCHEMA_INVALID",
+                    f"pipeline validation crashed: {exc}",
+                    domain="pipelines",
+                    file_path=".agent/pipeline.toml",
+                )
+            )
+
+        # 协议调度注册表治理：.agent/protocols.toml 语义硬门控（纯静态；文件不存在则优雅跳过，存在则 100% 严格）
+        try:
+            from k3dge.engine.protocol import validate_protocols_config
+
+            for code, msg in validate_protocols_config(self.workspace_root):
+                violations.append(
+                    Violation(
+                        code,
+                        msg,
+                        domain="protocols",
+                        file_path=".agent/protocols.toml",
+                    )
+                )
+        except Exception as exc:
+            violations.append(
+                Violation(
+                    "PROTOCOL_REGISTRY_INVALID",
+                    f"protocol validation crashed: {exc}",
+                    domain="protocols",
+                    file_path=".agent/protocols.toml",
                 )
             )
 

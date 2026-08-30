@@ -29,6 +29,7 @@ class TestTemplateSync(unittest.TestCase):
             "mcp-bridge.md.template",
             "downstream.md",
             "gitignore.template",
+            "pre-commit-sentinel.sh",
             "tasks-readme.md",
             "branches-readme.md",
             "memo-readme.md",
@@ -43,6 +44,11 @@ class TestTemplateSync(unittest.TestCase):
             "rules/09-absorption.md",
             "agent-readme.md",
             "protocols/audit_default.md",
+            "protocols/verify_default.md",
+            "protocols/adr_default.md",
+            "protocols/incident_default.md",
+            "protocols/task_default.md",
+            "protocols/meta_protocol.md",
         ]
         for name in expected:
             with self.subTest(asset=name):

@@ -4,7 +4,7 @@
 
 ## 交付
 
-`docs/reviews/YYYY-MM-DD-<scope>.md`，表头 9 列 `ID|严重度|优先级|类型|问题描述|位置|状态|处置|验证`（`已修/待修/有意留` 三选一）。
+`docs/reviews/YYYY-MM-DD-<scope>.md`，表头 12 列 `ID|日期|严重度|优先级|类型|问题描述|位置|状态|处置|验证|复审|验收`（`状态∈{已修,待修,有意留}`；`复审∈{待复审,通过,驳回}`；`验收` 为 `验收人 YYYY-MM-DD [#reason]`）。
 
 ## 5-Pass 透镜（一次一轮）
 
@@ -19,3 +19,12 @@
 ## 前置
 
 `docs/reviews/SUMMARY.md` 顶部常驻表 + `docs/architecture/overview.md` §8 先读，不重提已修/有意留。
+
+## Constraints
+
+L2 入场券须逐条确认（agent 进车间前绑定到任务）：
+
+- 交付物写入 `docs/reviews/YYYY-MM-DD-<scope>.md`，表头 12 列 `ID|日期|严重度|优先级|类型|问题描述|位置|状态|处置|验证|复审|验收`
+- 5-Pass 透镜逐轮独立执行（健壮安全 / 架构边界 / 设计契约 / 一致验证 / 性能简洁）
+- 前置先读 `docs/reviews/SUMMARY.md` 顶部常驻表与 `docs/architecture/overview.md` §8
+- 每行 `状态 ∈ {已修, 待修, 有意留}`；`复审 ∈ {待复审, 通过, 驳回}`；`验收` 为 `验收人 YYYY-MM-DD [#reason]`

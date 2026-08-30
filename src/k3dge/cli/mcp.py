@@ -264,6 +264,82 @@ def k3dge_task_list(
     )
 
 
+@mcp.resource("protocol://{task_type}")
+def get_protocol_resource(task_type: str, workspace_path: Optional[str] = None) -> str:
+    """Read the protocol markdown a worker must follow for a given task_type.
+
+    Deterministic operation-spec injection: the host harness pulls this into a
+    fresh, bounded-attention session before acting. See ADR 0012.
+    """
+    from k3dge.engine.protocol import ProtocolResolutionError, ProtocolResolver
+
+    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ref = ProtocolResolver(ws).resolve(task_type)
+    except ProtocolResolutionError as exc:
+        return _err("ProtocolNotFound", str(exc))
+    if not ref.exists:
+        return _err("ProtocolMissing", f"protocol file not found: {ref.rel}", path=ref.rel)
+    try:
+        return ref.path.read_text(encoding="utf-8")
+    except Exception as exc:
+        return _err("ProtocolReadError", str(exc), path=ref.rel)
+
+
+@mcp.tool()
+def k3dge_protocol_resolve(
+    task_type: str = "",
+    path: Optional[str] = None,
+    workspace_path: Optional[str] = None,
+) -> str:
+    """Resolve a protocol to inject before an agent acts.
+
+    Deterministic call for an upstream harness:
+    - `path` (preferred): the file about to be touched; the most-specific glob in
+      `.agent/protocols.toml [paths]` decides the protocol. No match => base spec.
+    - `task_type`: explicit protocol key (fallback when no path routing applies).
+    Returns the operation spec markdown so attention is bounded by protocol, not
+    by conversational history. Use this instead of the agent inventing rules.
+    """
+    from k3dge.engine.protocol import ProtocolResolutionError, ProtocolResolver
+
+    ws = _find_workspace(workspace_path=workspace_path)
+    resolver = ProtocolResolver(ws)
+    ref = None
+    if path:
+        ref = resolver.resolve_by_path(path)
+        if ref is None:
+            return json.dumps(
+                {
+                    "ok": True,
+                    "task_type": None,
+                    "protocol_path": None,
+                    "exists": False,
+                    "content": "",
+                    "note": f"no protocol mapped for path '{path}'; proceed under base spec",
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+    else:
+        try:
+            ref = resolver.resolve(task_type)
+        except ProtocolResolutionError as exc:
+            return _err("ProtocolNotFound", str(exc))
+    content = ref.path.read_text(encoding="utf-8") if ref.exists else ""
+    return json.dumps(
+        {
+            "ok": True,
+            "task_type": ref.task_type,
+            "protocol_path": ref.rel,
+            "exists": ref.exists,
+            "content": content,
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
 @mcp.tool()
 def k3dge_milestone_control(
     action: str,
@@ -285,9 +361,109 @@ def k3dge_milestone_control(
                 "pending_tasks": len(tasks) - done_cnt,
                 "tasks": [{"slug": t.slug, "status": t.status, "path": str(t.path.relative_to(ws))} for t in tasks],
             },
+        indent=2,
+        ensure_ascii=False,
+    )
+
+    if act == "align":
+        ok, msg, tasks = milestone.run_milestone_alignment(ws, milestone_id)
+        payload = {
+            "milestone_id": milestone_id,
+            "aligned": ok,
+            "message": msg,
+            "task_count": len(tasks),
+        }
+        if ok:
+            payload["checkpoint"] = {
+                "type": "HUMAN_CHECKPOINT",
+                "question": f"Milestone {milestone_id} 全绿，是否执行 5-Pass 专项审计？",
+                "options": ["y", "N"],
+                "default": "N",
+                "timeout_seconds": 60,
+            }
+        return json.dumps(payload, indent=2, ensure_ascii=False)
+
+    if act == "seal":
+        ok, msg = milestone.seal_milestone(ws, milestone_id)
+        if not ok:
+            return json.dumps(
+                {
+                    "milestone_id": milestone_id,
+                    "sealed": False,
+                    "message": msg,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        try:
+            from k3dge.engine.version import append_changelog, bump_version, consume_unreleased, get_version
+
+            prev = get_version(ws)
+            new_v = bump_version(ws, part="patch")
+            body = consume_unreleased(ws)
+            notes = body if body else f"Seal milestone {milestone_id}."
+            append_changelog(ws, new_v, notes=notes)
+            return json.dumps(
+                {
+                    "milestone_id": milestone_id,
+                    "sealed": True,
+                    "message": msg,
+                    "version": new_v,
+                    "previous_version": prev,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        except Exception as exc:
+            return json.dumps(
+                {
+                    "milestone_id": milestone_id,
+                    "sealed": True,
+                    "message": msg,
+                    "version_bump_failed": str(exc),
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+
+    return _err("InvalidAction", f"Invalid action '{action}'. Choose from: status, align, seal.")
+
+
+@mcp.tool()
+def k3dge_protocol_challenge(
+    path: Optional[str] = None,
+    task_type: str = "",
+    task_id: str = "",
+    workspace_path: Optional[str] = None,
+) -> str:
+    """Compute the dynamic load-proof challenge for a workshop entry.
+
+    Returns `sha256(normalize(protocol_text) + task_id)[:12]`. The host harness
+    issues this right after injecting the protocol and before letting the agent
+    act; the agent must echo it back. A correct reply proves the protocol was
+    loaded into the live session (attention reset), not merely grepped. None when
+    no protocol maps (base spec, no helmet required). See ADR 0012.
+    """
+    from k3dge.engine.protocol import ProtocolResolver
+
+    ws = _find_workspace(workspace_path=workspace_path)
+    chal = ProtocolResolver(ws).challenge(target=path, task_type=task_type, task_id=task_id or "")
+    if chal is None:
+        return json.dumps(
+            {
+                "ok": True,
+                "required": False,
+                "challenge": None,
+                "note": "no protocol mapped; proceed under base spec",
+            },
             indent=2,
             ensure_ascii=False,
         )
+    return json.dumps(
+        {"ok": True, "required": True, "challenge": chal},
+        indent=2,
+        ensure_ascii=False,
+    )
 
     if act == "align":
         ok, msg, tasks = milestone.run_milestone_alignment(ws, milestone_id)
@@ -426,6 +602,107 @@ def k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippe
         + f" Execute only Pass {pass_number}. Scope: {target_scope}.\n\n"
         f"```\n{context_snippet}\n```\n"
     )
+
+
+@mcp.tool()
+def k3dge_protocol_ticket(
+    path: Optional[str] = None,
+    task_type: str = "",
+    task_id: str = "",
+    ticket: Optional[object] = None,
+    workspace_path: Optional[str] = None,
+) -> str:
+    """L2 entry-ticket: structured acknowledgment that the agent bound every protocol constraint.
+
+    Without `ticket`: returns the checklist of declared constraints the agent must
+    bind to the task (the "what to recite" list). With `ticket` (a JSON object or
+    string): validates shape + completeness — every declared constraint must be
+    acknowledged. This proves a synthesis step, not mere copying; final deliverable
+    adherence is still gated by `k3dge check` (L3). See ADR 0022.
+    """
+    from k3dge.engine.protocol import ProtocolResolver
+
+    ws = _find_workspace(workspace_path=workspace_path)
+    resolver = ProtocolResolver(ws)
+    if ticket is None:
+        ref = resolver.resolve_by_path(path) if path else (resolver.resolve(task_type) if task_type else None)
+        if ref is None:
+            return json.dumps(
+                {"ok": True, "required": False, "constraints": [], "note": "no protocol mapped; base spec"},
+                indent=2,
+                ensure_ascii=False,
+            )
+        constraints = resolver.expected_constraints(target=path, task_type=task_type) or []
+        return json.dumps(
+            {"ok": True, "required": True, "protocol": ref.task_type, "constraints": constraints},
+            indent=2,
+            ensure_ascii=False,
+        )
+    if isinstance(ticket, str):
+        try:
+            ticket = json.loads(ticket)
+        except Exception as exc:
+            return _err("TicketParseError", str(exc))
+    errs = resolver.validate_ticket(
+        target=path, task_type=task_type, ticket=ticket, task_id=task_id or ""
+    )
+    return json.dumps(
+        {"ok": not errs, "errors": errs},
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
+@mcp.tool()
+def k3dge_protocol_verify(
+    path: Optional[str] = None,
+    task_type: str = "",
+    task_id: str = "",
+    ticket: Optional[object] = None,
+    workspace_path: Optional[str] = None,
+) -> str:
+    """Soft gate (ADR 0022, revised): advisory L1+L2 verdict, never a hard block.
+
+    Returns `pass` (no protocol / ticket valid) or `advise` (protocol required but
+    ticket invalid, with remediation so a cooperating agent self-corrects). The agent
+    may still proceed; persistent deviation should be escalated via `k3dge_protocol_report`
+    and is ultimately caught by `k3dge check` (L3) where the agent cannot reach it.
+    """
+    from k3dge.engine.protocol import ProtocolResolver
+
+    ws = _find_workspace(workspace_path=workspace_path)
+    resolver = ProtocolResolver(ws)
+    if isinstance(ticket, str):
+        try:
+            ticket = json.loads(ticket)
+        except Exception as exc:
+            return _err("TicketParseError", str(exc))
+    verdict = resolver.verify(target=path, task_type=task_type, ticket=ticket, task_id=task_id or "")
+    return json.dumps(verdict, indent=2, ensure_ascii=False)
+
+
+@mcp.tool()
+def k3dge_protocol_report(
+    detail: str,
+    path: Optional[str] = None,
+    task_type: str = "",
+    task_id: str = "",
+    workspace_path: Optional[str] = None,
+) -> str:
+    """Escalate a persistent protocol deviation to a human-visible incident note.
+
+    Writes `docs/incidents/INC-YYYYMMDD-protocol-<slug>.md` so a person knows the agent
+    ignored the soft gate and proceeded regardless. This is the "report it to a human"
+    backstop; it is NOT enforcement. See ADR 0022.
+    """
+    from k3dge.engine.protocol import write_incident
+
+    if not detail or not detail.strip():
+        return _err("MissingDetail", "report requires non-empty detail")
+    ws = _find_workspace(workspace_path=workspace_path)
+    out = write_incident(ws, path, task_type or None, task_id or "", detail)
+    rel = str(out.relative_to(ws)) if out.is_relative_to(ws) else str(out)
+    return json.dumps({"ok": True, "incident": rel}, indent=2, ensure_ascii=False)
 
 
 if __name__ == "__main__":

@@ -11,9 +11,20 @@ cmd_sync(args: argparse.Namespace) -> int
 cmd_version(args: argparse.Namespace) -> int
 cmd_doc(args: argparse.Namespace) -> int
 cmd_task(args: argparse.Namespace) -> int
+cmd_protocol(args: argparse.Namespace) -> int
+    # doc: Deterministic protocol dispatch: pull the operation spec for a task_type.
 cmd_init(args: argparse.Namespace) -> int
 cmd_mcp(args: argparse.Namespace) -> int
 cmd_milestone(args: argparse.Namespace) -> int
+cmd_get(args: argparse.Namespace) -> int
+cmd_search(args: argparse.Namespace) -> int
+cmd_where(args: argparse.Namespace) -> int
+cmd_edit(args: argparse.Namespace) -> int
+cmd_put(args: argparse.Namespace) -> int
+cmd_index(args: argparse.Namespace) -> int
+cmd_end(args: argparse.Namespace) -> int
+cmd_commit(args: argparse.Namespace) -> int
+cmd_incident(args: argparse.Namespace) -> int
 build_parser() -> argparse.ArgumentParser
 main(argv: Optional[Sequence[str]]=None) -> int
 # mcp.py
@@ -35,10 +46,22 @@ k3dge_task_done(path: str, workspace_path: Optional[str]=None) -> str
     # doc: Mark one task done. Prefer the path from k3dge_task_list.
 k3dge_task_list(milestone_id: Optional[str]=None, status: Optional[str]=None, workspace_path: Optional[str]=None) -> str
     # doc: Index living docs/tasks/*.md (not archive). Returns title/status/milestone/priority, not bodies.
+get_protocol_resource(task_type: str, workspace_path: Optional[str]=None) -> str
+    # doc: Read the protocol markdown a worker must follow for a given task_type.
+k3dge_protocol_resolve(task_type: str='', path: Optional[str]=None, workspace_path: Optional[str]=None) -> str
+    # doc: Resolve a protocol to inject before an agent acts.
 k3dge_milestone_control(action: str, milestone_id: str, workspace_path: Optional[str]=None) -> str
     # doc: Control milestone state machine: status, align (full-matrix regression), seal (atomic compaction).
+k3dge_protocol_challenge(path: Optional[str]=None, task_type: str='', task_id: str='', workspace_path: Optional[str]=None) -> str
+    # doc: Compute the dynamic load-proof challenge for a workshop entry.
 k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str) -> str
     # doc: Pointer to the independent audit harness. Lenses do not live in k3dge.
+k3dge_protocol_ticket(path: Optional[str]=None, task_type: str='', task_id: str='', ticket: Optional[object]=None, workspace_path: Optional[str]=None) -> str
+    # doc: L2 entry-ticket: structured acknowledgment that the agent bound every protocol constraint.
+k3dge_protocol_verify(path: Optional[str]=None, task_type: str='', task_id: str='', ticket: Optional[object]=None, workspace_path: Optional[str]=None) -> str
+    # doc: Soft gate (ADR 0022, revised): advisory L1+L2 verdict, never a hard block.
+k3dge_protocol_report(detail: str, path: Optional[str]=None, task_type: str='', task_id: str='', workspace_path: Optional[str]=None) -> str
+    # doc: Escalate a persistent protocol deviation to a human-visible incident note.
 ```
 
 ## engine — `src/k3dge/engine`
@@ -75,7 +98,7 @@ get_changed_files(workspace: Path) -> List[str]
     # doc: Return all files changed relative to merge-base, including uncommitted work.
 # evaluator.py
 class ConsistencyEngine
-    evaluate(self, run_tests: bool=False, force_full: bool=False) -> GateReport
+    evaluate(self, run_tests: bool=False, force_full: bool=False, staged: bool=False) -> GateReport
 # manifest.py
 class ManifestError(ValueError)
 class Manifest
@@ -87,6 +110,16 @@ class Manifest
     spec_path(self, domain: str) -> Optional[str]
     is_ignored(self, path: str) -> bool
     under_package_root(self, path: str) -> bool
+# marker.py
+session_path(workspace: Path) -> Path
+ensure_epoch(workspace: Path, epoch_id: Optional[str]=None) -> str
+    # doc: Return the active epoch_id, generating/rotating it if absent or stale.
+register_attendance(workspace: Path, zone: str, answer: str, expected: str, epoch_id: Optional[str]=None) -> Tuple[bool, str]
+    # doc: Record attendance for `zone` only when the agent's answer matches the challenge.
+is_attended(workspace: Path, zone: str, epoch_id: Optional[str]=None) -> bool
+attended_zones(workspace: Path) -> List[str]
+reset_session(workspace: Path) -> None
+    # doc: `k3dge end` / timeout: drop attended_zones and rotate the epoch.
 # milestone.py
 parse_frontmatter(content: str) -> dict[str, str]
     # doc: Strict frontmatter parser: only `---` block at start, YAML-like `key: value`.
@@ -131,6 +164,55 @@ class GateReport
     modified_domains: Tuple[str, ...] = ()
     violations: Tuple[Violation, ...] = ()
     render(self) -> str
+# pipeline_schema.py
+validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
+    # doc: Validate `.agent/pipeline.toml`. Returns [] when valid or file absent.
+# protocol.py
+specificity(pattern: str) -> Tuple[int, int, int]
+    # doc: Specificity Tuple = (LiteralSegments, -WildcardSegments, PathDepth).
+class ProtocolResolutionError(ValueError)
+# doc: Raised when a task_type cannot be mapped to an existing protocol file.
+class ProtocolRef
+    task_type: str
+    rel: str
+    path: Path
+    exists: bool
+    require_attend: bool = False
+class ProtocolResolver
+# doc: Map a task_type to its protocol file deterministically from config.
+    list_types(self) -> List[str]
+    resolve(self, task_type: str) -> ProtocolRef
+    resolve_by_path(self, target: Path | str) -> Optional[ProtocolRef]
+        # doc: Resolve the protocol for a file the agent is about to touch.
+    resolve_raw(self, task_type: str) -> str
+    challenge(self, target: Path | str | None=None, task_type: str | None=None, task_id: str='') -> Optional[str]
+        # doc: Dynamic load-proof for a workshop entry.
+    expected_constraints(self, target: Path | str | None=None, task_type: str | None=None) -> Optional[List[str]]
+        # doc: Declared machine-checkable constraints of the mapped protocol (the checklist).
+    validate_ticket(self, target: Path | str | None=None, task_type: str | None=None, ticket: object=None, task_id: str='') -> List[str]
+        # doc: L2 entry-ticket validation: the agent's structured acknowledgment of the protocol.
+    verify(self, target: Path | str | None=None, task_type: str | None=None, ticket: object=None, task_id: str='') -> Dict[str, object]
+        # doc: Soft gate (ADR 0022, revised): advisory L1+L2 verdict, never a hard block.
+write_incident(workspace: Path, target: str | None, task_type: str | None, task_id: str, detail: str) -> Path
+    # doc: Escalate a persistent protocol deviation to a human-visible incident note.
+load_registry(workspace: Path) -> Dict[str, str]
+default_type(workspace: Path) -> str
+validate_protocols_config(workspace: Path) -> List[Tuple[str, str]]
+    # doc: Static gate for .agent/protocols.toml.
+# search.py
+class Location
+    file: str
+    line: Optional[int] = None
+    snippet: Optional[str] = None
+    render(self) -> str
+index_path(workspace: Path) -> Path
+build_symbol_index(workspace: Path) -> Dict[str, List[dict]]
+    # doc: Map top-level public symbol -> [{file, line}] across all domain src trees.
+write_symbol_index(workspace: Path) -> Path
+where(workspace: Path, symbol: str) -> List[Location]
+    # doc: Deterministic name -> file:line. No grep discovery, no model judgment.
+search(workspace: Path, query: str, *, snippet: bool=True, context: int=2, max_snippet: int=240) -> List[Location]
+    # doc: Controlled search. Returns path:line[: snippet]. Snippet window is clamped to
 # spec_schema.py
 validate_structure(content: str) -> List[str]
 extract_contract_hash(content: str) -> Optional[str]

@@ -45,5 +45,10 @@ PAIRS: list[tuple[str, str]] = [
     ("branches-readme.md", "docs/branches/README.md"),
     ("memo-readme.md", "docs/memo/README.md"),
     ("downstream.md", "docs/guides/downstream.md"),
+    ("pre-commit-sentinel.sh", "scripts/pre-commit-sentinel.sh"),
     ("protocols/audit_default.md", "docs/protocols/audit_default.md"),
+    ("protocols/verify_default.md", "docs/protocols/verify_default.md"),
+    ("protocols/incident_default.md", "docs/protocols/incident_default.md"),
+    ("protocols/task_default.md", "docs/protocols/task_default.md"),
+    ("protocols/meta_protocol.md", "docs/protocols/meta_protocol.md"),
 ]

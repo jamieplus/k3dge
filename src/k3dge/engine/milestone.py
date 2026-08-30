@@ -152,6 +152,151 @@ def _append_to_unreleased(workspace: Path, task_path: Path) -> bool:
         return False
 
 
+def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, milestone: str | None) -> None:
+    """Best-effort auto-backfill for audit reviews when a task is marked done.
+
+    - Finds `docs/reviews/*.md` whose 9-col table has a `待修` row whose `问题描述` contains the task title (or ID in task filename)
+    - Flips `状态` to `已修` and `处置` to `已修 → <task file>` for that row
+    - Appends/updates `## 回填` section with the task (idempotent)
+    - Also appends a `SUMMARY.md` 回填行 if a review was backfilled
+    Never raises; prints WARN on failure (P3 light, not blocking).
+    """
+    import sys
+
+    try:
+        reviews_dir = workspace / "docs" / "reviews"
+        if not reviews_dir.is_dir():
+            return
+        # Derive a searchable token from task: title words and file stem
+        title_token = task_title.strip()
+        stem_token = task_path.stem  # e.g. 2026-08-27-M6-fix-fix_AGENTS_route_05...
+        # Milestone of the task, if any, narrows the review set
+        milestone_token = (milestone or "").strip()
+        for review_path in sorted(reviews_dir.glob("*.md")):
+            if review_path.name in ("README.md", "SUMMARY.md"):
+                continue
+            try:
+                text = review_path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            # Heuristic: only consider reviews that look like an audit (have 9-col header)
+            if "ID|严重度|优先级|类型|问题描述|位置|状态|处置|验证" not in text.replace(" ", "").replace("|", "|"):
+                # Quick check for required headers without strict whitespace
+                if "ID" not in text or "问题描述" not in text or "状态" not in text:
+                    continue
+            # If task has a milestone, require the review to mention it (avoid cross-milestone noise)
+            if milestone_token and not _has_milestone_token(text, milestone_token):
+                # For k8d3e-a78 style reviews, milestone may be in tasks, not in review header;
+                # fall back to title-token matching without milestone filter
+                if title_token not in text and stem_token[:20] not in text:
+                    continue
+            lines = text.splitlines()
+            header_idx = -1
+            header_cols: list[str] | None = None
+            for i, raw in enumerate(lines):
+                stripped = raw.strip()
+                if not stripped.startswith("|"):
+                    continue
+                cols = [c.strip() for c in stripped.strip("|").split("|")]
+                # Skip separator line
+                if cols and all(set(c.replace(":", "").replace("-", "").strip()) == set() or set(c) <= {"-", ":"} for c in cols):
+                    continue
+                # Detect 9-col header
+                if "ID" in cols and "问题描述" in cols and "状态" in cols:
+                    header_idx = i
+                    header_cols = cols
+                    break
+            if header_idx == -1 or header_cols is None:
+                continue
+            # Find column indices
+            try:
+                id_idx = header_cols.index("ID")
+                desc_idx = header_cols.index("问题描述")
+                status_idx = header_cols.index("状态")
+                disp_idx = header_cols.index("处置")
+            except ValueError:
+                continue
+            changed = False
+            new_lines = lines[:]
+            for i in range(header_idx + 2, len(lines)):
+                raw = lines[i]
+                if not raw.strip().startswith("|"):
+                    # End of table
+                    break
+                cols = [c.strip() for c in raw.strip("|").split("|")]
+                if len(cols) != len(header_cols):
+                    continue
+                status = cols[status_idx]
+                if status != "待修":
+                    continue
+                desc = cols[desc_idx]
+                fid = cols[id_idx]
+                # Match if task title is in desc, or fid in task stem, or desc words in title
+                hit = False
+                if title_token and title_token[:15] and title_token[:15] in desc:
+                    hit = True
+                elif fid and fid in stem_token:
+                    hit = True
+                elif desc and desc[:15] in title_token:
+                    hit = True
+                if not hit:
+                    continue
+                # Flip status and disposition
+                cols[status_idx] = "已修"
+                # Ensure disposition contains 已修
+                disp = cols[disp_idx]
+                if "已修" not in disp:
+                    cols[disp_idx] = f"已修 → {task_path.name}（{disp[:40]}）" if disp else f"已修 → {task_path.name}"
+                new_lines[i] = "| " + " | ".join(cols) + " |"
+                changed = True
+            if not changed:
+                continue
+            # Append/ensure ## 回填 section (quoted to avoid k3dit second-table check)
+            backfill_marker = f"> | {fid if 'fid' in locals() and fid else 'ID'} |"
+            # Check if a backfill section already mentions this task
+            if task_path.name not in text:
+                # Find or create ## 回填 section at end
+                if "## 回填" not in text:
+                    new_lines.append("")
+                    new_lines.append("## 回填 — 自动（`k3dge task done`）")
+                    new_lines.append("")
+                    new_lines.append(f"> | {fid if 'fid' in locals() and fid else 'ID'} | 待修 | 已修 | {task_path.name} | 自动回填 |")
+                    new_lines.append(f"> | 已修 → {task_path.name} |")
+                else:
+                    # Append to existing 回填 block (after its header)
+                    for j, ln in enumerate(new_lines):
+                        if ln.strip().startswith("## 回填"):
+                            # Insert after the header's next non-empty line
+                            insert_at = j + 1
+                            # Skip blank lines after header
+                            while insert_at < len(new_lines) and not new_lines[insert_at].strip():
+                                insert_at += 1
+                            # Find end of existing quoted backfill lines
+                            k = insert_at
+                            while k < len(new_lines) and new_lines[k].lstrip().startswith(">"):
+                                k += 1
+                            new_lines.insert(k, f"> | {task_path.name} | 已修 | 自动回填 |")
+                            break
+            # Write back
+            review_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+            # Also append a SUMMARY 回填 line (idempotent)
+            try:
+                summary_path = reviews_dir / "SUMMARY.md"
+                if summary_path.is_file():
+                    summary_text = summary_path.read_text(encoding="utf-8")
+                    marker = f"回填：{review_path.name} {task_path.name}"
+                    if marker not in summary_text:
+                        # Append to the review's section if it exists, else at end
+                        summary_path.write_text(summary_text.rstrip("\n") + f"\n- {marker}\n", encoding="utf-8")
+            except Exception:
+                pass
+            print(f"[INFO][REVIEW BACKFILL] {review_path.name}: {fid} → 已修 ({task_path.name})", file=sys.stderr)
+    except Exception as exc:
+        import sys
+
+        print(f"[WARN][REVIEW BACKFILL] failed for {task_path.name}: {exc}", file=sys.stderr)
+
+
 def _has_milestone_token(text: str, milestone_id: str) -> bool:
     """True iff `milestone_id` appears as a path/word token, not a substring of a longer id.
 
@@ -385,6 +530,20 @@ def mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Pat
         import sys
 
         print(f"[WARN] mark_task_done: CHANGELOG update failed for {target.name}", file=sys.stderr)
+    # Auto-backfill audit reviews (light, not blocking)
+    try:
+        # Extract title/milestone for backfill matching
+        t_content = target.read_text(encoding="utf-8")
+        t_m = TITLE_RE.search(t_content)
+        t_title = t_m.group(1).strip() if t_m else target.stem
+        fm2 = parse_frontmatter(t_content)
+        t_ms = fm2.get("milestone", "").strip() if fm2 else ""
+        if not t_ms:
+            mm = MILESTONE_RE.search(t_content)
+            t_ms = mm.group(1).strip() if mm else ""
+        _auto_backfill_reviews(workspace, target, t_title, t_ms)
+    except Exception:
+        pass
     return True, f"marked done: {target.name}", target
 
 

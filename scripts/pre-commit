@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""k3dge doc-gate (managed git pre-commit hook).
+
+STRUCTURE-ONLY gate. For each staged managed document, look at its directory
+README:
+  - no README, or README never had the anchor  -> no rules (fallback: pass)
+  - README had the anchor (in HEAD) but it is now gone -> STRUCTURE BROKEN,
+    commit blocked
+  - README has the anchor -> governed, intact (pass)
+
+So the only hard failure is *removing* the `## 文档编撰规则 (Document
+Authoring Rules)` anchor from a directory that was already governed. Content
+(rule text, individual doc frontmatter/sections, index sync) is NOT validated:
+protocols are soft rules followed by reading the README.
+
+Routing is implicit: the protocol IS the README in the document's own directory.
+No central registry, no hardcoded prefixes.
+
+Activate:  git config core.hooksPath scripts
+Self-test: python3 scripts/pre-commit --scan
+"""
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
+WS = Path(__file__).resolve().parent.parent
+ANCHOR = "## 文档编撰规则 (Document Authoring Rules)"
+
+
+def doc_dirs_with_docs() -> set[Path]:
+    dirs = set()
+    for p in (WS / "docs").rglob("*.md"):
+        if p.name == "README.md":
+            continue
+        dirs.add(p.parent)
+    return dirs
+
+
+def read_head(rel: str) -> str | None:
+    out = subprocess.run(
+        ["git", "show", f"HEAD:{rel}"], cwd=WS, capture_output=True, text=True,
+    )
+    return out.stdout if out.returncode == 0 else None
+
+
+def staged_docs() -> list[str]:
+    out = subprocess.run(
+        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+        cwd=WS, capture_output=True, text=True,
+    )
+    return [
+        p for p in out.stdout.splitlines()
+        if p.startswith("docs/") and p.endswith(".md") and not p.endswith("/README.md")
+    ]
+
+
+def check_one(rel: str) -> list[str]:
+    rm = WS / Path(rel).parent / "README.md"
+    if not rm.exists():
+        return []  # no README -> no rules (fallback)
+    working = rm.read_text(encoding="utf-8")
+    if ANCHOR in working:
+        return []  # governed, intact
+    head = read_head(str(rm.relative_to(WS)))
+    governed_before = head is not None and ANCHOR in head
+    if governed_before:
+        return [f"{rm.relative_to(WS)}: anchor section removed (README structure broken)"]
+    return []  # ungoverned -> fallback pass
+
+
+def main() -> int:
+    if "--scan" in sys.argv:
+        governed = 0
+        for d in sorted(doc_dirs_with_docs()):
+            if d == WS / "docs" / "protocols":
+                continue
+            rm = d / "README.md"
+            if rm.exists() and ANCHOR in rm.read_text(encoding="utf-8"):
+                governed += 1
+        print(f"[k3dge doc-gate] PASS: {governed} governed doc-dir READMEs intact "
+              f"(others fall back to no-rules)")
+        return 0
+
+    files = staged_docs()
+    if not files:
+        return 0
+    errs: list[str] = []
+    for f in files:
+        errs.extend(check_one(f))
+    if errs:
+        print("[k3dge doc-gate] FAIL: README structure broken -> commit blocked")
+        for e in errs:
+            print(f"  - {e}")
+        print("[k3dge doc-gate] restore the anchor section, then commit (or `git commit --no-verify`)")
+        return 1
+    print(f"[k3dge doc-gate] PASS: {len(files)} managed doc(s) — README structure intact")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
