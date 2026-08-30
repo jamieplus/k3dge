@@ -1,15 +1,9 @@
 repos:
   - repo: local
     hooks:
-      - id: k3dge-check
-        name: k3dge consistency gate
-        entry: scripts/gate.py
-        language: python
-        pass_filenames: false
-        always_run: true
-      - id: doc-gate
-        name: docs README-anchor gate
-        entry: python3 scripts/pre-commit --scan
+      - id: k3dge-gate
+        name: k3dge unified gate (doc-gate + consistency)
+        entry: scripts/pre-commit
         language: python
         pass_filenames: false
         always_run: true

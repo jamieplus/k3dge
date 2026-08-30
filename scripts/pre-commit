@@ -72,20 +72,27 @@ def main() -> int:
         print(f"[k3dge doc-gate] PASS: {total} docs subdirs have README + anchor")
         return 0
 
+    rc = 0
     files = staged_docs()
-    if not files:
-        return 0
-    errs: list[str] = []
-    for f in files:
-        errs.extend(check_one(f))
-    if errs:
-        print("[k3dge doc-gate] FAIL: README structure broken -> commit blocked")
-        for e in errs:
-            print(f"  - {e}")
-        print("[k3dge doc-gate] add/fix the domain README (with anchor), then commit (or `git commit --no-verify`)")
-        return 1
-    print(f"[k3dge doc-gate] PASS: {len(files)} managed doc(s) — README structure intact")
-    return 0
+    if files:
+        errs: list[str] = []
+        for f in files:
+            errs.extend(check_one(f))
+        if errs:
+            print("[k3dge doc-gate] FAIL: README structure broken -> commit blocked")
+            for e in errs:
+                print(f"  - {e}")
+            print("[k3dge doc-gate] add/fix the domain README (with anchor), then commit (or `git commit --no-verify`)")
+            rc = 1
+        else:
+            print(f"[k3dge doc-gate] PASS: {len(files)} managed doc(s) — README structure intact")
+
+    # consistency gate (k3dge check) — single unified pre-commit entrypoint
+    print("[k3dge check] running consistency gate...", flush=True)
+    check_rc = subprocess.call([sys.executable, str(WS / "scripts" / "gate.py")])
+    if check_rc != 0:
+        rc = check_rc
+    return rc
 
 
 if __name__ == "__main__":
