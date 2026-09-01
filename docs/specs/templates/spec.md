@@ -11,7 +11,7 @@
     `manifest.json`、`rules/` 完整 00–03 含 `02-simplification.md`、`docs.toml`）、
     `AGENTS.md`、`docs/` 目录树、标准 spec 模板与 `.pre-commit-config.yaml`。
   - 第一条域：目录名（或 `--name`）写入 `domains`、`src/<name>/`、spec、tests；空 domains 的已有 manifest 会被升级。
-  - 下游协议包：`docs/guides/mcp-bridge.md`、`docs/guides/downstream.md`、空 reviews 索引、`.gitignore`（不把本仓审计目录拷给下游）。
+  - 下游协议包：`docs/guides/mcp-bridge.md`、`docs/guides/downstream.md`、空 reviews 索引与空 `LEFTOVERS.md`、`.gitignore`（不把本仓审计目录拷给下游）。
 - **Out of Scope**:
   - 门禁判定（由 `engine` 域负责）。
 

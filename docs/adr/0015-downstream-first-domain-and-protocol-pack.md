@@ -17,8 +17,8 @@ Deciders: Core Maintainer
 2. **第一条域**：scaffold 用目录名（或 `--name`）登记一域：`src/<name>/`、`docs/specs/<name>/spec.md`、`tests/unit/<name>/`。已有非空 domains 不改（自举仓安全）。已有 **空** domains 的 manifest 会被升级（给 k3dit 这类旧 init 一条出路）。
 3. **init 后 `k3dge sync`**：补第一条域的 Contract Hash，避免立刻 `CONTRACT_HASH_MISSING`。
 4. **协议包与本仓特化拆开**（同 G-04 architecture 模式）：
-   - `reviews-readme.md` **不进 PAIRS**；资产是空索引，本仓 `docs/reviews/README.md` 是活目录。
-   - scaffold 写出 `docs/guides/mcp-bridge.md`、`docs/reviews/README.md`、`docs/adr/README.md`、`.gitignore`。
+   - `reviews-readme.md` / `reviews/LEFTOVERS.md` **不进 PAIRS**；资产是空索引/空表，本仓 README 是类型门面、LEFTOVERS 是本仓有意留。
+   - scaffold 写出 `docs/guides/mcp-bridge.md`、`docs/reviews/README.md`、`docs/reviews/LEFTOVERS.md`、`docs/adr/README.md`、`.gitignore`。
    - `AGENTS.md` 仍与模板字节锁（不衰退），但正文改为读**本仓** overview/adr；harness 自身 ADR 留在 k3dge 检出。
 
 ## 3. 产生后果 (Consequences)

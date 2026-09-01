@@ -44,6 +44,10 @@ class TestScaffold(unittest.TestCase):
         self.assertTrue((self.target / ".gitignore").is_file())
         reviews = (self.target / "docs" / "reviews" / "README.md").read_text(encoding="utf-8")
         self.assertNotIn("2026-08-25-pass1", reviews)
+        leftovers = self.target / "docs" / "reviews" / "LEFTOVERS.md"
+        self.assertTrue(leftovers.is_file())
+        self.assertNotIn("2026-08-25-pass1", leftovers.read_text(encoding="utf-8"))
+        self.assertIn("LEFTOVERS.md", reviews)
 
         readme = self.target / ".agent" / "README.md"
         self.assertTrue(readme.exists())

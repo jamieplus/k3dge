@@ -70,4 +70,4 @@ flowchart LR
 ## 5. 决策与有意留索引
 
 * 已定案决策：`docs/adr/README.md`（按编号索引）
-* 有意留：`docs/reviews/README.md` Intentional leftovers 表
+* 有意留：`docs/reviews/LEFTOVERS.md`

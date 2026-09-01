@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- `k3dge milestone seal` archives this-milestone reviews to `docs/reviews/archive/<id>/` and rewrites leftover hrefs in `docs/reviews/README.md`.
+- `k3dge milestone seal` archives this-milestone reviews to `docs/reviews/archive/<id>/` and rewrites leftover hrefs in `docs/reviews/LEFTOVERS.md`.
+- Move the intentional-leftovers table from `docs/reviews/README.md` to `docs/reviews/LEFTOVERS.md`.
 - Align ADRs 0001–0006 / 0008 / 0010 with current AGENTS, 0018 catalog, and pipeline `[peers]` schema.
 - `k3dge check` rejects legacy `pipeline.toml` `[harnesses]` / `[hooks]` keys (`PIPELINE_SCHEMA_INVALID`).
 - Move per-type structure gates from README comment blocks to `docs/<type>/.schema.json`.

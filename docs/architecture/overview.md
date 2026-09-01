@@ -128,4 +128,4 @@ sequenceDiagram
 
 已定案决策：寻址用 `k3dge doc list --type adr`；主题与旧号映射见 [`docs/adr/README.md`](../adr/README.md)。
 
-有意留（活文档常驻表）：[`docs/reviews/README.md`](../reviews/README.md) 的 Intentional leftovers 表为唯一事实源。
+有意留（活文档常驻表）：[`docs/reviews/LEFTOVERS.md`](../reviews/LEFTOVERS.md) 为唯一事实源。

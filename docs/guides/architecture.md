@@ -11,5 +11,5 @@ k3dge 是一致性门禁：`check` 比对公开签名哈希，`sync` 回写 spec
 * 域与依赖：`docs/architecture/overview.md` §1–2
 * 提交数据流：`docs/architecture/overview.md` §3
 * 已定案决策：`docs/architecture/overview.md` §8 及 `docs/adr/README.md`
-* 有意留：`docs/reviews/README.md` Intentional leftovers 表（`overview §8` 为索引）
+* 有意留：`docs/reviews/LEFTOVERS.md`（`overview §8` 为索引）
 * 本地自用与职责切分：`docs/adr/0005-local-first-and-layer-cuts.md`

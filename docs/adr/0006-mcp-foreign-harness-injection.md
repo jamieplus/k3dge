@@ -29,7 +29,7 @@ k3dge 先在本仓自用（ADR-0007 自举），下一步是用 k3dge 去开发�
   - 新仓 init 之后与自举 k3dge 同一套 Agent 协议（门控、`AGENTS.md` §12 文档/里程碑触发、MCP 只走固定剧本）；`k3dge check` 在该仓 pre-commit 硬拦。脚手架幂等不覆盖已有 `AGENTS.md`/`scripts/init.sh`——协议升级要再同步这两份，不是 init 行为回退。
 - **透镜审计不在 `src/k3dge`**（ADR-0005 §2.6）：MCP prompt 只指路，不在桥里演进规程。
    - **信任边界**：本机 stdio 信任边界 = 调起该 MCP 的 OS 用户（S-13）；网络化后再重开鉴权。
-   - **`pipeline.toml` 是第三根门禁支柱**：并列 harness 的调用编排只写在 `.agent/pipeline.toml` 的 `[peers]` / `[pipelines]`（`manual` / `mcp` / `cli` / `skip` 传输与 fallback）。旧键 `[harnesses]` / `[hooks]` 必须 `PIPELINE_SCHEMA_INVALID`，不得当空 `peers` 放行。`k3dge check` 只验 schema / 符号引用 / 协议文件存在，**不连 MCP、不跑 CLI**；编排执行失败走 fallback / skip，不改变一致性判定（T-01，见 `docs/reviews/README.md` 有意留表）。
+   - **`pipeline.toml` 是第三根门禁支柱**：并列 harness 的调用编排只写在 `.agent/pipeline.toml` 的 `[peers]` / `[pipelines]`（`manual` / `mcp` / `cli` / `skip` 传输与 fallback）。旧键 `[harnesses]` / `[hooks]` 必须 `PIPELINE_SCHEMA_INVALID`，不得当空 `peers` 放行。`k3dge check` 只验 schema / 符号引用 / 协议文件存在，**不连 MCP、不跑 CLI**；编排执行失败走 fallback / skip，不改变一致性判定（T-01，见 `docs/reviews/LEFTOVERS.md`）。
    - **harness 身份不混用**：其它并列 harness 自定入口，禁止共用 `k3dge_*` 工具名装成一个进程。
 
 ## 3. 产生后果 (Consequences)
