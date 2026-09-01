@@ -6,8 +6,6 @@ Tests and any templates-side consumer import from here.
 Not in PAIRS (intentional, do not "complete" the list):
 - architecture.md.template — downstream generic placeholder; never byte-compare
   against this repo's four-domain docs/architecture/overview.md (G-04 / P4-05).
-- reviews-readme.md — downstream empty index; this repo's docs/reviews/README.md
-  is the type front door (same split as architecture).
 - reviews/LEFTOVERS.md — downstream empty table; this repo's leftovers are k3dge-specific.
 - mcp-bridge.md.template / gitignore.template — downstream-only init files.
 - architecture-style splits only; docs/guides/downstream.md is paired (upgrade protocol).
@@ -42,6 +40,7 @@ PAIRS: list[tuple[str, str]] = [
     ("pipeline.toml.template", ".agent/pipeline.toml"),
     ("spec.md.template", "docs/specs/_template/spec.md"),
     ("tasks-readme.md", "docs/tasks/README.md"),
+    ("reviews-readme.md", "docs/reviews/README.md"),
     ("tasks/_template.md", "docs/tasks/_template.md"),
     ("memo/_template.md", "docs/memo/_template.md"),
     ("branches/_template.md", "docs/branches/_template.md"),
