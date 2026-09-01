@@ -43,6 +43,7 @@ class TestTemplateSync(unittest.TestCase):
             "branches/AUTHORING.md",
             "incidents/AUTHORING.md",
             "reviews/AUTHORING.md",
+            "reviews/LEFTOVERS.md",
             "tasks/.schema.json",
             "memo/.schema.json",
             "branches/.schema.json",

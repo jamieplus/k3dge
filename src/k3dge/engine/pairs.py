@@ -7,7 +7,8 @@ Not in PAIRS (intentional, do not "complete" the list):
 - architecture.md.template — downstream generic placeholder; never byte-compare
   against this repo's four-domain docs/architecture/overview.md (G-04 / P4-05).
 - reviews-readme.md — downstream empty index; this repo's docs/reviews/README.md
-  is the living audit catalog (same split as architecture).
+  is the type front door (same split as architecture).
+- reviews/LEFTOVERS.md — downstream empty table; this repo's leftovers are k3dge-specific.
 - mcp-bridge.md.template / gitignore.template — downstream-only init files.
 - architecture-style splits only; docs/guides/downstream.md is paired (upgrade protocol).
 - runtime state and empty skeletons — .agent/milestone, logs/ (P4-08).

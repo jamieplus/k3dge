@@ -38,7 +38,7 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 | Guide has `guide-stub` | Fill guide |
 | Simplify / delete dead code / C2 nesting | `.agent/rules/02-simplification.md` first, then change |
 | `check` red ×2 | `docs/branches/` then `stash` |
-| Audit done | `docs/reviews/` + leftovers table in `docs/reviews/README.md` |
+| Audit done | `docs/reviews/` + leftovers in `docs/reviews/LEFTOVERS.md` |
 | Audit fix done | Backfill `## 回填` to same report + `docs/incidents/INC-YYYYMMDD-<TYPE>-<slug>.md` B-T-D |
 | 文档改动（`docs/<type>` 变更） | 走同一条 `k3dit.actions.audit` 链；`target_scope` 为文档时套用 Doc Audit 节（ADR-0020），同一 12 列报告 + `on_pre_seal` verify |
 | Move/delete fact source | Update all pointers; memo target gone → move back |

@@ -337,14 +337,6 @@
       "tokens": "Memo：Harness 环境级硬隔离 vs 认知级软隔离（h8m2k-a1）"
     },
     {
-      "path": "docs/memo/2026-08-29-impl-task-protocol-resolver-git-gate.md",
-      "type": "memo",
-      "id": "2026-08-29-impl-task-protocol-resolver-git-gate",
-      "title": "Memo：Protocol Resolver + Git Gate 两 Task 实现全记录（2026-08-28 双任务落地）",
-      "status": "",
-      "tokens": "Memo：Protocol Resolver + Git Gate 两 Task 实现全记录（2026-08-28 双任务落地）"
-    },
-    {
       "path": "docs/protocols/audit_default.md",
       "type": "protocols",
       "id": "audit_default",
@@ -359,22 +351,6 @@
       "title": "Re-verify Protocol — Default (12 列验收)",
       "status": "",
       "tokens": "Re-verify Protocol — Default (12 列验收)"
-    },
-    {
-      "path": "docs/reviews/2026-08-27-M7-5pass.md",
-      "type": "reviews",
-      "id": "2026-08-27-M7-5pass",
-      "title": "审计：M7 5-Pass 穿透式代码与架构审计（0.1.8 / M7 空窗期）",
-      "status": "",
-      "tokens": "审计：M7 5-Pass 穿透式代码与架构审计（0.1.8 / M7 空窗期）"
-    },
-    {
-      "path": "docs/reviews/2026-08-27-M7-k3dit-5pass.md",
-      "type": "reviews",
-      "id": "2026-08-27-M7-k3dit-5pass",
-      "title": "审计：M7 k3dit 5-Pass 穿透式代码与架构审计（0.1.8 / M7 空窗期）",
-      "status": "",
-      "tokens": "审计：M7 k3dit 5-Pass 穿透式代码与架构审计（0.1.8 / M7 空窗期）"
     },
     {
       "path": "docs/specs/_template/spec.md",

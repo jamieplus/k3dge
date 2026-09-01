@@ -137,7 +137,7 @@ class TestMilestone(unittest.TestCase):
         (self.ws / "docs/reviews/2026-08-23-untagged.md").write_text(
             "# untagged no pass mark\n", encoding="utf-8"
         )
-        (self.ws / "docs/reviews/README.md").write_text(
+        (self.ws / "docs/reviews/LEFTOVERS.md").write_text(
             "| ID | 报告 |\n| --- | --- |\n"
             "| X | [2026-08-23-M9-align.md](2026-08-23-M9-align.md) |\n"
             "| Y | [rel](./2026-08-23-M9-align.md) |\n",
@@ -159,10 +159,10 @@ class TestMilestone(unittest.TestCase):
         self.assertFalse((self.ws / "docs/reviews/2026-08-23-M9-align.md").exists())
         self.assertTrue((self.ws / "docs/reviews/2026-08-23-M8-align.md").exists())
         self.assertTrue((self.ws / "docs/reviews/2026-08-23-untagged.md").exists())
-        readme = (self.ws / "docs/reviews/README.md").read_text(encoding="utf-8")
-        self.assertIn("](archive/M9/2026-08-23-M9-align.md)", readme)
-        self.assertNotIn("](2026-08-23-M9-align.md)", readme)
-        self.assertNotIn("](./2026-08-23-M9-align.md)", readme)
+        leftovers = (self.ws / "docs/reviews/LEFTOVERS.md").read_text(encoding="utf-8")
+        self.assertIn("](archive/M9/2026-08-23-M9-align.md)", leftovers)
+        self.assertNotIn("](2026-08-23-M9-align.md)", leftovers)
+        self.assertNotIn("](./2026-08-23-M9-align.md)", leftovers)
         self.assertIn("reviews to docs/reviews/archive/M9/", msg)
 
     def test_seal_rejects_missing_review(self) -> None:
@@ -286,14 +286,16 @@ class TestMilestone(unittest.TestCase):
             f"# Extra\n{_align_pass_marker('M14')}\n", encoding="utf-8"
         )
         (reviews / "AUTHORING.md").write_text("# Authoring\n", encoding="utf-8")
+        (reviews / "LEFTOVERS.md").write_text("# Intentional leftovers\n", encoding="utf-8")
         ok, msg = seal_milestone(self.ws, "M14")
         self.assertTrue(ok, msg)
         self.assertTrue((self.ws / "docs/reviews/archive/M14/extra-5pass.md").exists())
         self.assertTrue((self.ws / "docs/reviews/archive/M14/2026-08-24-M14-align.md").exists())
         self.assertTrue((reviews / "AUTHORING.md").exists())
+        self.assertTrue((reviews / "LEFTOVERS.md").exists())
         self.assertFalse((reviews / "extra-5pass.md").exists())
 
-    def test_seal_rollback_restores_review_readme(self) -> None:
+    def test_seal_rollback_restores_leftovers(self) -> None:
         from unittest import mock
 
         _write_task(self.ws / "docs/tasks/a.md", "done", "M15")
@@ -306,7 +308,7 @@ class TestMilestone(unittest.TestCase):
             "| ID | 报告 |\n| --- | --- |\n"
             "| X | [2026-08-24-M15-align.md](2026-08-24-M15-align.md) |\n"
         )
-        (reviews / "README.md").write_text(leftover, encoding="utf-8")
+        (reviews / "LEFTOVERS.md").write_text(leftover, encoding="utf-8")
 
         real_move = __import__("shutil").move
         calls = {"n": 0}
@@ -322,7 +324,7 @@ class TestMilestone(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue((self.ws / "docs/tasks/a.md").exists())
         self.assertTrue((reviews / "2026-08-24-M15-align.md").exists())
-        self.assertEqual((reviews / "README.md").read_text(encoding="utf-8"), leftover)
+        self.assertEqual((reviews / "LEFTOVERS.md").read_text(encoding="utf-8"), leftover)
 
     def test_seal_rejects_existing_archive_target(self) -> None:
         _write_task(self.ws / "docs/tasks/a.md", "done", "M16")

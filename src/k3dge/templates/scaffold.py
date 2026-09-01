@@ -242,6 +242,7 @@ def scaffold(target: Path, name: str | None = None) -> None:
     (target / "docs" / "reviews").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "reviews" / "README.md", REVIEWS_README_TEMPLATE)
     _write_if_missing(target / "docs" / "reviews" / "AUTHORING.md", _asset("reviews/AUTHORING.md"))
+    _write_if_missing(target / "docs" / "reviews" / "LEFTOVERS.md", _asset("reviews/LEFTOVERS.md"))
     _write_if_missing(target / ".gitignore", GITIGNORE_TEMPLATE)
     (target / "docs" / "memo").mkdir(parents=True, exist_ok=True)
     (target / "docs" / "memo" / "archive").mkdir(parents=True, exist_ok=True)

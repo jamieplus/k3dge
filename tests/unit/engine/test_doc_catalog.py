@@ -77,6 +77,7 @@ class TestDocList(unittest.TestCase):
             (ws / "docs" / "adr").mkdir(parents=True, exist_ok=True)
             (ws / "docs" / "adr" / "README.md").write_text("# ADR\n", encoding="utf-8")
             (ws / "docs" / "adr" / "AUTHORING.md").write_text("# Authoring\n\nx\n", encoding="utf-8")
+            (ws / "docs" / "adr" / "LEFTOVERS.md").write_text("# leftovers\n", encoding="utf-8")
             (ws / "docs" / "adr" / "_template.md").write_text("tmpl\n", encoding="utf-8")
             (ws / "docs" / "adr" / "0001-a.md").write_text(
                 "---\nStatus: Accepted\nDate: 2026-08-19\n---\n\n# ADR-0001: x\n",
@@ -87,6 +88,7 @@ class TestDocList(unittest.TestCase):
             paths = [c["path"] for c in cards]
             self.assertTrue(all("README.md" not in p for p in paths))
             self.assertTrue(all("AUTHORING.md" not in p for p in paths))
+            self.assertTrue(all("LEFTOVERS.md" not in p for p in paths))
             self.assertTrue(all("_template.md" not in p for p in paths))
             self.assertTrue(all("archive" not in p for p in paths))
 

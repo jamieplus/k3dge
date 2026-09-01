@@ -300,7 +300,9 @@ def _has_milestone_token(text: str, milestone_id: str) -> bool:
     )
 
 
-_REVIEW_AUX = frozenset({"README.md", "AUTHORING.md", "_template.md"})
+_REVIEW_AUX = frozenset(
+    {"README.md", "AUTHORING.md", "_template.md", "LEFTOVERS.md", "leftovers.md"}
+)
 _FILENAME_MILESTONE_RE = re.compile(r"(?:^|[._-])(M\d+)(?:[._-]|$)", re.IGNORECASE)
 
 
@@ -343,18 +345,18 @@ def _reviews_to_archive(reviews_dir: Path, milestone_id: str, pass_mark: str) ->
     return out
 
 
-def _rewrite_review_readme_links(workspace: Path, filename: str, new_href: str) -> None:
-    readme = workspace / "docs" / "reviews" / "README.md"
-    if not readme.is_file():
+def _rewrite_leftover_links(workspace: Path, filename: str, new_href: str) -> None:
+    leftovers = workspace / "docs" / "reviews" / "LEFTOVERS.md"
+    if not leftovers.is_file():
         return
     try:
-        text = readme.read_text(encoding="utf-8")
+        text = leftovers.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return
     updated = text.replace(f"]({filename})", f"]({new_href})")
     updated = updated.replace(f"](./{filename})", f"]({new_href})")
     if updated != text:
-        readme.write_text(updated, encoding="utf-8")
+        leftovers.write_text(updated, encoding="utf-8")
 
 
 def _safe_archive_dir(workspace: Path, kind: str, milestone_id: str) -> Tuple[Optional[Path], str]:
@@ -777,13 +779,13 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
             f"Cannot seal milestone '{milestone_id}': archive target already exists: {collisions}"
         )
 
-    readme_path = reviews_dir / "README.md"
-    readme_orig: str | None = None
-    if readme_path.is_file():
+    leftover_path = reviews_dir / "LEFTOVERS.md"
+    leftover_orig: str | None = None
+    if leftover_path.is_file():
         try:
-            readme_orig = readme_path.read_text(encoding="utf-8")
+            leftover_orig = leftover_path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
-            readme_orig = None
+            leftover_orig = None
 
     task_archive.mkdir(parents=True, exist_ok=True)
     if to_archive_reviews:
@@ -799,11 +801,11 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
             target = review_archive / rev.name
             shutil.move(str(rev), str(target))
             moved_records.append((target, rev))
-            _rewrite_review_readme_links(workspace, rev.name, f"archive/{milestone_id}/{rev.name}")
+            _rewrite_leftover_links(workspace, rev.name, f"archive/{milestone_id}/{rev.name}")
     except Exception as exc:
-        if readme_orig is not None:
+        if leftover_orig is not None:
             try:
-                readme_path.write_text(readme_orig, encoding="utf-8")
+                leftover_path.write_text(leftover_orig, encoding="utf-8")
             except OSError:
                 pass
         rollback_errors: list[str] = []

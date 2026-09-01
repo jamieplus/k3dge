@@ -18,7 +18,15 @@ SCHEMA_FILE = ".schema.json"
 INDEX_REL = "docs/generated/docs-index.json"
 AUTHORING_FILE = "AUTHORING.md"
 AUX_NAMES = frozenset(
-    {"README.md", "_template.md", "AUTHORING.md", "summary.md", "SUMMARY.md"}
+    {
+        "README.md",
+        "_template.md",
+        "AUTHORING.md",
+        "summary.md",
+        "SUMMARY.md",
+        "LEFTOVERS.md",
+        "leftovers.md",
+    }
 )
 SKIP_TYPES = frozenset({"generated"})
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
