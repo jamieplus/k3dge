@@ -1,6 +1,6 @@
 # Rule 02: Simplification Methodology
 
-> Protocol slice for tools that look under `.agent/rules/` (ADR 0012).
+> Protocol slice for tools that look under `.agent/rules/` (ADR-0010).
 > Live agent protocol is repo-root `AGENTS.md`. If this file disagrees, `AGENTS.md` wins; fix this file in the same task.
 > This file is the procedure (not duplicated in AGENTS.md). AGENTS.md §12 points here when simplification is requested.
 

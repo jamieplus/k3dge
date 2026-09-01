@@ -1,6 +1,6 @@
 # Rule 00: Core Discipline
 
-> Protocol slice for tools that look under `.agent/rules/` (ADR 0012).
+> Protocol slice for tools that look under `.agent/rules/` (ADR-0010).
 > Live agent protocol is repo-root `AGENTS.md`. If this file disagrees, `AGENTS.md` wins; fix this file in the same task.
 
 Immutable, machine-gated invariants. These are enforced by `k3dge check`, not by reading.

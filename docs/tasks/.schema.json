@@ -1,0 +1,8 @@
+{
+  "headers": {
+    "Status": ["idea", "deferred", "in-progress", "done"]
+  },
+  "codes": {
+    "headers": "TASK_STATUS_INVALID"
+  }
+}

@@ -1,5 +1,10 @@
-# ADRs — 本仓设计决策
+# ADRs — this project's design decisions
 
-只记**这个项目**的持久选择。k3dge 门禁自身的 ADR 在 k3dge 检出的 `docs/adr/`，不要复制过来。
+Record this project's lasting choices. k3dge's own ADRs stay in the k3dge checkout; do not copy them here.
 
-下一号：看本目录已有最大 `NNNN`，加一。空目录从 `0001` 起。
+Next number: max `NNNN` in this directory plus one (start at `0001` if empty).
+
+- **Address**: `k3dge doc list --type adr` / `k3dge doc where ADR-0001`.
+- **Write**: read `AUTHORING.md`; copy `_template.md`.
+
+

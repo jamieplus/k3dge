@@ -64,6 +64,31 @@ class TestContract(unittest.TestCase):
             self.assertFalse(ok)
             self.assertNotEqual(expected, actual)
 
+    def test_symbol_diff_reports_changed_symbols(self):
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / "src"
+            src.mkdir()
+            mod = src / "mod.py"
+            mod.write_text("def foo(x: int) -> str:\n    return ''\n\ndef bar() -> None:\n    return None\n")
+            iface = contract.collect_domain_interface(src)
+            h = contract.compute_hash(iface)
+            spec = (
+                "**Contract Hash**: `sha256:" + h + "`\n"
+                + contract.INTERFACE_START + "\n" + iface + "\n" + contract.INTERFACE_END + "\n"
+            )
+            self.assertEqual(
+                contract.symbol_diff(spec, src),
+                {"added": [], "removed": [], "changed": []},
+            )
+            mod.write_text(
+                "def foo(x: int, y: int) -> str:\n    return ''\n\n"
+                "def baz() -> int:\n    return 1\n"
+            )
+            diff = contract.symbol_diff(spec, src)
+            self.assertIn("foo", diff["changed"])
+            self.assertIn("bar", diff["removed"])
+            self.assertIn("baz", diff["added"])
+
     def test_cached_property_changes_hash(self):
         prop = "class W:\n    @property\n    def x(self) -> int:\n        return 1\n"
         cached = (

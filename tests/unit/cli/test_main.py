@@ -156,6 +156,91 @@ class TestCli(unittest.TestCase):
             finally:
                 os.chdir(old)
 
+    def test_mcp_sync_adds_peer_pythonpath(self):
+        import os
+        import contextlib
+        import io
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            ws = root / "k3dge"
+            peer = root / "k3che"
+            ws.mkdir()
+            (ws / ".agent").mkdir()
+            (ws / ".agent" / "manifest.json").write_text(json.dumps({"package_root": "src", "domains": {}}))
+            (ws / ".agent" / "pipeline.toml").write_text(
+                "[peers.k3che]\nscope = \"cache\"\ntransports = [{ provider = \"mcp\", tool = \"k3che_search\" }]\n"
+            )
+            (peer / "src" / "k3che").mkdir(parents=True)
+            (peer / "src" / "k3che" / "mcp.py").write_text("def main():\n    pass\n")
+            subprocess.run(["git", "init", "-b", "main"], cwd=ws, check=True, capture_output=True)
+            old = Path.cwd()
+            try:
+                os.chdir(ws)
+                buf = io.StringIO()
+                err = io.StringIO()
+                with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(err):
+                    code = main(["mcp", "sync"])
+                self.assertEqual(code, 0)
+                data = json.loads((ws / ".mcp.json").read_text(encoding="utf-8"))
+                k3che = data["mcpServers"]["k3che"]
+                self.assertEqual(k3che["args"], ["-m", "k3che.mcp"])
+                self.assertEqual(k3che["env"]["PYTHONPATH"], os.path.join("..", "k3che", "src"))
+            finally:
+                os.chdir(old)
+
+    def test_mcp_sync_repairs_peer_pythonpath(self):
+        import os
+        import contextlib
+        import io
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            ws = root / "k3dge"
+            peer = root / "k3che"
+            ws.mkdir()
+            (ws / ".agent").mkdir()
+            (ws / ".agent" / "manifest.json").write_text(json.dumps({"package_root": "src", "domains": {}}))
+            (ws / ".agent" / "pipeline.toml").write_text(
+                "[peers.k3che]\nscope = \"cache\"\ntransports = [{ provider = \"mcp\", tool = \"k3che_search\" }]\n"
+            )
+            (ws / ".mcp.json").write_text(
+                json.dumps({"mcpServers": {"k3che": {"command": "python", "args": ["-m", "k3che.mcp"]}}})
+            )
+            (peer / "src" / "k3che").mkdir(parents=True)
+            (peer / "src" / "k3che" / "mcp.py").write_text("def main():\n    pass\n")
+            subprocess.run(["git", "init", "-b", "main"], cwd=ws, check=True, capture_output=True)
+            old = Path.cwd()
+            try:
+                os.chdir(ws)
+                buf = io.StringIO()
+                err = io.StringIO()
+                with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(err):
+                    code = main(["mcp", "sync"])
+                self.assertEqual(code, 0)
+                data = json.loads((ws / ".mcp.json").read_text(encoding="utf-8"))
+                self.assertEqual(data["mcpServers"]["k3che"]["env"]["PYTHONPATH"], os.path.join("..", "k3che", "src"))
+            finally:
+                os.chdir(old)
+
+    def test_workspace_status_shared_by_cli_and_mcp(self):
+        import os
+
+        ws = Path(__file__).resolve().parents[3]
+        if not (ws / ".agent" / "manifest.json").exists():
+            self.skipTest("no manifest in repo root")
+        from k3dge.cli.status import workspace_status
+        from k3dge.cli.mcp import k3dge_status
+
+        cli = workspace_status(ws)
+        keys = ["domains", "gate_passed", "modified_domains", "drift", "pipeline", "unfinished_tasks"]
+        for k in keys:
+            self.assertIn(k, cli)
+        mcp = json.loads(k3dge_status(workspace_path=str(ws)))
+        # MCP tool must delegate to the same implementation, not re-scan — identical shape.
+        for k in keys:
+            self.assertEqual(cli[k], mcp[k])
+
 
 if __name__ == "__main__":
     unittest.main()

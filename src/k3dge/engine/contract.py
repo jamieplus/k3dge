@@ -292,3 +292,63 @@ def _extract_hash(spec_content: str) -> Optional[str]:
     from k3dge.engine import spec_schema
 
     return spec_schema.extract_contract_hash(spec_content)
+
+
+def _extract_interface_block(spec_content: str) -> str:
+    start = spec_content.find(INTERFACE_START)
+    end = spec_content.find(INTERFACE_END)
+    if start == -1 or end == -1:
+        return ""
+    return spec_content[start + len(INTERFACE_START) : end].strip()
+
+
+def _symbol_name(line: str) -> Optional[str]:
+    s = line.strip()
+    if s.startswith("class "):
+        head = s[len("class ") :]
+    elif "(" in s:
+        head = s[: s.index("(")]
+    else:
+        return None
+    return head.strip() or None
+
+
+def _parse_symbols(normalized: str) -> "dict[str, str]":
+    """Map each top-level public symbol -> normalized signature (class includes members)."""
+    syms: dict[str, str] = {}
+    current: Optional[str] = None
+    for raw in normalized.split("\n"):
+        if not raw.strip():
+            continue
+        indent = len(raw) - len(raw.lstrip())
+        name = _symbol_name(raw)
+        if indent == 0 and name:
+            current = name
+            syms[name] = raw.strip()
+        elif current is not None:
+            syms[current] += "\n" + raw.strip()
+    return syms
+
+
+def symbol_diff(
+    spec_content: str,
+    src_dir: Path,
+    manifest=None,
+    workspace_root: Path | None = None,
+) -> dict:
+    """L1 report layer: symbol-level diff between spec-stored interface and live code.
+
+    Returns {added, removed, changed} of public symbol names. The contract hash
+    proves "you didn't sync"; this proves "you changed the contract" — so sync can
+    no longer be a universal wash for abstraction churn (ADR-0001 decision 6).
+    """
+    spec_block = _extract_interface_block(spec_content)
+    code_iface = collect_domain_interface(src_dir, manifest, workspace_root)
+    spec_syms = _parse_symbols(normalize(spec_block))
+    code_syms = _parse_symbols(normalize(code_iface))
+    added = sorted(set(code_syms) - set(spec_syms))
+    removed = sorted(set(spec_syms) - set(code_syms))
+    changed = sorted(
+        n for n in (set(code_syms) & set(spec_syms)) if code_syms[n] != spec_syms[n]
+    )
+    return {"added": added, "removed": removed, "changed": changed}

@@ -20,8 +20,8 @@
 
 * **Unreleased**：`[dev]` 含 mcp；下游 init 装 `[mcp]`；CI 为 `--force-full --with-tests`；无 Milestone 的 done 在 `archive/untagged/`
 * **0.1.0**（2026-08-23）：基线四域门禁 + `mcp` 桥接 + `5-Pass` 15 项审计全绿
-* 详细按 `CHANGELOG.md` 与 `docs/adr/` 编号顺序、`docs/reviews/SUMMARY.md` 索引
-* 活文档搬走/删除须同轮接上扫描入口：ADR 0016
+* 详细按 `CHANGELOG.md` 与 `k3dge doc list --type adr` / `--type reviews`
+* 活文档搬走/删除须同轮接上扫描入口：ADR-0018
 
 ## 概述
 

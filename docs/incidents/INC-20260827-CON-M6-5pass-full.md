@@ -57,8 +57,8 @@ action_task_ref: docs/tasks/2026-08-27-M6-fix-fix_template_sync_missing_protocol
 
 ## 5. 双向回链
 
-- **Audit**: `docs/reviews/2026-08-27-5pass-full.md: P1-01..P4-02`
+- **Audit**: `docs/reviews/archive/untagged/2026-08-27-5pass-full.md: P1-01..P4-02`
 - **Branch**: `docs/branches/2026-08-27-M6-5pass-repro.md:1`（镜像，`incidents` 为主）
 - **Tasks**: `docs/tasks/2026-08-27-M6-fix-*.done.md` 9 项（`M6`）
-- **Review 回填**: `docs/reviews/2026-08-27-5pass-full.md: 回填` 已 `已修/有意留`
+- **Review 回填**: `docs/reviews/archive/untagged/2026-08-27-5pass-full.md: 回填` 已 `已修/有意留`
 - **Harness**: `k3che` `BranchThrottler` / `k3lity` `B-T-D` / `k3dit` `5-Pass`

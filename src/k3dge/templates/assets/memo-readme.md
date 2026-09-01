@@ -1,46 +1,6 @@
-# Memo — 灵光收件箱
+# Memo — spark inbox
 
-本目录是 k3dge 的**灵光收件箱（Memo）**：收三类暂不成事的念头，与 `docs/tasks/`（有方案的容器）互补。
+Three kinds of not-yet-work: fuzzy, not-landable, weakly related. Promote to `docs/tasks/` when mature; then `mv` to `archive/`.
 
-- **用途**：把"先存着、不排期"的闪念落盘，避免丢失也不污染工作项。
-- **组织**：按 `YYYY-MM-DD-<slug>.md` 命名，仅扫描顶层；晋升后 `mv` 至 `archive/`。
-- **怎么写**：新增 memo 的写法见本页 `## 文档编撰规则` 段。
-- **怎么读**：成熟后并入 `docs/tasks/` 或 guide/PROTOCOL，原条目归档。
-
-## 文档编撰规则 (Document Authoring Rules)
-
-> **事实源**：`k3dge` 仅验"文件存在 / 注册一致"（`k3dge check`）；本文件载 memo 的机检契约，叙事质量由评审保证。
-
-### 交付
-
-`docs/memo/YYYY-MM-DD-<slug>.md`（顶层），含 `类型` / `念头` / `触发场景` / `Date`。
-
-### Constraints
-
-L2 入场券须逐条确认：
-
-- 文件名满足 `^\d{4}-\d{2}-\d{2}-[\w-]+\.md$`，仅存顶层（晋升后 `mv` 至 `archive/`）
-- 单条含 `类型`（模糊概念 / 暂无法落地 / 弱相关）/`念头`/`触发场景`/`Date`
-- 三类暂不成事念头；不排期、不进门禁；成熟晋升 `docs/tasks/`，原条目归档
-
-## 触发（满足任一即记）
-
-1. **显式口令**（主）：你一句"memo一下 / 灵感记一下 / 这个不排期先存着" → 当轮落盘
-2. **无法成方案**（辅）：想法与系统相关但你判断暂无方案/不可落地 → Agent 提议"先 memo？"，你点头再记
-3. **域外溢出**：想法与 `manifest.json` 全量域均不匹配 → Agent 问"要 memo 吗？"，点头再记
-
-## 单条形态 `YYYY-MM-DD-<slug>.md`
-
-```markdown
-# Memo: <一句话念头>
-
-- **类型**：模糊概念 / 暂无法落地 / 弱相关
-- **念头**：...
-- **触发场景**：在聊什么时冒出的
-- **Date**: YYYY-MM-DD
-
-```
-
-## 晋升
-
-成熟后：内容并入 `docs/tasks/<slug>.md`（或已存在的 guide/PROTOCOL），原文件 `mv` 至 `docs/memo/archive/`。扫描约定：只读 `memo/*.md` 顶层，不进 `archive/`。晋升目标必须已经在磁盘上；目标被删则同轮把 memo 搬回顶层（ADR 0016）。
+- **Address**: `k3dge doc list --type memo`. Top-level only.
+- **Write**: read [`AUTHORING.md`](AUTHORING.md); copy [`_template.md`](_template.md).

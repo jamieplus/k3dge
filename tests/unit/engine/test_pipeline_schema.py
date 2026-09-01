@@ -62,6 +62,25 @@ class TestPipelineSchema(unittest.TestCase):
             errs = validate_pipeline_config(root)
             self.assertTrue(any(c == "PIPELINE_SCHEMA_INVALID" for c, _ in errs))
 
+    def test_legacy_harnesses_hooks_rejected(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            _write(
+                root,
+                ".agent/pipeline.toml",
+                "[harnesses.k3dit]\n"
+                'mcp_tool = "k3dit_run_audit"\n'
+                "[hooks]\n"
+                "on_align_success = []\n",
+            )
+            errs = validate_pipeline_config(root)
+            self.assertTrue(any(c == "PIPELINE_SCHEMA_INVALID" for c, _ in errs))
+            msg = " ".join(m for _, m in errs)
+            self.assertIn("harnesses", msg)
+            self.assertIn("hooks", msg)
+
     def test_protocol_not_found(self):
         import tempfile
 

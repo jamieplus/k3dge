@@ -53,6 +53,15 @@ def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
         return [("PIPELINE_SYNTAX_ERROR", f"TOML parse failed: {exc}")]
 
     errors: List[PipelineViolation] = []
+    legacy = [k for k in ("harnesses", "hooks") if k in data]
+    if legacy:
+        errors.append(
+            (
+                "PIPELINE_SCHEMA_INVALID",
+                "legacy keys %s are not read; migrate to [peers]/[pipelines] (ADR-0006)"
+                % ", ".join(legacy),
+            )
+        )
     peers = data.get("peers", {})
     if not isinstance(peers, dict):
         return [("PIPELINE_SCHEMA_INVALID", "'peers' must be a table")]

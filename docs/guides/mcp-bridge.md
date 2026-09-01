@@ -1,6 +1,6 @@
 # MCP Bridge — 零漂移门禁桥接器
 
-> MCP 是 **对外 Agent harness 的注入面**（DSH、Codex、Claude Code、OpenCode 等），不是本仓第二套人机 UI。把 `engine` 事实源以 stdio JSON-RPC 2.0 交给那些工具，零私有重实现门禁（ADR 0006）。
+> MCP 是 **对外 Agent harness 的注入面**（DSH、Codex、Claude Code、OpenCode 等），不是本仓第二套人机 UI。把 `engine` 事实源以 stdio JSON-RPC 2.0 交给那些工具，零私有重实现门禁（ADR-0006）。
 >
 > k3dge **不会**自动改那些工具的配置。用户说「帮我配 MCP」或「接入某某 harness」时，Agent **必须**只走下面剧本，禁止另起一套 JSON 或猜测未列出的路径。
 >
@@ -66,7 +66,8 @@
 | Tool | `k3dge_task_create` | `milestone.create_task` | 写入 living task 文件 |
 | Tool | `k3dge_task_done` | `milestone.mark_task_done` | 优先 `list` 返回的 path |
 | Tool | `k3dge_milestone_control` | `milestone.(status|align|seal)` | `status` 查任务、`align` Full Matrix 回归、`seal` 三闸机原子归档 |
-| Prompt | `k3dge_5pass_audit_prompt` | 优先 `../k3dit/docs/guides/protocol.md`，否则 `docs/protocols/audit_default.md` | 只指路，不在 k3dge 内维护透镜；MCP 仅注入事实源 |
+| Prompt | `k3dge_5pass_audit_prompt` | 优先 `../k3dit/docs/guides/protocol.md`，否则 `docs/protocols/audit_default.md` | 只指路；同一审计入口，按 `target_scope` 路由代码 5-Pass / 文档 Doc Audit（ADR-0020）；不在 k3dge 内维护透镜 |
+| Tool | `k3dge_adr_index` | `engine.doc_catalog.analyze_adr_coverage` | ADR 集合自洽事实（重叠/指针 findings，非判断）；文档审计透镜原料 |
 
 ## 路径解析
 

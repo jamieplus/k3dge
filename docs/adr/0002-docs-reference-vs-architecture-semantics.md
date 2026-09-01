@@ -4,16 +4,18 @@ Date: 2026-08-21
 Deciders: Core Maintainer
 ---
 
-# ADR 0002: docs 双架构文件的语义分工（reference vs architecture）
+# ADR-0002: docs 判据与投影的语义分工（architecture vs generated）
+
+> **Related**: ADR-0018（README 锚定治理）
 
 ## 1. 上下文 (Context)
-`docs/reference/architecture.md`（机器生成的 manifest 快照）与 `docs/architecture/overview.md`（人写的系统级判据）内容高度重叠，Agent 在"去重"时险些合并两者。经人指出才避免——暴露出"看似冗余实则有别"的成对产物缺乏语义声明。
+机器生成的 manifest 快照与人写的系统级判据内容高度重叠。两者曾同放在易混淆的目录名下（旧名 `docs/reference/`），缺少「谁是判据、谁可重建」的声明时，Agent 会把成对物合并或删掉其中一份。
 
 ## 2. 决策 (Decision)
-1. reference 侧更名为 `docs/reference/domains.md`，消除同名混淆。
+1. reference 侧（机器生成的 manifest 快照 / 投影）目录现为 `docs/generated/`（如 `docs/generated/domains.md`），消除同名混淆。
 2. 语义分工永久固定：
    - `docs/architecture/overview.md` = **一致性判据**：人写常驻，Agent 跨域改动必读；含依赖方向、数据流、全局不变量。
-   - `docs/reference/*` = **投影**：`k3dge sync` 从 manifest 派生，可随时重建，**永不作为一致性判据**。
+   - `docs/generated/*` = **投影**：`k3dge sync` 从 manifest 派生，可随时重建，**永不作为一致性判据**。
 3. 通用纪律（写入 AGENTS.md）：动任何"看似冗余"的成对物前，必查 `docs/adr/` 与全局不变量；无据则停下来询问，不得自作主张合并/删除。
 
 ## 3. 产生后果 (Consequences)

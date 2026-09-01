@@ -2,9 +2,9 @@
 
 You are inside a spec-gate harness. `k3dge check` blocks bad commits, not this prompt.
 
-**Read first**: `docs/architecture/overview.md` + `docs/adr/` (esp. 0001), map coarse intent onto them (ADR 0010).
+**Read first**: run `k3dge status` for current workspace state; then `docs/architecture/overview.md` + `k3dge doc where ADR-0001` (ADR-0008 for triggers).
 
-This file is the **only auto-loaded surface**. `.agent/` is process config, not a browsed folder (ADR 0014).
+This file is the **only auto-loaded surface**. `.agent/` is process config, not a browsed folder (ADR-0011).
 
 ## Core Invariants
 
@@ -13,9 +13,17 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 3. **Atomic**: Read `manifest`+`spec`+`k3dge task list --json`, plan diff, code, `k3dge sync` if needed, `k3dge check` + tests, then §12 triggers.
 4. **Revert**: `check` red >2 → `git stash`, reread `spec`.
 
+## Docs — locate, then load
+
+- **Write** `docs/<type>/…` (not README / AUTHORING.md): open `docs/<type>/AUTHORING.md`; copy `docs/<type>/_template.md` if it exists. `<type>` is the first path segment under `docs/` (`docs/tasks/archive/x.md` → `docs/tasks/`).
+- **Find** a document: default `k3dge doc list` / `k3dge doc where <id>` (or `k3dge task list --json` for tasks), then `read` the path. Body scan only via `k3dge doc grep <word>` (paths, or `--line` for `path:line`). Never return snippets. Do not raw-grep `docs/`.
+- k3dge structure gate is `docs/<type>/.schema.json` (hidden). Do not self-audit document *merit*.
+
 ## 路由 — 软规则 + 提交门禁
 
-文档治理总则见 `docs/README.md`：**每个 `docs/` 子目录必须配备 `README.md`**，其 `## 文档编撰规则 (Document Authoring Rules)` 段约束该目录文档写法（软规则，编辑时直接读照办，不注入、不强制）。提交门禁在 `scripts/pre-commit`（已 `git config core.hooksPath scripts`）：缺 README 或锚定段即拦提交，不验内容。代码侧验证仍由 `k3dge check` 保证微观形式/结构；`.agent/rules/*` 按 ADR 0012 作协议切片，由本文件点名路径读取。
+`scripts/pre-commit` (`git config core.hooksPath scripts`): staged `docs/**` need `docs/<type>/README.md` and `AUTHORING.md`. Code/spec changes still run `k3dge check`. `.agent/rules/*` are slices (ADR-0010); this file wins.
+
+审计回退（`.agent/pipeline.toml` 指向 `audit_default.md` 且 k3dit 不可达）**不是独立审计**：MCP 挂时，干活 agent 不得自审出报告即 `seal`；须转人工 / 外部 harness 复核（ADR-0006 sidecar：work 与 check 不可由同一 agent 粘合）。
 
 ## 12. Triggers — do in same turn
 
@@ -23,17 +31,19 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 | --- | --- |
 | Public signature | `k3dge sync` |
 | New `src/` domain | `manifest` + `spec` + tests |
-| Persistent design | 解析目标路径协议（`k3dge protocol resolve --path <file>`）并遵循之；产物形态由对应协议（如 `incident`/`task`）决定 |
+| Persistent design | copy `docs/adr/_template.md`; read `docs/adr/AUTHORING.md` |
 | Task done | `Status: done` + `.done.md` |
 | Milestone all `done` | `k3dge milestone align` → `HUMAN_CHECKPOINT(60s/N)` → `audit` or `seal` |
 | `align` hook | `pipeline.toml` `pipelines.on_align_success` → `peers` `mcp→cli→manual`/`skip`；`pipelines.on_pre_seal` → `k3dit.actions.verify` |
 | Guide has `guide-stub` | Fill guide |
+| Simplify / delete dead code / C2 nesting | `.agent/rules/02-simplification.md` first, then change |
 | `check` red ×2 | `docs/branches/` then `stash` |
-| Audit done | `docs/reviews/` + `SUMMARY` |
-| Audit fix done | Backfill `## 回填` to same report + `docs/incidents/INC-YYYYMMDD-<TYPE>-<slug>.md` B-T-D + `SUMMARY` 回填行 |
+| Audit done | `docs/reviews/` + leftovers table in `docs/reviews/README.md` |
+| Audit fix done | Backfill `## 回填` to same report + `docs/incidents/INC-YYYYMMDD-<TYPE>-<slug>.md` B-T-D |
+| 文档改动（`docs/<type>` 变更） | 走同一条 `k3dit.actions.audit` 链；`target_scope` 为文档时套用 Doc Audit 节（ADR-0020），同一 12 列报告 + `on_pre_seal` verify |
 | Move/delete fact source | Update all pointers; memo target gone → move back |
 
-## 13. Evidence Chain (ADR 0015)
+## 13. Evidence Chain (ADR-0012)
 
 Need 3 links: **产物** (path/cmd output) + **消费者** (engine/check/CI) + **到达** (hardcoded/harness/`AGENTS.md` path). No name/intent.
 

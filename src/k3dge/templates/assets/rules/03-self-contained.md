@@ -1,6 +1,6 @@
 # Rule 03: Self-Contained Documents
 
-> Protocol slice for tools that look under `.agent/rules/` (ADR 0012).
+> Protocol slice for tools that look under `.agent/rules/` (ADR-0010).
 > Live agent protocol is repo-root `AGENTS.md`. If this file disagrees, `AGENTS.md` wins; fix this file in the same task.
 
 Every document (spec, ADR, guide, memo, task, architecture overview) MUST be
@@ -12,7 +12,7 @@ memory) can understand it from the file alone.
   restating the essential facts.
 - For memos: list what was considered, what was decided, and the trigger for
   revisiting.
-- For ADRs: the authoring & governance rules live in `docs/adr/README.md` (`## 文档编撰规则`); read that section before writing one.
+- For ADRs: the authoring rules live in `docs/adr/AUTHORING.md`; read that file before writing one.
 - For specs: include In/Out of Scope and Verification Matrix.
 
 Violations are not blocked by `k3dge check` (hard to machine-verify), but are

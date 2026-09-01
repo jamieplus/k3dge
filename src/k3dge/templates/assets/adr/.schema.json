@@ -1,0 +1,28 @@
+{
+  "filename": "^(\\d{4})-[\\w-]+\\.md$",
+  "h1": "^#\\s+ADR-{id}\\s*[:—-]",
+  "sections": [
+    "## 1. 上下文 (Context)",
+    "## 2. 决策 (Decision)",
+    "## 3. 产生后果 (Consequences)"
+  ],
+  "frontmatter": {
+    "Status": [
+      "Accepted",
+      "Draft",
+      "Proposed",
+      "Deprecated",
+      "Rejected",
+      "Amended by ADR-\\d{4}",
+      "Superseded by ADR-\\d{4}"
+    ],
+    "Date": "date"
+  },
+  "codes": {
+    "filename": "ADR_FILENAME_MISMATCH",
+    "h1": "ADR_FILENAME_MISMATCH",
+    "frontmatter": "ADR_FRONTMATTER_MISSING",
+    "sections": "ADR_SECTIONS_MISSING",
+    "unique": "ADR_NUMBER_COLLISION"
+  }
+}

@@ -1,7 +1,7 @@
 """MCP injection surface for foreign agent harnesses (DSH, Codex, Claude Code, OpenCode).
 
 Zero-drift: those runtimes must not reimplement the gate; they call this stdio server.
-Native humans/CI use ``k3dge.cli.main``, not this module. See ADR 0006.
+Native humans/CI use ``k3dge.cli.main``, not this module. See ADR-0006.
 """
 
 from __future__ import annotations
@@ -101,6 +101,23 @@ def k3dge_check(
     payload["render_output"] = report.render()
     payload["force_full"] = force_full
     return json.dumps(payload, indent=2, ensure_ascii=False)
+
+
+@mcp.tool()
+def k3dge_status(workspace_path: Optional[str] = None) -> str:
+    """Synthesize current workspace state: domains / drift / pipeline / unfinished tasks.
+
+    Runs ConsistencyEngine.evaluate() — same cost tier as k3dge_check. Shares the single
+    workspace_status() implementation with the CLI; never re-scans tasks or re-filters drift.
+    Output shape is isomorphic to ``k3dge status --json``.
+    """
+    from k3dge.cli.status import workspace_status
+
+    ws = _find_workspace(workspace_path=workspace_path)
+    status_obj = workspace_status(ws)
+    if not status_obj.get("ok", True):
+        return _err(status_obj.get("error", "UnknownError"), status_obj.get("message", ""))
+    return json.dumps(status_obj, indent=2, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -264,80 +281,46 @@ def k3dge_task_list(
     )
 
 
-@mcp.resource("protocol://{task_type}")
-def get_protocol_resource(task_type: str, workspace_path: Optional[str] = None) -> str:
-    """Read the protocol markdown a worker must follow for a given task_type.
-
-    Deterministic operation-spec injection: the host harness pulls this into a
-    fresh, bounded-attention session before acting. See ADR 0012.
-    """
-    from k3dge.engine.protocol import ProtocolResolutionError, ProtocolResolver
+@mcp.tool()
+def k3dge_doc_list(
+    typ: Optional[str] = None,
+    ident: Optional[str] = None,
+    q: Optional[str] = None,
+    include_archive: bool = False,
+    workspace_path: Optional[str] = None,
+) -> str:
+    """Thin document catalog (path/id/title/status/tokens). Never returns bodies. Same as CLI k3dge doc list."""
+    from k3dge.engine.doc_catalog import list_docs
 
     ws = _find_workspace(workspace_path=workspace_path)
-    try:
-        ref = ProtocolResolver(ws).resolve(task_type)
-    except ProtocolResolutionError as exc:
-        return _err("ProtocolNotFound", str(exc))
-    if not ref.exists:
-        return _err("ProtocolMissing", f"protocol file not found: {ref.rel}", path=ref.rel)
-    try:
-        return ref.path.read_text(encoding="utf-8")
-    except Exception as exc:
-        return _err("ProtocolReadError", str(exc), path=ref.rel)
+    rows = list_docs(ws, typ=typ, ident=ident, q=q, include_archive=include_archive)
+    return json.dumps({"ok": True, "count": len(rows), "docs": rows}, indent=2, ensure_ascii=False)
 
 
 @mcp.tool()
-def k3dge_protocol_resolve(
-    task_type: str = "",
-    path: Optional[str] = None,
-    workspace_path: Optional[str] = None,
-) -> str:
-    """Resolve a protocol to inject before an agent acts.
-
-    Deterministic call for an upstream harness:
-    - `path` (preferred): the file about to be touched; the most-specific glob in
-      `.agent/protocols.toml [paths]` decides the protocol. No match => base spec.
-    - `task_type`: explicit protocol key (fallback when no path routing applies).
-    Returns the operation spec markdown so attention is bounded by protocol, not
-    by conversational history. Use this instead of the agent inventing rules.
-    """
-    from k3dge.engine.protocol import ProtocolResolutionError, ProtocolResolver
+def k3dge_doc_where(ident: str, workspace_path: Optional[str] = None) -> str:
+    """Resolve a document id to catalog cards (path only). Same as CLI k3dge doc where."""
+    from k3dge.engine.doc_catalog import where_doc
 
     ws = _find_workspace(workspace_path=workspace_path)
-    resolver = ProtocolResolver(ws)
-    ref = None
-    if path:
-        ref = resolver.resolve_by_path(path)
-        if ref is None:
-            return json.dumps(
-                {
-                    "ok": True,
-                    "task_type": None,
-                    "protocol_path": None,
-                    "exists": False,
-                    "content": "",
-                    "note": f"no protocol mapped for path '{path}'; proceed under base spec",
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-    else:
-        try:
-            ref = resolver.resolve(task_type)
-        except ProtocolResolutionError as exc:
-            return _err("ProtocolNotFound", str(exc))
-    content = ref.path.read_text(encoding="utf-8") if ref.exists else ""
-    return json.dumps(
-        {
-            "ok": True,
-            "task_type": ref.task_type,
-            "protocol_path": ref.rel,
-            "exists": ref.exists,
-            "content": content,
-        },
-        indent=2,
-        ensure_ascii=False,
-    )
+    rows = where_doc(ws, ident)
+    return json.dumps({"ok": True, "count": len(rows), "docs": rows}, indent=2, ensure_ascii=False)
+
+
+@mcp.tool()
+def k3dge_doc_grep(
+    query: str,
+    typ: Optional[str] = None,
+    line: bool = False,
+    include_archive: bool = False,
+    workspace_path: Optional[str] = None,
+) -> str:
+    """Scan managed doc bodies. Returns path (and line if requested). Never snippets. Same as CLI k3dge doc grep."""
+    from k3dge.engine.doc_catalog import grep_docs
+
+    ws = _find_workspace(workspace_path=workspace_path)
+    rows = grep_docs(ws, query, typ=typ, line=line, include_archive=include_archive)
+    return json.dumps({"ok": True, "count": len(rows), "hits": rows}, indent=2, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -429,42 +412,6 @@ def k3dge_milestone_control(
     return _err("InvalidAction", f"Invalid action '{action}'. Choose from: status, align, seal.")
 
 
-@mcp.tool()
-def k3dge_protocol_challenge(
-    path: Optional[str] = None,
-    task_type: str = "",
-    task_id: str = "",
-    workspace_path: Optional[str] = None,
-) -> str:
-    """Compute the dynamic load-proof challenge for a workshop entry.
-
-    Returns `sha256(normalize(protocol_text) + task_id)[:12]`. The host harness
-    issues this right after injecting the protocol and before letting the agent
-    act; the agent must echo it back. A correct reply proves the protocol was
-    loaded into the live session (attention reset), not merely grepped. None when
-    no protocol maps (base spec, no helmet required). See ADR 0012.
-    """
-    from k3dge.engine.protocol import ProtocolResolver
-
-    ws = _find_workspace(workspace_path=workspace_path)
-    chal = ProtocolResolver(ws).challenge(target=path, task_type=task_type, task_id=task_id or "")
-    if chal is None:
-        return json.dumps(
-            {
-                "ok": True,
-                "required": False,
-                "challenge": None,
-                "note": "no protocol mapped; proceed under base spec",
-            },
-            indent=2,
-            ensure_ascii=False,
-        )
-    return json.dumps(
-        {"ok": True, "required": True, "challenge": chal},
-        indent=2,
-        ensure_ascii=False,
-    )
-
     if act == "align":
         ok, msg, tasks = milestone.run_milestone_alignment(ws, milestone_id)
         payload = {
@@ -495,7 +442,7 @@ def k3dge_protocol_challenge(
                 indent=2,
                 ensure_ascii=False,
             )
-        # Auto-bump patch version to keep CLI and MCP seal semantics identical (U-04); bump failure does not rollback seal (see ADR 0017)
+        # Auto-bump patch version to keep CLI and MCP seal semantics identical (U-04); bump failure does not rollback seal (see ADR-0013)
         # Both CLI and MCP now use consume_unreleased for identical changelog body (P3-01)
         try:
             from k3dge.engine.version import append_changelog, bump_version, consume_unreleased, get_version
@@ -581,128 +528,76 @@ def _audit_protocol_with_fallback(workspace_path: Optional[str] = None) -> tuple
     return (proto, fell_back, reason)
 
 
+_DOC_SCOPE_MARKERS = (
+    "docs/", "docs\\", "/docs/",
+    "adr", "tasks", "incidents", "memo", "branches", "reviews",
+    "guides", "specs", "architecture",
+)
+
+
+def _is_doc_scope(target_scope: str) -> bool:
+    s = (target_scope or "").strip().lower()
+    if not s:
+        return False
+    return any(marker in s for marker in _DOC_SCOPE_MARKERS)
+
+
 @mcp.prompt()
 def k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str) -> str:
-    """Pointer to the independent audit harness. Lenses do not live in k3dge."""
+    """Pointer to the independent audit harness (k3dit). Lenses do not live in k3dge.
+
+    Unified audit entry — NOT a separate doc harness. Code scope routes to the 5-Pass
+    lens; document scope routes to the Doc Audit section of the same protocol. Same peer
+    (k3dit), same 12-col report, same on_pre_seal verify (ADR-0020).
+    """
     proto, fell_back, reason = _audit_protocol_with_fallback()
     # Highlighted fallback warning when external harness (k3dit) unavailable
     banner = ""
     if fell_back:
+        # Audit protocol is NOT part of k3dge; under fallback the working agent would
+        # self-audit, which re-glues work/check (ADR-0006 sidecar boundary). Surface it
+        # loudly and forbid self-certifying a seal with this lens.
         banner = (
             "!!! \033[1;41m[WARN][HARNESS FALLBACK]\033[0m \033[1;33m"
             f"k3dit audit harness unavailable ({reason}), "
-            "falling back to DEFAULT docs/protocols/audit_default.md (manual lens, no k3dit)\033[0m !!!\n"
+            "falling back to DEFAULT docs/protocols/audit_default.md\033[0m !!!\n"
             "[WARN][HARNESS FALLBACK] k3dit not found → DEFAULT audit_default.md\n"
-            f"[WARN] Reason: {reason}\n\n"
+            f"[WARN] Reason: {reason}\n"
+            "[WARN] lens_source = default-self: 此透镜由干活 agent 自审，不构成独立审计；"
+            "seal 前须转人工 / 外部 harness（k3dit）复核，禁止自审即封板。\n\n"
+        )
+    if _is_doc_scope(target_scope):
+        return (
+            banner
+            + f"Audit protocol is NOT part of k3dge. Read {proto} (Doc Audit section); "
+            + ("(DEFAULT fallback = 自审，非独立审计)" if fell_back else "(k3dit lens)")
+            + f" Apply the document lens (ADR conflict/coverage + README-rule compliance). "
+            + f"Scope: {target_scope}. ADR facts via k3dge_adr_index.\n\n"
+            f"```\n{context_snippet}\n```\n"
         )
     return (
         banner
         + f"Audit protocol is NOT part of k3dge. Read {proto}; "
-        + ("(DEFAULT fallback, no k3dit)" if fell_back else "(k3dit lens)")
+        + ("(DEFAULT fallback = 自审，非独立审计)" if fell_back else "(k3dit lens)")
         + f" Execute only Pass {pass_number}. Scope: {target_scope}.\n\n"
         f"```\n{context_snippet}\n```\n"
     )
 
 
 @mcp.tool()
-def k3dge_protocol_ticket(
-    path: Optional[str] = None,
-    task_type: str = "",
-    task_id: str = "",
-    ticket: Optional[object] = None,
-    workspace_path: Optional[str] = None,
-) -> str:
-    """L2 entry-ticket: structured acknowledgment that the agent bound every protocol constraint.
+def k3dge_adr_index(workspace_path: Optional[str] = None) -> str:
+    """Fact tool: ADR set self-consistency (coverage/conflict facts). Non-judgmental; k3dit decides.
 
-    Without `ticket`: returns the checklist of declared constraints the agent must
-    bind to the task (the "what to recite" list). With `ticket` (a JSON object or
-    string): validates shape + completeness — every declared constraint must be
-    acknowledged. This proves a synthesis step, not mere copying; final deliverable
-    adherence is still gated by `k3dge check` (L3). See ADR 0022.
+    Builds the ADR index + O(n) overlap/pointer findings (AdrIndex). Surfaces candidates
+    only — never judges whether a conflict is real. See audit_default.md Doc Audit lens.
     """
-    from k3dge.engine.protocol import ProtocolResolver
+    from k3dge.engine.doc_catalog import analyze_adr_coverage
 
     ws = _find_workspace(workspace_path=workspace_path)
-    resolver = ProtocolResolver(ws)
-    if ticket is None:
-        ref = resolver.resolve_by_path(path) if path else (resolver.resolve(task_type) if task_type else None)
-        if ref is None:
-            return json.dumps(
-                {"ok": True, "required": False, "constraints": [], "note": "no protocol mapped; base spec"},
-                indent=2,
-                ensure_ascii=False,
-            )
-        constraints = resolver.expected_constraints(target=path, task_type=task_type) or []
-        return json.dumps(
-            {"ok": True, "required": True, "protocol": ref.task_type, "constraints": constraints},
-            indent=2,
-            ensure_ascii=False,
-        )
-    if isinstance(ticket, str):
-        try:
-            ticket = json.loads(ticket)
-        except Exception as exc:
-            return _err("TicketParseError", str(exc))
-    errs = resolver.validate_ticket(
-        target=path, task_type=task_type, ticket=ticket, task_id=task_id or ""
-    )
-    return json.dumps(
-        {"ok": not errs, "errors": errs},
-        indent=2,
-        ensure_ascii=False,
-    )
+    return json.dumps(analyze_adr_coverage(ws), ensure_ascii=False, indent=2)
 
 
-@mcp.tool()
-def k3dge_protocol_verify(
-    path: Optional[str] = None,
-    task_type: str = "",
-    task_id: str = "",
-    ticket: Optional[object] = None,
-    workspace_path: Optional[str] = None,
-) -> str:
-    """Soft gate (ADR 0022, revised): advisory L1+L2 verdict, never a hard block.
 
-    Returns `pass` (no protocol / ticket valid) or `advise` (protocol required but
-    ticket invalid, with remediation so a cooperating agent self-corrects). The agent
-    may still proceed; persistent deviation should be escalated via `k3dge_protocol_report`
-    and is ultimately caught by `k3dge check` (L3) where the agent cannot reach it.
-    """
-    from k3dge.engine.protocol import ProtocolResolver
-
-    ws = _find_workspace(workspace_path=workspace_path)
-    resolver = ProtocolResolver(ws)
-    if isinstance(ticket, str):
-        try:
-            ticket = json.loads(ticket)
-        except Exception as exc:
-            return _err("TicketParseError", str(exc))
-    verdict = resolver.verify(target=path, task_type=task_type, ticket=ticket, task_id=task_id or "")
-    return json.dumps(verdict, indent=2, ensure_ascii=False)
-
-
-@mcp.tool()
-def k3dge_protocol_report(
-    detail: str,
-    path: Optional[str] = None,
-    task_type: str = "",
-    task_id: str = "",
-    workspace_path: Optional[str] = None,
-) -> str:
-    """Escalate a persistent protocol deviation to a human-visible incident note.
-
-    Writes `docs/incidents/INC-YYYYMMDD-protocol-<slug>.md` so a person knows the agent
-    ignored the soft gate and proceeded regardless. This is the "report it to a human"
-    backstop; it is NOT enforcement. See ADR 0022.
-    """
-    from k3dge.engine.protocol import write_incident
-
-    if not detail or not detail.strip():
-        return _err("MissingDetail", "report requires non-empty detail")
-    ws = _find_workspace(workspace_path=workspace_path)
-    out = write_incident(ws, path, task_type or None, task_id or "", detail)
-    rel = str(out.relative_to(ws)) if out.is_relative_to(ws) else str(out)
-    return json.dumps({"ok": True, "incident": rel}, indent=2, ensure_ascii=False)
 
 
 if __name__ == "__main__":

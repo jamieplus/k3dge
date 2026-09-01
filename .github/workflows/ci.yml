@@ -21,5 +21,21 @@ jobs:
         run: k3dge check --force-full --with-tests
       - name: Doc-gate (README + anchor per docs subdir)
         run: python3 scripts/pre-commit --scan
+      - name: Verify commit attestations
+        run: |
+          base="${{ github.event.before }}"
+          head="${{ github.event.after }}"
+          if [ -n "$base" ] && [ -n "$head" ] && git rev-list "$base..$head" >/dev/null 2>&1; then
+            range="$base..$head"
+          elif git rev-list origin/main..HEAD >/dev/null 2>&1; then
+            range="origin/main..HEAD"
+          else
+            range="HEAD~50..HEAD"
+          fi
+          bad=0
+          for h in $(git rev-list "$range"); do
+            k3dge verify-attest --commit "$h" || bad=1
+          done
+          [ "$bad" -eq 0 ]
       - name: Tests
         run: pytest -q

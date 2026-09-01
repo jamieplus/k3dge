@@ -4,10 +4,10 @@ Date: 2026-08-24
 Deciders: Core Maintainer
 ---
 
-# ADR 0005: 本地自用、职责切分、审计独立 harness
+# ADR-0005: 本地自用、职责切分、审计独立 harness
 
 ## 1. 上下文 (Context)
-k3dge 先在本仓自用，不按 PyPI 发行假设设计（阶段定义见 ADR 0007：自举开发）。同时收口六处未定设计：安装源、engine/cli 职责、契约覆盖面、封板证据、guides 桩与 seal 互打、审计透镜位置。
+k3dge 先在本仓自用，不按 PyPI 发行假设设计（阶段定义见 ADR-0007：自举开发）。同时收口六处未定设计：安装源、engine/cli 职责、契约覆盖面、封板证据、guides 桩与 seal 互打、审计透镜位置。
 
 ## 2. 决策 (Decision)
 
@@ -21,7 +21,7 @@ k3dge 先在本仓自用，不按 PyPI 发行假设设计（阶段定义见 ADR 
 
 ### 2.2 职责（有完整方案，本轮落地）
 - **engine 双责写死，不拆第五域**：`ConsistencyEngine` = 纯判定（`GateReport`）；`milestone` = 生命周期副作用（写 reviews、搬 tasks）。align 的 Full Matrix **调用** `evaluate(run_tests=True, force_full=True)`，禁止再复制一套 L2。
-- **cli = 传输层**（细化见 ADR 0006）：`main` = 本仓终端/CI；`mcp` = 外部 harness（DSH / Codex / Claude Code / OpenCode）注入面。不新建 mcp 域。
+- **cli = 传输层**（细化见 ADR-0006）：`main` = 本仓终端/CI；`mcp` = 外部 harness（DSH / Codex / Claude Code / OpenCode）注入面。不新建 mcp 域。
 - **L2 执行集 = `manifest.domains.*.tests` 目录**。Verification Matrix 只保证所列 `tests/...` 文件存在（及跨域标注）；不单独当 pytest 路径清单。check 与 align 同一收集规则。
 
 ### 2.3 契约范围
@@ -36,7 +36,7 @@ L1 锁的是 **Python 模块顶层公开函数/类签名**（含白名单装饰�
 seal 只拦 `docs/guides/*.md` 里的 `<!-- k3dge:guide-stub -->`。`generate-docs` 写该标记，不再写通用 `<!-- TODO -->`。正文里的 TODO 不挡封板。
 
 ### 2.6 审计独立 harness
-透镜规程不进 `src/k3dge`、不加 `k3dge audit`。本仓 `docs/protocols/audit_default.md` 为本地审计 harness（PROTOCOL + 报告格式校验 CLI）。k3dge 只留 `docs/reviews/` 槽位与 seal 证据。MCP `k3dge_5pass_audit_prompt` 只指向该 PROTOCOL。
+透镜规程不进 `src/k3dge`、不加 `k3dge audit`。`docs/protocols/audit_default.md` 与 `verify_default.md` 只作 `.agent/pipeline.toml` 的 manual fallback（存在性由 `PIPELINE_PROTOCOL_NOT_FOUND` 校验，ADR-0019）。12 列报告与 `check-report` 在 k3dit。k3dge 只留 `docs/reviews/` 槽位与 seal 证据。MCP `k3dge_5pass_audit_prompt` 只指路，优先 `../k3dit/docs/guides/protocol.md`。
 
 ## 3. 产生后果 (Consequences)
 - **正**：本仓可直接 `./k3dge-init.sh`；align/check 测集不再分叉；封板无法用任意 md 冒充 align 产物；审计与一致性门禁解耦。

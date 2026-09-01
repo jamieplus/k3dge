@@ -1,22 +1,16 @@
 #!/usr/bin/env python3
 """k3dge doc-gate (managed git pre-commit hook).
 
-STRUCTURE-ONLY gate. Every top-level docs/ domain directory must carry a
-README.md whose `## 文档编撰规则 (Document Authoring Rules)` anchor section
-states that domain's soft authoring rules. For each staged managed document,
-the hook checks the README of its top-level domain (docs/<domain>/README.md):
-  - no README            -> commit blocked (mandatory)
-  - README lacks anchor  -> commit blocked (README structure broken)
-  - README has anchor    -> governed, intact (pass)
+STRUCTURE-ONLY gate. Every top-level docs/ type directory must carry README.md
+and AUTHORING.md. For each staged managed document the hook checks
+docs/<type>/ of the first path segment:
+  - no README.md      -> commit blocked
+  - no AUTHORING.md   -> commit blocked
+  - both present      -> pass
 
-Nested content dirs (docs/specs/<domain>/, docs/*/archive/, ...) are governed
-by their top-level domain README; they are not separate governed units.
-
-Content (rule text, per-doc frontmatter/sections, index sync) is NOT validated:
-protocols are soft rules followed by reading the domain README.
-
-Routing is implicit: the protocol IS the README in the document's own domain dir.
-No central registry, no hardcoded prefixes.
+Nested dirs (docs/specs/<domain>/, docs/*/archive/, ...) use the type-level
+files. Soft-rule text is not parsed (k3dit). Structure JSON is `.schema.json`
+(`k3dge check`).
 
 Activate:  git config core.hooksPath scripts
 Self-test: python3 scripts/pre-commit --scan
@@ -28,7 +22,7 @@ import sys
 from pathlib import Path
 
 WS = Path(__file__).resolve().parent.parent
-ANCHOR = "## 文档编撰规则 (Document Authoring Rules)"
+AUTHORING = "AUTHORING.md"
 
 
 def staged_files() -> list[str]:
@@ -53,31 +47,32 @@ def relevant_for_check(files: list[str]) -> bool:
 def check_one(rel: str) -> list[str]:
     parts = Path(rel).parts
     domain = parts[1] if len(parts) > 1 else ""
-    rm = WS / "docs" / domain / "README.md"
+    type_dir = WS / "docs" / domain
+    errs: list[str] = []
+    rm = type_dir / "README.md"
+    am = type_dir / AUTHORING
     if not rm.exists():
-        return [f"{rm.relative_to(WS)}: missing — every docs subdir must have a README.md"]
-    if ANCHOR not in rm.read_text(encoding="utf-8"):
-        return [f"{rm.relative_to(WS)}: anchor section `{ANCHOR}` missing (README structure broken)"]
-    return []
+        errs.append(f"{rm.relative_to(WS)}: missing — every docs subdir must have a README.md")
+    if not am.exists():
+        errs.append(f"{am.relative_to(WS)}: missing — every docs subdir must have AUTHORING.md")
+    return errs
 
 
 def main() -> int:
     if "--scan" in sys.argv:
         missing: list[str] = []
         for d in sorted(p for p in (WS / "docs").iterdir() if p.is_dir()):
-            rm = d / "README.md"
-            label = str(d.relative_to(WS)) + "/README.md"
-            if not rm.exists():
-                missing.append(f"{label}: missing")
-            elif ANCHOR not in rm.read_text(encoding="utf-8"):
-                missing.append(f"{label}: no anchor")
+            if not (d / "README.md").exists():
+                missing.append(f"{d.relative_to(WS)}/README.md: missing")
+            if not (d / AUTHORING).exists():
+                missing.append(f"{d.relative_to(WS)}/{AUTHORING}: missing")
         if missing:
-            print("[k3dge doc-gate] FAIL: docs subdirs missing README/anchor:")
+            print("[k3dge doc-gate] FAIL: docs subdirs missing README/AUTHORING.md:")
             for m in missing:
                 print(f"  - {m}")
             return 1
         total = len([p for p in (WS / "docs").iterdir() if p.is_dir()])
-        print(f"[k3dge doc-gate] PASS: {total} docs subdirs have README + anchor")
+        print(f"[k3dge doc-gate] PASS: {total} docs subdirs have README + AUTHORING.md")
         return 0
 
     rc = 0
@@ -90,13 +85,13 @@ def main() -> int:
         for f in doc_files:
             errs.extend(check_one(f))
         if errs:
-            print("[k3dge doc-gate] FAIL: README structure broken -> commit blocked")
+            print("[k3dge doc-gate] FAIL: type README/AUTHORING.md missing -> commit blocked")
             for e in errs:
                 print(f"  - {e}")
-            print("[k3dge doc-gate] add/fix the domain README (with anchor), then commit")
+            print("[k3dge doc-gate] add docs/<type>/README.md and AUTHORING.md, then commit")
             rc = 1
         else:
-            print(f"[k3dge doc-gate] PASS: {len(doc_files)} managed doc(s) — README structure intact")
+            print(f"[k3dge doc-gate] PASS: {len(doc_files)} managed doc(s) — README + AUTHORING.md present")
     else:
         print("[k3dge doc-gate] skipped (no docs changed in this commit)")
 
@@ -108,6 +103,7 @@ def main() -> int:
             rc = check_rc
     else:
         print("[k3dge check] skipped (no code/spec/agent changes in this commit)")
+
     return rc
 
 

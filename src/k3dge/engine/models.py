@@ -12,6 +12,7 @@ class Violation:
     message: str
     domain: Optional[str] = None
     file_path: Optional[str] = None
+    detail: Optional[dict] = None
 
     def format(self) -> str:
         loc = f" [{self.file_path}]" if self.file_path else ""

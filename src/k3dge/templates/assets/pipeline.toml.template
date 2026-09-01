@@ -1,5 +1,5 @@
 # k3dge external peer pipeline — declarative peers + action fallback chains
-# Peers are equal (ADR 0008), not plugins. k3dge only gates; lenses live in peers.
+# Peers are equal (ADR-0006), not plugins. k3dge only gates; lenses live in peers.
 # Connection endpoints live in .mcp.json (k3dge mcp sync); this file defines flows only.
 
 [peers.k3dit]
@@ -7,7 +7,7 @@ scope = "audit,verify"
 log_level = "warn"
 
 [peers.k3dit.actions.audit]
-blocking = false                               # 初审产出待修缺陷，不阻断 align
+blocking = false                               # 初审产出待修缺陷，不阻断 align；代码/文档同一条 k3dit 链，文档按 scope 套 Doc Audit 节（ADR-0020）
 transports = [
   { provider = "mcp", tool = "k3dit_run_audit", timeout = 60 },
   { provider = "manual", protocol = "docs/protocols/audit_default.md" },
@@ -38,7 +38,7 @@ transports = [
 ]
 
 [pipelines.on_align_success]
-# 里程碑对齐后：同步上下文 -> 质量验证 -> 触发初审生成 9 列表格
+# 里程碑对齐后：同步上下文 -> 质量验证 -> 触发初审生成 12 列表格（ADR-0017）
 stages = [
   "k3che",
   "k3lity",
@@ -46,7 +46,7 @@ stages = [
 ]
 
 [pipelines.on_pre_seal]
-# 封板前：验证 9 列表格三态闭环，零悬空缺陷
+# 封板前：验证 12 列表格（ADR-0017）三态闭环，零悬空缺陷
 stages = [
   "k3dit.actions.verify",
 ]

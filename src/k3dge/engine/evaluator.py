@@ -28,6 +28,39 @@ def _spec_violation_path(workspace: Path, manifest: Manifest, domain: str) -> Op
     return str(workspace / rel) if rel else None
 
 
+def _shape_change_documented(workspace: Path, domain: str, spec_content: str, sym_diff: dict) -> bool:
+    """C gate (WARN only): a shape change (added/removed/changed symbols) must leave a human trace.
+
+    Either a CHANGELOG `## [Unreleased]` line, or a spec §1 boundary sentence, mentioning the
+    domain or any changed symbol. Structural check only — never NLP over the prose (ADR-0001 decision 6).
+    """
+    names = set(
+        sym_diff.get("added", []) + sym_diff.get("removed", []) + sym_diff.get("changed", [])
+    )
+    if not names:
+        return True
+    needles = {domain, *names}
+    cl = workspace / "CHANGELOG.md"
+    if cl.is_file():
+        try:
+            text = cl.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            text = ""
+        i = text.find("## [Unreleased]")
+        if i != -1:
+            j = text.find("## [", i + 1)
+            block = text[i:j] if j != -1 else text[i:]
+            if any(n in block for n in needles):
+                return True
+    m = re.search(r"^#{2,3}\s+.*(?:Domain Boundary|边界)", spec_content, re.MULTILINE)
+    if m:
+        nxt = re.search(r"\n#{2,3}\s+", spec_content[m.start() + 1 :])
+        sec = spec_content[m.start() : nxt.start() if nxt else len(spec_content)]
+        if any(n in sec for n in needles):
+            return True
+    return False
+
+
 def _run_batch_tests(
     workspace: Path,
     manifest: Manifest,
@@ -229,9 +262,14 @@ class ConsistencyEngine:
             modified_domains = set(manifest.domains)
 
         # 收集所有 touched 域的 tests 路径，去重后批量执行（直接基于 manifest，不爬 spec 表格）
+        # 跨域影响：某域公开哈希变化时，跑声明 depends_on 该域的消费方域测试（ADR-0001 决策点 6）
         if run_tests:
+            affected = set(modified_domains)
+            for d in sorted(manifest.domains):
+                if set(manifest.depends_on(d)) & affected:
+                    affected.add(d)
             batch_refs: dict[str, set[str]] = {}
-            for domain in sorted(touched):
+            for domain in sorted(affected):
                 ref = manifest.domains.get(domain, {}).get("tests", "")
                 if ref and (self.workspace_root / ref).exists():
                     batch_refs.setdefault(ref, set()).add(domain)
@@ -268,7 +306,12 @@ class ConsistencyEngine:
                     u_next = changelog_text.find("## [", u_idx + len(unreleased_tag))
                     unreleased_block = changelog_text[u_idx:u_next] if u_next != -1 else changelog_text[u_idx:]
                     for p in files:
-                        if not p.startswith("docs/tasks/") or p.startswith("docs/tasks/archive/") or p.endswith("README.md"):
+                        if (
+                            not p.startswith("docs/tasks/")
+                            or p.startswith("docs/tasks/archive/")
+                            or p.endswith("README.md")
+                            or p.endswith("_template.md")
+                        ):
                             continue
                         task_path = self.workspace_root / p
                         if not task_path.is_file():
@@ -297,7 +340,7 @@ class ConsistencyEngine:
         except Exception:
             pass
 
-        # 脚手架镜像漂移：assets ↔ 本仓文件必须一致（仅 manifest.self_hosting=true 时，ADR 0018 显式声明）
+        # 脚手架镜像漂移：assets ↔ 本仓文件必须一致（仅 manifest.self_hosting=true 时，ADR-0014 显式声明）
         try:
             is_self_host = bool(getattr(manifest, "self_hosting", False))
             if is_self_host:
@@ -374,28 +417,31 @@ class ConsistencyEngine:
                 )
             )
 
-        # 协议调度注册表治理：.agent/protocols.toml 语义硬门控（纯静态；文件不存在则优雅跳过，存在则 100% 严格）
-        try:
-            from k3dge.engine.protocol import validate_protocols_config
+        docs_touched = any(str(p).replace("\\", "/").startswith("docs/") for p in files)
+        if force_full or docs_touched:
+            try:
+                from k3dge.engine.doc_catalog import validate_docs, validate_docs_index
 
-            for code, msg in validate_protocols_config(self.workspace_root):
+                types = None
+                if not force_full:
+                    types = sorted(
+                        {
+                            Path(p).parts[1]
+                            for p in files
+                            if str(p).replace("\\", "/").startswith("docs/")
+                            and len(Path(p).parts) > 1
+                        }
+                    )
+                violations.extend(validate_docs(self.workspace_root, types=types))
+                violations.extend(validate_docs_index(self.workspace_root))
+            except Exception as extra:
                 violations.append(
                     Violation(
-                        code,
-                        msg,
-                        domain="protocols",
-                        file_path=".agent/protocols.toml",
+                        "DOC_SCHEMA_INVALID",
+                        f"docs catalog check crashed: {extra}",
+                        file_path="docs",
                     )
                 )
-        except Exception as exc:
-            violations.append(
-                Violation(
-                    "PROTOCOL_REGISTRY_INVALID",
-                    f"protocol validation crashed: {exc}",
-                    domain="protocols",
-                    file_path=".agent/protocols.toml",
-                )
-            )
 
         return GateReport(
             passed=not violations,
@@ -451,12 +497,43 @@ class ConsistencyEngine:
             foreign = bool(tests_root) and not (
                 ref == tests_root or ref.startswith(tests_root.rstrip("/") + "/")
             )
-            if not (self.workspace_root / ref).exists():
+            if "::" in ref:
+                fpath, _, tname = ref.partition("::")
+            else:
+                fpath, tname = ref, ""
+            target = self.workspace_root / fpath
+            if not target.exists():
                 out.append(
                     Violation(
                         "MISSING_TEST_FILE",
                         f"Verification Matrix references missing test '{ref}'"
                         + (" (cross-domain reference)" if foreign else ""),
+                        domain=domain,
+                        file_path=str(spec_path),
+                    )
+                )
+                continue
+            # 行级绑定：矩阵行须可解析到具体测试（文件在、场景不在 = 红，ADR-0001 决策点 6）
+            try:
+                _t_src = target.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                _t_src = ""
+            if tname:
+                if not re.search(rf"(?:async\s+def|def)\s+{re.escape(tname)}\b", _t_src):
+                    out.append(
+                        Violation(
+                            "MATRIX_TEST_UNRESOLVED",
+                            f"Verification Matrix row binds '{ref}' but no test '{tname}' in {fpath}"
+                            + (" (cross-domain reference)" if foreign else ""),
+                            domain=domain,
+                            file_path=str(spec_path),
+                        )
+                    )
+            elif not re.search(r"\bdef\s+test_", _t_src):
+                out.append(
+                    Violation(
+                        "MATRIX_TEST_UNRESOLVED",
+                        f"Verification Matrix row references '{fpath}' which contains no test functions",
                         domain=domain,
                         file_path=str(spec_path),
                     )
@@ -487,6 +564,21 @@ class ConsistencyEngine:
                     )
                 )
             elif not ok:
+                detail = None
+                try:
+                    detail = contract.symbol_diff(content, src_dir, manifest, self.workspace_root)
+                except Exception:
+                    detail = None
+                if detail and any(detail.get(k) for k in ("added", "removed", "changed")):
+                    if not _shape_change_documented(self.workspace_root, domain, content, detail):
+                        import sys
+
+                        print(
+                            f"[WARN][CONTRACT_SHAPE_NO_TRACE] domain '{domain}' changed contract symbols "
+                            f"{detail} but no CHANGELOG '## [Unreleased]' line or spec §1 boundary mentions it; "
+                            f"sync still required and a human trace is expected (ADR-0001 decision 6)",
+                            file=sys.stderr,
+                        )
                 out.append(
                     Violation(
                         "CONTRACT_DRIFT",
@@ -494,7 +586,49 @@ class ConsistencyEngine:
                         "run 'k3dge sync'",
                         domain=domain,
                         file_path=str(spec_path),
+                        detail={
+                            "symbol_diff": detail,
+                            "expected_hash": expected,
+                            "actual_hash": actual,
+                        },
                     )
                 )
 
+        out.extend(self._check_domain_imports(domain, manifest))
+        return out
+
+    def _check_domain_imports(self, domain: str, manifest: Manifest) -> List[Violation]:
+        """Reverse-import ban: a domain may import another domain only if declared in depends_on (ADR-0001 decision 6)."""
+        out: List[Violation] = []
+        src_rel = manifest.src_path(domain)
+        if not src_rel:
+            return out
+        src_dir = self.workspace_root / src_rel
+        if not src_dir.exists():
+            return out
+        import_re = re.compile(r"^\s*(?:from\s+k3dge\.([a-z_]+)|import\s+k3dge\.([a-z_]+))")
+        allowed = set(manifest.depends_on(domain))
+        for py in sorted(src_dir.rglob("*.py")):
+            if py.name == "__init__.py":
+                continue
+            try:
+                text = py.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            for line in text.splitlines():
+                m = import_re.match(line)
+                if not m:
+                    continue
+                target = m.group(1) or m.group(2)
+                if target == domain or target not in manifest.domains:
+                    continue
+                if target not in allowed:
+                    out.append(
+                        Violation(
+                            "DOMAIN_IMPORT_VIOLATION",
+                            f"domain '{domain}' imports '{target}' but does not declare depends_on ('{target}')",
+                            domain=domain,
+                            file_path=str(py),
+                        )
+                    )
         return out

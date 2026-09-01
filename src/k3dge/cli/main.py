@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -45,6 +47,7 @@ def _to_json(report: GateReport) -> dict:
                 "message": v.message,
                 "domain": v.domain,
                 "file_path": v.file_path,
+                **({"detail": v.detail} if v.detail is not None else {}),
             }
             for v in report.violations
         ],
@@ -130,6 +133,59 @@ def cmd_doc(args: argparse.Namespace) -> int:
     import subprocess
 
     workspace = _find_workspace(Path.cwd())
+    action = getattr(args, "doc_action", None)
+    if action == "list":
+        from k3dge.engine.doc_catalog import list_docs
+
+        rows = list_docs(
+            workspace,
+            typ=getattr(args, "doc_type", None),
+            ident=getattr(args, "doc_id", None),
+            q=getattr(args, "q", None),
+            include_archive=getattr(args, "include_archive", False),
+        )
+        if getattr(args, "as_json", False):
+            print(json.dumps({"ok": True, "count": len(rows), "docs": rows}, indent=2, ensure_ascii=False))
+        else:
+            if not rows:
+                print("[DOC] no matches")
+            for c in rows:
+                print(f"{c['id']}\t{c['path']}\t{c['title']}")
+        return 0
+    if action == "where":
+        from k3dge.engine.doc_catalog import where_doc
+
+        rows = where_doc(workspace, args.ident)
+        if getattr(args, "as_json", False):
+            print(json.dumps({"ok": True, "count": len(rows), "docs": rows}, indent=2, ensure_ascii=False))
+        else:
+            for c in rows:
+                print(c["path"])
+            if not rows:
+                print(f"[DOC] not found: {args.ident}", file=sys.stderr)
+                return 1
+        return 0
+    if action == "grep":
+        from k3dge.engine.doc_catalog import grep_docs
+
+        rows = grep_docs(
+            workspace,
+            args.query,
+            typ=getattr(args, "doc_type", None),
+            line=getattr(args, "line", False),
+            include_archive=getattr(args, "include_archive", False),
+        )
+        if getattr(args, "as_json", False):
+            print(json.dumps({"ok": True, "count": len(rows), "hits": rows}, indent=2, ensure_ascii=False))
+        else:
+            if not rows:
+                print("[DOC] no matches")
+            for h in rows:
+                if "line" in h:
+                    print(f"{h['path']}:{h['line']}")
+                else:
+                    print(h["path"])
+        return 0
     if args.doc_action == "sync":
         from k3dge.sync.generator import sync_all
 
@@ -145,10 +201,6 @@ def cmd_doc(args: argparse.Namespace) -> int:
                     print(result.stderr, file=sys.stderr)
             except Exception as exc:
                 print(f"[DOC] generate-docs.sh failed: {exc}", file=sys.stderr)
-        # Verify SUMMARY index
-        summary = workspace / "docs" / "reviews" / "SUMMARY.md"
-        if summary.is_file():
-            print(f"[DOC] SUMMARY: {summary.relative_to(workspace)} exists")
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc sync -> changed={changed}")
         return 0
     return 1
@@ -226,153 +278,6 @@ def cmd_task(args: argparse.Namespace) -> int:
     return 1
 
 
-def cmd_protocol(args: argparse.Namespace) -> int:
-    """Deterministic protocol dispatch: pull the operation spec for a task_type."""
-    workspace = _find_workspace(Path.cwd())
-    action = getattr(args, "protocol_action", None)
-    if action == "list":
-        from k3dge.engine.protocol import ProtocolResolver
-
-        types = ProtocolResolver(workspace).list_types()
-        for t in types:
-            print(t)
-        print(f"[PROTOCOL] {len(types)} types registered")
-        return 0
-    if action == "resolve":
-        from k3dge.engine.protocol import ProtocolResolver
-
-        target = getattr(args, "path", None)
-        if target:
-            ref = ProtocolResolver(workspace).resolve_by_path(target)
-            if ref is None:
-                print(f"[PROTOCOL] no protocol mapped for path '{target}'; proceed under base spec")
-                return 0
-            print(f"[PROTOCOL] {ref.task_type} (path {target}) -> {ref.rel} (exists={ref.exists})")
-            if ref.exists:
-                print(ref.path.read_text(encoding="utf-8"))
-            return 0
-        task_type = getattr(args, "task_type", None)
-        if not task_type:
-            print("[PROTOCOL] resolve requires --path <file> or a task_type (see 'k3dge protocol list')", file=sys.stderr)
-            return 1
-        try:
-            ref = ProtocolResolver(workspace).resolve(task_type)
-        except ProtocolResolutionError as exc:
-            print(f"[PROTOCOL] {exc}", file=sys.stderr)
-            return 1
-        print(f"[PROTOCOL] {ref.task_type} -> {ref.rel} (exists={ref.exists})")
-        if ref.exists:
-            print(ref.path.read_text(encoding="utf-8"))
-        return 0
-    if action == "challenge":
-        from k3dge.engine.protocol import ProtocolResolver
-
-        target = getattr(args, "path", None)
-        task_type = getattr(args, "task_type", None)
-        task_id = getattr(args, "task_id", "") or ""
-        chal = ProtocolResolver(workspace).challenge(target=target, task_type=task_type, task_id=task_id)
-        if chal is None:
-            print("[PROTOCOL] no protocol mapped; no challenge required (proceed under base spec)")
-            return 0
-        print(chal)
-        return 0
-    if action == "ticket":
-        import json as _json
-
-        from k3dge.engine.protocol import ProtocolResolver
-
-        target = getattr(args, "path", None)
-        task_type = getattr(args, "task_type", None)
-        task_id = getattr(args, "task_id", "") or ""
-        ticket_json = getattr(args, "ticket", None)
-        resolver = ProtocolResolver(workspace)
-        if ticket_json:
-            try:
-                ticket = _json.loads(ticket_json)
-            except Exception as exc:
-                print(f"[PROTOCOL] ticket JSON parse failed: {exc}", file=sys.stderr)
-                return 1
-            errs = resolver.validate_ticket(target=target, task_type=task_type, ticket=ticket, task_id=task_id)
-            if errs:
-                for e in errs:
-                    print(f"[PROTOCOL] {e}")
-                return 1
-            print("[PROTOCOL] ticket valid")
-            return 0
-        # checklist mode: show the constraints the agent must bind
-        ref = resolver.resolve_by_path(target) if target else (resolver.resolve(task_type) if task_type else None)
-        if ref is None:
-            print("[PROTOCOL] no protocol mapped; no ticket required (base spec)")
-            return 0
-        constraints = resolver.expected_constraints(target=target, task_type=task_type) or []
-        print(f"[PROTOCOL] protocol '{ref.task_type}' requires binding these constraints:")
-        for c in constraints:
-            print(f"  - {c}")
-        if not constraints:
-            print("  (protocol declares no structured constraints; ticket only needs shape)")
-        return 0
-    if action == "verify":
-        import json as _json
-
-        from k3dge.engine.protocol import ProtocolResolver
-
-        target = getattr(args, "path", None)
-        task_type = getattr(args, "task_type", None)
-        task_id = getattr(args, "task_id", "") or ""
-        ticket_json = getattr(args, "ticket", None)
-        ticket = None
-        if ticket_json:
-            try:
-                ticket = _json.loads(ticket_json)
-            except Exception as exc:
-                print(f"[PROTOCOL] ticket JSON parse failed: {exc}", file=sys.stderr)
-                return 1
-        verdict = ProtocolResolver(workspace).verify(
-            target=target, task_type=task_type, ticket=ticket, task_id=task_id
-        )
-        print(_json.dumps(verdict, ensure_ascii=False, indent=2))
-        # Soft gate: never a hard block. Non-zero only on tool error, not on advise.
-        return 0
-    if action == "report":
-        from k3dge.engine.protocol import write_incident
-
-        target = getattr(args, "path", None)
-        task_type = getattr(args, "task_type", None)
-        task_id = getattr(args, "task_id", "") or ""
-        detail = getattr(args, "detail", "") or ""
-        if not detail:
-            print("[PROTOCOL] report requires --detail <text>", file=sys.stderr)
-            return 1
-        path = write_incident(workspace, target, task_type, task_id, detail)
-        print(f"[PROTOCOL] incident reported: {path.relative_to(workspace)}")
-        return 0
-    if action == "attend":
-        from k3dge.engine import marker
-        from k3dge.engine.protocol import ProtocolResolver
-
-        target = getattr(args, "path", None)
-        answer = getattr(args, "answer", None)
-        task_id = getattr(args, "task_id", "") or ""
-        epoch_id = getattr(args, "epoch_id", None)
-        if not target or not answer:
-            print("[PROTOCOL] attend requires --path <file> --answer <sha>", file=sys.stderr)
-            return 1
-        resolver = ProtocolResolver(workspace)
-        expected = resolver.challenge(target=target, task_id=task_id)
-        if expected is None:
-            print("[PROTOCOL] no protocol mapped; nothing to attend")
-            return 0
-        ok, epoch = marker.register_attendance(
-            workspace, target, answer=answer, expected=expected, epoch_id=epoch_id
-        )
-        if ok:
-            print(f"[PROTOCOL] attended {target} (epoch {epoch})")
-            return 0
-        print(f"[PROTOCOL] challenge mismatch: expected {expected}", file=sys.stderr)
-        return 1
-    print("[PROTOCOL] unknown action", file=sys.stderr)
-    return 1
-
 
 def cmd_init(args: argparse.Namespace) -> int:
     from pathlib import Path
@@ -425,6 +330,52 @@ def _peer_fallback(pcfg: dict) -> str:
     return "audit_default.md"
 
 
+def _probe_peer_mcp(workspace: Path, pid: str) -> tuple[Optional[Path], Optional[str], Optional[str]]:
+    """Locate a sibling peer MCP module and a PYTHONPATH that can import it."""
+    sibling = workspace.parent / pid
+    alt_sibling = workspace / pid
+    probe = sibling if sibling.is_dir() else (alt_sibling if alt_sibling.is_dir() else None)
+    if probe is None:
+        return None, None, None
+    mod = None
+    if (probe / "src" / pid / "mcp.py").is_file():
+        mod = f"{pid}.mcp"
+    elif (probe / "src" / pid / "cli" / "mcp.py").is_file():
+        mod = f"{pid}.cli.mcp"
+    elif (probe / "pyproject.toml").is_file():
+        mod = f"{pid}.mcp"
+    py_path = None
+    src = probe / "src"
+    if src.is_dir():
+        try:
+            py_path = os.path.relpath(src, workspace)
+        except ValueError:
+            py_path = str(src)
+    return probe, mod, py_path
+
+
+def _peer_mcp_entry(mod: str, pythonpath: Optional[str]) -> dict:
+    entry: dict = {"command": "python", "args": ["-m", mod]}
+    if pythonpath:
+        entry["env"] = {"PYTHONPATH": pythonpath}
+    return entry
+
+
+def _ensure_peer_pythonpath(existing: dict, pythonpath: Optional[str]) -> bool:
+    """Fill PYTHONPATH on an existing peer entry. Returns True if mutated."""
+    if not pythonpath or not isinstance(existing, dict):
+        return False
+    env = existing.get("env")
+    if not isinstance(env, dict):
+        env = {}
+    if env.get("PYTHONPATH"):
+        return False
+    merged = dict(env)
+    merged["PYTHONPATH"] = pythonpath
+    existing["env"] = merged
+    return True
+
+
 def cmd_mcp(args: argparse.Namespace) -> int:
     from k3dge.templates.scaffold import ensure_mcp_config
 
@@ -472,29 +423,22 @@ def cmd_mcp(args: argparse.Namespace) -> int:
                             continue
                         if not pcfg.get("enabled", True):
                             continue
-                        if pid in data["mcpServers"]:
+                        probe, mod, py_path = _probe_peer_mcp(workspace, pid)
+                        if probe is None or mod is None:
+                            if pid not in data["mcpServers"]:
+                                sibling = workspace.parent / pid
+                                alt_sibling = workspace / pid
+                                fallback = _peer_fallback(pcfg)
+                                _peer_fallback_warn(pid, f"sibling not found at {sibling} nor {alt_sibling} or no mcp module", fallback)
                             continue
-                        # Probe sibling peer (e.g. ../k3dit, ../k3che, ../k3lity)
-                        sibling = workspace.parent / pid
-                        alt_sibling = workspace / pid
-                        probe = sibling if sibling.is_dir() else (alt_sibling if alt_sibling.is_dir() else None)
-                        # Deduce module: prefer <pid>.mcp, fallback to <pid>.cli.mcp
-                        mod = None
-                        if probe is not None:
-                            if (probe / "src" / pid / "mcp.py").is_file():
-                                mod = f"{pid}.mcp"
-                            elif (probe / "src" / pid / "cli" / "mcp.py").is_file():
-                                mod = f"{pid}.cli.mcp"
-                            elif (probe / "pyproject.toml").is_file():
-                                mod = f"{pid}.mcp"
-                        if probe is not None and mod is not None:
-                            # Auto-add peer entry (best-effort)
-                            data["mcpServers"][pid] = {"command": "python", "args": ["-m", mod]}
+                        existing = data["mcpServers"].get(pid)
+                        if existing is None:
+                            data["mcpServers"][pid] = _peer_mcp_entry(mod, py_path)
                             changed = True
                             print(f"[MCP] auto-added peer '{pid}' from sibling {probe} as python -m {mod}", file=sys.stderr)
-                        else:
-                            fallback = _peer_fallback(pcfg)
-                            _peer_fallback_warn(pid, f"sibling not found at {sibling} nor {alt_sibling} or no mcp module", fallback)
+                        elif _ensure_peer_pythonpath(existing, py_path):
+                            changed = True
+                            print(f"[MCP] filled PYTHONPATH for peer '{pid}' -> {py_path}", file=sys.stderr)
                     if changed:
                         try:
                             tmp = mcp_path.with_suffix(".tmp")
@@ -629,6 +573,66 @@ def _conventional_ok(msg: str) -> bool:
     return bool(_CONV_RE.match(msg or ""))
 
 
+_ATTEST_PREFIX = "k3dge-commit: "
+_ATTEST_DEFAULT_SECRET = "k3dge-local-attest-v1"
+_ATTEST_WORDLIST = [
+    "aura", "brick", "cedar", "delta", "ember", "flux", "glyph", "haven",
+    "iris", "jolt", "kiwi", "lumen", "moss", "nexus", "onyx", "prism",
+    "quill", "rune", "sage", "tide", "umber", "vault", "wisp", "xenon",
+    "yarn", "zephyr",
+]
+
+
+def _attest_secret() -> str:
+    return os.environ.get("K3DGE_ATTEST_SECRET") or _ATTEST_DEFAULT_SECRET
+
+
+def _attest_tree_hash(workspace: Path) -> str:
+    import subprocess
+
+    return subprocess.run(
+        ["git", "write-tree"], cwd=workspace, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def _attest_window(when_iso: str) -> str:
+    return when_iso[:16]  # minute precision — binds the token to a time window
+
+
+def _attest_token(workspace: Path, when_iso: str) -> str:
+    secret = _attest_secret()
+    tree = _attest_tree_hash(workspace)
+    window = _attest_window(when_iso)
+    digest = hashlib.sha256(f"{secret}|{window}|{tree}".encode()).hexdigest()
+    return _ATTEST_WORDLIST[int(digest, 16) % len(_ATTEST_WORDLIST)]
+
+
+def _attest_line(workspace: Path) -> str:
+    """Lightweight commit attestation: who + when + time-bound dictionary token.
+
+    The token = word(hash(secret + minute-window + tree)). It proves the line came
+    from the governed path *if* the secret is set via K3DGE_ATTEST_SECRET (raw
+    `git commit` has no secret to compute it). Without the env secret it falls back
+    to a built-in constant — a deterrent, not a proof. CI recomputes and compares.
+    """
+    import getpass
+    import subprocess
+    from datetime import datetime, timezone
+
+    who = ""
+    try:
+        who = subprocess.run(
+            ["git", "config", "user.name"], cwd=workspace, capture_output=True, text=True
+        ).stdout.strip()
+    except Exception:
+        who = ""
+    if not who:
+        who = getpass.getuser()
+    when = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    token = _attest_token(workspace, when)
+    return f"{_ATTEST_PREFIX}{who} @ {when} #{token}"
+
+
 def _rel_within_workspace(workspace: Path, p: str) -> Path:
     """SEC-01: resolve a user path and ensure it stays inside the workspace."""
     target = (workspace / p).resolve()
@@ -639,39 +643,12 @@ def _rel_within_workspace(workspace: Path, p: str) -> Path:
     return target
 
 
-def cmd_get(args: argparse.Namespace) -> int:
-    import uuid
-
-    from k3dge.engine.protocol import ProtocolResolver
-
-    workspace = _find_workspace(Path.cwd())
-    try:
-        target = _rel_within_workspace(workspace, args.path)
-    except ValueError as exc:
-        print(f"[GET] {exc}", file=sys.stderr)
-        return 1
-    resolver = ProtocolResolver(workspace)
-    ref = resolver.resolve_by_path(target)
-    if ref is not None:
-        print(f"[GET] protocol injected ({ref.task_type}): {ref.rel}")
-        if ref.exists:
-            print("=" * 60)
-            print(ref.path.read_text(encoding="utf-8"))
-            print("=" * 60)
-    if not target.is_file():
-        print(f"[GET] file not found: {args.path}", file=sys.stderr)
-        return 1
-    print(target.read_text(encoding="utf-8"))
-    print(f"[GET] TASK_ID: {uuid.uuid4().hex[:8]}")
-    return 0
-
-
 def cmd_search(args: argparse.Namespace) -> int:
     from k3dge.engine.search import search
 
     workspace = _find_workspace(Path.cwd())
     if getattr(args, "path", None):
-        # Path-listing mode (replaces bare `find`): list files matching the glob.
+        # Path-listing mode: list files matching the glob (scoped alternative to `find`).
         matches = sorted(
             str(p.relative_to(workspace)).replace("\\", "/")
             for p in workspace.glob(args.path)
@@ -699,81 +676,6 @@ def cmd_where(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_edit(args: argparse.Namespace) -> int:
-    import uuid
-
-    from k3dge.engine.protocol import ProtocolResolver
-
-    workspace = _find_workspace(Path.cwd())
-    resolver = ProtocolResolver(workspace)
-    rc = 0
-    for raw in args.files:
-        try:
-            target = _rel_within_workspace(workspace, raw)
-        except ValueError as exc:
-            print(f"[EDIT] {exc}", file=sys.stderr)
-            rc = 1
-            continue
-        rel = str(target.relative_to(workspace)).replace("\\", "/")
-        ref = resolver.resolve_by_path(target)
-        task_id = uuid.uuid4().hex[:8]
-        print(f"[EDIT] session opened: {rel}")
-        if ref is not None and ref.require_attend:
-            print(f"[EDIT] REQUIRE_ATTEND zone ({ref.task_type}); protocol injected below")
-            if ref.exists:
-                print("-" * 40)
-                print(ref.path.read_text(encoding="utf-8"))
-                print("-" * 40)
-            print(
-                f"[EDIT] after reading, run: k3dge protocol attend --path {rel} "
-                f"--task-id {task_id} --answer <sha>"
-            )
-        else:
-            print(f"[EDIT] no protocol required for {rel}")
-    return rc
-
-
-def cmd_put(args: argparse.Namespace) -> int:
-    import os
-
-    from k3dge.engine import marker
-    from k3dge.engine.protocol import ProtocolResolver
-
-    workspace = _find_workspace(Path.cwd())
-    try:
-        target = _rel_within_workspace(workspace, args.path)
-    except ValueError as exc:
-        print(f"[PUT] {exc}", file=sys.stderr)
-        return 1
-    rel = str(target.relative_to(workspace)).replace("\\", "/")
-    resolver = ProtocolResolver(workspace)
-    ref = resolver.resolve_by_path(target)
-    content = sys.stdin.read()
-    if ref is not None and ref.require_attend:
-        if not args.answer:
-            print(
-                f"[PUT] REQUIRE_ATTEND zone ({ref.task_type}) needs --answer <sha> (load-proof)",
-                file=sys.stderr,
-            )
-            return 1
-        task_id = args.task_id or ""
-        expected = resolver.challenge(target=target, task_id=task_id)
-        if args.answer != expected:
-            print(
-                f"[PUT] challenge mismatch: expected {expected}, got {args.answer}",
-                file=sys.stderr,
-            )
-            return 1
-        marker.register_attendance(
-            workspace, rel, answer=args.answer, expected=expected, epoch_id=args.epoch_id
-        )
-    tmp = target.with_suffix(target.suffix + ".tmp")
-    tmp.write_text(content, encoding="utf-8")
-    os.replace(tmp, target)
-    print(f"[PUT] wrote {rel}")
-    return 0
-
-
 def cmd_index(args: argparse.Namespace) -> int:
     from k3dge.engine.search import write_symbol_index
 
@@ -783,21 +685,10 @@ def cmd_index(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_end(args: argparse.Namespace) -> int:
-    from k3dge.engine import marker
-
-    workspace = _find_workspace(Path.cwd())
-    marker.reset_session(workspace)
-    print("[END] session cleared (attended_zones + epoch rotated)")
-    return 0
-
-
 def cmd_commit(args: argparse.Namespace) -> int:
     import subprocess
 
-    from k3dge.engine import marker
     from k3dge.engine.evaluator import ConsistencyEngine
-    from k3dge.engine.protocol import ProtocolResolver, write_incident
 
     workspace = _find_workspace(Path.cwd())
     # 1) stage (GIT-01: -- separator isolates filenames)
@@ -812,31 +703,19 @@ def cmd_commit(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
-    # 3) single-point attendance check (advisory + L2 incident, not blocking — soft gate)
-    staged = ConsistencyEngine(workspace)._staged_files()
-    resolver = ProtocolResolver(workspace)
-    epoch = marker.ensure_epoch(workspace)
-    for f in staged:
-        ref = resolver.resolve_by_path(f)
-        if ref is not None and ref.require_attend and not marker.is_attended(workspace, f, epoch):
-            detail = (
-                f"require_attend zone '{f}' ({ref.task_type}) committed without a valid "
-                "(zone,task_id) challenge credential"
-            )
-            print(f"[COMMIT][ADVISORY] {detail}", file=sys.stderr)
-            write_incident(workspace, f, ref.task_type, "", detail)
-    # 4) gate (blocking)
+    # 3) gate (blocking)
     report = ConsistencyEngine(workspace).evaluate(staged=True, run_tests=args.with_tests)
     if not report.passed:
         print(report.render())
         return 1
-    # 5) commit, bypass hooks (internal check already covered) under sentinel env
-    env = dict(__import__("os").environ)
-    env["K3DGE_COMMIT_ACTIVE"] = "1"
+    # 5) commit; --no-verify bypasses the live hook (which would re-run the same gate).
+    #    Self-attach the attestation trailer so k3dge commits are signed like hook commits.
+    msg = args.message
+    if _ATTEST_PREFIX not in msg:
+        msg = f"{msg}\n\n{_attest_line(workspace)}"
     res = subprocess.run(
-        ["git", "commit", "-m", args.message, "--no-verify"],
+        ["git", "commit", "-m", msg, "--no-verify"],
         cwd=workspace,
-        env=env,
         capture_output=True,
         text=True,
     )
@@ -844,6 +723,67 @@ def cmd_commit(args: argparse.Namespace) -> int:
         print(res.stderr or res.stdout, file=sys.stderr)
         return 1
     print(res.stdout)
+    return 0
+
+
+def cmd_commit_attest(args: argparse.Namespace) -> int:
+    """Print the attestation trailer line for the live commit-msg hook to append."""
+    print(_attest_line(_find_workspace(Path.cwd())))
+    return 0
+
+
+_ATTEST_RE = re.compile(r"^k3dge-commit: (.+?) @ (.+?) #([a-z]+)$")
+
+
+def cmd_verify_attest(args: argparse.Namespace) -> int:
+    """Verify a commit's attestation token (used by CI)."""
+    import subprocess
+
+    workspace = _find_workspace(Path.cwd())
+    h = args.commit
+    tree = subprocess.run(
+        ["git", "rev-parse", f"{h}^{{tree}}"], cwd=workspace, capture_output=True, text=True
+    ).stdout.strip()
+    when_iso = subprocess.run(
+        ["git", "show", "-s", "--format=%cI", h], cwd=workspace, capture_output=True, text=True
+    ).stdout.strip()
+    body = subprocess.run(
+        ["git", "log", "-1", "--format=%B", h], cwd=workspace, capture_output=True, text=True
+    ).stdout
+    m = None
+    for line in body.splitlines():
+        m = _ATTEST_RE.match(line.strip())
+        if m:
+            break
+    if not m:
+        print(f"[ATTEST] commit {h} missing attestation line", file=sys.stderr)
+        return 1
+    who, when, token = m.group(1), m.group(2), m.group(3)
+    secret = _attest_secret()
+    window = _attest_window(when)
+    digest = hashlib.sha256(f"{secret}|{window}|{tree}".encode()).hexdigest()
+    expected = _ATTEST_WORDLIST[int(digest, 16) % len(_ATTEST_WORDLIST)]
+    if expected != token:
+        print(
+            f"[ATTEST] commit {h} token mismatch (got '{token}', expected '{expected}') "
+            f"-- attestation was not produced by the governed path",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"[ATTEST] commit {h} OK ({who} @ {when})")
+    return 0
+
+
+def cmd_check_msg(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    msg = Path(args.file).read_text(encoding="utf-8").strip()
+    if not _conventional_ok(msg):
+        print(
+            f"[COMMIT] message is not Conventional Commits (e.g. 'feat: ...')",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 
@@ -866,6 +806,40 @@ def cmd_incident(args: argparse.Namespace) -> int:
         data.get("detail", ""),
     )
     print(f"[INCIDENT] wrote {p.relative_to(workspace)}")
+    return 0
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    """Read-only synthesized workspace state (delegates to cli.status.workspace_status)."""
+    import sys
+
+    from k3dge.cli.status import workspace_status
+
+    status_obj = workspace_status(_find_workspace())
+    if not status_obj.get("ok", True):
+        print(f"[STATUS] {status_obj.get('error')}: {status_obj.get('message')}", file=sys.stderr)
+        return 1
+    if getattr(args, "json", False):
+        print(json.dumps(status_obj, indent=2, ensure_ascii=False))
+    else:
+        print(f"Domains: {', '.join(status_obj['domains'])}")
+        print(f"Gate: {'PASS' if status_obj['gate_passed'] else 'FAIL'}")
+        if status_obj["drift"]:
+            print("Contract drift:")
+            for d in status_obj["drift"]:
+                print(f"  - {d['domain']}: {d['symbol_diff']}")
+        else:
+            print("Contract drift: none")
+        print(
+            f"Pipeline: {'configured' if status_obj['pipeline']['configured'] else 'absent'}"
+            + (f" ({len(status_obj['pipeline']['issues'])} issue(s))" if status_obj["pipeline"]["issues"] else "")
+        )
+        if status_obj["unfinished_tasks"]:
+            print(f"Unfinished tasks ({len(status_obj['unfinished_tasks'])}):")
+            for t in status_obj["unfinished_tasks"][:10]:
+                print(f"  - [{t['status'] or '?'}] {t['title']}")
+        else:
+            print("Unfinished tasks: none")
     return 0
 
 
@@ -935,9 +909,31 @@ def build_parser() -> argparse.ArgumentParser:
     p_task.add_argument("task_id", nargs="?", default=None, help="task id substring for done (alternative to title)")
     p_task.set_defaults(func=cmd_task)
 
-    p_doc = sub.add_parser("doc", help="doc generation")
-    p_doc.add_argument("doc_action", choices=["sync"], help="doc action")
-    p_doc.set_defaults(func=lambda args: cmd_doc(args))
+    p_doc = sub.add_parser("doc", help="doc catalog (list/where), body grep (path only), sync")
+    doc_sub = p_doc.add_subparsers(dest="doc_action", required=True)
+    p_doc_sync = doc_sub.add_parser("sync", help="regenerate specs + generated docs")
+    p_doc_sync.set_defaults(func=cmd_doc)
+    p_doc_list = doc_sub.add_parser("list", help="thin catalog cards (no bodies); do not grep docs/")
+    p_doc_list.add_argument("--type", dest="doc_type", default=None, help="docs/<type>/ filter")
+    p_doc_list.add_argument("--id", dest="doc_id", default=None, help="exact id (ADR-0001, INC-...)")
+    p_doc_list.add_argument("-q", dest="q", default=None, help="substring on id/title/tokens")
+    p_doc_list.add_argument("--include-archive", action="store_true")
+    p_doc_list.add_argument("--json", dest="as_json", action="store_true")
+    p_doc_list.set_defaults(func=cmd_doc)
+    p_doc_where = doc_sub.add_parser("where", help="resolve a doc id to path")
+    p_doc_where.add_argument("ident", help="ADR-0001 / INC-... / task stem")
+    p_doc_where.add_argument("--json", dest="as_json", action="store_true")
+    p_doc_where.set_defaults(func=cmd_doc)
+    p_doc_grep = doc_sub.add_parser(
+        "grep",
+        help="scan doc bodies; print path (or path:line with --line); never snippets",
+    )
+    p_doc_grep.add_argument("query", help="regex; invalid patterns used as literals")
+    p_doc_grep.add_argument("--type", dest="doc_type", default=None)
+    p_doc_grep.add_argument("--line", action="store_true", help="include line numbers; still no text")
+    p_doc_grep.add_argument("--include-archive", action="store_true")
+    p_doc_grep.add_argument("--json", dest="as_json", action="store_true")
+    p_doc_grep.set_defaults(func=cmd_doc)
 
     p_init = sub.add_parser("init", help="initialize k3dge harness in target directory")
     p_init.add_argument("target", nargs="?", default=".", help="target directory (default: current working dir)")
@@ -948,60 +944,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_mcp.add_argument("mcp_action", choices=["sync"], help="mcp action")
     p_mcp.set_defaults(func=cmd_mcp)
 
-    p_protocol = sub.add_parser(
-        "protocol",
-        help="deterministic protocol dispatch (task_type -> protocol markdown)",
-    )
-    p_protocol.add_argument("protocol_action", choices=["resolve", "list", "challenge", "ticket", "verify", "report", "attend"], help="protocol action")
-    p_protocol.add_argument(
-        "task_type",
-        nargs="?",
-        default=None,
-        help="task type to resolve (for 'resolve'/'challenge'; see 'k3dge protocol list')",
-    )
-    p_protocol.add_argument(
-        "--path",
-        dest="path",
-        default=None,
-        help="target file path to resolve by path routing (for 'resolve'/'challenge'); overrides task_type",
-    )
-    p_protocol.add_argument(
-        "--task-id",
-        dest="task_id",
-        default="",
-        help="task id bound into the dynamic challenge / entry ticket (for 'challenge'/'ticket')",
-    )
-    p_protocol.add_argument(
-        "--ticket",
-        dest="ticket",
-        default=None,
-        help="entry ticket JSON to validate (for 'ticket'/'verify'); omit to print the required constraint checklist",
-    )
-    p_protocol.add_argument(
-        "--detail",
-        dest="detail",
-        default=None,
-        help="human-visible deviation description (for 'report')",
-    )
-    p_protocol.add_argument(
-        "--answer",
-        dest="answer",
-        default=None,
-        help="dynamic challenge answer (sha256(normalize(protocol)+task_id)[:12]) for 'attend'",
-    )
-    p_protocol.add_argument(
-        "--epoch-id",
-        dest="epoch_id",
-        default=None,
-        help="explicit epoch id; if omitted marker.py auto-generates uuid4().hex[:8]",
-    )
-    p_protocol.set_defaults(func=cmd_protocol)
-
-    p_get = sub.add_parser("get", help="controlled read: file content + injected protocol context")
-    p_get.add_argument("path", help="repo-relative file path to read")
-    p_get.set_defaults(func=cmd_get)
-
-    p_search = sub.add_parser("search", help="controlled search (replaces bare grep/ls)")
+    p_search = sub.add_parser("search", help="controlled search (scoped, narrow-context alternative to grep/find)")
     p_search.add_argument("query", help="search term / regex")
     p_search.add_argument("--path", dest="path", default=None, help="glob for path-listing mode (replaces `find`)")
     p_search.add_argument("--no-snippet", action="store_true", help="return path:line coords only")
@@ -1017,24 +960,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_where.add_argument("symbol", help="top-level symbol name")
     p_where.set_defaults(func=cmd_where)
 
-    p_edit = sub.add_parser("edit", help="open a controlled edit session (inject protocol, trigger attend)")
-    p_edit.add_argument("files", nargs="+", help="repo-relative file paths")
-    p_edit.set_defaults(func=cmd_edit)
-
-    p_put = sub.add_parser("put", help="controlled writeback (attend verify + atomic write)")
-    p_put.add_argument("path", help="repo-relative file path to write")
-    p_put.add_argument("--answer", dest="answer", default=None, help="challenge answer sha for require_attend zones")
-    p_put.add_argument("--task-id", dest="task_id", default="", help="task id bound into the challenge")
-    p_put.add_argument("--epoch-id", dest="epoch_id", default=None, help="explicit epoch id")
-    p_put.set_defaults(func=cmd_put)
-
     p_index = sub.add_parser("index", help="rebuild the symbol index (docs/generated/symbol-index.json)")
     p_index.set_defaults(func=cmd_index)
 
-    p_end = sub.add_parser("end", help="end the session: clear attended_zones + rotate epoch")
-    p_end.set_defaults(func=cmd_end)
-
-    p_commit = sub.add_parser("commit", help="encapsulated commit: gate + single-point attendance check")
+    p_commit = sub.add_parser("commit", help="convenience commit: gate + attestation sign")
     p_commit.add_argument("files", nargs="*", default=[], help="files to stage (else use --all)")
     p_commit.add_argument("-m", dest="message", required=True, help="conventional commit message")
     p_commit.add_argument("-a", dest="all", action="store_true", help="stage all tracked modifications")
@@ -1046,6 +975,25 @@ def build_parser() -> argparse.ArgumentParser:
     p_incident = sub.add_parser("incident", help="L2 incident generator (from CI JSON)")
     p_incident.add_argument("--from-ci", dest="from_ci", default=None, help="path to JSON payload")
     p_incident.set_defaults(func=cmd_incident)
+
+    p_status = sub.add_parser(
+        "status",
+        help="synthesized workspace state: domains / drift / pipeline / unfinished tasks",
+    )
+    p_status.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    p_status.set_defaults(func=cmd_status)
+
+    # Hidden hooks used by the live git hooks (scripts/pre-commit, scripts/commit-msg).
+    # Not advertised: they give raw `git commit` the same convention + attestation
+    # coverage as `k3dge commit`, making `k3dge commit` a pure convenience wrapper.
+    p_cm = sub.add_parser("check-msg", help=argparse.SUPPRESS)
+    p_cm.add_argument("--file", dest="file", required=True, help="path to commit message file")
+    p_cm.set_defaults(func=cmd_check_msg)
+    p_catt = sub.add_parser("commit-attest", help=argparse.SUPPRESS)
+    p_catt.set_defaults(func=cmd_commit_attest)
+    p_vatt = sub.add_parser("verify-attest", help=argparse.SUPPRESS)
+    p_vatt.add_argument("--commit", dest="commit", required=True, help="commit hash/tree-ish")
+    p_vatt.set_defaults(func=cmd_verify_attest)
 
     return parser
 

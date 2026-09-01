@@ -1,36 +1,8 @@
-# Reviews — 审计报告归档
+# Reviews — audit archive
 
-Agent 对本仓的代码审计/评审结果的**唯一存放地**。点时快照，append-only：
-原文不改写，后续进展以追加"情况"列或新小节记录。
+Point-in-time reports. Append-only.
 
-## 索引
-
-| Date | Scope | 报告 | 摘要 | 发现 | 处置 |
-| --- | --- | --- | --- | --- | --- |
-| | | | | | |
-
-> 新增报告时在此表与 `SUMMARY.md` 同步追加；Agent 先读 `SUMMARY.md` 定相关性，再按需读单篇。
-
-## 命名与结构
-
-`YYYY-MM-DD-<scope>.md`
-
-```markdown
-# 审计：<范围>
-
-- **Date**: YYYY-MM-DD
-- **基线**：commit/tests 状态快照
-- **审计人**：...
-
-## 发现
-
-| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| R1-1 | 2026-08-27 | 高 | P0 | 缺陷 | ... | `file:line` | 已修 | ... | `gate PASS` | 待复审 |  |
-```
-
-## 纪律
-
-- **处置三选一**：已修 / 转为 `docs/tasks/` 条目（链接回本文）/ 有意留（必须写否决理由）
-- 未修且未否决的发现不得只留在报告里——必须转 tasks，否则丢
-- 本目录不进门禁、不要求 Status/Priority（它是证据档案，不是工作项）
+- **Address**: `k3dge doc list --type reviews`.
+- **Write**: read `AUTHORING.md`.
+- **Horizon**: top-level `*.md` is the current milestone. `k3dge milestone seal <id>` moves this-milestone reports to `archive/<id>/` and rewrites leftover hrefs in this README.
+- **Before a new audit**: read leftovers in this README if the table exists.

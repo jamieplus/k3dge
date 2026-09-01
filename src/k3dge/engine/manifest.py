@@ -65,6 +65,21 @@ class Manifest:
                 val = cfg.get(key)
                 if val:
                     cfg[key] = _require_relative_path(f"domain '{domain}' {key}", val)
+            dep = cfg.get("depends_on", [])
+            if dep is None:
+                dep = []
+            if not isinstance(dep, list) or not all(isinstance(x, str) for x in dep):
+                raise ManifestError(f"domain '{domain}' depends_on must be a list of strings")
+            for x in dep:
+                if x not in self.domains:
+                    raise ManifestError(
+                        f"domain '{domain}' depends_on references unknown domain '{x}'"
+                    )
+            cfg["depends_on"] = dep
+
+    def depends_on(self, domain: str) -> List[str]:
+        """Domains whose contract this domain is allowed to import (ADR-0001 decision 6)."""
+        return list(self.domains.get(domain, {}).get("depends_on", []))
 
     @classmethod
     def load(cls, workspace: Path) -> "Manifest":

@@ -43,8 +43,8 @@ action_task_ref: docs/tasks/2026-08-27-M6-fix-fix_template_sync_missing_protocol
 
 ## 5. 双向回链
 
-- **Audit**: `docs/reviews/2026-08-27-k8d3e-a78-5pass.md: 05`
+- **Audit**: `docs/reviews/archive/untagged/2026-08-27-k8d3e-a78-5pass.md: 05`
 - **Branch**: `docs/branches/2026-08-27-k8d3e-a78-repro.md: 05`
 - **Task**: `docs/tasks/2026-08-27-M6-fix-fix_template_sync_missing_protocols_asset.done.md`
-- **Review 回填**: `docs/reviews/2026-08-27-k8d3e-a78-5pass.md: 回填 05 已修`
+- **Review 回填**: `docs/reviews/archive/untagged/2026-08-27-k8d3e-a78-5pass.md: 回填 05 已修`
 - **PAIRS**: `src/k3dge/engine/pairs.py:47`

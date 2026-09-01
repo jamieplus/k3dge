@@ -41,6 +41,6 @@ action_task_ref: docs/tasks/2026-08-27-M6-fix-fix_mcp_bridge_deprecated_protocol
 
 ## 5. 双向回链
 
-- **Audit**: `docs/reviews/2026-08-27-k8d3e-a78-5pass.md: 04`
+- **Audit**: `docs/reviews/archive/untagged/2026-08-27-k8d3e-a78-5pass.md: 04`
 - **Branch**: `docs/branches/2026-08-27-k8d3e-a78-repro.md: 04`
 - **Task**: `docs/tasks/2026-08-27-M6-fix-fix_mcp_bridge_deprecated_protocol_pointer.done.md`

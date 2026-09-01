@@ -26,14 +26,14 @@ main(argv: Optional[Sequence[str]]=None) -> int
 
 ## 3. State Machine & Invariants
 - 脚手架幂等：已存在的文件不被覆盖（除明确安全的模板外）。
-- `.agent/rules/*.md` 从 `templates/assets/rules/` 整文件拷出，禁止空标题桩；必须含 Rule 02（ADR 0012）。
-- `.agent/README.md` 从 `templates/assets/agent-readme.md` 拷出（ADR 0014：标明本目录是进程配置，不是 Agent 发现面）。
+- `.agent/rules/*.md` 从 `templates/assets/rules/` 整文件拷出，禁止空标题桩；必须含 Rule 02（ADR-0010）。
+- `.agent/README.md` 从 `templates/assets/agent-readme.md` 拷出（ADR-0011：标明本目录是进程配置，不是 Agent 发现面）。
 
 ## 4. Verification Matrix
 | Scenario ID | Level | Input Condition | Expected Outcome | Test File |
 | --- | --- | --- | --- | --- |
-| TC-TPL-01 | L0 | 对空目录执行 init | 生成 manifest 与 docs 树 | `tests/unit/templates/test_scaffold.py` |
-| TC-TPL-02 | L0 | 对空目录执行 init | `.agent/rules/` 含完整 00–03（含 02，非空标题） | `tests/unit/templates/test_scaffold.py` |
-| TC-TPL-03 | L0 | assets/rules 与本仓 `.agent/rules` | 字节级一致 | `tests/unit/templates/test_template_sync.py` |
-| TC-TPL-04 | L0 | 对空目录执行 init | 写出 `.agent/README.md`（标明进程配置） | `tests/unit/templates/test_scaffold.py` |
-| TC-TPL-05 | L0 | 对空目录 scaffold | 至少一域 + mcp-bridge + 空 reviews 索引 + gitignore | `tests/unit/templates/test_scaffold.py` |
+| TC-TPL-01 | L0 | 对空目录执行 init | 生成 manifest 与 docs 树 | `tests/unit/templates/test_scaffold.py::test_generates_tree` |
+| TC-TPL-02 | L0 | 对空目录执行 init | `.agent/rules/` 含完整 00–03（含 02，非空标题） | `tests/unit/templates/test_template_sync.py::test_all_expected_assets_exist` |
+| TC-TPL-03 | L0 | assets/rules 与本仓 `.agent/rules` | 字节级一致 | `tests/unit/templates/test_template_sync.py::test_templates_match_repo_scripts` |
+| TC-TPL-04 | L0 | 对空目录执行 init | 写出 `.agent/README.md`（标明进程配置） | `tests/unit/templates/test_scaffold.py::test_generates_tree` |
+| TC-TPL-05 | L0 | 对空目录 scaffold | 至少一域 + mcp-bridge + 空 reviews 索引 + gitignore | `tests/unit/templates/test_scaffold.py::test_generates_tree` |

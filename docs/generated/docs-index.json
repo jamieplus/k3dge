@@ -1,0 +1,420 @@
+{
+  "docs": [
+    {
+      "path": "docs/adr/0001-k3dge-architecture-baseline.md",
+      "type": "adr",
+      "id": "ADR-0001",
+      "title": "ADR-0001: k3dge 架构设计与工程治理基线",
+      "status": "Accepted",
+      "tokens": "ADR-0001: k3dge 架构设计与工程治理基线"
+    },
+    {
+      "path": "docs/adr/0002-docs-reference-vs-architecture-semantics.md",
+      "type": "adr",
+      "id": "ADR-0002",
+      "title": "ADR-0002: docs 判据与投影的语义分工（architecture vs generated）",
+      "status": "Accepted",
+      "tokens": "ADR-0002: docs 判据与投影的语义分工（architecture vs generated）"
+    },
+    {
+      "path": "docs/adr/0003-tasks-backlog-merge.md",
+      "type": "adr",
+      "id": "ADR-0003",
+      "title": "ADR-0003: tasks 与 backlog 合并为单一 tasks 目录",
+      "status": "Accepted",
+      "tokens": "ADR-0003: tasks 与 backlog 合并为单一 tasks 目录"
+    },
+    {
+      "path": "docs/adr/0004-milestone-lifecycle-governance.md",
+      "type": "adr",
+      "id": "ADR-0004",
+      "title": "ADR-0004: 里程碑生命周期治理（Milestone Lifecycle Governance）",
+      "status": "Accepted",
+      "tokens": "ADR-0004: 里程碑生命周期治理（Milestone Lifecycle Governance）"
+    },
+    {
+      "path": "docs/adr/0005-local-first-and-layer-cuts.md",
+      "type": "adr",
+      "id": "ADR-0005",
+      "title": "ADR-0005: 本地自用、职责切分、审计独立 harness",
+      "status": "Accepted",
+      "tokens": "ADR-0005: 本地自用、职责切分、审计独立 harness"
+    },
+    {
+      "path": "docs/adr/0006-mcp-foreign-harness-injection.md",
+      "type": "adr",
+      "id": "ADR-0006",
+      "title": "ADR-0006: 对外 harness 注入面与并列 harness 集成",
+      "status": "Accepted",
+      "tokens": "ADR-0006: 对外 harness 注入面与并列 harness 集成"
+    },
+    {
+      "path": "docs/adr/0007-self-hosting-bootstrap.md",
+      "type": "adr",
+      "id": "ADR-0007",
+      "title": "ADR-0007: k3dge 处于自举开发（dogfood / bootstrap）",
+      "status": "Accepted",
+      "tokens": "ADR-0007: k3dge 处于自举开发（dogfood / bootstrap）"
+    },
+    {
+      "path": "docs/adr/0008-unsolicited-doc-triggers.md",
+      "type": "adr",
+      "id": "ADR-0008",
+      "title": "ADR-0008: 触发式文档维护与先读已敲定设计",
+      "status": "Accepted",
+      "tokens": "ADR-0008: 触发式文档维护与先读已敲定设计"
+    },
+    {
+      "path": "docs/adr/0009-purpose-reduce-agent-failure-modes.md",
+      "type": "adr",
+      "id": "ADR-0009",
+      "title": "ADR-0009: k3dge 的目的是给后续项目收住 Agent 的常见失败态",
+      "status": "Accepted",
+      "tokens": "ADR-0009: k3dge 的目的是给后续项目收住 Agent 的常见失败态"
+    },
+    {
+      "path": "docs/adr/0010-agent-rules-are-protocol-slices.md",
+      "type": "adr",
+      "id": "ADR-0010",
+      "title": "ADR-0010: `.agent/rules` 是协议切片，不是第二份协议",
+      "status": "Accepted",
+      "tokens": "ADR-0010: `.agent/rules` 是协议切片，不是第二份协议"
+    },
+    {
+      "path": "docs/adr/0011-agent-dir-is-harness-config.md",
+      "type": "adr",
+      "id": "ADR-0011",
+      "title": "ADR-0011: `.agent/` 是 harness 机器配置，不是 Agent 的发现面",
+      "status": "Accepted",
+      "tokens": "ADR-0011: `.agent/` 是 harness 机器配置，不是 Agent 的发现面"
+    },
+    {
+      "path": "docs/adr/0012-assertion-evidence-chain.md",
+      "type": "adr",
+      "id": "ADR-0012",
+      "title": "ADR-0012: Agent 对仓库的断言必须带证据链",
+      "status": "Accepted",
+      "tokens": "ADR-0012: Agent 对仓库的断言必须带证据链"
+    },
+    {
+      "path": "docs/adr/0013-version-and-changelog.md",
+      "type": "adr",
+      "id": "ADR-0013",
+      "title": "ADR-0013: 自动版本与变更日志",
+      "status": "Accepted",
+      "tokens": "ADR-0013: 自动版本与变更日志"
+    },
+    {
+      "path": "docs/adr/0014-template-drift-in-engine.md",
+      "type": "adr",
+      "id": "ADR-0014",
+      "title": "ADR-0014: TEMPLATE_DRIFT 锁在 engine，不 import templates",
+      "status": "Accepted",
+      "tokens": "ADR-0014: TEMPLATE_DRIFT 锁在 engine，不 import templates"
+    },
+    {
+      "path": "docs/adr/0015-downstream-first-domain-and-protocol-pack.md",
+      "type": "adr",
+      "id": "ADR-0015",
+      "title": "ADR-0015: 下游 init 必须能被门禁咬住，协议包不得带本仓特化",
+      "status": "Accepted",
+      "tokens": "ADR-0015: 下游 init 必须能被门禁咬住，协议包不得带本仓特化"
+    },
+    {
+      "path": "docs/adr/0016-pattern-absorption-protocol.md",
+      "type": "adr",
+      "id": "ADR-0016",
+      "title": "ADR-0016: 外部模式与资产吸收纪律（洁净室 + License 分级）",
+      "status": "Accepted",
+      "tokens": "ADR-0016: 外部模式与资产吸收纪律（洁净室 + License 分级）"
+    },
+    {
+      "path": "docs/adr/0017-report-schema-v2.md",
+      "type": "adr",
+      "id": "ADR-0017",
+      "title": "ADR-0017: Audit Report Schema v2 (12 columns)",
+      "status": "Accepted",
+      "tokens": "ADR-0017: Audit Report Schema v2 (12 columns)"
+    },
+    {
+      "path": "docs/adr/0018-doc-readme-anchor-governance.md",
+      "type": "adr",
+      "id": "ADR-0018",
+      "title": "ADR-0018: Managed document layout (Authoring, template, Gate, catalog)",
+      "status": "Accepted",
+      "tokens": "ADR-0018: Managed document layout (Authoring, template, Gate, catalog)"
+    },
+    {
+      "path": "docs/adr/0019-protocol-load-proof-abandoned.md",
+      "type": "adr",
+      "id": "ADR-0019",
+      "title": "ADR-0019: No load-proof; routing formula in AGENTS.md, payload beside the files",
+      "status": "Accepted",
+      "tokens": "ADR-0019: No load-proof; routing formula in AGENTS.md, payload beside the files"
+    },
+    {
+      "path": "docs/adr/0020-harness-responsibility-split.md",
+      "type": "adr",
+      "id": "ADR-0020",
+      "title": "ADR-0020: Harness Responsibility Split (k3dge / k3dit / k3lity)",
+      "status": "Accepted",
+      "tokens": "ADR-0020: Harness Responsibility Split (k3dge / k3dit / k3lity)"
+    },
+    {
+      "path": "docs/architecture/overview.md",
+      "type": "architecture",
+      "id": "overview",
+      "title": "Architecture — 系统全貌（System Overview）",
+      "status": "",
+      "tokens": "Architecture — 系统全貌（System Overview）"
+    },
+    {
+      "path": "docs/branches/2026-08-27-M6-5pass-repro.md",
+      "type": "branches",
+      "id": "2026-08-27-M6-5pass-repro",
+      "title": "分支：M6 5-Pass 审计 9 缺陷 B-T-D 复现",
+      "status": "",
+      "tokens": "分支：M6 5-Pass 审计 9 缺陷 B-T-D 复现"
+    },
+    {
+      "path": "docs/branches/2026-08-27-k8d3e-a78-repro.md",
+      "type": "branches",
+      "id": "2026-08-27-k8d3e-a78-repro",
+      "title": "分支：k8d3e-a78 5-Pass 穿透 01-05 缺陷 B-T-D 复现（镜像）",
+      "status": "",
+      "tokens": "分支：k8d3e-a78 5-Pass 穿透 01-05 缺陷 B-T-D 复现（镜像）"
+    },
+    {
+      "path": "docs/guides/architecture.md",
+      "type": "guides",
+      "id": "architecture",
+      "title": "Architecture Guide",
+      "status": "",
+      "tokens": "Architecture Guide"
+    },
+    {
+      "path": "docs/guides/changelog.md",
+      "type": "guides",
+      "id": "changelog",
+      "title": "Changelog — 版本与变更说明",
+      "status": "",
+      "tokens": "Changelog — 版本与变更说明"
+    },
+    {
+      "path": "docs/guides/client_intro.md",
+      "type": "guides",
+      "id": "client_intro",
+      "title": "k3dge 给不懂代码的甲方讲解",
+      "status": "",
+      "tokens": "k3dge 给不懂代码的甲方讲解"
+    },
+    {
+      "path": "docs/guides/downstream.md",
+      "type": "guides",
+      "id": "downstream",
+      "title": "下游仓与 k3dge 升级",
+      "status": "",
+      "tokens": "下游仓与 k3dge 升级"
+    },
+    {
+      "path": "docs/guides/mcp-bridge.md",
+      "type": "guides",
+      "id": "mcp-bridge",
+      "title": "MCP Bridge — 零漂移门禁桥接器",
+      "status": "",
+      "tokens": "MCP Bridge — 零漂移门禁桥接器"
+    },
+    {
+      "path": "docs/guides/user_guide.md",
+      "type": "guides",
+      "id": "user_guide",
+      "title": "User Guide",
+      "status": "",
+      "tokens": "User Guide"
+    },
+    {
+      "path": "docs/incidents/INC-20260826-REG-m3-task-truncate.md",
+      "type": "incidents",
+      "id": "INC-20260826-REG-m3-task-truncate",
+      "title": "INCIDENT REPORT: [M2 回归] 审计转任务截断致任务失自包含",
+      "status": "closed",
+      "tokens": "INCIDENT REPORT: [M2 回归] 审计转任务截断致任务失自包含"
+    },
+    {
+      "path": "docs/incidents/INC-20260827-AST-template-sync-protocols.md",
+      "type": "incidents",
+      "id": "INC-20260827-AST-template-sync-protocols",
+      "title": "INCIDENT REPORT: [k8d3e-a78-05] 模板同步缺 protocols 资产",
+      "status": "closed",
+      "tokens": "INCIDENT REPORT: [k8d3e-a78-05] 模板同步缺 protocols 资产"
+    },
+    {
+      "path": "docs/incidents/INC-20260827-CON-M6-5pass-full.md",
+      "type": "incidents",
+      "id": "INC-20260827-CON-M6-5pass-full",
+      "title": "INCIDENT REPORT: [M6] 5-Pass 全量 9 缺陷（M3 回归 4 项）B-T-D 复现",
+      "status": "closed",
+      "tokens": "INCIDENT REPORT: [M6] 5-Pass 全量 9 缺陷（M3 回归 4 项）B-T-D 复现"
+    },
+    {
+      "path": "docs/incidents/INC-20260827-CON-agents-route-05.md",
+      "type": "incidents",
+      "id": "INC-20260827-CON-agents-route-05",
+      "title": "INCIDENT REPORT: [k8d3e-a78-01] AGENTS.md 路由表规则编号错位",
+      "status": "closed",
+      "tokens": "INCIDENT REPORT: [k8d3e-a78-01] AGENTS.md 路由表规则编号错位"
+    },
+    {
+      "path": "docs/incidents/INC-20260827-CON-arch-guide-links.md",
+      "type": "incidents",
+      "id": "INC-20260827-CON-arch-guide-links",
+      "title": "INCIDENT REPORT: [k8d3e-a78-03] 架构导读悬空链接",
+      "status": "closed",
+      "tokens": "INCIDENT REPORT: [k8d3e-a78-03] 架构导读悬空链接"
+    },
+    {
+      "path": "docs/incidents/INC-20260827-CON-audit-rule-path.md",
+      "type": "incidents",
+      "id": "INC-20260827-CON-audit-rule-path",
+      "title": "INCIDENT REPORT: [k8d3e-a78-02] 审计规则废弃协议路径悬空",
+      "status": "closed",
+      "tokens": "INCIDENT REPORT: [k8d3e-a78-02] 审计规则废弃协议路径悬空"
+    },
+    {
+      "path": "docs/incidents/INC-20260827-CON-k8d3e-a78-5pass.md",
+      "type": "incidents",
+      "id": "INC-20260827-CON-k8d3e-a78-5pass",
+      "title": "INCIDENT REPORT: [k8d3e-a78] 5-Pass 穿透 01-05 一致性悬空与 PAIRS 缺口",
+      "status": "closed",
+      "tokens": "INCIDENT REPORT: [k8d3e-a78] 5-Pass 穿透 01-05 一致性悬空与 PAIRS 缺口"
+    },
+    {
+      "path": "docs/incidents/INC-20260827-CON-mcp-bridge-prompt.md",
+      "type": "incidents",
+      "id": "INC-20260827-CON-mcp-bridge-prompt",
+      "title": "INCIDENT REPORT: [k8d3e-a78-04] MCP Bridge 残留废弃协议指针",
+      "status": "closed",
+      "tokens": "INCIDENT REPORT: [k8d3e-a78-04] MCP Bridge 残留废弃协议指针"
+    },
+    {
+      "path": "docs/memo/2026-08-21-code-quality-discussion.md",
+      "type": "memo",
+      "id": "2026-08-21-code-quality-discussion",
+      "title": "Memo: 代码质量与全局优化不归本 harness",
+      "status": "",
+      "tokens": "Memo: 代码质量与全局优化不归本 harness"
+    },
+    {
+      "path": "docs/memo/2026-08-21-deferred-standards.md",
+      "type": "memo",
+      "id": "2026-08-21-deferred-standards",
+      "title": "Memo: 未落地的对标项（6 类标准评估小结）",
+      "status": "",
+      "tokens": "Memo: 未落地的对标项（6 类标准评估小结）"
+    },
+    {
+      "path": "docs/memo/2026-08-24-docs-self-reflective-gate-vs-audit.md",
+      "type": "memo",
+      "id": "2026-08-24-docs-self-reflective-gate-vs-audit",
+      "title": "Memo: 人读文档自省体治理 — 审计先行、收敛后升闸",
+      "status": "",
+      "tokens": "Memo: 人读文档自省体治理 — 审计先行、收敛后升闸"
+    },
+    {
+      "path": "docs/memo/2026-08-25-prompt-as-neural-net.md",
+      "type": "memo",
+      "id": "2026-08-25-prompt-as-neural-net",
+      "title": "Memo: Prompt as Neural Net — 稀疏门控解释框架",
+      "status": "",
+      "tokens": "Memo: Prompt as Neural Net — 稀疏门控解释框架"
+    },
+    {
+      "path": "docs/memo/2026-08-27-h8m2k-a1-harness-hard-isolation.md",
+      "type": "memo",
+      "id": "2026-08-27-h8m2k-a1-harness-hard-isolation",
+      "title": "Memo：Harness 环境级硬隔离 vs 认知级软隔离（h8m2k-a1）",
+      "status": "memo（`k3dge` 已 `M7` `Gate SUCCESS`，`k3dit` 5-Pass 已 `k3dit_run_audit 1..5`，无需立即转 `tasks`）",
+      "tokens": "Memo：Harness 环境级硬隔离 vs 认知级软隔离（h8m2k-a1）"
+    },
+    {
+      "path": "docs/memo/2026-08-29-impl-task-protocol-resolver-git-gate.md",
+      "type": "memo",
+      "id": "2026-08-29-impl-task-protocol-resolver-git-gate",
+      "title": "Memo：Protocol Resolver + Git Gate 两 Task 实现全记录（2026-08-28 双任务落地）",
+      "status": "",
+      "tokens": "Memo：Protocol Resolver + Git Gate 两 Task 实现全记录（2026-08-28 双任务落地）"
+    },
+    {
+      "path": "docs/protocols/audit_default.md",
+      "type": "protocols",
+      "id": "audit_default",
+      "title": "Audit Protocol — Default (5-Pass / 8 维)",
+      "status": "",
+      "tokens": "Audit Protocol — Default (5-Pass / 8 维)"
+    },
+    {
+      "path": "docs/protocols/verify_default.md",
+      "type": "protocols",
+      "id": "verify_default",
+      "title": "Re-verify Protocol — Default (12 列验收)",
+      "status": "",
+      "tokens": "Re-verify Protocol — Default (12 列验收)"
+    },
+    {
+      "path": "docs/reviews/2026-08-27-M7-5pass.md",
+      "type": "reviews",
+      "id": "2026-08-27-M7-5pass",
+      "title": "审计：M7 5-Pass 穿透式代码与架构审计（0.1.8 / M7 空窗期）",
+      "status": "",
+      "tokens": "审计：M7 5-Pass 穿透式代码与架构审计（0.1.8 / M7 空窗期）"
+    },
+    {
+      "path": "docs/reviews/2026-08-27-M7-k3dit-5pass.md",
+      "type": "reviews",
+      "id": "2026-08-27-M7-k3dit-5pass",
+      "title": "审计：M7 k3dit 5-Pass 穿透式代码与架构审计（0.1.8 / M7 空窗期）",
+      "status": "",
+      "tokens": "审计：M7 k3dit 5-Pass 穿透式代码与架构审计（0.1.8 / M7 空窗期）"
+    },
+    {
+      "path": "docs/specs/_template/spec.md",
+      "type": "specs",
+      "id": "spec",
+      "title": "Domain Specification: <domain>",
+      "status": "Active",
+      "tokens": "Domain Specification: <domain>"
+    },
+    {
+      "path": "docs/specs/cli/spec.md",
+      "type": "specs",
+      "id": "spec",
+      "title": "Domain Specification: cli",
+      "status": "Active",
+      "tokens": "Domain Specification: cli"
+    },
+    {
+      "path": "docs/specs/engine/spec.md",
+      "type": "specs",
+      "id": "spec",
+      "title": "Domain Specification: engine",
+      "status": "Active",
+      "tokens": "Domain Specification: engine"
+    },
+    {
+      "path": "docs/specs/sync/spec.md",
+      "type": "specs",
+      "id": "spec",
+      "title": "Domain Specification: sync",
+      "status": "Active",
+      "tokens": "Domain Specification: sync"
+    },
+    {
+      "path": "docs/specs/templates/spec.md",
+      "type": "specs",
+      "id": "spec",
+      "title": "Domain Specification: templates",
+      "status": "Active",
+      "tokens": "Domain Specification: templates"
+    }
+  ]
+}

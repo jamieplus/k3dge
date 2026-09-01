@@ -15,21 +15,30 @@
       "args": [
         "-m",
         "k3dit.mcp"
-      ]
+      ],
+      "env": {
+        "PYTHONPATH": "../k3dit/src"
+      }
     },
     "k3che": {
       "command": "python",
       "args": [
         "-m",
         "k3che.mcp"
-      ]
+      ],
+      "env": {
+        "PYTHONPATH": "../k3che/src"
+      }
     },
     "k3lity": {
       "command": "python",
       "args": [
         "-m",
         "k3lity.mcp"
-      ]
+      ],
+      "env": {
+        "PYTHONPATH": "../k3lity/src"
+      }
     }
   }
 }

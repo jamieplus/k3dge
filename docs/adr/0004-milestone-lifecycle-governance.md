@@ -4,7 +4,7 @@ Date: 2026-08-23
 Deciders: Core Maintainer
 ---
 
-# ADR 0004: 里程碑生命周期治理（Milestone Lifecycle Governance）
+# ADR-0004: 里程碑生命周期治理（Milestone Lifecycle Governance）
 
 ## 1. 上下文 (Context)
 `k3dge` 初始设计覆盖微观门禁（`k3dge check` 的 L0/L1 结构与契约校验）。随着
@@ -27,12 +27,19 @@ Deciders: Core Maintainer
 原稿把 Macro Gate 写成「`k3dge check --with-tests` 的全量触发」。实现上 Full Matrix 只在 `milestone align`；`--with-tests` 始终是增量域。以本节现稿为准，勿按旧句实现。
 
 ### 2.1.2 触发（Agent，无需用户提醒）
-某 `Milestone` 字段下，`docs/tasks/` 顶层条目全部 `Status: done` → 当轮 `k3dge milestone align <id>`。align 通过后：去掉 align-stub、保留 align-pass、更新 SUMMARY；无 `k3dge:guide-stub` 则当轮 `seal`。见 AGENTS.md §12 / ADR 0009。
+某 `Milestone` 字段下，`docs/tasks/` 顶层条目全部 `Status: done` → 当轮 `k3dge milestone align <id>`。align 通过后：去掉 align-stub、保留 align-pass。接着 `HUMAN_CHECKPOINT`：`y` 走审计，`N`/60s 在无 `k3dge:guide-stub` 时 `seal`。见 AGENTS.md §12 / ADR-0008。
+
+### 2.1.3 封板闸机（2026-09-01）
+`seal` 机器闸是：对应里程碑的 reviews 文件含 `align-pass`、不含 `align-stub`、正文列出该里程碑全部任务、`docs/guides/` 无 `guide-stub`。不读 `docs/reviews/SUMMARY.md`（禁止手维护类型索引，ADR-0018）。有意留只在 `docs/reviews/README.md`。
 
 ### 2.2 为什么通过文件系统物理移动实现上下文压缩
 `k3dge milestone seal` 将 `docs/tasks/*.md` 物理移入 `docs/tasks/archive/<id>/`。
-`AGENTS.md §3` 的开工扫描仅覆盖顶层活跃文件，`archive/` 天然排除——实现
-Token 零浪费的上下文重置，且符合 `docs/tasks/archive/` 的 append-only 审计需求。
+`k3dge task list` 只扫顶层活跃文件，`archive/` 不在扫描面——Token 零浪费的上下文重置，且符合 `docs/tasks/archive/` 的 append-only 审计需求。
+
+同一次 `seal` 把本里程碑的 `docs/reviews/*.md`（文件名含该 id，或正文含 `<!-- k3dge:align-pass:<id> -->`；文件名属其他里程碑的不动）移入 `docs/reviews/archive/<id>/`，并把 `docs/reviews/README.md` leftovers 表里的相对链接改写成 `archive/<id>/…`。失败则回滚文件移动并还原 README。`k3dge doc list` 默认不扫 `archive/`。
+
+### 2.2.1 修正（2026-09-01）
+原稿只归档 tasks。reviews 同属 append-only 证据，顶层堆积会把 leftovers 寻址和当前里程碑报告混在一起。以本节现稿为准。
 
 ## 3. 产生后果 (Consequences)
 - **正面**：确定性验收 + 防过度工程 + 上下文经济性闭环；`engine` 域由纯判定

@@ -158,7 +158,6 @@ def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, mi
     - Finds `docs/reviews/*.md` whose 9-col table has a `待修` row whose `问题描述` contains the task title (or ID in task filename)
     - Flips `状态` to `已修` and `处置` to `已修 → <task file>` for that row
     - Appends/updates `## 回填` section with the task (idempotent)
-    - Also appends a `SUMMARY.md` 回填行 if a review was backfilled
     Never raises; prints WARN on failure (P3 light, not blocking).
     """
     import sys
@@ -173,7 +172,7 @@ def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, mi
         # Milestone of the task, if any, narrows the review set
         milestone_token = (milestone or "").strip()
         for review_path in sorted(reviews_dir.glob("*.md")):
-            if review_path.name in ("README.md", "SUMMARY.md"):
+            if _is_review_aux(review_path.name):
                 continue
             try:
                 text = review_path.read_text(encoding="utf-8")
@@ -277,19 +276,7 @@ def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, mi
                                 k += 1
                             new_lines.insert(k, f"> | {task_path.name} | 已修 | 自动回填 |")
                             break
-            # Write back
             review_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-            # Also append a SUMMARY 回填 line (idempotent)
-            try:
-                summary_path = reviews_dir / "SUMMARY.md"
-                if summary_path.is_file():
-                    summary_text = summary_path.read_text(encoding="utf-8")
-                    marker = f"回填：{review_path.name} {task_path.name}"
-                    if marker not in summary_text:
-                        # Append to the review's section if it exists, else at end
-                        summary_path.write_text(summary_text.rstrip("\n") + f"\n- {marker}\n", encoding="utf-8")
-            except Exception:
-                pass
             print(f"[INFO][REVIEW BACKFILL] {review_path.name}: {fid} → 已修 ({task_path.name})", file=sys.stderr)
     except Exception as exc:
         import sys
@@ -300,7 +287,7 @@ def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, mi
 def _has_milestone_token(text: str, milestone_id: str) -> bool:
     """True iff `milestone_id` appears as a path/word token, not a substring of a longer id.
 
-    `M1` must not match `M10` in filenames (`2026-08-23-M10-align.md`) or SUMMARY text.
+    `M1` must not match `M10` in filenames (`2026-08-23-M10-align.md`) or review body text.
     """
     if not milestone_id:
         return False
@@ -311,6 +298,76 @@ def _has_milestone_token(text: str, milestone_id: str) -> bool:
         )
         is not None
     )
+
+
+_REVIEW_AUX = frozenset({"README.md", "AUTHORING.md", "_template.md"})
+_FILENAME_MILESTONE_RE = re.compile(r"(?:^|[._-])(M\d+)(?:[._-]|$)", re.IGNORECASE)
+
+
+def _is_review_aux(name: str) -> bool:
+    return name in _REVIEW_AUX or name.startswith(".")
+
+
+def _filename_milestone(name: str) -> str | None:
+    m = _FILENAME_MILESTONE_RE.search(name)
+    return m.group(1) if m else None
+
+
+def _living_review_files(reviews_dir: Path) -> List[Path]:
+    if not reviews_dir.is_dir():
+        return []
+    return sorted(
+        f for f in reviews_dir.iterdir() if f.is_file() and f.suffix == ".md" and not _is_review_aux(f.name)
+    )
+
+
+def _reviews_to_archive(reviews_dir: Path, milestone_id: str, pass_mark: str) -> List[Path]:
+    """Living reports for this milestone: filename token, or align-pass marker in body.
+
+    Files named for another milestone stay at top-level.
+    """
+    out: List[Path] = []
+    for path in _living_review_files(reviews_dir):
+        named = _filename_milestone(path.name)
+        if named and named != milestone_id:
+            continue
+        if _has_milestone_token(path.name, milestone_id):
+            out.append(path)
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if pass_mark in text:
+            out.append(path)
+    return out
+
+
+def _rewrite_review_readme_links(workspace: Path, filename: str, new_href: str) -> None:
+    readme = workspace / "docs" / "reviews" / "README.md"
+    if not readme.is_file():
+        return
+    try:
+        text = readme.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return
+    updated = text.replace(f"]({filename})", f"]({new_href})")
+    updated = updated.replace(f"](./{filename})", f"]({new_href})")
+    if updated != text:
+        readme.write_text(updated, encoding="utf-8")
+
+
+def _safe_archive_dir(workspace: Path, kind: str, milestone_id: str) -> Tuple[Optional[Path], str]:
+    """Return (dir, error). dir is None on path escape."""
+    root = (workspace / "docs" / kind / "archive").resolve()
+    dest = (root / milestone_id).resolve()
+    try:
+        dest.relative_to(root)
+    except ValueError:
+        return None, (
+            f"Invalid milestone id '{milestone_id}': archive path escapes docs/{kind}/archive/"
+        )
+    return dest, ""
 
 
 def scan_unfilled_guides(workspace: Path) -> List[str]:
@@ -362,7 +419,7 @@ def list_tasks(
     want_ms = milestone_id.strip() if milestone_id else None
     out: List[TaskIndex] = []
     for p in sorted(tasks_dir.glob("*.md")):
-        if p.name == "README.md":
+        if p.name in ("README.md", "_template.md"):
             continue
         try:
             content = p.read_text(encoding="utf-8")
@@ -697,22 +754,7 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
             f"  Run 'k3dge milestone align {milestone_id}' and fill docs/reviews/ before sealing."
         )
 
-    # 闸机 2: docs/reviews/SUMMARY.md 必须已登记该里程碑（完整 token，防 M1⊂M10）
-    summary_file = reviews_dir / "SUMMARY.md"
-    try:
-        summary_text = summary_file.read_text(encoding="utf-8") if summary_file.exists() else ""
-    except UnicodeDecodeError:
-        return False, (
-            f"[SEAL REJECTED] docs/reviews/SUMMARY.md is not UTF-8.\n"
-            f"  Fix encoding then re-run seal."
-        )
-    if not summary_file.exists() or not _has_milestone_token(summary_text, milestone_id):
-        return False, (
-            f"[SEAL REJECTED] docs/reviews/SUMMARY.md not updated with '{milestone_id}'.\n"
-            f"  Append the audit summary for the review to SUMMARY.md."
-        )
-
-    # 闸机 3: docs/guides/ 不得残留 k3dge:guide-stub
+    # 闸机 2: docs/guides/ 不得残留 k3dge:guide-stub
     unfilled = scan_unfilled_guides(workspace)
     if unfilled:
         return False, (
@@ -720,22 +762,50 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
             f"  Complete the documentation before milestone seal."
         )
 
-    archive_root = (workspace / "docs" / "tasks" / "archive").resolve()
-    archive_dir = (archive_root / milestone_id).resolve()
-    try:
-        archive_dir.relative_to(archive_root)
-    except ValueError:
-        return False, f"Invalid milestone id '{milestone_id}': archive path escapes docs/tasks/archive/"
+    task_archive, err = _safe_archive_dir(workspace, "tasks", milestone_id)
+    if task_archive is None:
+        return False, err
+    review_archive, err = _safe_archive_dir(workspace, "reviews", milestone_id)
+    if review_archive is None:
+        return False, err
 
-    archive_dir.mkdir(parents=True, exist_ok=True)
+    to_archive_reviews = _reviews_to_archive(reviews_dir, milestone_id, pass_mark)
+    collisions = [t.path.name for t in tasks if (task_archive / t.path.name).exists()]
+    collisions.extend(rev.name for rev in to_archive_reviews if (review_archive / rev.name).exists())
+    if collisions:
+        return False, (
+            f"Cannot seal milestone '{milestone_id}': archive target already exists: {collisions}"
+        )
+
+    readme_path = reviews_dir / "README.md"
+    readme_orig: str | None = None
+    if readme_path.is_file():
+        try:
+            readme_orig = readme_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            readme_orig = None
+
+    task_archive.mkdir(parents=True, exist_ok=True)
+    if to_archive_reviews:
+        review_archive.mkdir(parents=True, exist_ok=True)
 
     moved_records: list[tuple[Path, Path]] = []
     try:
         for t in tasks:
-            target = archive_dir / t.path.name
+            target = task_archive / t.path.name
             shutil.move(str(t.path), str(target))
             moved_records.append((target, t.path))
+        for rev in to_archive_reviews:
+            target = review_archive / rev.name
+            shutil.move(str(rev), str(target))
+            moved_records.append((target, rev))
+            _rewrite_review_readme_links(workspace, rev.name, f"archive/{milestone_id}/{rev.name}")
     except Exception as exc:
+        if readme_orig is not None:
+            try:
+                readme_path.write_text(readme_orig, encoding="utf-8")
+            except OSError:
+                pass
         rollback_errors: list[str] = []
         for current, original in reversed(moved_records):
             try:
@@ -749,9 +819,17 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
             )
         return False, f"Failed to seal milestone '{milestone_id}', rolled back: {exc}"
 
-    # Bump cursor M0→M1… for next round (script-controlled, docs generated via sync if needed)
+    review_note = (
+        f" and {len(to_archive_reviews)} reviews to docs/reviews/archive/{milestone_id}/"
+        if to_archive_reviews
+        else ""
+    )
+    sealed = (
+        f"Sealed milestone '{milestone_id}'. Archived {len(tasks)} tasks to "
+        f"docs/tasks/archive/{milestone_id}/{review_note}."
+    )
     try:
         nxt = bump_milestone(workspace)
-        return True, f"Sealed milestone '{milestone_id}'. Archived {len(tasks)} tasks to docs/tasks/archive/{milestone_id}/. Next milestone: {nxt}"
+        return True, f"{sealed} Next milestone: {nxt}"
     except Exception:
-        return True, f"Sealed milestone '{milestone_id}'. Archived {len(tasks)} tasks to docs/tasks/archive/{milestone_id}/. (milestone bump failed)"
+        return True, f"{sealed} (milestone bump failed)"

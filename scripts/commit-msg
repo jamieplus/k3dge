@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# k3dge commit-msg hook: enforce Conventional Commits and attach a lightweight
+# attestation trailer so CI can detect commits that bypassed the governed path
+# (e.g. `git commit --no-verify`). Activate via: git config core.hooksPath scripts
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+
+python3 "${ROOT}/scripts/gate.py" check-msg --file "$1" || exit 1
+
+LINE="$(python3 "${ROOT}/scripts/gate.py" commit-attest)"
+if ! grep -q '^k3dge-commit: ' "$1"; then
+  printf '\n%s\n' "$LINE" >> "$1"
+fi

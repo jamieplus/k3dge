@@ -53,8 +53,8 @@ action_task_ref: docs/tasks/2026-08-27-M6-fix-fix_AGENTS_route_05_branches_misro
 
 ## 5. 双向回链
 
-- **Audit**: `docs/reviews/2026-08-27-k8d3e-a78-5pass.md: 01-05`
+- **Audit**: `docs/reviews/archive/untagged/2026-08-27-k8d3e-a78-5pass.md: 01-05`
 - **Branch**: `docs/branches/2026-08-27-k8d3e-a78-repro.md:1`（`incident` 为主，`branches` 镜像）
 - **Tasks**: `docs/tasks/2026-08-27-M6-fix-*.done.md` 5 项
-- **Review 回填**: `docs/reviews/2026-08-27-k8d3e-a78-5pass.md: 回填` 已 `已修`
+- **Review 回填**: `docs/reviews/archive/untagged/2026-08-27-k8d3e-a78-5pass.md: 回填` 已 `已修`
 - **ADR**: `ADR 0002` Diátaxis / `ADR 0005` 本地优先

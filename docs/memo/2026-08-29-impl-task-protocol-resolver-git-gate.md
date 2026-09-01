@@ -84,7 +84,7 @@
 1. **`require_attend` 取"命中即 True"**：未引入 `protocols.toml` 的 `[require_attend]` 段（resolver 当前无该字段解析），所有已注册协议即 require_attend 区。如需分协议细化，后续加段即可。
 2. **epoch 自举**：`epoch_id` 缺省 `uuid4().hex[:8]`；`session_id` 缺省 `"sess-"+8hex`；TTL 3600s 硬编码常量。SEC-01 校验对象是 `zone` 路径（外部不可注入 `session_id`，故不校验它）。
 3. **attend 时序严格两阶段**（盲区 2）：`get` 只发题（协议 + `TASK_ID`），`--answer` 仅经 `attend`/`put`/`edit` 在阶段 2 提交；`get --answer` 不存在。
-4. **commit 的 attend 校验为软**（ADR 0022）：缺凭证仅 stderr 告警 + 产 L2 incident，不阻断；硬阻断在 `check --staged`。
+4. **commit 的 attend 校验为软**（原 ADR 0022，已随 ADR-0019 废弃；attend/load-proof 机制整体移除）：缺凭证仅 stderr 告警 + 产 L2 incident，不阻断；硬阻断在 `check --staged`。
 5. **tie 检测扫描真实文件**：用 `git ls-files` 优先 + `rglob` 兜底；本仓同三元组 glob 前缀互斥 → 零误报。
 6. **`search --path` 兼作 find 替代**：列举模式与文本模式同一命令，`--no-snippet` 退回纯坐标。
 7. **`k3dge sync`**：因新增 `cmd_*` 公有符号与 `search/marker` 新模块改动了 `cli`/`engine` 契约，已运行 `k3dge sync` 重生 `docs/specs/{cli,engine}/spec.md` 的 contract hash（check 由红转绿）。

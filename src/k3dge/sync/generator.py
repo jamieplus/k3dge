@@ -200,5 +200,8 @@ def sync_all(workspace: Path, domains: Optional[Sequence[str]] = None) -> Tuple[
             changed.append(domain)
     # README 由收尾脚本（docs 生成）经 agent 更新，不再由 sync 触碰；基础版本始终存在于仓库
     manual_written = render_manual_docs(workspace, manifest, doc_cache)
+    from k3dge.engine.doc_catalog import write_docs_index
+
+    write_docs_index(workspace)
     docs_updated = bool(manual_written)
     return changed, docs_updated

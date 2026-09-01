@@ -2,7 +2,7 @@
 
 Spec-gate harness：为 vibecoding agent 提供确定性的契约漂移检测与 git 硬门禁。
 
-当前阶段是 **自举**（ADR 0007）：用本仓的 k3dge 开发本仓，并作为门禁去开发并列的 audit / quality / cache harness（ADR 0008）。不是 PyPI 产品。存在的目的是给后续项目收住 Agent 漂移、幻觉、修局部坏整体等（ADR 0011），不必穷举失败态。
+当前阶段是 **自举**（ADR 0007）：用本仓的 k3dge 开发本仓，并作为门禁去开发并列的 audit / quality / cache harness（ADR 0006）。不是 PyPI 产品。存在的目的是给后续项目收住 Agent 漂移、幻觉、修局部坏整体等（ADR 0011），不必穷举失败态。
 
 核心思路：把对 agent 的口头约束（Soft Prompting）降维成文件系统事实（`spec.md` 契约哈希）
 与 git hook 硬门禁，杜绝跨会话语义漂移。

@@ -1,6 +1,6 @@
 """Scaffold ↔ repo file pairs for the self-host TEMPLATE_DRIFT gate.
 
-Engine owns this registry so it does not import k3dge.templates (ADR 0018).
+Engine owns this registry so it does not import k3dge.templates (ADR-0014).
 Tests and any templates-side consumer import from here.
 
 Not in PAIRS (intentional, do not "complete" the list):
@@ -41,14 +41,24 @@ PAIRS: list[tuple[str, str]] = [
     ("pipeline.toml.template", ".agent/pipeline.toml"),
     ("spec.md.template", "docs/specs/_template/spec.md"),
     ("tasks-readme.md", "docs/tasks/README.md"),
+    ("tasks/_template.md", "docs/tasks/_template.md"),
+    ("memo/_template.md", "docs/memo/_template.md"),
+    ("branches/_template.md", "docs/branches/_template.md"),
+    ("adr/_template.md", "docs/adr/_template.md"),
+    ("adr/AUTHORING.md", "docs/adr/AUTHORING.md"),
+    ("adr/.schema.json", "docs/adr/.schema.json"),
+    ("tasks/AUTHORING.md", "docs/tasks/AUTHORING.md"),
+    ("memo/AUTHORING.md", "docs/memo/AUTHORING.md"),
+    ("branches/AUTHORING.md", "docs/branches/AUTHORING.md"),
+    ("incidents/AUTHORING.md", "docs/incidents/AUTHORING.md"),
+    ("tasks/.schema.json", "docs/tasks/.schema.json"),
+    ("memo/.schema.json", "docs/memo/.schema.json"),
+    ("branches/.schema.json", "docs/branches/.schema.json"),
+    ("incidents/.schema.json", "docs/incidents/.schema.json"),
     ("pre-commit.yaml.template", ".pre-commit-config.yaml"),
     ("branches-readme.md", "docs/branches/README.md"),
     ("memo-readme.md", "docs/memo/README.md"),
     ("downstream.md", "docs/guides/downstream.md"),
-    ("pre-commit-sentinel.sh", "scripts/pre-commit-sentinel.sh"),
     ("protocols/audit_default.md", "docs/protocols/audit_default.md"),
     ("protocols/verify_default.md", "docs/protocols/verify_default.md"),
-    ("protocols/incident_default.md", "docs/protocols/incident_default.md"),
-    ("protocols/task_default.md", "docs/protocols/task_default.md"),
-    ("protocols/meta_protocol.md", "docs/protocols/meta_protocol.md"),
 ]

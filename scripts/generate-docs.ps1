@@ -76,7 +76,7 @@ function Write-Guide([string]$key, [string]$file, [string]$title) {
         "",
         "> Auto-generated stub by ``./scripts/generate-docs.sh`` from ``.agent/docs.toml``.",
         "> Agent: please fill this document per software engineering standards, referencing",
-        "> ``docs/specs/``, ``.agent/manifest.json`` and ``docs/reference/``.",
+        "> ``docs/specs/``, ``.agent/manifest.json`` and ``docs/generated/``.",
         "",
         "## 概述",
         "",

@@ -44,7 +44,6 @@ GENERATE_DOCS_SH_TEMPLATE = _asset("generate-docs.sh")
 GENERATE_DOCS_PS1_TEMPLATE = _asset("generate-docs.ps1")
 
 PRE_COMMIT_TEMPLATE = _asset("pre-commit.yaml.template")
-SENTINEL_TEMPLATE = _asset("pre-commit-sentinel.sh")
 
 ARCHITECTURE_TEMPLATE = _asset("architecture.md.template")
 
@@ -54,17 +53,12 @@ MCP_BRIDGE_TEMPLATE = _asset("mcp-bridge.md.template")
 
 GITIGNORE_TEMPLATE = _asset("gitignore.template")
 
-REVIEWS_SUMMARY_TEMPLATE = _asset("reviews-summary.md.template")
-
 ADR_README_TEMPLATE = _asset("adr-readme.md.template")
 
 DOWNSTREAM_GUIDE_TEMPLATE = _asset("downstream.md")
 
 PROTOCOL_TEMPLATE = _asset("protocols/audit_default.md")
 VERIFY_PROTOCOL_TEMPLATE = _asset("protocols/verify_default.md")
-INCIDENT_PROTOCOL_TEMPLATE = _asset("protocols/incident_default.md")
-TASK_PROTOCOL_TEMPLATE = _asset("protocols/task_default.md")
-META_PROTOCOL_TEMPLATE = _asset("protocols/meta_protocol.md")
 
 TASKS_README_TEMPLATE = _asset("tasks-readme.md")
 
@@ -114,24 +108,6 @@ def _write_if_missing(path: Path, content: str, executable: bool = False) -> boo
     if executable:
         path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     return True
-
-
-def _install_sentinel_hook(target: Path) -> None:
-    """Best-effort: drop the pre-commit sentinel into .git/hooks if no hook exists yet.
-
-    Non-destructive — never overwrites an existing hook (the operator may have their own).
-    """
-    hook_dir = target / ".git" / "hooks"
-    hook_path = hook_dir / "pre-commit"
-    if not hook_dir.is_dir() or hook_path.exists():
-        return
-    try:
-        import shutil
-
-        shutil.copy(target / "scripts" / "pre-commit-sentinel.sh", hook_path)
-        hook_path.chmod(hook_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    except OSError:
-        pass
 
 
 def ensure_mcp_config(target: Path) -> bool:
@@ -231,8 +207,6 @@ def scaffold(target: Path, name: str | None = None) -> None:
         SPEC_TEMPLATE.format(domain="<domain>", date=today),
     )
     _write_if_missing(target / ".pre-commit-config.yaml", PRE_COMMIT_TEMPLATE)
-    _write_if_missing(target / "scripts" / "pre-commit-sentinel.sh", SENTINEL_TEMPLATE, executable=True)
-    _install_sentinel_hook(target)
     _write_if_missing(target / "scripts" / "gate.sh", GATE_SH_TEMPLATE, executable=True)
     _write_if_missing(target / "scripts" / "gate.py", GATE_PY_TEMPLATE, executable=True)
     _write_if_missing(target / "scripts" / "gate.ps1", GATE_PS1_TEMPLATE)
@@ -243,28 +217,37 @@ def scaffold(target: Path, name: str | None = None) -> None:
 
     (target / "docs" / "adr").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "adr" / "README.md", ADR_README_TEMPLATE)
+    _write_if_missing(target / "docs" / "adr" / "AUTHORING.md", _asset("adr/AUTHORING.md"))
+    _write_if_missing(target / "docs" / "adr" / ".schema.json", _asset("adr/.schema.json"))
     (target / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "tasks" / "README.md", TASKS_README_TEMPLATE)
+    _write_if_missing(target / "docs" / "tasks" / "AUTHORING.md", _asset("tasks/AUTHORING.md"))
+    _write_if_missing(target / "docs" / "tasks" / ".schema.json", _asset("tasks/.schema.json"))
+    _write_if_missing(target / "docs" / "tasks" / "_template.md", _asset("tasks/_template.md"))
+    _write_if_missing(target / "docs" / "memo" / "_template.md", _asset("memo/_template.md"))
+    _write_if_missing(target / "docs" / "branches" / "_template.md", _asset("branches/_template.md"))
+    _write_if_missing(target / "docs" / "adr" / "_template.md", _asset("adr/_template.md"))
     (target / "docs" / "guides").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "guides" / "mcp-bridge.md", MCP_BRIDGE_TEMPLATE)
     _write_if_missing(target / "docs" / "guides" / "downstream.md", DOWNSTREAM_GUIDE_TEMPLATE)
     (target / "docs" / "protocols").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "protocols" / "audit_default.md", PROTOCOL_TEMPLATE)
     _write_if_missing(target / "docs" / "protocols" / "verify_default.md", VERIFY_PROTOCOL_TEMPLATE)
-    _write_if_missing(target / "docs" / "protocols" / "incident_default.md", INCIDENT_PROTOCOL_TEMPLATE)
-    _write_if_missing(target / "docs" / "protocols" / "task_default.md", TASK_PROTOCOL_TEMPLATE)
-    _write_if_missing(target / "docs" / "protocols" / "meta_protocol.md", META_PROTOCOL_TEMPLATE)
     (target / "docs" / "generated").mkdir(parents=True, exist_ok=True)
     (target / "docs" / "branches").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "branches" / "README.md", BRANCHES_README_TEMPLATE)
+    _write_if_missing(target / "docs" / "branches" / "AUTHORING.md", _asset("branches/AUTHORING.md"))
+    _write_if_missing(target / "docs" / "branches" / ".schema.json", _asset("branches/.schema.json"))
     (target / "logs").mkdir(parents=True, exist_ok=True)
     (target / "docs" / "reviews").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "reviews" / "README.md", REVIEWS_README_TEMPLATE)
-    _write_if_missing(target / "docs" / "reviews" / "SUMMARY.md", REVIEWS_SUMMARY_TEMPLATE)
+    _write_if_missing(target / "docs" / "reviews" / "AUTHORING.md", _asset("reviews/AUTHORING.md"))
     _write_if_missing(target / ".gitignore", GITIGNORE_TEMPLATE)
     (target / "docs" / "memo").mkdir(parents=True, exist_ok=True)
     (target / "docs" / "memo" / "archive").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "memo" / "README.md", MEMO_README_TEMPLATE)
+    _write_if_missing(target / "docs" / "memo" / "AUTHORING.md", _asset("memo/AUTHORING.md"))
+    _write_if_missing(target / "docs" / "memo" / ".schema.json", _asset("memo/.schema.json"))
     _write_if_missing(target / "docs" / "architecture" / "overview.md", ARCHITECTURE_TEMPLATE)
     _write_if_missing(target / ".agent" / "docs.toml", DOCS_TOML_TEMPLATE)
     _write_if_missing(target / ".agent" / "pipeline.toml", PIPELINE_TOML_TEMPLATE)

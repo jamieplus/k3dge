@@ -2,7 +2,7 @@
 
 > 给**已经 `k3dge-init` 过的工程仓**看：k3dge 源更新之后，什么会跟着变、什么不会、该怎么升。本仓自举另走 `TEMPLATE_DRIFT`，不要把那把锁套到下游。
 >
-> 设计依据：ADR 0008（脚手架幂等、协议升级不是 init 覆盖）、ADR 0005（`K3DGE_SOURCE` / editable）、ADR 0006（MCP 零漂移）、ADR 0019（下游至少一域）。
+> 设计依据：ADR-0006（并列 harness 模型、脚手架幂等、MCP 零漂移）、ADR-0005（`K3DGE_SOURCE` / editable）、ADR-0015（下游至少一域）。
 
 ## 两层 harness
 
@@ -23,7 +23,7 @@ Agent 用的索引工具（`k3dge task list`、MCP `k3dge_task_list` / `k3dge_sy
 
 - 再执行 `pip install -e "${K3DGE_SOURCE}[mcp]"` → 判定核换成当前源（含 MCP）
 - scaffold 只**补当时还不存在的新模板文件**（例如后来才有的 `docs/guides/mcp-bridge.md`、`.gitignore`）
-- `manifest.domains` 仍为空时，写入第一条域（ADR 0019）
+- `manifest.domains` 仍为空时，写入第一条域（ADR-0015）
 - `k3dge sync`、`pre-commit install`（含 `--hook-type commit-msg`）
 
 **不会做**
@@ -31,7 +31,7 @@ Agent 用的索引工具（`k3dge task list`、MCP `k3dge_task_list` / `k3dge_sy
 - 覆盖已有 `AGENTS.md`、`scripts/gate.*`、`scripts/init.sh`、overview、已有的 mcp-bridge 旧稿
 - 把本仓的 `docs/adr/` 或 reviews 审计目录拷过来
 
-这是刻意的：init 幂等，避免把项目改过的协议冲掉。协议升级要**另同步**，不是 init 行为回退（ADR 0008）。
+这是刻意的：init 幂等，避免把项目改过的协议冲掉。协议升级要**另同步**，不是 init 行为回退（ADR-0006）。
 
 ## 推荐升级步骤
 
@@ -57,7 +57,7 @@ k3dge check --force-full
 
 - 不要用 `git checkout` 清下游仓来「对齐模板」
 - 不要以为再 init 就会把 AGENTS.md 变成最新
-- 不要在下游重实现哈希 / 私写 `k3dge check`（ADR 0006）
+- 不要在下游重实现哈希 / 私写 `k3dge check`（ADR-0006）
 - 不要把 k3dge 检出的 `docs/reviews/` 索引当下游模板拷
 
 ## 何时重开

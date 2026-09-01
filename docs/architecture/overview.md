@@ -46,8 +46,8 @@ graph TD
 
 * `engine` 为门禁判定与生命周期治理核心，不依赖 `cli/sync/templates`。
 * `sync` 依赖 `engine.contract`。
-* `cli` 分两路：`main` 本仓；`mcp` 外部 harness 注入（ADR 0006）。
-* `templates` 仅 `scaffolding`；`cli→templates` 仅 `init` 装配（ADR 0018）。
+* `cli` 分两路：`main` 本仓；`mcp` 外部 harness 注入（ADR-0006）。
+* `templates` 仅 `scaffolding`；`cli→templates` 仅 `init` 装配（ADR-0014）。
 
 ## 3. 数据流（提交门禁）
 
@@ -64,22 +64,29 @@ flowchart LR
 
 ## 4. 全局不变量
 
-* `GateReport.passed ⇔ violations.is_empty`
-* `Contract Hash` 锚定公开签名，`TEMPLATE_DRIFT` 仅自举（`pairs.py:1`）
+* `GateReport.passed ⇔ violations.is_empty` —— 门禁语义基线（ADR-0001）
+* `Contract Hash` 锚定公开签名；改 `src/<domain>/` 公开接口须 `k3dge sync` 回写哈希（双向绑定）—— ADR-0001
+* `TEMPLATE_DRIFT` 仅自举、不 import `templates/` —— ADR-0014（`pairs.py:1`）
+* spec 是契约、ADR 是决策事实源：操作层以指针引用 ADR 编号，不复写其正文 —— ADR-0001 / docs/adr/README.md
+* 文档类型合同：`docs/<type>/AUTHORING.md`（软）+ `docs/<type>/.schema.json`（硬闸）；寻址公式在 `AGENTS.md`；薄索引 `docs/generated/docs-index.json` —— ADR-0018 / ADR-0019
+* 协议仅 audit 两层 fallback，配置在 `.agent/pipeline.toml`，由 `PIPELINE_PROTOCOL_NOT_FOUND` 校验 —— ADR-0019
+* MCP 为外部 harness 调用 engine 事实/工具的唯一面，禁止私有重实现门禁 —— ADR-0006
 
 ## 5. 组件解耦（通用模板）
 
 ```mermaid
 C4Context
-    title Harness 隔离（示例：k3dge 元门禁 + 3 并列）
-    System(meta, "Meta Harness", "一致性门禁")
-    System_Ext(audit, "Audit Harness", "透镜")
-    System_Ext(cache, "Cache Harness", "记忆/检索")
-    System_Ext(quality, "Quality Harness", "度量/证伪")
-    Rel(meta, audit, "MCP/文件", "透镜不进 engine")
-    Rel(meta, cache, "MCP", "Observer 异步")
-    Rel(meta, quality, "MCP", "verify")
-    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+    title Harness 隔离（Agent 编排 + k3dge sidecar + 并列外部 harness）
+    System(agent, "Agent Harness (DSH/Codex/Claude/OpenCode)", "编排者：读 pipeline，调 k3dge 与外部 harness 的 MCP")
+    System_Ext(k3dge, "k3dge (sidecar MCP)", "一致性门禁 / 契约事实")
+    System_Ext(audit, "Audit Harness (k3dit)", "透镜（外部 MCP，不进 engine）")
+    System_Ext(cache, "Cache Harness", "记忆/检索（外部 MCP）")
+    System_Ext(quality, "Quality Harness", "度量/证伪（外部 MCP）")
+    Rel(agent, k3dge, "MCP stdio", "check/sync/status/incident — 零漂移委托")
+    Rel(agent, audit, "MCP", "透镜不进 engine")
+    Rel(agent, cache, "MCP", "Observer 异步")
+    Rel(agent, quality, "MCP", "verify")
+    UpdateLayoutConfig($c4ShapeInRow="4", $c4BoundaryInRow="1")
 ```
 
 ## 6. Milestone 状态机（通用）
@@ -99,23 +106,26 @@ stateDiagram-v2
 
 ```mermaid
 sequenceDiagram
-    participant Agent
-    participant Meta as Meta Harness
-    participant Quality as Quality Harness
-    participant Audit as Audit Harness
-    participant Cache as Cache Harness
-    Agent->>Meta: milestone align
-    Meta->>Quality: verify
-    Quality-->>Meta: VERIFIED
-    Meta->>Audit: run-audit (5-Pass)
-    Audit-->>Meta: 12 列报告（含 日期/复审/验收）
-    Meta->>Cache: inject_summary
-    Cache-->>Meta: HARNESS_SKIP/OK
-    Meta-->>Agent: HUMAN_CHECKPOINT y/N
-    Agent->>Meta: milestone seal
+    participant Agent as Agent Harness (DSH/Codex/Claude/OpenCode)
+    participant K3 as k3dge (sidecar MCP)
+    participant Quality as Quality Harness (ext MCP)
+    participant Audit as Audit Harness (k3dit, ext MCP)
+    participant Cache as Cache Harness (ext MCP)
+    Agent->>K3: read .agent/pipeline.toml (on_align_success)
+    Agent->>K3: k3dge check / status
+    K3-->>Agent: GateReport
+    Agent->>Quality: verify (ext MCP)
+    Quality-->>Agent: VERIFIED
+    Agent->>Audit: run-audit 5-Pass (ext MCP；fallback=default 自审须转人工)
+    Audit-->>Agent: 12 列报告（含 日期/复审/验收）
+    Agent->>Cache: inject_summary (ext MCP)
+    Cache-->>Agent: HARNESS_SKIP/OK
+    Agent-->>Agent: HUMAN_CHECKPOINT y/N
+    Agent->>K3: milestone seal
 ```
 
 ## 8. 决策与有意留索引
 
-* 已定案决策：`docs/adr/README.md`（按编号索引）
-* 有意留：`docs/reviews/SUMMARY.md` 顶部常驻表为唯一事实源（历史 `overview.md §5.1` 已迁移至此，此处不再维护）
+已定案决策：寻址用 `k3dge doc list --type adr`；主题与旧号映射见 [`docs/adr/README.md`](../adr/README.md)。
+
+有意留（活文档常驻表）：[`docs/reviews/README.md`](../reviews/README.md) 的 Intentional leftovers 表为唯一事实源。
