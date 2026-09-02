@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/cli`
-- **Contract Hash**: `sha256:44fdbd656d319f43970180a446cbc1378860a292aa9e759e1efb0937fc5714b8`
-- **Last Updated**: 2026-09-01
+- **Contract Hash**: `sha256:67fbdd8d2b343964a673f3b775d83e8033aab6ec25f24051e5e2c908d7ddc103`
+- **Last Updated**: 2026-09-02
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -22,6 +22,7 @@
 ## 2. Public Interfaces & Type Contracts
 <!-- k3dge:interfaces-start -->
 ```python
+cmd_doc_audit(args: argparse.Namespace) -> int
 cmd_check(args: argparse.Namespace) -> int
 cmd_sync(args: argparse.Namespace) -> int
 cmd_version(args: argparse.Namespace) -> int
@@ -55,6 +56,7 @@ k3dge_doc_list(typ: Optional[str]=None, ident: Optional[str]=None, q: Optional[s
 k3dge_doc_where(ident: str, workspace_path: Optional[str]=None) -> str
 k3dge_doc_grep(query: str, typ: Optional[str]=None, line: bool=False, include_archive: bool=False, workspace_path: Optional[str]=None) -> str
 k3dge_milestone_control(action: str, milestone_id: str, workspace_path: Optional[str]=None) -> str
+k3dge_submit_audit_report(milestone_id: str, content: str, workspace_path: Optional[str]=None) -> str
 k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str) -> str
 k3dge_adr_index(workspace_path: Optional[str]=None) -> str
 workspace_status(workspace: Path) -> Dict[str, Any]

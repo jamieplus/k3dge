@@ -4,161 +4,177 @@
       "path": "docs/adr/0001-k3dge-architecture-baseline.md",
       "type": "adr",
       "id": "ADR-0001",
-      "title": "ADR-0001: k3dge 架构设计与工程治理基线",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0001: k3dge 架构设计与工程治理基线"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0002-docs-reference-vs-architecture-semantics.md",
       "type": "adr",
       "id": "ADR-0002",
-      "title": "ADR-0002: docs 判据与投影的语义分工（architecture vs generated）",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0002: docs 判据与投影的语义分工（architecture vs generated）"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0003-tasks-backlog-merge.md",
       "type": "adr",
       "id": "ADR-0003",
-      "title": "ADR-0003: tasks 与 backlog 合并为单一 tasks 目录",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0003: tasks 与 backlog 合并为单一 tasks 目录"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0004-milestone-lifecycle-governance.md",
       "type": "adr",
       "id": "ADR-0004",
-      "title": "ADR-0004: 里程碑生命周期治理（Milestone Lifecycle Governance）",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0004: 里程碑生命周期治理（Milestone Lifecycle Governance）"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0005-local-first-and-layer-cuts.md",
       "type": "adr",
       "id": "ADR-0005",
-      "title": "ADR-0005: 本地自用、职责切分、审计独立 harness",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0005: 本地自用、职责切分、审计独立 harness"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0006-mcp-foreign-harness-injection.md",
       "type": "adr",
       "id": "ADR-0006",
-      "title": "ADR-0006: 对外 harness 注入面与并列 harness 集成",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0006: 对外 harness 注入面与并列 harness 集成"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0007-self-hosting-bootstrap.md",
       "type": "adr",
       "id": "ADR-0007",
-      "title": "ADR-0007: k3dge 处于自举开发（dogfood / bootstrap）",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0007: k3dge 处于自举开发（dogfood / bootstrap）"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0008-unsolicited-doc-triggers.md",
       "type": "adr",
       "id": "ADR-0008",
-      "title": "ADR-0008: 触发式文档维护与先读已敲定设计",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0008: 触发式文档维护与先读已敲定设计"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0009-purpose-reduce-agent-failure-modes.md",
       "type": "adr",
       "id": "ADR-0009",
-      "title": "ADR-0009: k3dge 的目的是给后续项目收住 Agent 的常见失败态",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0009: k3dge 的目的是给后续项目收住 Agent 的常见失败态"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0010-agent-rules-are-protocol-slices.md",
       "type": "adr",
       "id": "ADR-0010",
-      "title": "ADR-0010: `.agent/rules` 是协议切片，不是第二份协议",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0010: `.agent/rules` 是协议切片，不是第二份协议"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0011-agent-dir-is-harness-config.md",
       "type": "adr",
       "id": "ADR-0011",
-      "title": "ADR-0011: `.agent/` 是 harness 机器配置，不是 Agent 的发现面",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0011: `.agent/` 是 harness 机器配置，不是 Agent 的发现面"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0012-assertion-evidence-chain.md",
       "type": "adr",
       "id": "ADR-0012",
-      "title": "ADR-0012: Agent 对仓库的断言必须带证据链",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0012: Agent 对仓库的断言必须带证据链"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0013-version-and-changelog.md",
       "type": "adr",
       "id": "ADR-0013",
-      "title": "ADR-0013: 自动版本与变更日志",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0013: 自动版本与变更日志"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0014-template-drift-in-engine.md",
       "type": "adr",
       "id": "ADR-0014",
-      "title": "ADR-0014: TEMPLATE_DRIFT 锁在 engine，不 import templates",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0014: TEMPLATE_DRIFT 锁在 engine，不 import templates"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0015-downstream-first-domain-and-protocol-pack.md",
       "type": "adr",
       "id": "ADR-0015",
-      "title": "ADR-0015: 下游 init 必须能被门禁咬住，协议包不得带本仓特化",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0015: 下游 init 必须能被门禁咬住，协议包不得带本仓特化"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0016-pattern-absorption-protocol.md",
       "type": "adr",
       "id": "ADR-0016",
-      "title": "ADR-0016: 外部模式与资产吸收纪律（洁净室 + License 分级）",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0016: 外部模式与资产吸收纪律（洁净室 + License 分级）"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0017-report-schema-v2.md",
       "type": "adr",
       "id": "ADR-0017",
-      "title": "ADR-0017: Audit Report Schema v2 (12 columns)",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0017: Audit Report Schema v2 (12 columns)"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0018-doc-readme-anchor-governance.md",
       "type": "adr",
       "id": "ADR-0018",
-      "title": "ADR-0018: Managed document layout (Authoring, template, Gate, catalog)",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0018: Managed document layout (Authoring, template, Gate, catalog)"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0019-protocol-load-proof-abandoned.md",
       "type": "adr",
       "id": "ADR-0019",
-      "title": "ADR-0019: No load-proof; routing formula in AGENTS.md, payload beside the files",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0019: No load-proof; routing formula in AGENTS.md, payload beside the files"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/adr/0020-harness-responsibility-split.md",
       "type": "adr",
       "id": "ADR-0020",
-      "title": "ADR-0020: Harness Responsibility Split (k3dge / k3dit / k3lity)",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
-      "tokens": "ADR-0020: Harness Responsibility Split (k3dge / k3dit / k3lity)"
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
+    },
+    {
+      "path": "docs/adr/0021-doc-audit-post-check-non-blocking.md",
+      "type": "adr",
+      "id": "ADR-0021",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
+      "status": "Draft",
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
+    },
+    {
+      "path": "docs/adr/0022-task-maps-to-audit-report.md",
+      "type": "adr",
+      "id": "ADR-0022",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
+      "status": "Draft",
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
       "path": "docs/architecture/overview.md",
@@ -343,6 +359,14 @@
       "title": "Audit Protocol — Default (5-Pass / 8 维)",
       "status": "",
       "tokens": "Audit Protocol — Default (5-Pass / 8 维)"
+    },
+    {
+      "path": "docs/protocols/quality_default.md",
+      "type": "protocols",
+      "id": "quality_default",
+      "title": "Quality Protocol — Default (k3lity 12 列)",
+      "status": "",
+      "tokens": "Quality Protocol — Default (k3lity 12 列)"
     },
     {
       "path": "docs/protocols/verify_default.md",

@@ -11,7 +11,7 @@ Entries are append-only after Accepted. Revise via `Amended by` / `Superseded by
 
 - **Gate / baseline**: 0001, 0014
 - **Docs**: 0002, 0003, 0018, 0019
-- **Lifecycle**: 0004, 0008
+- **Lifecycle**: 0004, 0008, 0021, 0022
 - **Agent / harness**: 0005, 0006, 0009, 0010, 0011, 0012
 - **Bootstrap / version**: 0007, 0013, 0015, 0016
 - **Audit report schema**: 0017

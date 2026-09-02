@@ -6,6 +6,7 @@
     "## 2. 决策 (Decision)",
     "## 3. 产生后果 (Consequences)"
   ],
+  "section_order": true,
   "frontmatter": {
     "Status": [
       "Accepted",
@@ -23,6 +24,7 @@
     "h1": "ADR_FILENAME_MISMATCH",
     "frontmatter": "ADR_FRONTMATTER_MISSING",
     "sections": "ADR_SECTIONS_MISSING",
+    "section_order": "ADR_SECTION_ORDER",
     "unique": "ADR_NUMBER_COLLISION"
   }
 }

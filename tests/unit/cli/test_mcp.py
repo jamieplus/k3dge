@@ -120,7 +120,7 @@ class TestMcp(unittest.TestCase):
             self.assertTrue(ver["ok"])
             self.assertEqual(ver["version"], "0.1.0")
 
-    def test_align_checkpoint_payload(self) -> None:
+    def test_align_payload_no_checkpoint(self) -> None:
         import subprocess
 
         with tempfile.TemporaryDirectory() as d:
@@ -157,9 +157,12 @@ class TestMcp(unittest.TestCase):
             subprocess.run(["git", "commit", "-m", "init"], cwd=root, capture_output=True)
             payload = json.loads(mcp.k3dge_milestone_control("align", "M9", workspace_path=d))
             self.assertTrue(payload["aligned"], payload)
-            self.assertIn("checkpoint", payload)
-            self.assertEqual(payload["checkpoint"]["timeout_seconds"], 60)
-            self.assertEqual(payload["checkpoint"]["default"], "N")
+            # align no longer carries a checkpoint nor "seal_eligible"; the next
+            # step after align is AUDIT (seal only unlocks after the audit closes).
+            self.assertNotIn("checkpoint", payload)
+            self.assertNotIn("seal_eligible", payload)
+            self.assertIn("next", payload)
+            self.assertEqual(payload["next"]["state"], "audit_suggested")
 
 
 class TestAuditPromptRouting(unittest.TestCase):

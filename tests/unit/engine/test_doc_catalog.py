@@ -7,6 +7,7 @@ from pathlib import Path
 
 from k3dge.engine.doc_catalog import (
     analyze_adr_coverage,
+    check_section_order,
     grep_docs,
     list_docs,
     validate_docs,
@@ -142,3 +143,41 @@ class TestAdrCoverage(unittest.TestCase):
             kinds = {f["type"] for f in out["findings"]}
             self.assertIn("pointer_stale", kinds)
             self.assertNotIn("scope_overlap", kinds)
+
+
+class TestSectionOrder(unittest.TestCase):
+    def test_valid_outline_ok(self):
+        text = "## 1. a\n### 1.1 b\n### 1.2 c\n## 2. d\n### 2.1 e\n## 3. f\n"
+        self.assertIsNone(check_section_order(text))
+
+    def test_out_of_order_detected(self):
+        # a subsection appended out of position: 2.1.8 then 2.1.5 (the 0004 regression)
+        text = "### 2.1.4 a\n### 2.1.7 b\n### 2.1.8 c\n### 2.1.5 d\n"
+        bad = check_section_order(text)
+        self.assertIsNotNone(bad)
+        self.assertEqual(bad, ("2.1.8", "2.1.5"))
+
+    def test_duplicate_detected(self):
+        text = "## 2. a\n## 2. b\n"
+        self.assertEqual(check_section_order(text), ("2", "2"))
+
+    def test_unnumbered_doc_ok(self):
+        text = "## Context\n## Decision\n"
+        self.assertIsNone(check_section_order(text))
+
+    def test_gate_emits_violation(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            schema = dict(ADR_SCHEMA)
+            schema["section_order"] = True
+            schema.setdefault("codes", {})["section_order"] = "ADR_SECTION_ORDER"
+            _write_schema(ws, "adr", schema)
+            (ws / "docs" / "adr" / "_template.md").write_text("", encoding="utf-8")
+            (ws / "docs" / "adr" / "0001-x.md").write_text(
+                "---\nStatus: Accepted\nDate: 2026-01-01\n---\n# ADR-0001: x\n\n"
+                "## 1. 上下文 (Context)\n## 2. 决策 (Decision)\n### 2.1 a\n### 2.2 b\n### 2.1 c\n"
+                "## 3. 产生后果 (Consequences)\n",
+                encoding="utf-8",
+            )
+            codes = [v.rule_id for v in validate_docs(ws, ["adr"])]
+            self.assertIn("ADR_SECTION_ORDER", codes)

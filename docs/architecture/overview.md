@@ -94,35 +94,50 @@ C4Context
 ```mermaid
 stateDiagram-v2
     [*] --> DRAFT
-    DRAFT --> ALIGNED: milestone align
-    ALIGNED --> AUDITING: HUMAN_CHECKPOINT y
-    ALIGNED --> SEALED: N/60s timeout
-    AUDITING --> AUDITED: 5-Pass 闭环
-    AUDITED --> SEALED: milestone seal
-    SEALED --> [*]
+    DRAFT --> ALIGNED: milestone align (Full Matrix, 无人问)
+    ALIGNED --> AUDIT_SUGGESTED: 量化触发(账齐/C2≥5/体积≥8)
+    AUDIT_SUGGESTED --> DRAFT: 要不要审? N（继续干活；无倒计时）
+    AUDIT_SUGGESTED --> AUDITING: k3dge milestone audit
+    AUDITING --> AUDITING: audit+quality 待修>0 + agent 修（倒计时默认修；重审各报告）
+    AUDITING --> AUDITING: 位置钉 k3dit:pending <ID>（check/status 报 pending=N）
+    AUDITING --> ESCALATED: verify 连续 >3 次未闭环 → 转人工
+    AUDITING --> SEAL_READY: audit 与 quality 两份报告均 待修=0（审计闭环=真界限）
+    SEAL_READY --> DRAFT: 要不要封? N（里程碑继续挂着）
+    SEAL_READY --> SEALED: k3dge milestone seal（align→归档+版本+指针）
+    SEALED --> [*]: 收摊=上下文压缩(closure.md → 设计文档 → 提交)
 ```
 
-## 7. 对齐协作时序（通用模板）
+> **两问拆开**：封板没有尺子（全 done/硬闸绿/零 task 都能说"可封"），界限是**审计环收口 = audit + quality 两份 12 列报告都到 待修=0**。自动触发只服务「要不要审」，「要不要封」只在闭环后出现一次。未审计调 `seal` → `audit_needed`。发现用 `k3dit:pending <ID>` 钉在 `位置` 处（仅指针，处置仍以报告+tasks 为准），`check`/`status` 报 `pending_findings`。外来审计源经 `k3dge milestone audit-submit`(或 MCP `k3dge_submit_audit_report`) 落盘即计入闭环。架构/`overview.md` 更新**不是钩子**，在 closure 里做。详见 ADR-0004 §2.1.4–§2.1.8。
+
+## 7. 审计→封板时序（通用模板）
 
 ```mermaid
 sequenceDiagram
     participant Agent as Agent Harness (DSH/Codex/Claude/OpenCode)
     participant K3 as k3dge (sidecar MCP)
-    participant Quality as Quality Harness (ext MCP)
     participant Audit as Audit Harness (k3dit, ext MCP)
-    participant Cache as Cache Harness (ext MCP)
-    Agent->>K3: read .agent/pipeline.toml (on_align_success)
-    Agent->>K3: k3dge check / status
-    K3-->>Agent: GateReport
-    Agent->>Quality: verify (ext MCP)
-    Quality-->>Agent: VERIFIED
-    Agent->>Audit: run-audit 5-Pass (ext MCP；fallback=default 自审须转人工)
-    Audit-->>Agent: 12 列报告（含 日期/复审/验收）
-    Agent->>Cache: inject_summary (ext MCP)
-    Cache-->>Agent: HARNESS_SKIP/OK
-    Agent-->>Agent: HUMAN_CHECKPOINT y/N
-    Agent->>K3: milestone seal
+    participant Quality as Quality Harness (k3lity, ext MCP)
+    Agent->>K3: read .agent/pipeline.toml (on_seal_enter / on_pre_seal)
+    Agent->>K3: k3dge check / status（硬闸绿）
+    K3-->>Agent: [NEXT] audit_suggested + reasons（量化触发；非建议封）
+    Agent->>K3: milestone align（Full Matrix，无人问）
+    K3-->>Agent: 问「要审吗？」(无倒计时；N=继续干活)
+    Agent->>K3: milestone audit <id>
+    Agent->>Audit: k3dit.actions.audit（mcp→cli→manual；fallback=default 自审须转人工）
+    Agent->>Quality: k3lity.actions.quality（mcp→cli→manual；人填不造假分）
+    Note over Agent,Audit: 外来审计源：人贴报告 → k3dge_submit_audit_report 落盘(--kind audit|quality)
+    Audit-->>Agent: 审计 12 列报告（含 待修/有意留/已修）+ 位置钉 k3dit:pending
+    Quality-->>Agent: 质量 12 列报告（k3dge:kind: quality）
+    Agent->>Agent: 任一报告 待修>0? 问「agent 修？」(倒计时默认修) → 重审各报告；>3 次 → escalated 转人工
+    K3-->>Agent: [NEXT] seal_ready（两份报告 待修=0，唯一界限达成）
+    Agent->>K3: milestone seal <id>
+    K3-->>Agent: 问「封板？」(无倒计时；否=不封，里程碑挂着)
+    K3->>K3: align→归档+版本+指针；写 *-closure.md 收摊清单（上下文压缩+设计文档由人/agent 补齐）
 ```
+
+> 命令结果末尾统一附 `[NEXT] state=… milestone=…` 一行提示（MCP 同构 JSON `next` 字段），只给合法下一步、不替人决定；优先级 `pending_findings > seal_ready > audit_suggested`，状态与 reasons 的唯一来源在 `engine/nextstep.STATE_OPTIONS` + `engine/audit_trigger.py`，与本节同一张状态机。新建 `src/` 域给 `new_domain`（是否算持久设计、写得对不对仍归 k3dit/人）；`overview.md` 更新已移出钩子、进 closure。
+>
+> **T-01 边界（doc-audit，ADR-0021）**：`check` 恒静态、不跑透镜。docs 改动时 `check` 绿后给 `[NEXT] doc_audit`，由 `k3dge doc-audit`（**之后**、**非阻断**）出 k3dit 报告 + 建带 `Milestone` 的 task；task 进 backlog 由封板「全 done」闸兜底。ADR 冲突/覆盖只在里程碑审计，不进每次 commit。
 
 ## 8. 决策与有意留索引
 

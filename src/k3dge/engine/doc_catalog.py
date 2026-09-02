@@ -259,6 +259,31 @@ def _code(schema: dict, key: str, default: str = "DOC_SCHEMA_INVALID") -> str:
     return str(codes.get(key) or default)
 
 
+_SECTION_NUM_RE = re.compile(r"^#{1,6}\s+(\d+(?:\.\d+)*)\b")
+
+
+def check_section_order(text: str) -> Optional[Tuple[str, str]]:
+    """Return (prev_number, this_number) for the first out-of-order/duplicate heading.
+
+    A valid outline's dotted section numbers (`## 1`, `### 2.1`, `#### 2.1.1`) are
+    strictly increasing in document order when compared as integer tuples: parents
+    precede children, siblings ascend, and it never steps back. Inserting a new
+    subsection out of position (or reusing a number) breaks this. Returns None if ok
+    or if the doc has no numbered sections.
+    """
+    numbers: List[Tuple[int, ...]] = []
+    for line in text.splitlines():
+        m = _SECTION_NUM_RE.match(line)
+        if m:
+            numbers.append(tuple(int(x) for x in m.group(1).split(".")))
+    prev: Optional[Tuple[int, ...]] = None
+    for cur in numbers:
+        if prev is not None and cur <= prev:
+            return (".".join(map(str, prev)), ".".join(map(str, cur)))
+        prev = cur
+    return None
+
+
 def _status_ok(value: str, allowed: Iterable[str]) -> bool:
     v = value.strip()
     for item in allowed:
@@ -353,6 +378,16 @@ def _validate_file(workspace: Path, typ: str, path: Path, schema: dict, seen: di
                     )
                 )
     fm_spec = schema.get("frontmatter") or {}
+    if schema.get("section_order"):
+        bad = check_section_order(text)
+        if bad:
+            out.append(
+                Violation(
+                    _code(schema, "section_order", "DOC_SECTION_ORDER"),
+                    f"section number out of order (must ascend): {bad[0]} before {bad[1]}: {path.name}",
+                    file_path=rel,
+                )
+            )
     if fm_spec:
         fm = _frontmatter(text)
         for key, rule in fm_spec.items():

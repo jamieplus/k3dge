@@ -6,6 +6,8 @@
 
 ```python
 # main.py
+cmd_doc_audit(args: argparse.Namespace) -> int
+    # doc: Non-blocking post-check doc authoring audit: report (k3dit) + milestone task.
 cmd_check(args: argparse.Namespace) -> int
 cmd_sync(args: argparse.Namespace) -> int
 cmd_version(args: argparse.Namespace) -> int
@@ -57,6 +59,8 @@ k3dge_doc_grep(query: str, typ: Optional[str]=None, line: bool=False, include_ar
     # doc: Scan managed doc bodies. Returns path (and line if requested). Never snippets. Same as CLI k3dge doc grep.
 k3dge_milestone_control(action: str, milestone_id: str, workspace_path: Optional[str]=None) -> str
     # doc: Control milestone state machine: status, align (full-matrix regression), seal (atomic compaction).
+k3dge_submit_audit_report(milestone_id: str, content: str, workspace_path: Optional[str]=None) -> str
+    # doc: Persist a human/agent-submitted audit report as the canonical on-disk report.
 k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str) -> str
     # doc: Pointer to the independent audit harness (k3dit). Lenses do not live in k3dge.
 k3dge_adr_index(workspace_path: Optional[str]=None) -> str
@@ -71,6 +75,11 @@ workspace_status(workspace: Path) -> Dict[str, Any]
 ```python
 # _ts.py
 extract_ts_interface(path: Path) -> str
+# audit_trigger.py
+compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
+    # doc: Return (suggested, reasons). Only fires on a quantitative event.
+audit_closed(workspace: Path, milestone_id: str) -> bool
+    # doc: True iff BOTH the audit (k3dit) and quality (k3lity) reports exist with 待修==0.
 # contract.py
 class ContractExtractor
 # doc: Abstract contract extractor — register per-language implementations.
@@ -112,6 +121,8 @@ list_docs(workspace: Path, *, typ: Optional[str]=None, ident: Optional[str]=None
 where_doc(workspace: Path, ident: str) -> List[dict]
 grep_docs(workspace: Path, query: str, *, typ: Optional[str]=None, line: bool=False, include_archive: bool=False, max_files: int=GREP_MAX_FILES, ignore_case: bool=True) -> List[dict]
     # doc: Scan managed doc bodies; return ``path`` or ``path``+``line`` only.
+check_section_order(text: str) -> Optional[Tuple[str, str]]
+    # doc: Return (prev_number, this_number) for the first out-of-order/duplicate heading.
 validate_docs(workspace: Path, types: Optional[Iterable[str]]=None) -> List[Violation]
     # doc: Structure-only gate. Types without ``.schema.json`` are skipped.
 validate_docs_index(workspace: Path) -> List[Violation]
@@ -144,6 +155,8 @@ bump_milestone(workspace: Path) -> str
     # doc: M0 → M1 → M2 …; writes new cursor and returns it.
 scan_unfilled_guides(workspace: Path) -> List[str]
     # doc: Names of guide stubs in docs/guides/ still carrying `<!-- k3dge:guide-stub -->`.
+scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
+    # doc: Return (count, ["path#ID", ...]) of open `k3dit:pending <ID>` markers.
 class MilestoneTask
     path: Path
     slug: str
@@ -159,12 +172,20 @@ class TaskIndex
 list_tasks(workspace: Path, milestone_id: Optional[str]=None, status: Optional[str]=None) -> List[TaskIndex]
     # doc: Index living task files (not archive/, not README). Filters are exact matches.
 scan_milestone_tasks(workspace: Path, milestone_id: str) -> List[MilestoneTask]
-create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=None, milestone: Optional[str]=None, priority: str='P2') -> Tuple[bool, str, Optional[Path]]
+create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=None, milestone: Optional[str]=None, priority: str='P2', report: Optional[str]=None) -> Tuple[bool, str, Optional[Path]]
     # doc: Write a living task file. Returns (ok, message, path).
 mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]
     # doc: Mark one living task done. Prefer exact path from list_tasks; else unique filename substring.
 run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
+persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
+    # doc: Persist a human/agent-submitted audit report as the canonical on-disk report.
+run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]
+    # doc: Non-blocking doc-audit, run AFTER the hard gate (never inside `check`).
+run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
+    # doc: Independent audit entry: BOTH k3dit.audit and k3lity.quality produce 12-col
+run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
+    # doc: Seal = archive + version + pointer. Requires a *closed* audit first.
 # models.py
 class Violation
     rule_id: str
@@ -179,12 +200,49 @@ class GateReport
     modified_domains: Tuple[str, ...] = ()
     violations: Tuple[Violation, ...] = ()
     render(self) -> str
+# nextstep.py
+class NextStep
+    state: str
+    milestone: str
+    pending: Optional[int] = None
+    note: Optional[str] = None
+    ask: Optional[str] = None
+    if_y: Optional[str] = None
+    if_n: Optional[str] = None
+    reasons: Optional[list] = None
+    @classmethod
+    from_state(cls, state: str, milestone: str, *, pending: Optional[int]=None, reasons: Optional[list]=None) -> 'NextStep'
+    render_cli(self) -> str
+    render_mcp(self) -> dict
+next_for_rejection(milestone: str, message: str) -> NextStep
+    # doc: Failure -> action. Pick the corrective command from the rejection reason.
+# pipeline_runner.py
+class TransportResult
+    ok: bool
+    provider: Optional[str]
+    detail: str
+    skipped: bool = False
+load_pipeline_config(workspace: Path) -> dict
+    # doc: Return parsed pipeline.toml, or {} if absent/unparseable.
+resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]
+    # doc: Resolve `peer.actions.name` (or `peer.name` alias) to its transports list.
+run_action(workspace: Path, action_ref: str, *, io=None, timeout_default: int=60) -> TransportResult
+    # doc: Execute a peer action by walking its transports. Returns first success.
 # pipeline_schema.py
 validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
     # doc: Validate `.agent/pipeline.toml`. Returns [] when valid or file absent.
 # protocol.py
 write_incident(workspace: Path, target: str | None, task_type: str | None, task_id: str, detail: str) -> Path
     # doc: Escalate a persistent protocol deviation to a human-visible incident note.
+# seal_checklist.py
+compute_eligibility(workspace: Path) -> tuple[dict, bool]
+    # doc: Recompute eligibility from scratch and persist the checklist.
+read_checklist(workspace: Path) -> Optional[dict]
+ensure_checklist(workspace: Path) -> dict
+is_eligible(workspace: Path) -> bool
+get_verify_attempts(workspace: Path) -> int
+bump_verify_attempt(workspace: Path) -> int
+reset_verify_attempts(workspace: Path) -> None
 # search.py
 class Location
     file: str

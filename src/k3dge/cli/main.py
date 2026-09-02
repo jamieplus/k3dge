@@ -54,6 +54,80 @@ def _to_json(report: GateReport) -> dict:
     }
 
 
+def _workspace_hints(workspace: Path) -> list:
+    """Cross-cutting [NEXT] hints from the current change set.
+
+    These are triggers the hard gate deliberately does NOT fail on, but which
+    have a file-level signal: src/ changed without overview.md touched, or a new
+    top-level src/ domain not registered in manifest. Single source: the option
+    text lives in engine.nextstep.STATE_OPTIONS (same table as AGENTS.md §12).
+    """
+    from k3dge.engine import nextstep
+    from k3dge.engine.milestone import get_current_milestone
+
+    try:
+        import json as _json
+        import subprocess
+
+        out = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=workspace, capture_output=True, text=True,
+        )
+        files = [ln[3:].strip() for ln in out.stdout.splitlines() if ln.strip()]
+    except Exception:
+        return []
+    if not files:
+        return []
+    mid = get_current_milestone(workspace)
+    hints = []
+    src_changed = [f for f in files if f.startswith("src/")]
+    # overview.md staleness is folded into the audit-suggestion reasons
+    # (compute_audit_suggestion), so it is NOT emitted as a standalone hint here.
+    # New domain: a changed src/ path not under any known domain source dir.
+    try:
+        manifest = _json.loads((workspace / ".agent" / "manifest.json").read_text(encoding="utf-8"))
+        known = {d.get("src") for d in manifest.get("domains", {}).values() if isinstance(d, dict)}
+    except Exception:
+        known = set()
+    if known:
+        new_top = set()
+        for f in src_changed:
+            if not any(f == ks or f.startswith(ks + "/") for ks in known):
+                new_top.add("/".join(f.split("/")[:2]))
+        if new_top:
+            hints.append(nextstep.NextStep.from_state("new_domain", mid))
+    return hints
+
+
+def _emit_workspace_hints(workspace: Path, stream) -> None:
+    for h in _workspace_hints(workspace):
+        print(h.render_cli(), file=stream)
+
+
+def _emit_doc_audit_hint(workspace: Path, stream) -> None:
+    # T-01: `check` is a static hard gate and never calls the lens. Doc-audit is a
+    # NON-BLOCKING follow-up after the gate — surface it here, do not run it inline.
+    try:
+        from k3dge.engine import nextstep
+        from k3dge.engine.milestone import _changed_docs, get_current_milestone
+
+        if _changed_docs(workspace):
+            print(nextstep.NextStep.from_state("doc_audit", get_current_milestone(workspace)).render_cli(), file=stream)
+    except Exception:
+        pass
+
+
+def cmd_doc_audit(args: argparse.Namespace) -> int:
+    """Non-blocking post-check doc authoring audit: report (k3dit) + milestone task."""
+    from k3dge.engine.milestone import run_doc_audit
+
+    workspace = _find_workspace(Path.cwd())
+    status, msg = run_doc_audit(workspace, io=sys.stderr)
+    print(f"[DOC-AUDIT] {msg}")
+    _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc-audit -> {status}")
+    return 0  # non-blocking by design (runs after check, never inside it)
+
+
 def cmd_check(args: argparse.Namespace) -> int:
     import datetime
 
@@ -73,7 +147,64 @@ def cmd_check(args: argparse.Namespace) -> int:
         f"[{datetime.datetime.now().isoformat()}] check {'--with-tests' if getattr(args, 'with_tests', False) else ''} -> {'PASS' if report.passed else 'FAIL'} "
         f"violations={len(report.violations)} domains={','.join(report.modified_domains)}",
     )
+    # Seal-eligibility hint: once the hard gate passes AND the current milestone's
+    # top-level tasks are all done, surface it so the operator can choose to seal.
+    # Non-blocking and informational only (ADR-0004 §2.1.2 revised).
+    if code == 0:
+        _emit_lifecycle_next(workspace, sys.stderr)
+        _emit_workspace_hints(workspace, sys.stderr)
+        _emit_doc_audit_hint(workspace, sys.stderr)
     return code
+
+
+def _read_submit_input(args: argparse.Namespace) -> str:
+    """Read audit-report content from --file, stdin '-', or stdin."""
+    src = getattr(args, "file", None)
+    if src and src != "-":
+        p = Path(src)
+        if not p.is_file():
+            return ""
+        return p.read_text(encoding="utf-8")
+    if src == "-":
+        return sys.stdin.read()
+    # No --file: read stdin if it is piped, else empty.
+    if not sys.stdin.isatty():
+        return sys.stdin.read()
+    return ""
+
+
+def _lifecycle_next(workspace: Path):
+    """Single source of the audit/seal next-step (mirrors ADR-0004 §2.1.7).
+
+    Order: audit closed -> seal_ready; else quant trigger -> audit_suggested.
+    Returns None when nothing is warranted (empty window / zero tasks / no trigger).
+    """
+    try:
+        from k3dge.engine import nextstep
+        from k3dge.engine.audit_trigger import audit_closed, compute_audit_suggestion
+        from k3dge.engine.milestone import get_current_milestone, scan_pending_findings
+
+        mid = get_current_milestone(workspace)
+        # Highest precedence: findings pinned in code/docs (the "看见" pointer).
+        count, samples = scan_pending_findings(workspace)
+        if count > 0:
+            return nextstep.NextStep.from_state(
+                "pending_findings", mid, pending=count, reasons=[f"标记: {s}" for s in samples[:5]]
+            )
+        if audit_closed(workspace, mid):
+            return nextstep.NextStep.from_state("seal_ready", mid)
+        suggested, reasons = compute_audit_suggestion(workspace)
+        if suggested:
+            return nextstep.NextStep.from_state("audit_suggested", mid, reasons=reasons)
+        return None
+    except Exception:
+        return None
+
+
+def _emit_lifecycle_next(workspace: Path, stream) -> None:
+    ns = _lifecycle_next(workspace)
+    if ns is not None:
+        print(ns.render_cli(), file=stream)
 
 
 def cmd_sync(args: argparse.Namespace) -> int:
@@ -95,6 +226,9 @@ def cmd_sync(args: argparse.Namespace) -> int:
         workspace,
         f"[{datetime.datetime.now().isoformat()}] sync -> updated domains={','.join(changed)} docs_updated={docs_updated}",
     )
+    # sync handles the contract hash; overview.md is still manual — remind if the
+    # change set touched src/ without overview.md.
+    _emit_workspace_hints(workspace, sys.stdout)
     return 0
 
 
@@ -238,6 +372,10 @@ def cmd_task(args: argparse.Namespace) -> int:
         ok, msg, _ = mark_task_done(workspace, raw_pat)
         print(f"[TASK] {msg}", file=sys.stderr if not ok else sys.stdout)
         _append_log(workspace, f"[{datetime.datetime.now().isoformat()}] task done -> {msg}")
+        if ok:
+            # Turning point: completing the batch is a *quantitative* event ->
+            # suggest an audit (not seal); seal appears only after the audit closes.
+            _emit_lifecycle_next(workspace, sys.stdout)
         return 0 if ok else 1
     if args.task_action == "list":
         from k3dge.engine.milestone import list_tasks
@@ -458,7 +596,8 @@ def cmd_mcp(args: argparse.Namespace) -> int:
 
 
 def cmd_milestone(args: argparse.Namespace) -> int:
-    from k3dge.engine.milestone import run_milestone_alignment, seal_milestone, scan_milestone_tasks
+    from k3dge.engine import nextstep
+    from k3dge.engine.milestone import run_milestone_alignment, seal_milestone, scan_milestone_tasks, run_seal_flow, run_audit_flow, _Prompt
 
     workspace = _find_workspace(Path.cwd())
     action = args.action
@@ -479,6 +618,12 @@ def cmd_milestone(args: argparse.Namespace) -> int:
     if action == "align":
         ok, msg, _ = run_milestone_alignment(workspace, m_id)
         print(msg)
+        if ok:
+            # align done + all tasks closed => suggest AUDIT (not seal).
+            _emit_lifecycle_next(workspace, sys.stdout)
+        else:
+            # Failure -> action (do not proceed to seal).
+            print(nextstep.next_for_rejection(m_id, msg).render_cli())
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone align -> {m_id} ok={ok}")
         # Peer pipeline availability check: highlight fallback to default when external peer missing
         if ok:
@@ -515,35 +660,45 @@ def cmd_milestone(args: argparse.Namespace) -> int:
                             pass
             except Exception:
                 pass
-        if ok and "HUMAN_CHECKPOINT" in msg:
-            # Interactive checkpoint: only when stdin is a TTY; 60s timeout, default N
-            if sys.stdin.isatty():
-                try:
-                    import select
-
-                    print("HUMAN_CHECKPOINT: Milestone {} all green, run 5-Pass audit? (y/N, 60s timeout default N): ".format(m_id), end="", flush=True)
-                    rlist, _, _ = select.select([sys.stdin], [], [], 60)
-                    if rlist:
-                        ans = sys.stdin.readline().strip().lower()
-                        if ans in ("y", "yes"):
-                            print("[CHECKPOINT] User requested audit — create audit task and run k3dit")
-                        else:
-                            print("[CHECKPOINT] Skipped audit")
-                    else:
-                        print("\n[CHECKPOINT] Timeout (60s), default N — skipping audit")
-                except Exception:
-                    pass
-            else:
-                # Non-interactive (CI/tests): surface checkpoint as log, default N
-                print("[CHECKPOINT] Non-interactive, default N — skipping audit")
         return 0 if ok else 1
 
-    if action == "seal":
-        ok, msg = seal_milestone(workspace, m_id)
-        print(msg)
-        _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone seal -> {m_id} ok={ok}")
-        if not ok:
+    if action == "checklist":
+        from k3dge.engine import seal_checklist as sc
+
+        data = sc.compute_eligibility(workspace)[0]
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+        return 0
+
+    if action == "audit-submit":
+        raw = _read_submit_input(args)
+        if not raw or not raw.strip():
+            print("[AUDIT] no content provided (use --file <path> or pipe via stdin '-')", file=sys.stderr)
             return 1
+        path = ms.persist_external_audit_report(workspace, m_id, raw, kind=getattr(args, "kind", "audit") or "audit")
+        print(f"[AUDIT] persisted external audit report -> {path}")
+        _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone audit-submit -> {m_id} -> {path}")
+        # Landed report may close the audit loop -> unlock the seal question.
+        _emit_lifecycle_next(workspace, sys.stdout)
+        return 0
+
+    if action == "audit":
+        status, msg = run_audit_flow(workspace, m_id, prompter=_Prompt.default())
+        print(msg)
+        _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone audit -> {m_id} status={status}")
+        return 0 if status == "audited" else 1
+
+    if action == "seal":
+        status, msg = run_seal_flow(
+            workspace,
+            m_id,
+            prompter=_Prompt.default(),
+            skip_enter_prompt=getattr(args, "yes", False),
+        )
+        print(msg)
+        _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone seal -> {m_id} status={status}")
+        if status != "sealed":
+            # deferred (normal commit) or audit_needed/rejected -> no version bump
+            return 0 if status == "deferred" else 1
         # Auto-bump patch version on successful seal (unless --no-bump)
         if getattr(args, "no_version_bump", False):
             return 0
@@ -840,6 +995,9 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"  - [{t['status'] or '?'}] {t['title']}")
         else:
             print("Unfinished tasks: none")
+        # Persistent one-line next-step hint (single source: engine.nextstep).
+        _emit_lifecycle_next(workspace, sys.stdout)
+        _emit_workspace_hints(workspace, sys.stdout)
     return 0
 
 
@@ -878,14 +1036,36 @@ def build_parser() -> argparse.ArgumentParser:
     p_sync.set_defaults(func=cmd_sync)
 
     p_milestone = sub.add_parser("milestone", help="milestone alignment and context compaction")
-    p_milestone.add_argument("action", choices=["status", "align", "seal"], help="milestone action")
+    p_milestone.add_argument("action", choices=["status", "align", "seal", "audit", "checklist", "audit-submit"], help="milestone action")
     p_milestone.add_argument("milestone_id", help="milestone identifier (matches Milestone field in tasks)")
     p_milestone.add_argument(
         "--no-version-bump",
         action="store_true",
         help="for seal: do not auto-bump patch version and changelog",
     )
+    p_milestone.add_argument(
+        "--file",
+        default=None,
+        help="for audit-submit: path to the audit report file; '-' or omitted reads stdin",
+    )
+    p_milestone.add_argument(
+        "--kind",
+        choices=["audit", "quality"],
+        default="audit",
+        help="for audit-submit: which report stream this is (k3dit audit vs k3lity quality)",
+    )
+    p_milestone.add_argument(
+        "--yes",
+        action="store_true",
+        help="for seal: skip the enter-seal prompt and enter the flow immediately (audit still mandatory)",
+    )
     p_milestone.set_defaults(func=cmd_milestone)
+
+    p_doc_audit = sub.add_parser(
+        "doc-audit",
+        help="non-blocking doc authoring audit that runs AFTER check: k3dit report + milestone task",
+    )
+    p_doc_audit.set_defaults(func=cmd_doc_audit)
 
     p_version = sub.add_parser("version", help="show or bump project version (pyproject.toml ↔ manifest ↔ __init__)")
     p_version.add_argument("version_action", choices=["show", "bump"], help="show current version or bump it")

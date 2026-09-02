@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:67c98e371de0003b8a7862ed8a1ef720cdf773e9682d90cce5b170c079dc1976`
-- **Last Updated**: 2026-09-01
+- **Contract Hash**: `sha256:32c023347270ce84acd3cc62f1e4eb9240cfc7930b387ab81af5c2d12ea116dd`
+- **Last Updated**: 2026-09-02
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -26,6 +26,8 @@
 <!-- k3dge:interfaces-start -->
 ```python
 extract_ts_interface(path: Path) -> str
+compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
+audit_closed(workspace: Path, milestone_id: str) -> bool
 class ContractExtractor
     can_handle(self, path: Path) -> bool
     extract(self, path: Path, include_doc: bool=False) -> str
@@ -54,6 +56,7 @@ write_docs_index(workspace: Path) -> Path
 list_docs(workspace: Path, *, typ: Optional[str]=None, ident: Optional[str]=None, q: Optional[str]=None, include_archive: bool=False) -> List[dict]
 where_doc(workspace: Path, ident: str) -> List[dict]
 grep_docs(workspace: Path, query: str, *, typ: Optional[str]=None, line: bool=False, include_archive: bool=False, max_files: int=GREP_MAX_FILES, ignore_case: bool=True) -> List[dict]
+check_section_order(text: str) -> Optional[Tuple[str, str]]
 validate_docs(workspace: Path, types: Optional[Iterable[str]]=None) -> List[Violation]
 validate_docs_index(workspace: Path) -> List[Violation]
 analyze_adr_coverage(workspace: Path) -> dict
@@ -75,6 +78,7 @@ get_current_milestone(workspace: Path) -> str
 set_current_milestone(workspace: Path, milestone_id: str) -> None
 bump_milestone(workspace: Path) -> str
 scan_unfilled_guides(workspace: Path) -> List[str]
+scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
 class MilestoneTask
     path: Path
     slug: str
@@ -88,10 +92,14 @@ class TaskIndex
     priority: str
 list_tasks(workspace: Path, milestone_id: Optional[str]=None, status: Optional[str]=None) -> List[TaskIndex]
 scan_milestone_tasks(workspace: Path, milestone_id: str) -> List[MilestoneTask]
-create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=None, milestone: Optional[str]=None, priority: str='P2') -> Tuple[bool, str, Optional[Path]]
+create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=None, milestone: Optional[str]=None, priority: str='P2', report: Optional[str]=None) -> Tuple[bool, str, Optional[Path]]
 mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]
 run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
+persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
+run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]
+run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
+run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
 class Violation
     rule_id: str
     message: str
@@ -105,8 +113,37 @@ class GateReport
     modified_domains: Tuple[str, ...] = ()
     violations: Tuple[Violation, ...] = ()
     render(self) -> str
+class NextStep
+    state: str
+    milestone: str
+    pending: Optional[int] = None
+    note: Optional[str] = None
+    ask: Optional[str] = None
+    if_y: Optional[str] = None
+    if_n: Optional[str] = None
+    reasons: Optional[list] = None
+    @classmethod
+    from_state(cls, state: str, milestone: str, *, pending: Optional[int]=None, reasons: Optional[list]=None) -> 'NextStep'
+    render_cli(self) -> str
+    render_mcp(self) -> dict
+next_for_rejection(milestone: str, message: str) -> NextStep
+class TransportResult
+    ok: bool
+    provider: Optional[str]
+    detail: str
+    skipped: bool = False
+load_pipeline_config(workspace: Path) -> dict
+resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]
+run_action(workspace: Path, action_ref: str, *, io=None, timeout_default: int=60) -> TransportResult
 validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
 write_incident(workspace: Path, target: str | None, task_type: str | None, task_id: str, detail: str) -> Path
+compute_eligibility(workspace: Path) -> tuple[dict, bool]
+read_checklist(workspace: Path) -> Optional[dict]
+ensure_checklist(workspace: Path) -> dict
+is_eligible(workspace: Path) -> bool
+get_verify_attempts(workspace: Path) -> int
+bump_verify_attempt(workspace: Path) -> int
+reset_verify_attempts(workspace: Path) -> None
 class Location
     file: str
     line: Optional[int] = None

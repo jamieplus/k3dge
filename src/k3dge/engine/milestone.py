@@ -389,6 +389,48 @@ def scan_unfilled_guides(workspace: Path) -> List[str]:
     return out
 
 
+# A finding pinned at its 位置 next to the code/doc — a *pointer only* (like
+# guide-stub). The disposition authority stays the 12-col report + tasks; these
+# markers carry no rationale/how-to-fix (that would become a 3rd fact source,
+# and L1 does not hash comments so the gate cannot catch comment drift).
+PENDING_MARKER_RE = re.compile(
+    r"(?:#|<!--|//)\s*k3dit:pending\s+([A-Za-z0-9._#-]+)", re.IGNORECASE
+)
+_MARKER_SCAN_SUFFIXES = frozenset({".py", ".md", ".js", ".ts", ".tsx", ".go", ".rs", ".java", ".rb"})
+
+
+def scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]:
+    """Return (count, ["path#ID", ...]) of open `k3dit:pending <ID>` markers.
+
+    Scans src/ and docs/ (excluding archive/, docs/reviews/, docs/generated/,
+    .agent/). A marker flipped to `k3dit:leftover <ID>` (有意留) or removed (已修)
+    no longer counts.
+    """
+    hits: List[str] = []
+    for root_rel in ("src", "docs"):
+        root = workspace / root_rel
+        if not root.exists():
+            continue
+        for p in sorted(root.rglob("*")):
+            if not p.is_file() or p.suffix.lower() not in _MARKER_SCAN_SUFFIXES:
+                continue
+            rel = p.relative_to(workspace).as_posix()
+            parts = set(p.relative_to(workspace).parts)
+            if (
+                "archive" in parts
+                or rel.startswith("docs/reviews/")
+                or rel.startswith("docs/generated/")
+            ):
+                continue
+            try:
+                text = p.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            for m in PENDING_MARKER_RE.finditer(text):
+                hits.append(f"{rel}#{m.group(1)}")
+    return (len(hits), hits)
+
+
 @dataclass(frozen=True)
 class MilestoneTask:
     path: Path
@@ -466,8 +508,14 @@ def create_task(
     slug: Optional[str] = None,
     milestone: Optional[str] = None,
     priority: str = "P2",
+    report: Optional[str] = None,
 ) -> Tuple[bool, str, Optional[Path]]:
-    """Write a living task file. Returns (ok, message, path)."""
+    """Write a living task file. Returns (ok, message, path).
+
+    `report` (ADR-0022): a `docs/reviews/<file>.md` pointer binding this task to an
+    audit report — 1 report = 1 task. When set, `mark_task_done` requires the report
+    to reach 待修==0 before the task can close.
+    """
     if typ not in _TASK_TYPES:
         return False, f"invalid type '{typ}'", None
     if milestone is not None:
@@ -498,22 +546,49 @@ def create_task(
         fm_lines.append(f"milestone: {milestone}")
     fm_lines.append(f"priority: {priority}")
     fm_lines.append(f"date: {date}")
+    if report:
+        fm_lines.append(f"report: {report}")
     fm_lines.append("---")
     fm_block = "\n".join(fm_lines)
     milestone_line = f"- **Milestone**: {milestone}\n" if milestone else ""
+    report_line = f"- **Report**: `{report}`\n" if report else ""
     content = (
         f"{fm_block}\n\n"
         f"# {title}\n\n"
         f"- **Status**: idea\n"
         f"{milestone_line}"
         f"- **Priority**: {priority}\n"
-        f"- **Date**: {date}\n\n"
+        f"- **Date**: {date}\n"
+        f"{report_line}"
+        f"\n"
         f"## 已确认意图\n{title}\n\n"
         f"## 可检索摘要\n{title}\n\n"
         f"## 上下文/切入点\n{title}\n"
     )
     target.write_text(content, encoding="utf-8")
     return True, f"created {target.relative_to(workspace)}", target
+
+
+def _task_report_pointer(content: str) -> str:
+    """A task's bound report path (frontmatter `report:` or body `- **Report**:`)."""
+    fm = parse_frontmatter(content)
+    rep = (fm.get("report") or "").strip()
+    if not rep:
+        m = re.search(r"-\s+\*\*Report\*\*:\s*`?([^`\n]+?)`?\s*$", content, re.MULTILINE)
+        rep = m.group(1).strip() if m else ""
+    return rep
+
+
+def _report_open_findings(workspace: Path, report_rel: str) -> Optional[List[str]]:
+    """待修 IDs still open in a report; None if the report can't be read (don't block)."""
+    p = workspace / report_rel
+    if not p.is_file():
+        return None
+    try:
+        text = p.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    return _parse_audit_stats(text).get("_ids_待修", [])
 
 
 def mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]:
@@ -560,6 +635,20 @@ def mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Pat
     except (OSError, UnicodeDecodeError) as exc:
         return False, str(exc), target
     fm = parse_frontmatter(content)
+    # ADR-0022: a task bound to an audit report can only close when that report has
+    # no open 待修 findings (1 report = 1 task; closing the task == audit closure).
+    report_rel = _task_report_pointer(content)
+    already_done = (fm.get("status", "").lower() == "done") or bool(
+        re.search(r"-\s+\*\*Status\*\*:\s*done\b", content, re.IGNORECASE)
+    )
+    if report_rel and not already_done:
+        pending = _report_open_findings(workspace, report_rel)
+        if pending:
+            return False, (
+                f"报告 {report_rel} 仍有 {len(pending)} 条待修（{', '.join(pending[:8])}）；"
+                f"先把这些行改成 已修/有意留 再关 task"
+                f"（特别大的单条可在 `处置` 写 `转 sub-task <id>` 例外拆出）。"
+            ), target
     if fm and "status" in fm:
         # Strict frontmatter path
         if fm.get("status", "").lower() == "done":
@@ -678,7 +767,8 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
     msg = (
         f"[ALIGN] Full Matrix verification PASS for milestone '{milestone_id}'.\n"
         f"  Created review scaffold: docs/reviews/{today}-{milestone_id}-align.md\n"
-        f"HUMAN_CHECKPOINT: Milestone {milestone_id} 全绿，是否执行 5-Pass 专项审计？(y/N, 60s 超时默认 N)"
+        f"  Milestone is seal-eligible. Audit is mandatory before seal "
+        f"(k3dge milestone seal -> enter-seal prompt -> k3dit.actions.audit)."
     )
     if note:
         msg += note
@@ -835,3 +925,496 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
         return True, f"{sealed} Next milestone: {nxt}"
     except Exception:
         return True, f"{sealed} (milestone bump failed)"
+
+
+# ---------------------------------------------------------------------------
+# Seal-flow state machine (ADR-0004 §2.1.2, revised 2026-09-01)
+#
+#   Full Matrix (align, no prompt)
+#     -> enter-seal prompt (NO countdown; N = treat as normal commit)
+#     -> mandatory audit via k3dit peer (pipeline transports)
+#     -> parse 待修 / 有意留 / 已修
+#         有意留 -> LEFTOVERS.md, proceeds
+#         待修 > 0 -> "agent 修?" prompt (countdown, timeout default = fix) -> fix -> re-audit (loop)
+#         待修 = 0 -> verify (best-effort) -> seal (archive + version + milestone bump)
+#
+# k3dge never audits or scores; it invokes the k3dit lens and gates on the
+# produced 12-col report. The work agent fixes; k3dit audits; k3dge routes.
+# ---------------------------------------------------------------------------
+
+_AUDIT_HEADER = "ID|日期|严重度|优先级|类型|问题描述|位置|状态|处置|验证|复审|验收"
+
+
+def _align_review_path(workspace: Path, milestone_id: str) -> Optional[Path]:
+    """Locate the generated align review scaffold for a milestone."""
+    reviews = workspace / "docs" / "reviews"
+    if not reviews.is_dir():
+        return None
+    for f in sorted(reviews.iterdir()):
+        if (
+            f.is_file()
+            and f.suffix == ".md"
+            and "-align.md" in f.name
+            and _has_milestone_token(f.name, milestone_id)
+        ):
+            return f
+    return None
+
+
+def _strip_align_stub(workspace: Path, milestone_id: str) -> None:
+    """Mark the align scaffold as filled so the seal gate (align-stub check) passes.
+
+    The mandatory audit now *is* the real verification; the align scaffold is a
+    structural placeholder only.
+    """
+    p = _align_review_path(workspace, milestone_id)
+    if not p:
+        return
+    try:
+        text = p.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return
+    if _ALIGN_STUB_MARKER in text:
+        p.write_text(text.replace(_ALIGN_STUB_MARKER, "").strip() + "\n", encoding="utf-8")
+
+
+_QUALITY_MARKER_RE = re.compile(r"k3dge:kind:\s*quality", re.IGNORECASE)
+
+
+def _report_kind(name: str, text: str) -> str:
+    """Classify a 12-col report as 'quality' (k3lity) or 'audit' (k3dit)."""
+    if _QUALITY_MARKER_RE.search(text) or "-quality" in name.lower():
+        return "quality"
+    return "audit"
+
+
+def _find_report(workspace: Path, milestone_id: str, kind: str = "audit"):
+    """Return (path, text) of the most recent 12-col report of the given kind."""
+    reviews = workspace / "docs" / "reviews"
+    if not reviews.is_dir():
+        return None
+    candidates = []
+    for f in reviews.iterdir():
+        if not (f.is_file() and f.suffix == ".md" and not _is_review_aux(f.name)):
+            continue
+        try:
+            text = f.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if _AUDIT_HEADER.replace(" ", "") not in text.replace(" ", ""):
+            continue
+        if _report_kind(f.name, text) != kind:
+            continue
+        if milestone_id and not _has_milestone_token(text, milestone_id):
+            fn_ms = _filename_milestone(f.name)
+            if fn_ms and fn_ms != milestone_id:
+                continue
+        candidates.append((f.stat().st_mtime, f, text))
+    if not candidates:
+        return None
+    candidates.sort(reverse=True)
+    return candidates[0][1], candidates[0][2]
+
+
+def _find_audit_report(workspace: Path, milestone_id: str):
+    """Most recent audit (k3dit) report. Back-compat wrapper for kind='audit'."""
+    return _find_report(workspace, milestone_id, "audit")
+
+
+def persist_external_audit_report(
+    workspace: Path,
+    milestone_id: str,
+    content: str,
+    scope: str = "external",
+    kind: str = "audit",
+) -> Path:
+    """Persist a human/agent-submitted audit report as the canonical on-disk report.
+
+    External audit sources (a human pasting a report into the dialog, or an agent
+    forwarding one) must be landed under docs/reviews/ so the seal flow can gate on
+    it via `_find_audit_report` / `_parse_audit_stats`. If the content lacks the
+    12-col header, a canonical header is prepended so downstream parsing works; the
+    latest submission for a (milestone, scope) overwrites any prior one.
+    """
+    reviews = workspace / "docs" / "reviews"
+    reviews.mkdir(parents=True, exist_ok=True)
+    norm = (content or "").replace(" ", "")
+    if _AUDIT_HEADER.replace(" ", "") not in norm:
+        header = (
+            f"# 外部审计报告（人工提交，milestone {milestone_id}）\n\n"
+            "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+        )
+        content = header + (content.strip() + "\n" if content.strip() else "")
+    today = datetime.date.today().isoformat()
+    if kind == "quality" and not _QUALITY_MARKER_RE.search(content):
+        content = f"<!-- k3dge:kind: quality -->\n{content}"
+    suffix = "quality" if kind == "quality" else "audit"
+    path = reviews / f"{today}-{milestone_id}-{scope}-{suffix}.md"
+    path.write_text(content.strip() + "\n", encoding="utf-8")
+    return path
+
+
+def _parse_audit_stats(text: str) -> dict:
+    """Count 待修 / 有意留 / 已修 rows in a 12-col audit table."""
+    counts = {"待修": 0, "有意留": 0, "已修": 0, "total": 0}
+    lines = text.splitlines()
+    header_idx = -1
+    header_cols = None
+    for i, raw in enumerate(lines):
+        s = raw.strip()
+        if not s.startswith("|"):
+            continue
+        cols = [c.strip() for c in s.strip("|").split("|")]
+        if cols and set("".join(cols)) <= set("-: ") and any(set(c) for c in cols):
+            continue  # separator row
+        if "ID" in cols and "状态" in cols:
+            header_idx = i
+            header_cols = cols
+            break
+    if header_idx == -1 or header_cols is None:
+        return counts
+    try:
+        status_idx = header_cols.index("状态")
+        id_idx = header_cols.index("ID")
+    except ValueError:
+        return counts
+    for raw in lines[header_idx + 1 :]:
+        s = raw.strip()
+        if not s.startswith("|"):
+            break
+        cols = [c.strip() for c in s.strip("|").split("|")]
+        if len(cols) != len(header_cols):
+            continue
+        status = cols[status_idx]
+        if status in counts:
+            counts[status] += 1
+            counts["total"] += 1
+            counts.setdefault("_ids_" + status, []).append(cols[id_idx])
+    return counts
+
+
+def _ensure_leftovers(workspace: Path, text: str, report_path: Path) -> None:
+    """Append 有意留 rows to docs/reviews/LEFTOVERS.md (idempotent by row ID)."""
+    counts = _parse_audit_stats(text)
+    if counts["有意留"] == 0:
+        return
+    ids = counts.get("_ids_有意留", [])
+    if not ids:
+        return
+    leftover_path = workspace / "docs" / "reviews" / "LEFTOVERS.md"
+    existing = leftover_path.read_text(encoding="utf-8") if leftover_path.is_file() else ""
+    new_lines = []
+    for rid in ids:
+        marker = f"| {rid} |"
+        if marker in existing or marker in "\n".join(new_lines):
+            continue
+        new_lines.append(f"> | {rid} | 有意留 | 见 {report_path.name} |")
+    if not new_lines:
+        return
+    block = "\n".join(new_lines) + "\n"
+    if "## 有意留" not in existing:
+        block = "\n## 有意留（审计有意保留，非待修）\n" + block
+    leftover_path.write_text(existing + block, encoding="utf-8")
+
+
+class _Prompt:
+    """Tiny interactive prompter; testable via `answers` injection."""
+
+    def __init__(self, in_stream=None, out_stream=None, answers=None):
+        self.in_stream = in_stream
+        self.out_stream = out_stream
+        self.answers = answers
+        self._ai = 0
+
+    @classmethod
+    def default(cls) -> "_Prompt":
+        import sys
+
+        return cls(sys.stdin, sys.stdout)
+
+    def _write(self, s: str) -> None:
+        if self.out_stream is not None:
+            print(s, file=self.out_stream, end="", flush=True)
+
+    def isatty(self) -> bool:
+        if self.answers is not None:
+            return False  # injected answers => deterministic, never block
+        return bool(getattr(self.in_stream, "isatty", lambda: False)())
+
+    def ask(self, question: str, *, countdown=None, default_yes=False) -> bool:
+        default = "Y/n" if default_yes else "y/N"
+        if countdown:
+            suffix = f" [{default}, {countdown}s default {'Y' if default_yes else 'N'}]"
+        else:
+            suffix = f" [{default}]"
+        self._write(question + suffix + ": ")
+        if self.answers is not None:
+            ans = (
+                self.answers[self._ai]
+                if self._ai < len(self.answers)
+                else ("y" if default_yes else "n")
+            )
+            self._ai += 1
+            return str(ans).strip().lower() in ("y", "yes")
+        if not self.isatty():
+            return default_yes
+        try:
+            if countdown:
+                import select
+
+                rlist, _, _ = select.select([self.in_stream], [], [], countdown)
+                if not rlist:
+                    self._write(("Y" if default_yes else "N") + "\n")
+                    return default_yes
+                ans = self.in_stream.readline().strip().lower()
+            else:
+                ans = self.in_stream.readline().strip().lower()
+        except (EOFError, OSError):
+            return default_yes
+        return ans in ("y", "yes")
+
+
+def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
+    """Emit the context-compression closure checklist for a sealed milestone.
+
+    k3dge seals the mechanical part (archive + version + pointer); the real
+    "收摊" is compressing context — documenting the unadopted/failed options,
+    pruning unrelated context, updating design docs, then committing. k3dge
+    cannot judge what is unrelated, so it lays down the checklist and stops.
+    """
+    today = datetime.date.today().isoformat()
+    p = workspace / "docs" / "reviews" / f"{today}-{milestone_id}-closure.md"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    if p.exists():
+        return p
+    p.write_text(
+        "\n".join(
+            [
+                f"# 封板收摊清单（上下文压缩）: {milestone_id}",
+                "",
+                f"- **Sealed**: {today}",
+                "- 归档/版本/指针已由 `seal` 完成；以下由人/agent 补齐（k3dit 判内容，k3dge 不替判）：",
+                "",
+                "## 1. 落盘失败/未采用的方案",
+                "- [ ] 本里程碑讨论过但**未采用**的方案 → 写 `docs/adr/`（含被否原因）或 `docs/incidents/`（B-T-D）",
+                "- [ ] 失败尝试 → `docs/incidents/INC-YYYYMMDD-<TYPE>-<slug>.md`",
+                "",
+                "## 2. 清理无关上下文",
+                "- [ ] 删除/折叠与现行方案无关的草稿、分支说明",
+                "",
+                "## 3. 更新设计文档",
+                "- [ ] `docs/architecture/overview.md` 对齐到已封板的现实",
+                "- [ ] 相关 ADR 标注 supersedes / 现行范围",
+                "",
+                "## 4. 提交里程碑",
+                "- [ ] `k3dge check` 绿 → 提交（归档 + 收摊 + 文档一起进一个 commit）",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return p
+
+
+_AUDIT_EXCLUDE_DOCS = ("docs/reviews/", "docs/tasks/", "docs/generated/")
+
+
+def _changed_docs(workspace: Path) -> List[str]:
+    """Managed docs in the current change set that warrant an authoring audit.
+
+    Excludes process artifacts (reviews/tasks/generated) and archives.
+    """
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True
+        )
+        files = [ln[3:].strip() for ln in out.stdout.splitlines() if ln.strip()]
+    except Exception:
+        return []
+    docs: List[str] = []
+    for f in files:
+        if not f.startswith("docs/"):
+            continue
+        parts = set(f.split("/"))
+        if "archive" in parts or any(f.startswith(p) for p in _AUDIT_EXCLUDE_DOCS):
+            continue
+        docs.append(f)
+    return docs
+
+
+def _ensure_doc_audit_task(workspace: Path, milestone_id: str, docs: List[str], report: Optional[str] = None):
+    """Idempotently open a milestone-scoped doc-audit task (the durability hook).
+
+    Because the task carries `Milestone` (and a `report:` pointer, ADR-0022), the
+    seal gate (all tasks done) forces it to be cleared in the milestone round even
+    if nobody acts on it at commit time. Returns the new task path, or None if an
+    open one already exists.
+    """
+    for t in scan_milestone_tasks(workspace, milestone_id):
+        if "doc-audit" in t.path.name.lower() and t.status != "done":
+            return None
+    scopes = sorted({d.split("/")[1] for d in docs if len(d.split("/")) > 1})
+    hint = ", ".join(scopes[:3]) or "docs"
+    title = f"doc-audit: 文档作者合规审计（{hint} 等 {len(docs)} 处）"
+    ok, _msg, path = create_task(workspace, title, typ="audit", milestone=milestone_id, priority="P3", report=report)
+    return path if ok else None
+
+
+def run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]:
+    """Non-blocking doc-audit, run AFTER the hard gate (never inside `check`).
+
+    k3dge keeps `check` static (no MCP/LLM — T-01). This step: routes the doc lens
+    to k3dit (authoring compliance; ADR conflict/coverage stays in the milestone
+    audit), and guarantees a milestone-scoped task so the finding cannot slip.
+    Always non-blocking (returns cleanly even if the peer is unavailable).
+    status ∈ {reported, clean}.
+    """
+    import sys
+
+    from k3dge.engine.pipeline_runner import run_action
+
+    io = io or sys.stderr
+    mid = get_current_milestone(workspace)
+    docs = _changed_docs(workspace)
+    if not docs:
+        return "clean", "no managed docs changed; nothing to doc-audit."
+
+    try:
+        run_action(workspace, "k3dit.actions.audit", io=io)  # peer/manual authors the report
+    except Exception:
+        pass
+    # Bind the task to the report it audits (1 report = 1 task, ADR-0022) if present.
+    found = _find_report(workspace, mid, "audit")
+    report_rel = found[0].relative_to(workspace).as_posix() if found else None
+    task = _ensure_doc_audit_task(workspace, mid, docs, report=report_rel)
+    if task is None:
+        return "reported", (
+            f"doc-audit: {len(docs)} 处文档改动；已有未关闭的 doc-audit task（不重复建）。"
+        )
+    return "reported", (
+        f"doc-audit: 报告由 k3dit/人产出，已开里程碑 task `{task.name}`（非阻断；本轮不改，封板闸也会逼这轮闭环）。"
+    )
+
+
+def run_audit_flow(
+    workspace: Path,
+    milestone_id: str,
+    *,
+    prompter: Optional[_Prompt] = None,
+    max_verify_attempts: int = 3,
+) -> Tuple[str, str]:
+    """Independent audit entry: BOTH k3dit.audit and k3lity.quality produce 12-col
+    reports, each must reach 待修==0 to count as "audited once". Verify is
+    per-report (audit→audit report, quality→quality report). Returns
+    (status, message); status ∈ {audited, rejected, escalated}. Seal unlocks only
+    after this closes (`run_seal_flow`).
+    """
+    from k3dge.engine import nextstep, seal_checklist as sc
+    from k3dge.engine.pipeline_runner import run_action
+
+    prompt = prompter or _Prompt.default()
+
+    # kind -> (produce action, verify action)
+    streams = {
+        "audit": ("k3dit.actions.audit", "k3dit.actions.verify"),
+        "quality": ("k3lity.actions.quality", "k3lity.actions.verify"),
+    }
+
+    # mandatory audit + fix loop, capped at `max_verify_attempts` verifies.
+    while True:
+        attempts = sc.get_verify_attempts(workspace)
+        if attempts >= max_verify_attempts:
+            msg = f"verify 已超过 {max_verify_attempts} 次仍未闭环，停止自动 loop，转人工干预。"
+            return "escalated", msg + "\n" + nextstep.NextStep.from_state("escalated", milestone_id).render_cli()
+        sc.bump_verify_attempt(workspace)
+
+        # produce phase: run every stream, then collect its report.
+        pending_total = 0
+        for kind, (produce_action, _verify_action) in streams.items():
+            run_action(workspace, produce_action, io=prompt.out_stream)
+            found = _find_report(workspace, milestone_id, kind)
+            if found is None:
+                msg = (
+                    f"Audit is mandatory: no 12-col {kind} report found under docs/reviews/. "
+                    f"Persist one (`k3dge milestone audit-submit {milestone_id} ... --scope ...` "
+                    f"or run the peer per docs/protocols/) and re-run audit."
+                )
+                return "rejected", msg + "\n" + nextstep.next_for_rejection(milestone_id, msg).render_cli()
+            report_path, report_text = found
+            stats = _parse_audit_stats(report_text)
+            _ensure_leftovers(workspace, report_text, report_path)
+            pending_total += stats["待修"]
+
+        if pending_total == 0:
+            break
+        # 待修 > 0 across reports -> surface the next-step hint, then ask agent to fix.
+        prompt._write(
+            nextstep.NextStep.from_state("audit_open", milestone_id, pending=pending_total).render_cli() + "\n"
+        )
+        if not prompt.ask(
+            f"审计/质量共发现 {pending_total} 项待修。是否由 agent 修复？（超时默认修复）",
+            countdown=60,
+            default_yes=True,
+        ):
+            msg = f"Audit open: {pending_total} 项待修未修复且 agent 拒绝修复。"
+            return "rejected", msg + "\n" + nextstep.NextStep(
+                state="rejected", milestone=milestone_id, note="stop / 转人工干预（待修未修复且 agent 拒绝修复）"
+            ).render_cli()
+        # agent fixes externally -> loop re-runs audit AND quality, each verifying its own report
+        continue
+
+    # verify phase: per-report secondary cross-check (audit→audit, quality→quality).
+    for _kind, (_produce_action, verify_action) in streams.items():
+        try:
+            run_action(workspace, verify_action, io=prompt.out_stream)
+        except Exception:
+            pass
+    sc.reset_verify_attempts(workspace)
+    msg = f"Milestone {milestone_id}: 审计闭环（audit + quality 报告 待修=0），可以谈封板。"
+    return "audited", msg + "\n" + nextstep.NextStep.from_state("seal_ready", milestone_id).render_cli()
+
+
+def run_seal_flow(
+    workspace: Path,
+    milestone_id: str,
+    *,
+    prompter: Optional[_Prompt] = None,
+    skip_enter_prompt: bool = False,
+) -> Tuple[str, str]:
+    """Seal = archive + version + pointer. Requires a *closed* audit first.
+
+    The boundary is not "when does a milestone end" (no ruler) — it is the audit
+    loop closing (12-col, 待修==0). Only after that do we ask "封板?", which is
+    really "要不要压缩上下文并收摊". status ∈ {sealed, deferred, audit_needed}.
+    """
+    from k3dge.engine import nextstep
+    from k3dge.engine.audit_trigger import audit_closed
+
+    prompt = prompter or _Prompt.default()
+
+    if not audit_closed(workspace, milestone_id):
+        msg = f"Milestone {milestone_id}: 未审计（待修未归零或无 12 列报告），不可封板。"
+        return "audit_needed", msg + "\n" + nextstep.NextStep.from_state("audit_needed", milestone_id).render_cli()
+
+    # enter-seal prompt — NO countdown; N = keep milestone open. Skipped with --yes.
+    if not skip_enter_prompt and not prompt.ask(
+        f"里程碑 {milestone_id} 审计已闭环，封板？", default_yes=False
+    ):
+        msg = f"Milestone {milestone_id}: seal deferred — 不封，里程碑继续挂着。"
+        return "deferred", msg + "\n" + nextstep.NextStep.from_state("deferred", milestone_id).render_cli()
+
+    # align (Full Matrix) if not yet run this cycle, then archive.
+    ok, amsg, _ = run_milestone_alignment(workspace, milestone_id)
+    if not ok:
+        return "rejected", amsg + "\n" + nextstep.next_for_rejection(milestone_id, amsg).render_cli()
+    _strip_align_stub(workspace, milestone_id)
+
+    ok, msg = seal_milestone(workspace, milestone_id)
+    if not ok:
+        return "rejected", msg + "\n" + nextstep.next_for_rejection(milestone_id, msg).render_cli()
+    closure = _write_closure_note(workspace, milestone_id)
+    msg += f"\n  收摊清单: {closure.relative_to(workspace)}"
+    return "sealed", msg + "\n" + nextstep.NextStep.from_state("sealed", milestone_id).render_cli()

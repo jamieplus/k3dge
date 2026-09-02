@@ -1,52 +1,68 @@
 # k3dge external peer pipeline — declarative peers + action fallback chains
-# Peers are equal (ADR-0006), not plugins. k3dge only gates; lenses live in peers.
+# Peers are equal (ADR-0006), not plugins. k3dge only routes + gates; lenses live in peers.
 # Connection endpoints live in .mcp.json (k3dge mcp sync); this file defines flows only.
+#
+# EXECUTION MODEL: k3dge invokes the lens, it does NOT audit or score (sidecar, ADR-0006).
+# `k3dge milestone seal` drives the lifecycle:
+#   align (Full Matrix, no prompt) -> enter-seal prompt (NO countdown; N = normal commit)
+#     -> [on_seal_enter] k3dit.actions.audit (MANDATORY, no skip)
+#     -> parse 待修/有意留/已修; 待修>0 -> "agent 修?" prompt (countdown, timeout = fix) -> re-audit
+#     -> [on_pre_seal] k3dit.actions.verify (待修==0 closure) -> seal
+# `blocking` is intentionally NOT a field: nothing in k3dge auto-runs a peer; the CLI
+# explicitly invokes the named actions below (see milestone.run_seal_flow).
 
 [peers.k3dit]
-scope = "audit,verify"
-log_level = "warn"
+enabled = true
 
 [peers.k3dit.actions.audit]
-blocking = false                               # 初审产出待修缺陷，不阻断 align；代码/文档同一条 k3dit 链，文档按 scope 套 Doc Audit 节（ADR-0020）
 transports = [
   { provider = "mcp", tool = "k3dit_run_audit", timeout = 60 },
   { provider = "manual", protocol = "docs/protocols/audit_default.md" },
 ]
 
 [peers.k3dit.actions.verify]
-blocking = true                                # 复审须三态闭环方可 seal
 transports = [
   { provider = "mcp", tool = "k3dit_check_report", timeout = 15 },
   { provider = "cli", command = "k3dit check-report", timeout = 15 },
   { provider = "manual", protocol = "docs/protocols/verify_default.md" },
 ]
 
+# k3lity (quality) produces a SECOND 12-col report in the same audit pass:
+# one "audited once" = audit report (k3dit) + quality report (k3lity), each 待修==0.
+# Chain mcp→cli→manual (manual = fill quality report per protocol; no fake auto-score).
+[peers.k3lity]
+enabled = true
+
+[peers.k3lity.actions.quality]
+transports = [
+  { provider = "mcp", tool = "k3lity_score", timeout = 30 },
+  { provider = "manual", protocol = "docs/protocols/quality_default.md" },
+]
+
+[peers.k3lity.actions.verify]
+transports = [
+  { provider = "mcp", tool = "k3lity_check_report", timeout = 15 },
+  { provider = "manual", protocol = "docs/protocols/quality_default.md" },
+]
+
+# Optional cache lens — NOT on the mandatory seal path. Degrades to `skip`.
 [peers.k3che]
-scope = "cache"
-log_level = "info"
+enabled = true
 transports = [
   { provider = "mcp", tool = "k3che_search", timeout = 10 },
   { provider = "skip" },
 ]
 
-[peers.k3lity]
-scope = "quality"
-log_level = "info"
-transports = [
-  { provider = "mcp", tool = "k3lity_score", timeout = 30 },
-  { provider = "skip" },
-]
-
-[pipelines.on_align_success]
-# 里程碑对齐后：同步上下文 -> 质量验证 -> 触发初审生成 12 列表格（ADR-0017）
+# 1) Entering seal triggers BOTH mandatory reports: audit (k3dit) + quality (k3lity).
+[pipelines.on_seal_enter]
 stages = [
-  "k3che",
-  "k3lity",
   "k3dit.actions.audit",
+  "k3lity.actions.quality",
 ]
 
+# 2) Pre-seal verify is per-report closure (audit→audit report, quality→quality report).
 [pipelines.on_pre_seal]
-# 封板前：验证 12 列表格（ADR-0017）三态闭环，零悬空缺陷
 stages = [
   "k3dit.actions.verify",
+  "k3lity.actions.verify",
 ]

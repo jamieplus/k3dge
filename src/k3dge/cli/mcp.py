@@ -349,31 +349,73 @@ def k3dge_milestone_control(
     )
 
     if act == "align":
+        # Full Matrix only — no human prompt. After align the next step is AUDIT
+        # (not seal); seal unlocks only once the audit loop closes.
+        from k3dge.engine import nextstep
+        from k3dge.engine.audit_trigger import audit_closed, compute_audit_suggestion
+
         ok, msg, tasks = milestone.run_milestone_alignment(ws, milestone_id)
-        payload = {
-            "milestone_id": milestone_id,
-            "aligned": ok,
-            "message": msg,
-            "task_count": len(tasks),
-        }
-        if ok:
-            payload["checkpoint"] = {
-                "type": "HUMAN_CHECKPOINT",
-                "question": f"Milestone {milestone_id} 全绿，是否执行 5-Pass 专项审计？",
-                "options": ["y", "N"],
-                "default": "N",
-                "timeout_seconds": 60,
-            }
-        return json.dumps(payload, indent=2, ensure_ascii=False)
+        if not ok:
+            nxt = nextstep.next_for_rejection(milestone_id, msg)
+        elif audit_closed(ws, milestone_id):
+            nxt = nextstep.NextStep.from_state("seal_ready", milestone_id)
+        else:
+            _, reasons = compute_audit_suggestion(ws)
+            nxt = nextstep.NextStep.from_state("audit_suggested", milestone_id, reasons=reasons)
+        return json.dumps(
+            {
+                "milestone_id": milestone_id,
+                "aligned": ok,
+                "message": msg,
+                "task_count": len(tasks),
+                "next": nxt.render_mcp(),
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+
+    if act == "audit":
+        # Independent audit entry: mandatory loop, 待修==0 to close.
+        from k3dge.engine import nextstep
+
+        status, msg = milestone.run_audit_flow(ws, milestone_id)
+        nxt_state = {"audited": "seal_ready", "escalated": "escalated"}.get(status)
+        nxt = (
+            nextstep.NextStep.from_state(nxt_state, milestone_id)
+            if nxt_state
+            else nextstep.next_for_rejection(milestone_id, msg)
+        )
+        return json.dumps(
+            {
+                "milestone_id": milestone_id,
+                "status": status,
+                "audited": status == "audited",
+                "message": msg,
+                "next": nxt.render_mcp(),
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
 
     if act == "seal":
-        ok, msg = milestone.seal_milestone(ws, milestone_id)
-        if not ok:
+        # Seal requires a closed audit. If not closed, run_seal_flow returns
+        # `audit_needed` pointing back at the audit entry.
+        from k3dge.engine import nextstep
+
+        status, msg = milestone.run_seal_flow(ws, milestone_id)
+        if status != "sealed":
+            nxt = (
+                nextstep.NextStep.from_state(status, milestone_id)
+                if status in ("deferred", "escalated", "audit_needed")
+                else nextstep.next_for_rejection(milestone_id, msg)
+            )
             return json.dumps(
                 {
                     "milestone_id": milestone_id,
                     "sealed": False,
+                    "status": status,
                     "message": msg,
+                    "next": nxt.render_mcp(),
                 },
                 indent=2,
                 ensure_ascii=False,
@@ -390,9 +432,11 @@ def k3dge_milestone_control(
                 {
                     "milestone_id": milestone_id,
                     "sealed": True,
+                    "status": status,
                     "message": msg,
                     "version": new_v,
                     "previous_version": prev,
+                    "next": nextstep.NextStep.from_state("sealed", milestone_id).render_mcp(),
                 },
                 indent=2,
                 ensure_ascii=False,
@@ -402,80 +446,39 @@ def k3dge_milestone_control(
                 {
                     "milestone_id": milestone_id,
                     "sealed": True,
+                    "status": status,
                     "message": msg,
                     "version_bump_failed": str(exc),
+                    "next": nextstep.NextStep.from_state("sealed", milestone_id).render_mcp(),
                 },
                 indent=2,
                 ensure_ascii=False,
             )
 
-    return _err("InvalidAction", f"Invalid action '{action}'. Choose from: status, align, seal.")
+    return _err("InvalidAction", f"Invalid action '{action}'. Choose from: status, align, audit, seal.")
 
 
-    if act == "align":
-        ok, msg, tasks = milestone.run_milestone_alignment(ws, milestone_id)
-        payload = {
-            "milestone_id": milestone_id,
-            "aligned": ok,
-            "message": msg,
-            "task_count": len(tasks),
-        }
-        if ok:
-            payload["checkpoint"] = {
-                "type": "HUMAN_CHECKPOINT",
-                "question": f"Milestone {milestone_id} 全绿，是否执行 5-Pass 专项审计？",
-                "options": ["y", "N"],
-                "default": "N",
-                "timeout_seconds": 60,
-            }
-        return json.dumps(payload, indent=2, ensure_ascii=False)
+@mcp.tool()
+def k3dge_submit_audit_report(
+    milestone_id: str,
+    content: str,
+    workspace_path: Optional[str] = None,
+) -> str:
+    """Persist a human/agent-submitted audit report as the canonical on-disk report.
 
-    if act == "seal":
-        ok, msg = milestone.seal_milestone(ws, milestone_id)
-        if not ok:
-            return json.dumps(
-                {
-                    "milestone_id": milestone_id,
-                    "sealed": False,
-                    "message": msg,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-        # Auto-bump patch version to keep CLI and MCP seal semantics identical (U-04); bump failure does not rollback seal (see ADR-0013)
-        # Both CLI and MCP now use consume_unreleased for identical changelog body (P3-01)
-        try:
-            from k3dge.engine.version import append_changelog, bump_version, consume_unreleased, get_version
+    External audit sources (a human pasting a report into the dialog, or an agent
+    forwarding one) must be landed under docs/reviews/ so the seal flow can gate on
+    it. Canonicalizes the 12-col header when missing; latest submission wins.
+    """
+    ws = _find_workspace(workspace_path=workspace_path)
+    from k3dge.engine import milestone
 
-            prev = get_version(ws)
-            new_v = bump_version(ws, part="patch")
-            body = consume_unreleased(ws)
-            notes = body if body else f"Seal milestone {milestone_id}."
-            append_changelog(ws, new_v, notes=notes)
-            return json.dumps(
-                {
-                    "milestone_id": milestone_id,
-                    "sealed": True,
-                    "message": msg,
-                    "version": new_v,
-                    "previous_version": prev,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-        except Exception as exc:
-            return json.dumps(
-                {
-                    "milestone_id": milestone_id,
-                    "sealed": True,
-                    "message": msg,
-                    "version_bump_failed": str(exc),
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-
-    return _err("InvalidAction", f"Invalid action '{action}'. Choose from: status, align, seal.")
+    path = milestone.persist_external_audit_report(ws, milestone_id, content or "")
+    return json.dumps(
+        {"ok": True, "milestone_id": milestone_id, "path": str(path)},
+        indent=2,
+        ensure_ascii=False,
+    )
 
 
 def _audit_protocol_with_fallback(workspace_path: Optional[str] = None) -> tuple[str, bool, str]:

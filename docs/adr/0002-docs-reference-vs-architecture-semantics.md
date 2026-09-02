@@ -1,5 +1,9 @@
 ---
 Status: Accepted
+# Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
+# NOT rewrite this decision's prose in place, and never reuse a number (see README).
+Supersedes: -
+Amended-by: -
 Date: 2026-08-21
 Deciders: Core Maintainer
 ---

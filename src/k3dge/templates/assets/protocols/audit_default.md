@@ -6,6 +6,10 @@
 
 `docs/reviews/YYYY-MM-DD-<scope>.md`，表头 12 列 `ID|日期|严重度|优先级|类型|问题描述|位置|状态|处置|验证|复审|验收`（`状态∈{已修,待修,有意留}`；`复审∈{待复审,通过,驳回}`；`验收` 为 `验收人 YYYY-MM-DD [#reason]`）。
 
+> **位置钉子**：在每行 `位置` 那处代码/文档旁钉一行短标记 `# k3dit:pending <ID>`（文档用 `<!-- k3dit:pending <ID> -->`），让修的人打开文件即见（`k3dge check` 扫到并在 `[NEXT]` 报 `pending=N`）。**标记只是指针**：理由/改法/验收只写本表，不写进正文（防第三份事实漂移）。已修删标记、有意留改 `k3dit:leftover <ID>`。
+
+> **一轮 = 两份报告**：本审计层（k3dit）出审计报告外，质量层（k3lity）另出 `...-quality.md`（`k3dge:kind: quality` 标类，见 `quality_default.md`）。两份都 `待修=0` 才算"审过一遍"；复审各自核对各自报告。
+
 ## 5-Pass 透镜（一次一轮）
 
 **Pass 1 — 健壮性与安全**：边界/空值/正则/子进程超时/事务回滚/注入/密钥 + Vibe `SQL/eval/pickle`
@@ -33,7 +37,7 @@ L2 入场券须逐条确认（agent 进车间前绑定到任务）：
 
 > **与 5-Pass 同源**：本节是同一份 k3dit 审计协议的一个 **scope**——代码走 5-Pass，文档走本节。二者由同一 peer（k3dit）执行、同一 12 列报告、同一 `on_pre_seal` verify，不是第五域、不另起 harness（ADR-0020）。`k3dge` 只**指路**（同一个审计 prompt，按 `target_scope` 路由到本节）并**提供事实**（`k3dge_adr_index`），不执行、不判。
 
-**触发**：文档改动时（非里程碑），与代码改动走同一条 `k3dit.actions.audit` 链；`target_scope` 为文档类型时即套用本节。不审"思想打分"（那归 k3lity，里程碑软审）。
+**触发**：文档改动时（非里程碑）。**T-01**：`k3dge check` 是静态硬闸、不跑透镜；doc-audit 在 **check 之后**经 `k3dge doc-audit` 触发（非阻断），走同一条 `k3dit.actions.audit` 链、`target_scope` 为文档时套用本节，产 12 列报告 + 建一个带 `Milestone` 的 `doc-audit` task（本轮不改，封板轮也得闭环，ADR-0021）。**只有 ADR 冲突/覆盖这一项留在里程碑审计**（`k3dge_adr_index` 事实 + k3dit 判，ADR-0020），不在每次 commit 的 doc-audit 里做。
 
 **per-type 透镜**：
 - **ADR — 集合自洽（冲突 / 覆盖）**：两篇 *未 superseded* 的 ADR 不应无声共享 scope / decision-topic（冗余）；指针须完整——`Supersedes`/`Related` 不悬空、被取代的 ADR 不再被当现行引用。事实来自 `k3dge_adr_index`（AdrIndex + O(n) 重叠/指针 findings，**非判断**）；冲突/冗余由 k3dit 判。
