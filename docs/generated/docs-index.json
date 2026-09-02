@@ -353,6 +353,14 @@
       "tokens": "Memo：Harness 环境级硬隔离 vs 认知级软隔离（h8m2k-a1）"
     },
     {
+      "path": "docs/memo/2026-09-02-plugins-main-absorption-eval.md",
+      "type": "memo",
+      "id": "2026-09-02-plugins-main-absorption-eval",
+      "title": "Memo: plugins-main → 四 harness 吸收评估（ledger v2，穷尽版）",
+      "status": "",
+      "tokens": "Memo: plugins-main → 四 harness 吸收评估（ledger v2，穷尽版）"
+    },
+    {
       "path": "docs/protocols/audit_default.md",
       "type": "protocols",
       "id": "audit_default",
