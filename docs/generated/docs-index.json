@@ -177,6 +177,14 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
+      "path": "docs/adr/0023-meta-rule-delivery.md",
+      "type": "adr",
+      "id": "ADR-0023",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
+      "status": "Draft",
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
+    },
+    {
       "path": "docs/architecture/overview.md",
       "type": "architecture",
       "id": "overview",
