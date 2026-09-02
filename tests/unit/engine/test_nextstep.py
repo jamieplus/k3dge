@@ -154,6 +154,16 @@ class TestWorkspaceHints(TestCase):
         # overview staleness is no longer a standalone hint (folded into audit_suggested)
         self.assertEqual(hints, [])
 
+    def test_bare_untracked_tree_not_new_domain(self) -> None:
+        # whole tree untracked -> git collapses to "?? src/"; that is NOT a new domain
+        from k3dge.cli import main as cli_main
+
+        ws = _base_ws()
+        with mock.patch("subprocess.run") as run:
+            run.return_value = mock.MagicMock(stdout="?? src/\n", returncode=0)
+            hints = cli_main._workspace_hints(ws)
+        self.assertEqual([h.state for h in hints], [])
+
 
 class TestLifecycleNext(TestCase):
     def test_audit_first_then_seal(self) -> None:

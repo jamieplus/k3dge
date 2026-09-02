@@ -80,10 +80,12 @@ def _workspace_hints(workspace: Path) -> list:
         return []
     mid = get_current_milestone(workspace)
     hints = []
-    src_changed = [f for f in files if f.startswith("src/")]
+    # Normalize: untracked dirs come back as "src/foo/" (trailing slash).
+    src_changed = [f.rstrip("/") for f in files if f.startswith("src/")]
     # overview.md staleness is folded into the audit-suggestion reasons
     # (compute_audit_suggestion), so it is NOT emitted as a standalone hint here.
-    # New domain: a changed src/ path not under any known domain source dir.
+    # New domain: a concrete src/<domain>/... path not under any known src dir.
+    # A bare "src" (whole tree untracked) is NOT a new domain — skip it.
     try:
         manifest = _json.loads((workspace / ".agent" / "manifest.json").read_text(encoding="utf-8"))
         known = {d.get("src") for d in manifest.get("domains", {}).values() if isinstance(d, dict)}
@@ -92,8 +94,21 @@ def _workspace_hints(workspace: Path) -> list:
     if known:
         new_top = set()
         for f in src_changed:
-            if not any(f == ks or f.startswith(ks + "/") for ks in known):
-                new_top.add("/".join(f.split("/")[:2]))
+            segs = f.split("/")
+            if len(segs) < 2 or not segs[1]:  # bare "src" (whole tree untracked) is not a domain
+                continue
+            top = "/".join(segs[:2])  # e.g. "src/k3dge" or "src/newdom"
+
+            def _known(t: str) -> bool:
+                # known if t equals, is under, OR is an ancestor of a domain src dir
+                return any(
+                    t == ks or t.startswith(ks + "/") or ks.startswith(t + "/")
+                    for ks in known if ks
+                )
+
+            if _known(top):
+                continue
+            new_top.add(top)
         if new_top:
             hints.append(nextstep.NextStep.from_state("new_domain", mid))
     return hints
