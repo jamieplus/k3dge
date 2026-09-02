@@ -26,7 +26,7 @@
 
 * **外来审计源落盘** —— 人贴/agent 转发的报告经 `k3dge milestone audit-submit <id> [--file <报告.md> | -] [--kind audit|quality]`（或 MCP `k3dge_submit_audit_report`）落盘为 `docs/reviews/YYYY-MM-DD-<id>-<scope>-{audit|quality}.md` 本版报告（缺 12 列表头自动补；`--kind quality` 打 `k3dge:kind: quality` 标类；最新覆盖旧）。两份都落/到 待修=0 才算闭环。
 
-* **Checklist 机制** —— `.agent/seal_checklist.json` 以当前里程碑任务状态 hash 为键缓存（任务集不变 `check` 不重算）；verify 尝试次数记此，审计闭环清零。`k3dge milestone checklist <id>` 显式查看。
+* **审计条件 Checklist（不是封板 checklist）** —— `.agent/audit_checklist.json` 记**审计条件达成 + 审计环状态**：量化触发快照（账齐/C2/体积 + reasons）、audit/quality 两份报告的 `待修`（closure）、`verify_attempts`（>3 升级用）、`audit_started_at`；以当前里程碑任务状态 hash 为键缓存（任务集不变 `check` 不重算）。**`k3dge milestone audit <id>` 发起审计时重置**（verify 预算归零 + 打 started_at，重跑拿新的 3 次预算）。封板资格不在此，由 `audit_trigger.audit_closed` 判。`k3dge milestone checklist <id>` 查看。
 
 * **钩子链** —— `pipeline.toml`：`pipelines.on_seal_enter` = `k3dit.actions.audit` + `k3lity.actions.quality`（两份都必做）；`pipelines.on_pre_seal` = `k3dit.actions.verify` + `k3lity.actions.verify`（各自核对本报告）。`transports` 链 `mcp→cli→manual`/`skip`，`skip` 记 `HARNESS_SKIP` 于 `logs/k3dge.log`。k3dge 只调透镜、不自己审/打分（sidecar，ADR-0006）。
 

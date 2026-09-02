@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest import TestCase, mock
 
 from k3dge.engine import milestone as ms
-from k3dge.engine import seal_checklist as sc
+from k3dge.engine import audit_checklist as ac
 from k3dge.engine.pipeline_runner import (
     TransportResult,
     load_pipeline_config,
@@ -202,32 +202,41 @@ class TestSealFlow(TestCase):
         seal.assert_called_once()
 
 
-class TestSealChecklist(TestCase):
-    def test_eligibility_cached_not_recomputed(self) -> None:
+class TestAuditChecklist(TestCase):
+    def test_build_snapshot_flags_suggestion(self) -> None:
         ws = _ws()
-        # No task -> not eligible; survives repeated reads without recompute error.
-        self.assertFalse(sc.is_eligible(ws))
-        self.assertFalse(sc.is_eligible(ws))  # second read hits cache, not a fresh scan crash
-
-        # Add a done task; cache is stale (task set changed) so it recomputes to eligible.
         _mk_task(ws)
-        self.assertTrue(sc.is_eligible(ws))
+        data = ac.build_checklist(ws, "M1")
+        self.assertTrue(data["audit_suggested"])
+        self.assertTrue(any("账齐" in r for r in data["reasons"]))
+        self.assertFalse(data["closed"])  # no reports yet
+        self.assertEqual(data["verify_attempts"], 0)
 
     def test_verify_attempt_tracking_and_reset(self) -> None:
         ws = _ws()
         _mk_task(ws)
-        sc.reset_verify_attempts(ws)
-        self.assertEqual(sc.get_verify_attempts(ws), 0)
-        self.assertEqual(sc.bump_verify_attempt(ws), 1)
-        self.assertEqual(sc.bump_verify_attempt(ws), 2)
-        sc.reset_verify_attempts(ws)
-        self.assertEqual(sc.get_verify_attempts(ws), 0)
+        ac.reset_verify_attempts(ws)
+        self.assertEqual(ac.get_verify_attempts(ws), 0)
+        self.assertEqual(ac.bump_verify_attempt(ws), 1)
+        self.assertEqual(ac.bump_verify_attempt(ws), 2)
+        ac.reset_verify_attempts(ws)
+        self.assertEqual(ac.get_verify_attempts(ws), 0)
 
-    def test_checklist_persists_to_disk(self) -> None:
+    def test_reset_for_audit_clears_budget_and_stamps(self) -> None:
         ws = _ws()
         _mk_task(ws)
-        sc.compute_eligibility(ws)
-        self.assertTrue((ws / ".agent" / "seal_checklist.json").is_file())
+        ac.bump_verify_attempt(ws)
+        ac.bump_verify_attempt(ws)
+        self.assertEqual(ac.get_verify_attempts(ws), 2)
+        data = ac.reset_for_audit(ws, "M1")
+        self.assertEqual(data["verify_attempts"], 0)
+        self.assertIsNotNone(data["audit_started_at"])
+
+    def test_persists_to_audit_path(self) -> None:
+        ws = _ws()
+        _mk_task(ws)
+        ac.build_checklist(ws, "M1")
+        self.assertTrue((ws / ".agent" / "audit_checklist.json").is_file())
 
 
 class TestReportTask(TestCase):

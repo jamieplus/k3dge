@@ -65,7 +65,7 @@ Deciders: Core Maintainer
 
 ### 2.1.7 人工入口 / Checklist 缓存 / 自动 loop 上限（2026-09-01）
 - **人工主动入口**：`k3dge milestone audit <id>` 与 `k3dge milestone seal [--yes] <id>` 都是人工入口，走同一套 `run_audit_flow` / `run_seal_flow`。`--yes` 仅跳过"要不要封"提问，不跳过审计（未审计闭环时 `seal` 返回 `audit_needed`）。自动探测（`check` 的 `[NEXT] audit_suggested`/`seal_ready`）与人工入口收敛到同一条流程。
-- **Checklist 缓存，避免每次实时算**：任务状态判定写入 `.agent/seal_checklist.json`，以当前里程碑任务状态 hash 为键；`check` 只读缓存、任务集不变不重算。`verify` 尝试次数也记于此文件，审计闭环后清零。
+- **审计条件 Checklist 缓存（非封板 checklist）**：`.agent/audit_checklist.json` 记审计条件达成快照（账齐/C2/体积 + reasons）、audit+quality 两份报告的 `待修`、`verify_attempts`、`audit_started_at`，以当前里程碑任务状态 hash 为键；`check` 只读缓存、任务集不变不重算。**`k3dge milestone audit <id>` 发起审计时重置该 checklist**（verify 预算归零 + 打 `audit_started_at`），所以人工/自动重跑各拿一个新的 3 次预算。封板资格改由 `audit_trigger.audit_closed` 判（不再由本文件判"可封"）。
 - **自动 loop 上限**：`run_audit_flow` 里若 `verify` 连续超过 3 次仍未闭环（待修不归零），返回 `escalated` 并**停止自动 loop、转人工干预**，杜绝死循环。
 
 ### 2.1.8 外来审计源落盘（2026-09-01）

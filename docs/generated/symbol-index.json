@@ -107,6 +107,12 @@
       "line": 120
     }
   ],
+  "build_checklist": [
+    {
+      "file": "src/k3dge/engine/audit_checklist.py",
+      "line": 61
+    }
+  ],
   "build_docs_index": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
@@ -133,8 +139,8 @@
   ],
   "bump_verify_attempt": [
     {
-      "file": "src/k3dge/engine/seal_checklist.py",
-      "line": 95
+      "file": "src/k3dge/engine/audit_checklist.py",
+      "line": 119
     }
   ],
   "bump_version": [
@@ -269,12 +275,6 @@
       "line": 65
     }
   ],
-  "compute_eligibility": [
-    {
-      "file": "src/k3dge/engine/seal_checklist.py",
-      "line": 39
-    }
-  ],
   "compute_hash": [
     {
       "file": "src/k3dge/engine/contract.py",
@@ -295,8 +295,8 @@
   ],
   "ensure_checklist": [
     {
-      "file": "src/k3dge/engine/seal_checklist.py",
-      "line": 80
+      "file": "src/k3dge/engine/audit_checklist.py",
+      "line": 98
     }
   ],
   "ensure_mcp_config": [
@@ -379,8 +379,8 @@
   ],
   "get_verify_attempts": [
     {
-      "file": "src/k3dge/engine/seal_checklist.py",
-      "line": 91
+      "file": "src/k3dge/engine/audit_checklist.py",
+      "line": 115
     }
   ],
   "get_version": [
@@ -399,12 +399,6 @@
     {
       "file": "src/k3dge/engine/search.py",
       "line": 36
-    }
-  ],
-  "is_eligible": [
-    {
-      "file": "src/k3dge/engine/seal_checklist.py",
-      "line": 87
     }
   ],
   "iter_doc_types": [
@@ -581,8 +575,8 @@
   ],
   "read_checklist": [
     {
-      "file": "src/k3dge/engine/seal_checklist.py",
-      "line": 63
+      "file": "src/k3dge/engine/audit_checklist.py",
+      "line": 82
     }
   ],
   "render_manual_docs": [
@@ -597,10 +591,16 @@
       "line": 117
     }
   ],
+  "reset_for_audit": [
+    {
+      "file": "src/k3dge/engine/audit_checklist.py",
+      "line": 102
+    }
+  ],
   "reset_verify_attempts": [
     {
-      "file": "src/k3dge/engine/seal_checklist.py",
-      "line": 102
+      "file": "src/k3dge/engine/audit_checklist.py",
+      "line": 126
     }
   ],
   "resolve_action": [
@@ -642,7 +642,7 @@
   "run_seal_flow": [
     {
       "file": "src/k3dge/engine/milestone.py",
-      "line": 1380
+      "line": 1383
     }
   ],
   "scaffold": [

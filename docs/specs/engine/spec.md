@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:32c023347270ce84acd3cc62f1e4eb9240cfc7930b387ab81af5c2d12ea116dd`
+- **Contract Hash**: `sha256:cecdfc8c8cdb31543a9e9bad141fa3e71dfe9c18e5a7060537367072a5820367`
 - **Last Updated**: 2026-09-02
 
 ## 1. Domain Boundary & Responsibilities
@@ -26,6 +26,13 @@
 <!-- k3dge:interfaces-start -->
 ```python
 extract_ts_interface(path: Path) -> str
+build_checklist(workspace: Path, milestone_id: Optional[str]=None) -> dict
+read_checklist(workspace: Path) -> Optional[dict]
+ensure_checklist(workspace: Path) -> dict
+reset_for_audit(workspace: Path, milestone_id: Optional[str]=None) -> dict
+get_verify_attempts(workspace: Path) -> int
+bump_verify_attempt(workspace: Path) -> int
+reset_verify_attempts(workspace: Path) -> None
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
 audit_closed(workspace: Path, milestone_id: str) -> bool
 class ContractExtractor
@@ -137,13 +144,6 @@ resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]
 run_action(workspace: Path, action_ref: str, *, io=None, timeout_default: int=60) -> TransportResult
 validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
 write_incident(workspace: Path, target: str | None, task_type: str | None, task_id: str, detail: str) -> Path
-compute_eligibility(workspace: Path) -> tuple[dict, bool]
-read_checklist(workspace: Path) -> Optional[dict]
-ensure_checklist(workspace: Path) -> dict
-is_eligible(workspace: Path) -> bool
-get_verify_attempts(workspace: Path) -> int
-bump_verify_attempt(workspace: Path) -> int
-reset_verify_attempts(workspace: Path) -> None
 class Location
     file: str
     line: Optional[int] = None

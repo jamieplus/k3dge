@@ -1312,10 +1312,13 @@ def run_audit_flow(
     (status, message); status ∈ {audited, rejected, escalated}. Seal unlocks only
     after this closes (`run_seal_flow`).
     """
-    from k3dge.engine import nextstep, seal_checklist as sc
+    from k3dge.engine import audit_checklist as ac, nextstep
     from k3dge.engine.pipeline_runner import run_action
 
     prompt = prompter or _Prompt.default()
+    # Initiating an audit resets the condition checklist (fresh verify budget +
+    # started_at stamp), whether triggered manually (`milestone audit`) or via a hook.
+    ac.reset_for_audit(workspace, milestone_id)
 
     # kind -> (produce action, verify action)
     streams = {
@@ -1325,11 +1328,11 @@ def run_audit_flow(
 
     # mandatory audit + fix loop, capped at `max_verify_attempts` verifies.
     while True:
-        attempts = sc.get_verify_attempts(workspace)
+        attempts = ac.get_verify_attempts(workspace)
         if attempts >= max_verify_attempts:
             msg = f"verify 已超过 {max_verify_attempts} 次仍未闭环，停止自动 loop，转人工干预。"
             return "escalated", msg + "\n" + nextstep.NextStep.from_state("escalated", milestone_id).render_cli()
-        sc.bump_verify_attempt(workspace)
+        ac.bump_verify_attempt(workspace)
 
         # produce phase: run every stream, then collect its report.
         pending_total = 0
@@ -1372,7 +1375,7 @@ def run_audit_flow(
             run_action(workspace, verify_action, io=prompt.out_stream)
         except Exception:
             pass
-    sc.reset_verify_attempts(workspace)
+    ac.reset_verify_attempts(workspace)
     msg = f"Milestone {milestone_id}: 审计闭环（audit + quality 报告 待修=0），可以谈封板。"
     return "audited", msg + "\n" + nextstep.NextStep.from_state("seal_ready", milestone_id).render_cli()
 

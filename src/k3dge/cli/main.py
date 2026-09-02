@@ -663,9 +663,9 @@ def cmd_milestone(args: argparse.Namespace) -> int:
         return 0 if ok else 1
 
     if action == "checklist":
-        from k3dge.engine import seal_checklist as sc
+        from k3dge.engine import audit_checklist
 
-        data = sc.compute_eligibility(workspace)[0]
+        data = audit_checklist.build_checklist(workspace, m_id)
         print(json.dumps(data, indent=2, ensure_ascii=False))
         return 0
 

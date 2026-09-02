@@ -75,6 +75,16 @@ workspace_status(workspace: Path) -> Dict[str, Any]
 ```python
 # _ts.py
 extract_ts_interface(path: Path) -> str
+# audit_checklist.py
+build_checklist(workspace: Path, milestone_id: Optional[str]=None) -> dict
+    # doc: Recompute the audit-condition snapshot and persist it (keeps counters if the
+read_checklist(workspace: Path) -> Optional[dict]
+ensure_checklist(workspace: Path) -> dict
+reset_for_audit(workspace: Path, milestone_id: Optional[str]=None) -> dict
+    # doc: Called when an audit pass is initiated (manual `milestone audit` or auto):
+get_verify_attempts(workspace: Path) -> int
+bump_verify_attempt(workspace: Path) -> int
+reset_verify_attempts(workspace: Path) -> None
 # audit_trigger.py
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
     # doc: Return (suggested, reasons). Only fires on a quantitative event.
@@ -234,15 +244,6 @@ validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
 # protocol.py
 write_incident(workspace: Path, target: str | None, task_type: str | None, task_id: str, detail: str) -> Path
     # doc: Escalate a persistent protocol deviation to a human-visible incident note.
-# seal_checklist.py
-compute_eligibility(workspace: Path) -> tuple[dict, bool]
-    # doc: Recompute eligibility from scratch and persist the checklist.
-read_checklist(workspace: Path) -> Optional[dict]
-ensure_checklist(workspace: Path) -> dict
-is_eligible(workspace: Path) -> bool
-get_verify_attempts(workspace: Path) -> int
-bump_verify_attempt(workspace: Path) -> int
-reset_verify_attempts(workspace: Path) -> None
 # search.py
 class Location
     file: str
