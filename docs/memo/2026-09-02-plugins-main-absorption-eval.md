@@ -48,7 +48,7 @@
 |---|---|---|---|
 | pstack **technical-writing** ⬤ | 各 docs/<type>/AUTHORING 软规则：4 层(Diátaxis+Google+STE+Global English)+3 顶规(删不干活词/用短日常词/规则伤句则改句)+节奏；"codebase 是词表，写真实符号名" | 🎯 | P2 |
 | **show-me-your-work** ⬤ | 决策 TSV 格式 = ADR-0012 证据链落地形态；可作封板 closure/review 模板 | 🎯 | P2 |
-| **eval** ⬤ | **盲测纪律**喂 k3dge 的 ADR-0013 A/B compare harness：候选不见 eval/rubric/score 词、单一有机 prompt、一个 judge 一遍两集同标尺、从 transcript 实读了哪些文件判 follow-through 非自报 | 🎯 | P2 |
+| pstack `eval` ⬤ | 盲测纪律（候选不见 eval/rubric/score 词、单一有机 prompt、一个 judge 一遍两集同标尺、从 transcript 实读哪些文件判 follow-through 非自报）。**更正：k3dge 目前没有任何 A/B/compare harness，ADR-0013 是版本/变更日志**——此条只在 k3dge *将来*真要建实验/对比 harness 时作设计输入，不是"修既有 harness" | ❌→📥 | 需先立 harness |
 | **encode-lessons-in-structure** | "规则该是 lint/metadata/运行时检查/脚本，而非更多散文"——正合 k3dge 门>文；可作元原则 | 📥 | P3 |
 | create-plugin review-plugin-submission | 声明路径↔真实文件一致 = k3dge 目录校验已覆盖 | ❌ 已实现 | — |
 | pstack `prove-it-works` | 完成前验真产物=seal `audit_closed` 已体现 | ❌ 已覆盖 | — |
@@ -62,5 +62,5 @@
 
 ## 执行计划（每 peer 一批：目标仓 改 + 1 ADR(Draft) + 测试；不自批 Accepted）
 - **P1**：k3dit ← `thermo-nuclear-review`(安全/正确性 + 只审 diff 内 + over-report 校准) + `interrogate/rubric`(并入可维护性透镜)；k3lity ← `agent-compatibility` 评分模型(升级 stub `_score`) + `control-cli/ui`(填 stub `probe`)
-- **P2**：k3lity ← `verify-this`精化/`deslop`+TS .mdc；k3dit ← epistemics 置信分层 + show-me-your-work 留痕；k3che ← continual-learning 蓝本；k3dge ← technical-writing + eval 盲测(修 ADR-0013 harness) + show-me-your-work closure 格式
+- **P2**：k3lity ← `verify-this`精化/`deslop`+TS .mdc；k3dit ← epistemics 置信分层 + show-me-your-work 留痕；k3che ← continual-learning 增量刷新；k3dge ← technical-writing 软规则 + show-me-your-work closure 格式。**eval 盲测移出 P2**：k3dge 无 compare harness 可修（见上更正），列为"需先立 harness"。
 - **P3**：perf 8 族、hillclimb/bug-fix/visual-parity 度量、principles 细则、reflect/recall、guard-context-window 半条
