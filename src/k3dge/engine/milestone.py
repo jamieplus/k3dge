@@ -1,3 +1,4 @@
+# k3dit:pending A-1 @file 上帝模块 1547 行跨越 task 生命周期、changelog 回填、review 回填、seal 流程、audit 流程、doc audit 等 6+ 关注点；应拆分以降低圈复杂度
 """Milestone lifecycle engine: alignment check, test regression, and context compaction."""
 
 from __future__ import annotations
@@ -98,6 +99,7 @@ def _changelog_draft_path(workspace: Path) -> Path:
     return workspace / ".agent" / "changelog_draft.md"
 
 
+# k3dit:pending F-6 @line _append_to_unreleased 写 CHANGELOG.md 用直接 write_text 而非 _atomic_write；同仓 version.py 已有原子写工具，此处未复用，写入中断可致 CHANGELOG 损坏
 def _append_to_unreleased(workspace: Path, task_path: Path) -> bool:
     """Append task's title to CHANGELOG.md ## [Unreleased] under the correct Keep a Changelog subsection.
 
@@ -252,6 +254,7 @@ def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, mi
             if not changed:
                 continue
             # Append/ensure ## 回填 section (quoted to avoid k3dit second-table check)
+            # k3dit:pending A-3 @line fid 依赖上层循环变量状态，用 'fid' in locals() 探测属脆弱作用域耦合；表无匹配行时 fid 未绑定
             backfill_marker = f"> | {fid if 'fid' in locals() and fid else 'ID'} |"
             # Check if a backfill section already mentions this task
             if task_path.name not in text:

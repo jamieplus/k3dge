@@ -213,6 +213,7 @@ def collect_audit(workspace: Path, milestone_id: str, io=None) -> dict:
                     + "本 task 在报告回填闭环（待修=0）后由修复席位 `task done`\n",
                     encoding="utf-8",
                 )
+        # k3dit:pending F-5 @line ticket task 回填失败静默吞掉 OSError；工单状态与审计状态脱钩且无任何可见告警
         except OSError:  # pragma: no cover - 回填失败不改判定
             pass
     job["state"] = "collected"

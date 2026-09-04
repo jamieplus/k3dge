@@ -139,6 +139,7 @@ def _run_ripgrep(workspace: Path, query: str) -> Optional[List[str]]:
     return [ln for ln in res.stdout.splitlines() if ln.strip()]
 
 
+# k3dit:pending A-2 @line _python_search 遍历全仓文件并无体积上限地 read_text；大仓/大文件场景下内存峰值与 IO 成本不可控
 def _python_search(workspace: Path, query: str) -> List[str]:
     out: List[str] = []
     pat = query

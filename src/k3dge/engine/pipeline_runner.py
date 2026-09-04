@@ -346,6 +346,7 @@ def probe_servers(workspace: Path, timeout: int = 20) -> List[Tuple[str, bool, s
 
 
 def _run_cli(workspace: Path, command: str, timeout: int, io) -> TransportResult:
+    # k3dit:pending F-4 @line shell=True 从 pipeline.toml 取命令字符串直接传入 shell；配置被篡改时构成命令注入面
     try:
         proc = subprocess.run(
             command,

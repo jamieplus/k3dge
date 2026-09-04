@@ -71,6 +71,7 @@ def extract_signatures(source: str) -> str:
         return ""
     src_lines = source.splitlines()
     out: List[str] = []
+    # k3dit:pending F-3 @line ast.walk 遍历全部嵌套节点，将内部/私有嵌套符号写入签名骨架；应只取 tree.body 顶层定义
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef):
             bases = ", ".join(ast.unparse(b) for b in node.bases) if node.bases else ""
