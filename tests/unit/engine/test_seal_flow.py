@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import tempfile
 from pathlib import Path
 from unittest import TestCase, mock
@@ -130,6 +131,41 @@ def _open_report(ws, mid="M1"):
 
 
 class TestAuditFlow(TestCase):
+    def test_produce_and_verify_send_action_level_arguments(self) -> None:
+        """ADR-0006 §2.3.8: k3dge asks for "audit this milestone", never for pass numbers,
+        and tells the verify transport *which* report to check."""
+        ws = _ws()
+        _clean_report(ws)
+        calls = []
+
+        def fake(_ws, ref, *, io=None, timeout_default=60, arguments=None):
+            calls.append((ref, arguments or {}))
+            return TransportResult(True, "mcp", "ok")
+
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", side_effect=fake):
+            status, _ = ms.run_audit_flow(ws, "M1", prompter=ms._Prompt(answers=["y"]))
+        self.assertEqual(status, "audited")
+        produce = {r: a for r, a in calls if r.endswith(("actions.audit", "actions.quality"))}
+        self.assertIn("k3dit.actions.audit", produce)
+        self.assertNotIn("pass_number", produce["k3dit.actions.audit"])  # never leaks k3dit internals
+        self.assertIn("M1", produce["k3dit.actions.audit"].get("target_scope", ""))
+        self.assertEqual(produce["k3dit.actions.audit"].get("milestone_id"), "M1")
+        verify = {r: a for r, a in calls if r.endswith("actions.verify")}
+        self.assertIn("k3dit.actions.verify", verify)
+        self.assertTrue(str(verify["k3dit.actions.verify"].get("path", "")).endswith(".md"))
+
+    def test_rejection_quotes_the_peer_suggested_report_path(self) -> None:
+        ws = _ws()  # no report on disk
+        payload = json.dumps({"ok": True, "lens_count": 5, "report_path": "docs/reviews/2026-09-03-M1-code.md"})
+        with mock.patch(
+            "k3dge.engine.pipeline_runner.run_action",
+            return_value=TransportResult(True, "mcp", "ok", payload=payload),
+        ):
+            status, msg = ms.run_audit_flow(ws, "M1", prompter=ms._Prompt(answers=["y"]))
+        self.assertEqual(status, "rejected")
+        self.assertIn("docs/reviews/2026-09-03-M1-code.md", msg)
+        self.assertIn("k3dge 不代笔正文", msg)
+
     def test_audited_when_clean(self) -> None:
         ws = _ws()
         _clean_report(ws)

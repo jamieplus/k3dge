@@ -362,6 +362,17 @@ def _validate_file(workspace: Path, typ: str, path: Path, schema: dict, seen: di
             out.append(
                 Violation(_code(schema, "h1"), f"H1 does not match `{h1_pat}` (id={ident}): {path.name}", file_path=rel)
             )
+    for frag, secs in (schema.get("sections_when") or {}).items():
+        if frag and frag in path.name:
+            for sec in secs or []:
+                if sec not in text:
+                    out.append(
+                        Violation(
+                            _code(schema, "sections_when"),
+                            f"required section '{sec}' missing in {path.name} (matched '{frag}')",
+                            file_path=rel,
+                        )
+                    )
     for heading in schema.get("sections") or []:
         if heading not in text:
             # allow regex headings

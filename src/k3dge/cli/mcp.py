@@ -240,7 +240,13 @@ def k3dge_task_create(
         ws, title, typ=typ, slug=slug, milestone=milestone_id, priority=priority
     )
     rel = str(path.relative_to(ws)).replace("\\", "/") if path else None
-    return json.dumps({"ok": ok, "message": msg, "path": rel}, indent=2, ensure_ascii=False)
+    similar = []
+    if ok and path is not None:
+        similar = [
+            {"path": p, "title": ttl}
+            for p, ttl in milestone._similar_task_hints(ws, title, exclude=path)
+        ]
+    return json.dumps({"ok": ok, "message": msg, "path": rel, "similar": similar}, indent=2, ensure_ascii=False)
 
 
 @mcp.tool()

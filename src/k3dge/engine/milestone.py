@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 import re
 import shutil
 from dataclasses import dataclass
@@ -300,9 +301,18 @@ def _has_milestone_token(text: str, milestone_id: str) -> bool:
     )
 
 
-_REVIEW_AUX = frozenset(
-    {"README.md", "AUTHORING.md", "_template.md", "LEFTOVERS.md", "leftovers.md"}
-)
+# Docs that live inside a docs/<type>/ directory but are never content items:
+# scaffolding/authoring files. Single source — task scanning and review scanning
+# used to keep their own copies and drifted (AUTHORING.md leaked into `task list`).
+_DOC_AUX_NAMES = frozenset({"README.md", "AUTHORING.md", "_template.md"})
+
+
+def _is_doc_aux(name: str) -> bool:
+    """True for structural files inside docs/<type>/ that are never items."""
+    return name in _DOC_AUX_NAMES or name.startswith(".")
+
+
+_REVIEW_AUX = _DOC_AUX_NAMES | frozenset({"LEFTOVERS.md", "leftovers.md"})
 _FILENAME_MILESTONE_RE = re.compile(r"(?:^|[._-])(M\d+)(?:[._-]|$)", re.IGNORECASE)
 
 
@@ -393,42 +403,17 @@ def scan_unfilled_guides(workspace: Path) -> List[str]:
 # guide-stub). The disposition authority stays the 12-col report + tasks; these
 # markers carry no rationale/how-to-fix (that would become a 3rd fact source,
 # and L1 does not hash comments so the gate cannot catch comment drift).
-PENDING_MARKER_RE = re.compile(
-    r"(?:#|<!--|//)\s*k3dit:pending\s+([A-Za-z0-9._#-]+)", re.IGNORECASE
-)
-_MARKER_SCAN_SUFFIXES = frozenset({".py", ".md", ".js", ".ts", ".tsx", ".go", ".rs", ".java", ".rb"})
-
-
 def scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]:
-    """Return (count, ["path#ID", ...]) of open `k3dit:pending <ID>` markers.
+    """未决 findings（语法 v1：pending/disputed/fixnote 计 open）。
 
-    Scans src/ and docs/ (excluding archive/, docs/reviews/, docs/generated/,
-    .agent/). A marker flipped to `k3dit:leftover <ID>` (有意留) or removed (已修)
-    no longer counts.
+    薄委托 `engine/markers.py`，保留历史返回 (count, ["path#ID", ...])。leftover（有意留）
+    照旧不计时；删标（已修）不计时。语法违规**不改计数口径**，由 `k3dge markers --check` 暴露。
     """
-    hits: List[str] = []
-    for root_rel in ("src", "docs"):
-        root = workspace / root_rel
-        if not root.exists():
-            continue
-        for p in sorted(root.rglob("*")):
-            if not p.is_file() or p.suffix.lower() not in _MARKER_SCAN_SUFFIXES:
-                continue
-            rel = p.relative_to(workspace).as_posix()
-            parts = set(p.relative_to(workspace).parts)
-            if (
-                "archive" in parts
-                or rel.startswith("docs/reviews/")
-                or rel.startswith("docs/generated/")
-            ):
-                continue
-            try:
-                text = p.read_text(encoding="utf-8")
-            except (UnicodeDecodeError, OSError):
-                continue
-            for m in PENDING_MARKER_RE.finditer(text):
-                hits.append(f"{rel}#{m.group(1)}")
-    return (len(hits), hits)
+    from k3dge.engine import markers as _mk
+
+    ms, _problems = _mk.extract(workspace)
+    samples = _mk.open_samples(ms)
+    return (len(samples), samples)
 
 
 @dataclass(frozen=True)
@@ -463,7 +448,7 @@ def list_tasks(
     want_ms = milestone_id.strip() if milestone_id else None
     out: List[TaskIndex] = []
     for p in sorted(tasks_dir.glob("*.md")):
-        if p.name in ("README.md", "_template.md"):
+        if _is_doc_aux(p.name):
             continue
         try:
             content = p.read_text(encoding="utf-8")
@@ -613,7 +598,7 @@ def mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Pat
                 return False, f"cannot modify archived task: {ident}", None
             except ValueError:
                 pass
-        if resolved.is_file() and resolved.name != "README.md":
+        if resolved.is_file() and not _is_doc_aux(resolved.name):
             target = resolved
     except (ValueError, OSError):
         target = None
@@ -622,7 +607,7 @@ def mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Pat
         matches = [
             p
             for p in sorted(tasks_dir.glob("*.md"))
-            if p.name != "README.md" and (ident in p.name or ident in p.stem or name_only == p.name)
+            if not _is_doc_aux(p.name) and (ident in p.name or ident in p.stem or name_only == p.name)
         ]
         if not matches:
             return False, f"no task matching '{ident}'", None
@@ -1254,13 +1239,110 @@ def _ensure_doc_audit_task(workspace: Path, milestone_id: str, docs: List[str], 
     open one already exists.
     """
     for t in scan_milestone_tasks(workspace, milestone_id):
-        if "doc-audit" in t.path.name.lower() and t.status != "done":
+        # create_task 把标题折成下划线文件名（doc_audit_*）——只匹配 "doc-audit" 会漏检，
+        # 于是每次 doc-audit 都开重复 task（2026-09-03 实测 _4 存在仍建出 _39）。
+        name = t.path.name.lower()
+        if ("doc-audit" in name or "doc_audit" in name) and t.status != "done":
             return None
     scopes = sorted({d.split("/")[1] for d in docs if len(d.split("/")) > 1})
     hint = ", ".join(scopes[:3]) or "docs"
     title = f"doc-audit: 文档作者合规审计（{hint} 等 {len(docs)} 处）"
     ok, _msg, path = create_task(workspace, title, typ="audit", milestone=milestone_id, priority="P3", report=report)
     return path if ok else None
+
+
+
+def _similar_task_hints(workspace: Path, title: str, exclude: Optional[Path] = None) -> List[Tuple[str, str]]:
+    """k3che 相似/历史提示——service 语义：skip/失败/坏信封 ⇒ 无提示，**永不阻断创建**。
+
+    语料含 tasks/archive（CacheIndex.rglob 覆盖归档子目录）——历史文件正是重复的
+    本体。只提示，不判定：是不是真重复由看的人决定（规则 08：观测≠裁决）。
+    """
+    from k3dge.engine.pipeline_runner import run_action
+
+    try:
+        res = run_action(workspace, "cache.search", arguments={"query": title, "top_k": 6})
+    except Exception:  # pragma: no cover - 观测件绝不误伤创建
+        return []
+    if not res.ok or res.provider != "mcp":
+        return []
+    try:
+        env = json.loads(res.payload or "")
+    except ValueError:
+        return []
+    if not isinstance(env, dict) or not env.get("ok"):
+        return []
+    excl = exclude.relative_to(workspace).as_posix() if exclude is not None else None
+    out: List[Tuple[str, str]] = []
+    for r in env.get("results") or []:
+        p = str(r.get("path") or "")
+        if not p or p == excl:
+            continue
+        out.append((p, str(r.get("title") or "")))
+        if len(out) >= 3:
+            break
+    return out
+
+# --- k3che 相关文档前路由（service 角色：只产提示，永不进判定链；peer contract §0） ---
+
+_K3CHE_HINT_RE = re.compile(r"<!-- k3che-hints -->.*?<!-- /k3che-hints -->\n?", re.S)
+
+
+def _related_doc_hints(workspace: Path, docs: List[str], io=None) -> List[Tuple[str, str]]:
+    """Ask the cache role for docs related to the changed ones. Any failure ⇒ [] (silent-safe)."""
+    from k3dge.engine.pipeline_runner import run_action
+
+    names = [Path(d).name for d in docs[:6] if d]
+    if not names:
+        return []
+    try:
+        res = run_action(workspace, "cache.search", io=io, arguments={"query": " ".join(names), "top_k": 3})
+    except Exception:  # pragma: no cover - service call must never break the flow
+        return []
+    if not res.ok or res.provider != "mcp":
+        return []  # skip/降级 = 没有提示，仅此而已
+    try:
+        env = json.loads(res.payload or "")
+    except ValueError:
+        return []
+    out: List[Tuple[str, str]] = []
+    for r in env.get("results") or []:
+        if isinstance(r, dict) and r.get("path"):
+            out.append((str(r["path"]), str(r.get("title", ""))))
+        if len(out) >= 3:
+            break
+    return out
+
+
+def _attach_k3che_hints(workspace: Path, docs: List[str], io=None) -> int:
+    """Write/refresh the hints block on the open doc-audit task. Returns #hints written."""
+    hints = _related_doc_hints(workspace, docs, io=io)
+    if not hints:
+        return 0
+    tasks_dir = workspace / "docs" / "tasks"
+    if not tasks_dir.is_dir():
+        return 0
+    target = None
+    for p in sorted(tasks_dir.glob("*.md")):
+        # create_task 把标题里的非字母数字折成下划线：文件名是 doc_audit_*，标题是 doc-audit:
+        if p.name.endswith(".done.md") or _is_doc_aux(p.name):
+            continue
+        if "doc-audit" not in p.name.lower() and "doc_audit" not in p.name.lower():
+            continue
+        target = p
+        break
+    if target is None:
+        return 0
+    block = (
+        "<!-- k3che-hints -->\n"
+        "## 相关文档提示（k3che · 服务性前路由，非判定；由审计席位取舍）\n\n"
+        + "".join(f"- `{path}`" + (f" — {title}" if title else "") + "\n" for path, title in hints)
+        + "<!-- /k3che-hints -->\n"
+    )
+    text = target.read_text(encoding="utf-8")
+    text = _K3CHE_HINT_RE.sub("", text).rstrip() + "\n\n" + block
+    target.write_text(text, encoding="utf-8")
+    return len(hints)
 
 
 def run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]:
@@ -1283,13 +1365,20 @@ def run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]:
         return "clean", "no managed docs changed; nothing to doc-audit."
 
     try:
-        run_action(workspace, "k3dit.actions.audit", io=io)  # peer/manual authors the report
+        # docs/ targets must route to the Doc Audit lens, not the code passes
+        run_action(
+            workspace,
+            "k3dit.actions.audit",
+            io=io,
+            arguments={"target_scope": "docs", "milestone_id": mid or ""},
+        )  # peer/manual authors the report
     except Exception:
         pass
     # Bind the task to the report it audits (1 report = 1 task, ADR-0022) if present.
     found = _find_report(workspace, mid, "audit")
     report_rel = found[0].relative_to(workspace).as_posix() if found else None
     task = _ensure_doc_audit_task(workspace, mid, docs, report=report_rel)
+    _attach_k3che_hints(workspace, docs, io=io)  # 服务性提示；失败=无提示，绝不无审计
     if task is None:
         return "reported", (
             f"doc-audit: {len(docs)} 处文档改动；已有未关闭的 doc-audit task（不重复建）。"
@@ -1337,13 +1426,34 @@ def run_audit_flow(
         # produce phase: run every stream, then collect its report.
         pending_total = 0
         for kind, (produce_action, _verify_action) in streams.items():
-            run_action(workspace, produce_action, io=prompt.out_stream)
+            # Action-level arguments only — no pass numbers (ADR-0006 §2.3.8). The lens
+            # entry decides internally how many passes that takes.
+            produced = run_action(
+                workspace,
+                produce_action,
+                io=prompt.out_stream,
+                arguments={"target_scope": f"milestone {milestone_id}", "milestone_id": milestone_id},
+            )
             found = _find_report(workspace, milestone_id, kind)
             if found is None:
+                hint = ""
+                try:
+                    import json as _json
+
+                    _body = _json.loads(produced.payload) if produced.payload else {}
+                    if _body.get("report_path"):
+                        hint = (
+                            f" {produced.provider} 已给出落点建议 `{_body['report_path']}`"
+                            f"（lens_count={_body.get('lens_count')}）；k3dge 不代笔正文。"
+                        )
+                except (ValueError, AttributeError):
+                    pass
                 msg = (
                     f"Audit is mandatory: no 12-col {kind} report found under docs/reviews/. "
                     f"Persist one (`k3dge milestone audit-submit {milestone_id} ... --scope ...` "
-                    f"or run the peer per docs/protocols/) and re-run audit."
+                    f"or run the peer per docs/protocols/) and re-run audit.{hint}"
+                    + ("" if not produced.downgrades else
+                       f" [本轮降级：{'; '.join(produced.downgrades)}]")
                 )
                 return "rejected", msg + "\n" + nextstep.next_for_rejection(milestone_id, msg).render_cli()
             report_path, report_text = found
@@ -1371,8 +1481,14 @@ def run_audit_flow(
 
     # verify phase: per-report secondary cross-check (audit→audit, quality→quality).
     for _kind, (_produce_action, verify_action) in streams.items():
+        # Verify is per-report and needs to be told *which* report (the check tools take a
+        # path); without this the mcp transport can never succeed and falls to manual.
+        found = _find_report(workspace, milestone_id, _kind)
+        verify_args = {"milestone_id": milestone_id}
+        if found:
+            verify_args["path"] = str(found[0].relative_to(workspace).as_posix())
         try:
-            run_action(workspace, verify_action, io=prompt.out_stream)
+            run_action(workspace, verify_action, io=prompt.out_stream, arguments=verify_args)
         except Exception:
             pass
     ac.reset_verify_attempts(workspace)
@@ -1420,4 +1536,12 @@ def run_seal_flow(
         return "rejected", msg + "\n" + nextstep.next_for_rejection(milestone_id, msg).render_cli()
     closure = _write_closure_note(workspace, milestone_id)
     msg += f"\n  收摊清单: {closure.relative_to(workspace)}"
+    try:  # ⑤ end-flow 清理钩子：派生件（worktree/bundle）收口即焚，store 与合并后的分支史保留
+        from k3dge.engine.audit_flow import prune_finished
+
+        pr = prune_finished(workspace)
+        if pr.get("pruned"):
+            msg += f"\n  审计派生件清理: {pr['pruned']} 组"
+    except Exception:
+        pass
     return "sealed", msg + "\n" + nextstep.NextStep.from_state("sealed", milestone_id).render_cli()

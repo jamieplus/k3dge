@@ -12,6 +12,7 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 2. **Contract**: `spec` holds `Contract Hash`; public symbol change → `k3dge sync` same task.
 3. **Atomic**: Read `manifest`+`spec`+`k3dge task list --json`, plan diff, code, `k3dge sync` if needed, `k3dge check` + tests, then §12 triggers.
 4. **Revert**: `check` red >2 → `git stash`, reread `spec`.
+5. **Boundary**: 设计先拆后做——先写「事实归属」（哪个模块拥有哪个事实），方案不许让 A 模块知道 B 的内部（步骤数/内部状态/实现方式）；先桩后实（契约冻结 + dummy 跑通骨架）再进局部细节。细则 `.agent/rules/08-design-discipline.md`。
 
 ## Docs — locate, then load
 
@@ -38,6 +39,7 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 | 审计建议触发（账齐/C2≥5/体积≥8） | `k3dge check`(绿)/`task done`/`align`/`status` 返回 `[NEXT] audit_suggested` + reasons（单一源 `engine/audit_trigger.py`+`nextstep`）。**overview/架构更新不是触发**——收摊(closure)里做；是否算持久设计、写得对不对仍归 k3dit/人 |
 | 代码/文档里有 `k3dit:pending` 钉 | `check`/`status` 返回 `[NEXT] pending_findings pending=N`（最高优先）。标记只是指针（`位置`旁一行短 ID，guide-stub 同类）；处置以 12 列+tasks 为准，理由/改法写报告**不入正文**；已修删标记、有意留改 `k3dit:leftover <ID>` |
 | 新建 `src/` 域 | `k3dge check` / `status` 返回 `[NEXT] new_domain`：补 `manifest` + `spec` + `tests`，再 `k3dge sync` 回写契约哈希 |
+| In-flight ratchet job (`[NEXT] ratchet_open`) | `k3dge audit status <job>`; seat loop = contract §1.4; do not seal while open |
 | Guide has `guide-stub` | Fill guide |
 | Simplify / delete dead code / C2 nesting | `.agent/rules/02-simplification.md` first, then change |
 | `check` red ×2 | `docs/branches/` then `stash` |

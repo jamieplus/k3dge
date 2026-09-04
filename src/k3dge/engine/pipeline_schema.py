@@ -14,6 +14,7 @@ Design constraints (ADR-aligned):
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
 from typing import List, Tuple
@@ -27,6 +28,8 @@ else:
         tomllib = None  # type: ignore
 
 _VALID_PROVIDERS = frozenset({"mcp", "cli", "manual", "skip"})
+# Endpoint facts belong to .mcp.json only (docs/protocols/peer_contract.md §0).
+_ENDPOINT_KEYS = frozenset({"command", "env", "cwd"})
 _PIPELINE_REL = ".agent/pipeline.toml"
 
 # Returned tuple: (rule_code, human_message)
@@ -65,6 +68,25 @@ def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
     peers = data.get("peers", {})
     if not isinstance(peers, dict):
         return [("PIPELINE_SCHEMA_INVALID", "'peers' must be a table")]
+    roles = data.get("roles", {})
+    if roles and not isinstance(roles, dict):
+        return [("PIPELINE_SCHEMA_INVALID", "'roles' must be a table")]
+    role_bind: dict = {}
+    servers = _load_mcp_server_names(workspace)
+    for r_name, r_cfg in (roles or {}).items():
+        bind = r_cfg.get("bind") if isinstance(r_cfg, dict) else None
+        kind = r_cfg.get("kind", "gate") if isinstance(r_cfg, dict) else "gate"
+        if kind not in ("gate", "service"):
+            errors.append(("PIPELINE_SCHEMA_INVALID",
+                           f"role '{r_name}' kind must be 'gate' or 'service'"))
+        if not isinstance(bind, str) or not bind:
+            errors.append(("PIPELINE_SCHEMA_INVALID",
+                           f"role '{r_name}' must declare a non-empty string 'bind'"))
+        elif servers is not None and bind not in servers:
+            errors.append(("PIPELINE_PEER_UNWIRED",
+                           f"role '{r_name}' binds to '{bind}' not declared in .mcp.json mcpServers"))
+        else:
+            role_bind[r_name] = bind
     declared: set[str] = set()
 
     for p_name, p_cfg in peers.items():
@@ -82,11 +104,11 @@ def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
                 declared.add(f"{p_name}.{a_name}")  # 2-part compat alias
                 errors.extend(_validate_transports(
                     workspace, a_cfg.get("transports", []),
-                    f"{p_name}.actions.{a_name}"))
+                    f"{p_name}.actions.{a_name}", servers, role_bind))
         else:
             declared.add(p_name)
             errors.extend(_validate_transports(
-                workspace, p_cfg.get("transports", []), p_name))
+                workspace, p_cfg.get("transports", []), p_name, servers, role_bind))
 
     pipelines = data.get("pipelines", {})
     if pipelines and not isinstance(pipelines, dict):
@@ -105,7 +127,21 @@ def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
     return errors
 
 
-def _validate_transports(workspace: Path, transports: object, scope: str) -> List[PipelineViolation]:
+def _load_mcp_server_names(workspace: Path):
+    """Names declared in .mcp.json[mcpServers]; None if absent/unreadable."""
+    p = workspace / ".mcp.json"
+    if not p.is_file():
+        return None
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    servers = data.get("mcpServers") if isinstance(data, dict) else None
+    return set(servers) if isinstance(servers, dict) else None
+
+
+def _validate_transports(workspace: Path, transports: object, scope: str,
+                         servers=None, roles: dict = None) -> List[PipelineViolation]:
     errs: List[PipelineViolation] = []
     if not isinstance(transports, list) or not transports:
         return [("PIPELINE_SCHEMA_INVALID",
@@ -121,6 +157,24 @@ def _validate_transports(workspace: Path, transports: object, scope: str) -> Lis
                          f"invalid provider '{prov}' in {scope}.transports[{idx}] "
                          f"(expected one of {sorted(_VALID_PROVIDERS)})"))
             continue
+        args = t.get("args")
+        if args is not None and not isinstance(args, dict):
+            errs.append(("PIPELINE_SCHEMA_INVALID",
+                         f"{scope}.transports[{idx}]['args'] must be a table (peer tool defaults)"))
+        if prov == "mcp":
+            leaked = sorted(k for k in _ENDPOINT_KEYS if k in t)
+            if leaked:
+                errs.append(("PIPELINE_SCHEMA_INVALID",
+                             f"{scope}.transports[{idx}] leaks endpoint facts {leaked}; "
+                             "they belong in .mcp.json (peer contract §0)"))
+            server = (roles or {}).get(scope.split(".")[0], scope.split(".")[0])
+            if servers is None:
+                errs.append(("PIPELINE_PEER_UNWIRED",
+                             f"mcp transport in '{scope}' but .mcp.json is missing/unreadable"))
+            elif server not in servers:
+                errs.append(("PIPELINE_PEER_UNWIRED",
+                             f"mcp transport '{scope}' resolves to server '{server}' "
+                             "not declared in .mcp.json mcpServers"))
         if prov == "mcp" and not t.get("tool"):
             errs.append(("PIPELINE_SCHEMA_INVALID",
                          f"missing 'tool' for mcp transport in {scope}.transports[{idx}]"))

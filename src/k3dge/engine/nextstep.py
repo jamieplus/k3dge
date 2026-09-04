@@ -35,6 +35,10 @@ STATE_OPTIONS: dict = {
         "if_y": "修完删 `k3dit:pending <ID>` 标记；有意留改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）",
         "if_n": "stop",
     },
+    "ratchet_open": {
+        "note": "有在办棘轮工单（ADR-0026）：进程不等人，但账必须可见",
+        "if_y": "k3dge audit status <job> 查对端；席位侧一圈见契约 §1.4（claim-round→落钉→complete-round→sign-report→close）",
+    },
     "doc_audit": {
         "note": "docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断——`k3dge doc-audit` 出报告(k3dit)+建里程碑 task（本轮不改，封板轮也得闭环）",
     },

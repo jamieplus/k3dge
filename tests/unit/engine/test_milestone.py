@@ -102,6 +102,26 @@ class TestMilestone(unittest.TestCase):
         self.assertEqual(len(list_tasks(self.ws, status="done")), 0)
         self.assertEqual(len(list_tasks(self.ws, milestone_id="M0")), 0)
 
+    def test_list_tasks_skips_doc_aux_structural_files(self) -> None:
+        """docs/tasks/{README,AUTHORING,_template}.md are authoring rules, never tasks.
+
+        Regression: `list_tasks` and `cli.status` each kept their own exclusion tuple
+        and `AUTHORING.md` leaked into `k3dge task list` / `status` as a ghost task.
+        """
+        _write_task(self.ws / "docs/tasks/open.md", "idea", "M2")
+        for name in ("README.md", "AUTHORING.md", "_template.md", ".hidden.md"):
+            (self.ws / "docs" / "tasks" / name).write_text("# aux\n", encoding="utf-8")
+        self.assertEqual(sorted(p.name for p in (self.ws / "docs/tasks").glob("*.md")), 
+                         [".hidden.md", "AUTHORING.md", "README.md", "_template.md", "open.md"])
+        rows = list_tasks(self.ws)
+        self.assertEqual([r.path.name for r in rows], ["open.md"])
+        # `task done` must refuse to archive an authoring file too
+        ok, msg, done_path = mark_task_done(self.ws, "docs/tasks/AUTHORING.md")
+        self.assertFalse(ok)
+        self.assertIsNone(done_path)
+        ok2, _, _ = mark_task_done(self.ws, "AUTHORING")
+        self.assertFalse(ok2)
+
     def test_mark_task_done_prefers_exact_path(self) -> None:
         _write_task(self.ws / "docs/tasks/alpha.md", "idea", "M2")
         _write_task(self.ws / "docs/tasks/alphabet.md", "idea", "M2")

@@ -194,26 +194,11 @@ def _lifecycle_next(workspace: Path):
     Order: audit closed -> seal_ready; else quant trigger -> audit_suggested.
     Returns None when nothing is warranted (empty window / zero tasks / no trigger).
     """
-    try:
-        from k3dge.engine import nextstep
-        from k3dge.engine.audit_trigger import audit_closed, compute_audit_suggestion
-        from k3dge.engine.milestone import get_current_milestone, scan_pending_findings
+    # Single source moved to cli.status.lifecycle_next so the JSON/MCP exits agree
+    # with this human line (ADR-0008). Imported lazily: cli.main imports cli.status.
+    from k3dge.cli.status import lifecycle_next
 
-        mid = get_current_milestone(workspace)
-        # Highest precedence: findings pinned in code/docs (the "看见" pointer).
-        count, samples = scan_pending_findings(workspace)
-        if count > 0:
-            return nextstep.NextStep.from_state(
-                "pending_findings", mid, pending=count, reasons=[f"标记: {s}" for s in samples[:5]]
-            )
-        if audit_closed(workspace, mid):
-            return nextstep.NextStep.from_state("seal_ready", mid)
-        suggested, reasons = compute_audit_suggestion(workspace)
-        if suggested:
-            return nextstep.NextStep.from_state("audit_suggested", mid, reasons=reasons)
-        return None
-    except Exception:
-        return None
+    return lifecycle_next(workspace)
 
 
 def _emit_lifecycle_next(workspace: Path, stream) -> None:
@@ -360,7 +345,7 @@ def cmd_task(args: argparse.Namespace) -> int:
 
     workspace = _find_workspace(Path.cwd())
     if args.task_action == "create":
-        from k3dge.engine.milestone import create_task
+        from k3dge.engine.milestone import _similar_task_hints, create_task
 
         title = args.title
         if not title:
@@ -375,6 +360,12 @@ def cmd_task(args: argparse.Namespace) -> int:
             priority=args.priority or "P2",
         )
         print(f"[TASK] {msg}", file=sys.stderr if not ok else sys.stdout)
+        if ok and path is not None:
+            hints = _similar_task_hints(workspace, title, exclude=path)
+            if hints:
+                print("[DUP-CHECK] k3che 相似/历史提示（观测建议，不阻断、不裁决）：", file=sys.stdout)
+                for hp, ht in hints:
+                    print(f"  - {hp}" + (f" — {ht}" if ht else ""), file=sys.stdout)
         _append_log(workspace, f"[{datetime.datetime.now().isoformat()}] task create -> {msg}")
         return 0 if ok else 1
     if args.task_action == "done":
@@ -607,7 +598,128 @@ def cmd_mcp(args: argparse.Namespace) -> int:
             return 1
         print(f"[MCP] synced {workspace / '.mcp.json'}")
         return 0
+
+    if args.mcp_action == "probe":
+        # Live handshake per declared server. Deliberately NOT part of `check`:
+        # `check` is a pure static hard gate (ADR-0006 §2.3.2).
+        from k3dge.engine.pipeline_runner import load_mcp_endpoints, probe_servers
+
+        timeout = int(getattr(args, "timeout", 20) or 20)
+        servers = load_mcp_endpoints(workspace)
+        if not servers:
+            print(f"[MCP] no servers declared in {workspace / '.mcp.json'}", file=sys.stderr)
+            return 1
+        rows = probe_servers(workspace, timeout=timeout)
+        as_json = getattr(args, "json", False)
+        if as_json:
+            print(json.dumps({"ok": all(r[1] for r in rows), "servers": [
+                {"name": n, "ok": ok, "detail": d, "tools": t} for n, ok, d, t in rows
+            ]}, indent=2, ensure_ascii=False))
+            return 0 if all(r[1] for r in rows) else 1
+        alive = 0
+        for name, ok, detail, tools in rows:
+            alive += 1 if ok else 0
+            print(f"  [{'ALIVE' if ok else 'DEAD '}] {name:8s} tools={tools if tools else '-'} {(':: ' + detail) if detail else ''}")
+        print(f"[MCP] probed {len(rows)} declared server(s): {alive} alive, {len(rows) - alive} dead ({workspace / '.mcp.json'})")
+        if alive < len(rows):
+            print("WARN[DOWNGRADE] any audit/quality action on a DEAD server falls back to manual,\n"
+                  "                and a manual report is NOT an independent audit (ADR-0006 §2.4)", file=sys.stderr)
+        return 0 if alive == len(rows) else 1
+
     return 1
+
+
+def cmd_bundle(args: argparse.Namespace) -> int:
+    """快照存取的用户/席位出口：resolve 物化 / ls 列清单（只读；引用即 `cas://sha256:<oid>`）。"""
+    import sys as _sys
+
+    from k3dge.engine.store import GitStore, StoreError
+
+    workspace = _find_workspace(Path.cwd())
+    if args.bundle_action == "create":
+        from k3dge.engine.bundle import build_bundle
+
+        r = build_bundle(workspace, args.target or ["src"], milestone_id=args.milestone)
+        print(json.dumps({"ref": r["ref"], "bundle_file": r.get("bundle_file"),
+                          "commit": r.get("commit"),
+                          "config_digest": (r.get("manifest", {}).get("pack_provenance") or {}).get("config_digest")},
+                         ensure_ascii=False))
+        return 0
+    st = GitStore(workspace)
+    try:
+        if args.bundle_action == "ls":
+            for blob_oid, path in st.list_tree(args.ref):
+                print(f"{blob_oid[:12]}  {path}")
+        else:
+            dest = Path(args.extract) if args.extract else Path.cwd() / ".k3dge" / "served"
+            st.get(args.ref, dest)
+            print(f"[BUNDLE] {args.ref} → {dest}")
+    except StoreError as exc:
+        print(f"[BUNDLE] {exc}", file=_sys.stderr)
+        return 1
+    return 0
+
+
+
+def cmd_audit(args: argparse.Namespace) -> int:
+    """棘轮四动词（席位出口，工作区=CWD）：建单/查单/快照推进/取回落位（closure merge 自动附带）。"""
+    from k3dge.engine import audit_flow
+
+    workspace = _find_workspace(Path.cwd())
+    tok = args.job_or_milestone
+    if args.audit_action == "submit":
+        r = audit_flow.submit_audit(workspace, args.milestone, targets=args.target or None)
+    elif args.audit_action == "status":
+        r = audit_flow.peer_status(workspace, tok)
+    elif args.audit_action == "advance":
+        from k3dge.engine import worktree as _wt
+
+        _wt.ensure(workspace, tok or "adhoc")
+        try:
+            r = {"ok": True, "commit": _wt.advance(workspace, tok or "adhoc")}
+        except RuntimeError as exc:
+            r = {"ok": False, "message": str(exc)}
+    else:
+        r = audit_flow.collect_audit(workspace, tok, args.job or None)
+    print(json.dumps({k: v for k, v in r.items() if k in
+                      ("ok", "state", "failed", "detail", "job_id", "counts", "pending",
+                       "baseline_ok", "report", "merge", "commit", "error", "message")},
+                     ensure_ascii=False))
+    return 0 if r.get("ok") else 1
+
+
+def cmd_markers(args: argparse.Namespace) -> int:
+    """树侧 findings 一览：三锚点计数、语法违规、结项判据（只读；从不改写）。"""
+    import sys as _sys
+
+    from k3dge.engine.markers import closure_ok, counts, extract, open_samples
+
+    workspace = _find_workspace(Path.cwd())
+    ms, problems = extract(workspace)
+    c = counts(ms)
+    ok_close, detail = closure_ok(ms)
+    if getattr(args, "json", False):
+        print(json.dumps({"counts": c, "blockers": detail["blockers"], "problems": problems,
+                          "samples": open_samples(ms), "closure_ok": ok_close,
+                          "markers": [
+                              {"file": x.file, "line": x.line, "kind": x.kind, "id": x.id,
+                               "scope": x.scope, "note": x.note}
+                              for x in ms
+                          ]},
+                         indent=2, ensure_ascii=False))
+    else:
+        print(f"findings: pending={c['pending']} disputed={c['disputed']} fixnote={c['fixnote']} "
+              f"leftover={c['leftover']} | open={c['open']}")
+        for s_ in open_samples(ms)[:20]:
+            print(f"  - {s_}")
+        for pr in problems[:20]:
+            print(f"  PROBLEM {pr}", file=_sys.stderr)
+        if not problems:
+            print("语法/锚点校验：无违规")
+    if getattr(args, "check", False):
+        return 1 if problems else 0
+    return 0
+
 
 
 def cmd_milestone(args: argparse.Namespace) -> int:
@@ -985,7 +1097,8 @@ def cmd_status(args: argparse.Namespace) -> int:
 
     from k3dge.cli.status import workspace_status
 
-    status_obj = workspace_status(_find_workspace())
+    workspace = _find_workspace()
+    status_obj = workspace_status(workspace)
     if not status_obj.get("ok", True):
         print(f"[STATUS] {status_obj.get('error')}: {status_obj.get('message')}", file=sys.stderr)
         return 1
@@ -1010,6 +1123,17 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"  - [{t['status'] or '?'}] {t['title']}")
         else:
             print("Unfinished tasks: none")
+        cache = status_obj.get("cache")
+        if cache:
+            hr = cache.get("hit_rate")
+            print(
+                "Cache (k3che): "
+                f"{cache.get('total', 0)} queries, hits {cache.get('hits', 0)}"
+                + (f", hit_rate {round(hr, 2)}" if isinstance(hr, (int, float)) else "")
+                + (f", indexed {cache.get('indexed')}" if cache.get("indexed") is not None else "")
+                + " —— 观测展示，不参与任何判定",
+                file=sys.stdout,
+            )
         # Persistent one-line next-step hint (single source: engine.nextstep).
         _emit_lifecycle_next(workspace, sys.stdout)
         _emit_workspace_hints(workspace, sys.stdout)
@@ -1136,7 +1260,30 @@ def build_parser() -> argparse.ArgumentParser:
     p_init.set_defaults(func=cmd_init)
 
     p_mcp = sub.add_parser("mcp", help="MCP config")
-    p_mcp.add_argument("mcp_action", choices=["sync"], help="mcp action")
+    p_mcp.add_argument("mcp_action", choices=["sync", "probe"], help="mcp action")
+    p_mcp.add_argument("--timeout", type=int, default=20, help="probe: per-server handshake timeout (s)")
+    p_mcp.add_argument("--json", dest="json", action="store_true", help="probe: emit JSON")
+
+    p_mk = sub.add_parser("markers", help="审计标记一览（只读：计数/违规/结项判据）")
+    p_mk.add_argument("--json", action="store_true")
+    p_mk.add_argument("--check", action="store_true", help="有语法/锚点违规时退出码 1（供 CI）")
+    p_mk.set_defaults(func=cmd_markers)
+
+    p_bd = sub.add_parser("bundle", help="送检快照存取（git 对象库）")
+    p_bd.add_argument("bundle_action", choices=["create", "resolve", "ls"])
+    p_bd.add_argument("ref", nargs="?", default="", help="cas://sha256:<tree-oid>（resolve/ls）")
+    p_bd.add_argument("--extract", default="", help="物化目录（默认 .k3dge/served/）")
+    p_bd.add_argument("--milestone", default="", help="create：挂里程碑 id")
+    p_bd.add_argument("--target", action="append", default=[], help="create：送检路径（可多次）")
+    p_bd.set_defaults(func=cmd_bundle)
+
+    p_aud = sub.add_parser("audit", help="证据棘轮：submit/status/advance/close（ADR-0026；工作区=CWD）")
+    p_aud.add_argument("audit_action", choices=["submit", "status", "advance", "close"])
+    p_aud.add_argument("job_or_milestone", nargs="?", default="", help="status/advance:job_id；close:milestone")
+    p_aud.add_argument("--milestone", default="", help="submit：挂里程碑 id")
+    p_aud.add_argument("--target", action="append", default=[], help="submit：送检路径（可多次）")
+    p_aud.add_argument("--job", default="", help="close：指定 job id（默认取该里程碑最新在办单）")
+    p_aud.set_defaults(func=cmd_audit)
     p_mcp.set_defaults(func=cmd_mcp)
 
     p_search = sub.add_parser("search", help="controlled search (scoped, narrow-context alternative to grep/find)")
