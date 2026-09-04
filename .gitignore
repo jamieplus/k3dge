@@ -25,3 +25,5 @@ k3dge-audit/
 .k3che/
 # 快照对象库与物化区（内容寻存的派生物，永不入库）
 .k3dge/
+# 编排本地工单账（状态件，可见但不入版本；票据走 docs/tasks）
+.agent/audit_jobs.json

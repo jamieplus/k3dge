@@ -553,6 +553,14 @@
       "tokens": "task create duplicate check via cache role"
     },
     {
+      "path": "docs/tasks/2026-09-04-M7-audit-audit_job_ae911e744eff.md",
+      "type": "tasks",
+      "id": "2026-09-04-M7-audit-audit_job_ae911e744eff",
+      "title": "audit job ae911e744eff: src",
+      "status": "idea",
+      "tokens": "audit job ae911e744eff: src"
+    },
+    {
       "path": "docs/tasks/2026-09-04-M7-feat-g1g2_seat_manual_and_ratchet_next.md",
       "type": "tasks",
       "id": "2026-09-04-M7-feat-g1g2_seat_manual_and_ratchet_next",

@@ -138,7 +138,7 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
         "submitted_at": datetime.datetime.now().isoformat(timespec="seconds"),
     })
     _save_state(workspace, state)
-    return {"state": "awaiting_audit", "job_id": job_id, "bundle": bundle}
+    return {"ok": True, "state": "awaiting_audit", "job_id": job_id, "bundle": bundle}
 
 
 def collect_audit(workspace: Path, milestone_id: str, io=None) -> dict:
