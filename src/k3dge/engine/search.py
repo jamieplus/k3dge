@@ -139,12 +139,16 @@ def _run_ripgrep(workspace: Path, query: str) -> Optional[List[str]]:
     return [ln for ln in res.stdout.splitlines() if ln.strip()]
 
 
-# k3dit:pending A-2 @line _python_search 遍历全仓文件并无体积上限地 read_text；大仓/大文件场景下内存峰值与 IO 成本不可控
 def _python_search(workspace: Path, query: str) -> List[str]:
     out: List[str] = []
     pat = query
     for path in workspace.rglob("*"):
         if not path.is_file() or ".git" in path.parts or "docs/generated" in path.parts:
+            continue
+        try:
+            if path.stat().st_size > 1_000_000:   # 体积闸：超大文件不整读（A-2）
+                continue
+        except OSError:
             continue
         try:
             text = path.read_text(encoding="utf-8", errors="ignore")

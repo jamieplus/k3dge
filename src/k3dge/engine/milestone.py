@@ -99,7 +99,6 @@ def _changelog_draft_path(workspace: Path) -> Path:
     return workspace / ".agent" / "changelog_draft.md"
 
 
-# k3dit:pending F-6 @line _append_to_unreleased 写 CHANGELOG.md 用直接 write_text 而非 _atomic_write；同仓 version.py 已有原子写工具，此处未复用，写入中断可致 CHANGELOG 损坏
 def _append_to_unreleased(workspace: Path, task_path: Path) -> bool:
     """Append task's title to CHANGELOG.md ## [Unreleased] under the correct Keep a Changelog subsection.
 
@@ -146,7 +145,9 @@ def _append_to_unreleased(workspace: Path, task_path: Path) -> bool:
             if header_end == 0:
                 header_end = idx + len(unreleased) + 1
             new_text = text[:header_end] + f"\n{section_header}\n{entry}" + text[header_end:]
-        changelog.write_text(new_text, encoding="utf-8")
+        from k3dge.engine.version import _atomic_write
+
+        _atomic_write(changelog, new_text)
         return True
     except Exception as exc:
         import sys
@@ -219,6 +220,7 @@ def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, mi
             except ValueError:
                 continue
             changed = False
+            fid = ""   # 表无匹配行时的绑定兜底（原 'fid' in locals() 探测属作用域耦合）
             new_lines = lines[:]
             for i in range(header_idx + 2, len(lines)):
                 raw = lines[i]
@@ -254,8 +256,7 @@ def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, mi
             if not changed:
                 continue
             # Append/ensure ## 回填 section (quoted to avoid k3dit second-table check)
-            # k3dit:pending A-3 @line fid 依赖上层循环变量状态，用 'fid' in locals() 探测属脆弱作用域耦合；表无匹配行时 fid 未绑定
-            backfill_marker = f"> | {fid if 'fid' in locals() and fid else 'ID'} |"
+            backfill_marker = f"> | {fid or 'ID'} |"
             # Check if a backfill section already mentions this task
             if task_path.name not in text:
                 # Find or create ## 回填 section at end

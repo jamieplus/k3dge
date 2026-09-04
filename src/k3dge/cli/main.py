@@ -69,10 +69,9 @@ def _workspace_hints(workspace: Path) -> list:
         import json as _json
         import subprocess
 
-        # k3dit:pending F-2 @line _workspace_hints 调 git status 无 timeout 参数；git 挂起时 check 命令无限阻塞
         out = subprocess.run(
             ["git", "status", "--porcelain"],
-            cwd=workspace, capture_output=True, text=True,
+            cwd=workspace, capture_output=True, text=True, timeout=10,
         )
         files = [ln[3:].strip() for ln in out.stdout.splitlines() if ln.strip()]
     except Exception:
@@ -176,11 +175,11 @@ def cmd_check(args: argparse.Namespace) -> int:
 def _read_submit_input(args: argparse.Namespace) -> str:
     """Read audit-report content from --file, stdin '-', or stdin."""
     src = getattr(args, "file", None)
-    # k3dit:pending F-1 @line _read_submit_input 对 --file 路径不存在时静默返回空串；调用方 cmd_milestone audit-submit 收到空内容仅 stderr 报错，报告不落盘
     if src and src != "-":
         p = Path(src)
         if not p.is_file():
-            return ""
+            print(f"[ERROR] --file 不存在：{src}", file=sys.stderr)
+            raise SystemExit(2)
         return p.read_text(encoding="utf-8")
     if src == "-":
         return sys.stdin.read()
