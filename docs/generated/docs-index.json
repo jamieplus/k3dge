@@ -409,6 +409,14 @@
       "tokens": "Re-verify Protocol — Default (12 列验收)"
     },
     {
+      "path": "docs/reviews/2026-09-04-M7-audit.md",
+      "type": "reviews",
+      "id": "2026-09-04-M7-audit",
+      "title": "审计：src（milestone M7）",
+      "status": "",
+      "tokens": "审计：src（milestone M7）"
+    },
+    {
       "path": "docs/specs/_template/spec.md",
       "type": "specs",
       "id": "spec",

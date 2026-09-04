@@ -34,3 +34,10 @@ date: 2026-09-04
 4. **`.mcp.json` 解释器固化**：k3dit/k3che/k3lity server 由 `"python"`＋landing 改为各仓 venv 绝对路径（demo 已验证该形）。验收：doc-audit/audit 活体各一次，`[PEER-MCP] landed` 警告消失。
 5. **CLI 四动词烟测欠账**（submit/status 已补；advance 带 present_pushed、close 待补）：`audit submit|status|advance|close` 各自 no-peer rc1 不崩的成组测试（本轮只补了 submit/status；⑩ 亮账时只测两个，违纪实锤入账）。
 6. **§7 复用预筛**：三条件（闭环报告＋当场重算 tree oid 比对 baseline＋lens_version 相等）在人工入口实现短路，痕迹行 `PRE-FILTER` 落 log。验收：无变更重跑 audit 提示"无审计需要执行"且 logs 有行。
+
+## 首案活体新增（09-04 晚，席工单回改清单）
+
+- **A/F 号段纪律**：工单未明说"审计席只用 A 段"⇒ 首席把 7 条发现全用了 F 段。修：seat_prompt 加"你是审计席，用 A 段号；F 段留给修席"。
+- **note ≤80 字符**：席落的三枚钉 note 超宽被 `markers` 判 PROBLEM（闸抓住了，席没看自己的 --check 输出）。修：工单里带"落钉后跑 `markers --check` 自检"。
+- **号段不可增补**：修席的新发现（cache 测试读真实 .k3che 状态＝环境脆弱）因 F 段耗尽无处登记。设计缺：claim 应能按已用号段续发。
+- **冲突重试无动词**：`merge 冲突→人工 rebase→重试` 的重试步只能进引擎手调 `merge_back`；且 worktree rebase 落 detached 需手动 update-ref。缺 `k3dge audit merge <milestone>`（幂等重试）。
