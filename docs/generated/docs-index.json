@@ -569,6 +569,14 @@
       "tokens": "audit job ae911e744eff: src"
     },
     {
+      "path": "docs/tasks/2026-09-04-M7-chore-engine_milestone_py_A_1_1547_6.md",
+      "type": "tasks",
+      "id": "2026-09-04-M7-chore-engine_milestone_py_A_1_1547_6",
+      "title": "拆分 engine/milestone.py 上帝模块（首案 A-1：1547 行 6+ 关注点）",
+      "status": "idea",
+      "tokens": "拆分 engine/milestone.py 上帝模块（首案 A-1：1547 行 6+ 关注点）"
+    },
+    {
       "path": "docs/tasks/2026-09-04-M7-feat-g1g2_seat_manual_and_ratchet_next.md",
       "type": "tasks",
       "id": "2026-09-04-M7-feat-g1g2_seat_manual_and_ratchet_next",
