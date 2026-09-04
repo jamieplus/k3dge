@@ -20,3 +20,8 @@ audit job ae911e744eff: src
 
 ## 上下文/切入点
 audit job ae911e744eff: src
+
+## 回收记录
+
+- 报告：`docs/reviews/2026-09-04-M7-audit.md`（待修 0 / 有意留 3 / 已修 7）
+- 席位：k3dit-audit-seat1；本 task 在报告回填闭环（待修=0）后由修复席位 `task done`
