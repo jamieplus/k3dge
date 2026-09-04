@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-25
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0016: 外部模式与资产吸收纪律（洁净室 + License 分级）

@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-19
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0001: k3dge 架构设计与工程治理基线

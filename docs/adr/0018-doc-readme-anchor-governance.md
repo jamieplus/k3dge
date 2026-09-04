@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-30
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0018: Managed document layout (Authoring, template, Gate, catalog)

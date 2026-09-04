@@ -21,3 +21,7 @@ harnesses/
 
 # clean audit snapshot copy (temp-stripped working tree for kedge3 audit)
 k3dge-audit/
+# k3che 观测状态目录（命中率 jsonl 等，缓存组件自己的地盘）
+.k3che/
+# 快照对象库与物化区（内容寻存的派生物，永不入库）
+.k3dge/

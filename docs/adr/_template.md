@@ -6,6 +6,10 @@ Supersedes: -
 Amended-by: -
 Date: YYYY-MM-DD
 Deciders: Core Maintainer
+Note: -
+# Note: default `-`. Carries the non-metadata trace of this record — e.g. an authorized
+# in-place revision (who/when) and how it actually passed the gate (real lens vs manual
+# fallback). See docs/adr/AUTHORING.md.
 ---
 
 # ADR-NNNN: <title>

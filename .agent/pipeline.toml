@@ -8,15 +8,47 @@
 #     -> [on_seal_enter] k3dit.actions.audit (MANDATORY, no skip)
 #     -> parse 待修/有意留/已修; 待修>0 -> "agent 修?" prompt (countdown, timeout = fix) -> re-audit
 #     -> [on_pre_seal] k3dit.actions.verify (待修==0 closure) -> seal
+# Action-level only (ADR-0006 §2.3.8): the audit tool is `k3dit_run_audit_flow` — one call =
+# "audit this target". k3dge never drives pass numbers; how many lenses k3dit runs is
+# k3dit's private implementation. Per-call args come from the caller (scope/milestone).
 # `blocking` is intentionally NOT a field: nothing in k3dge auto-runs a peer; the CLI
 # explicitly invokes the named actions below (see milestone.run_seal_flow).
+
+# 角色层（peer contract §0）：编排只认角色；角色→实现一处可换（含桩 bind = "dummy"）。
+# 两类角色（v0.3）：gate 类走送检包/工件/基线/两态；service 类同步查询、失败即 skip，永不进放行链。
+# 流程引用仍兼容 legacy 直名（k3dit.actions.*）；新流程一律走角色名（audit.*/quality.*/cache.*）。
+[roles.audit]
+bind = "k3dit"
+
+[roles.quality]
+bind = "k3lity"
+
+[roles.cache]
+bind = "k3che"
+kind = "service"
 
 [peers.k3dit]
 enabled = true
 
+# 判断型工单协议（契约 §1，2026-09-03）：提交登记/回收结果两态；领取与回投是席位的事（k3dit CLI/MCP）
+[peers.k3dit.actions.submit]
+transports = [
+  { provider = "mcp", tool = "k3dit_audit_submit", timeout = 15 },
+]
+
+[peers.k3dit.actions.collect]
+transports = [
+  { provider = "mcp", tool = "k3dit_audit_collect", timeout = 15 },
+]
+
+[peers.k3dit.actions.status]
+transports = [
+  { provider = "mcp", tool = "k3dit_audit_job_status", timeout = 10 },
+]
+
 [peers.k3dit.actions.audit]
 transports = [
-  { provider = "mcp", tool = "k3dit_run_audit", timeout = 60 },
+  { provider = "mcp", tool = "k3dit_run_audit_flow", timeout = 60 },
   { provider = "manual", protocol = "docs/protocols/audit_default.md" },
 ]
 
@@ -48,8 +80,16 @@ transports = [
 # Optional cache lens — NOT on the mandatory seal path. Degrades to `skip`.
 [peers.k3che]
 enabled = true
+
+[peers.k3che.actions.search]
 transports = [
   { provider = "mcp", tool = "k3che_search", timeout = 10 },
+  { provider = "skip" },
+]
+
+[peers.k3che.actions.stats]
+transports = [
+  { provider = "mcp", tool = "k3che_stats", timeout = 8 },
   { provider = "skip" },
 ]
 

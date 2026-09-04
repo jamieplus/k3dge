@@ -45,7 +45,7 @@
       "type": "adr",
       "id": "ADR-0006",
       "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Accepted",
+      "status": "Draft",
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
@@ -177,11 +177,19 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
-      "path": "docs/adr/0023-meta-rule-delivery.md",
+      "path": "docs/adr/0023-low-authority-archive-tier.md",
       "type": "adr",
       "id": "ADR-0023",
       "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Draft",
+      "status": "Proposed",
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
+    },
+    {
+      "path": "docs/adr/0026-audit-evidence-exchange-topology.md",
+      "type": "adr",
+      "id": "ADR-0026",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
+      "status": "Accepted",
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
@@ -321,12 +329,12 @@
       "tokens": "INCIDENT REPORT: [k8d3e-a78-04] MCP Bridge 残留废弃协议指针"
     },
     {
-      "path": "docs/memo/2026-08-21-code-quality-discussion.md",
-      "type": "memo",
-      "id": "2026-08-21-code-quality-discussion",
-      "title": "Memo: 代码质量与全局优化不归本 harness",
-      "status": "",
-      "tokens": "Memo: 代码质量与全局优化不归本 harness"
+      "path": "docs/incidents/INC-20260902-CON-exit-and-trail-blindspot.md",
+      "type": "incidents",
+      "id": "INC-20260902-CON-exit-and-trail-blindspot",
+      "title": "INCIDENT REPORT: [M7] 出口同构与审计痕迹只被文字承诺，未被任何一处机验",
+      "status": "open",
+      "tokens": "INCIDENT REPORT: [M7] 出口同构与审计痕迹只被文字承诺，未被任何一处机验"
     },
     {
       "path": "docs/memo/2026-08-21-deferred-standards.md",
@@ -335,14 +343,6 @@
       "title": "Memo: 未落地的对标项（6 类标准评估小结）",
       "status": "",
       "tokens": "Memo: 未落地的对标项（6 类标准评估小结）"
-    },
-    {
-      "path": "docs/memo/2026-08-24-docs-self-reflective-gate-vs-audit.md",
-      "type": "memo",
-      "id": "2026-08-24-docs-self-reflective-gate-vs-audit",
-      "title": "Memo: 人读文档自省体治理 — 审计先行、收敛后升闸",
-      "status": "",
-      "tokens": "Memo: 人读文档自省体治理 — 审计先行、收敛后升闸"
     },
     {
       "path": "docs/memo/2026-08-25-prompt-as-neural-net.md",
@@ -361,6 +361,14 @@
       "tokens": "Memo：Harness 环境级硬隔离 vs 认知级软隔离（h8m2k-a1）"
     },
     {
+      "path": "docs/memo/2026-09-02-peer-wiring-and-seat-options.md",
+      "type": "memo",
+      "id": "2026-09-02-peer-wiring-and-seat-options",
+      "title": "Memo: peer 接线与审计席位的选项账（研究用，不作决策）",
+      "status": "",
+      "tokens": "Memo: peer 接线与审计席位的选项账（研究用，不作决策）"
+    },
+    {
       "path": "docs/memo/2026-09-02-plugins-main-absorption-eval.md",
       "type": "memo",
       "id": "2026-09-02-plugins-main-absorption-eval",
@@ -375,6 +383,14 @@
       "title": "Audit Protocol — Default (5-Pass / 8 维)",
       "status": "",
       "tokens": "Audit Protocol — Default (5-Pass / 8 维)"
+    },
+    {
+      "path": "docs/protocols/peer_contract.md",
+      "type": "protocols",
+      "id": "peer_contract",
+      "title": "Peer Contract — k3dge ↔ 外部 harness 接口协议 (v0.6)",
+      "status": "",
+      "tokens": "Peer Contract — k3dge ↔ 外部 harness 接口协议 (v0.6)"
     },
     {
       "path": "docs/protocols/quality_default.md",
@@ -431,6 +447,142 @@
       "title": "Domain Specification: templates",
       "status": "Active",
       "tokens": "Domain Specification: templates"
+    },
+    {
+      "path": "docs/tasks/2026-09-02-M7-audit-doc_audit_adr_4.md",
+      "type": "tasks",
+      "id": "2026-09-02-M7-audit-doc_audit_adr_4",
+      "title": "doc-audit: 文档作者合规审计（本轮 docs 改动 26 处）",
+      "status": "idea",
+      "tokens": "doc-audit: 文档作者合规审计（本轮 docs 改动 26 处）"
+    },
+    {
+      "path": "docs/tasks/2026-09-02-M7-docs-adr0006_inplace_revise.done.md",
+      "type": "tasks",
+      "id": "2026-09-02-M7-docs-adr0006_inplace_revise.done",
+      "title": "ADR-0006 就地修订为入向/出向双向契约 + AUTHORING 例外条款",
+      "status": "done",
+      "tokens": "ADR-0006 就地修订为入向/出向双向契约 + AUTHORING 例外条款"
+    },
+    {
+      "path": "docs/tasks/2026-09-02-M7-docs-align_rules_overview_outbound.md",
+      "type": "tasks",
+      "id": "2026-09-02-M7-docs-align_rules_overview_outbound",
+      "title": "rules/07 与 overview 对齐 ADR-0006 出向编排与 downgrade 表述",
+      "status": "idea",
+      "tokens": "rules/07 与 overview 对齐 ADR-0006 出向编排与 downgrade 表述"
+    },
+    {
+      "path": "docs/tasks/2026-09-02-M7-feat-check_gate_by_doc_status.md",
+      "type": "tasks",
+      "id": "2026-09-02-M7-feat-check_gate_by_doc_status",
+      "title": "check 按文档 Status（Draft/Accepted）区分过闸口径",
+      "status": "deferred",
+      "tokens": "check 按文档 Status（Draft/Accepted）区分过闸口径"
+    },
+    {
+      "path": "docs/tasks/2026-09-02-M7-feat-k3che_cli_transport.md",
+      "type": "tasks",
+      "id": "2026-09-02-M7-feat-k3che_cli_transport",
+      "title": "k3che 补 cli 传输面（mcp/cli 成对）",
+      "status": "idea",
+      "tokens": "k3che 补 cli 传输面（mcp/cli 成对）"
+    },
+    {
+      "path": "docs/tasks/2026-09-02-M7-feat-peer_outbound_mcp_client.md",
+      "type": "tasks",
+      "id": "2026-09-02-M7-feat-peer_outbound_mcp_client",
+      "title": "k3dge 出向 MCP 客户端与 endpoint 唯一事实源",
+      "status": "in-progress",
+      "tokens": "k3dge 出向 MCP 客户端与 endpoint 唯一事实源"
+    },
+    {
+      "path": "docs/tasks/2026-09-02-M7-fix-k3che_indexes_authoring_files.done.md",
+      "type": "tasks",
+      "id": "2026-09-02-M7-fix-k3che_indexes_authoring_files.done",
+      "title": "k3che 检索索引把 docs/*/AUTHORING.md 当语料",
+      "status": "done",
+      "tokens": "k3che 检索索引把 docs/*/AUTHORING.md 当语料"
+    },
+    {
+      "path": "docs/tasks/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.md",
+      "type": "tasks",
+      "id": "2026-09-02-M7-fix-k3dge_mcp2_resource_strict",
+      "title": "k3dge 自身 MCP server 在 mcp 2.x 下无法启动（resource 严格校验）",
+      "status": "deferred",
+      "tokens": "k3dge 自身 MCP server 在 mcp 2.x 下无法启动（resource 严格校验）"
+    },
+    {
+      "path": "docs/tasks/2026-09-02-M7-fix-status_nameerror_next.done.md",
+      "type": "tasks",
+      "id": "2026-09-02-M7-fix-status_nameerror_next.done",
+      "title": "k3dge status 抛 NameError 致 [NEXT] 永不输出",
+      "status": "done",
+      "tokens": "k3dge status 抛 NameError 致 [NEXT] 永不输出"
+    },
+    {
+      "path": "docs/tasks/2026-09-02-M7-fix-task_list_ghost_authoring.done.md",
+      "type": "tasks",
+      "id": "2026-09-02-M7-fix-task_list_ghost_authoring.done",
+      "title": "task list 把 docs/tasks/AUTHORING.md 当幽灵任务",
+      "status": "done",
+      "tokens": "task list 把 docs/tasks/AUTHORING.md 当幽灵任务"
+    },
+    {
+      "path": "docs/tasks/2026-09-03-M7-feat-archive_tier_contract.md",
+      "type": "tasks",
+      "id": "2026-09-03-M7-feat-archive_tier_contract",
+      "title": "归档契约落地（去向标记提醒 + 显式 --archive 出口）",
+      "status": "idea",
+      "tokens": "归档契约落地（去向标记提醒 + 显式 --archive 出口）"
+    },
+    {
+      "path": "docs/tasks/2026-09-03-M7-feat-gate_exit_and_trail_checks.md",
+      "type": "tasks",
+      "id": "2026-09-03-M7-feat-gate_exit_and_trail_checks",
+      "title": "把出口同构与日志只追加变成机验",
+      "status": "idea",
+      "tokens": "把出口同构与日志只追加变成机验"
+    },
+    {
+      "path": "docs/tasks/2026-09-03-M7-feat-task_dup_check_via_cache.done.md",
+      "type": "tasks",
+      "id": "2026-09-03-M7-feat-task_dup_check_via_cache.done",
+      "title": "task create duplicate check via cache role",
+      "status": "done",
+      "tokens": "task create duplicate check via cache role"
+    },
+    {
+      "path": "docs/tasks/2026-09-04-M7-feat-g1g2_seat_manual_and_ratchet_next.md",
+      "type": "tasks",
+      "id": "2026-09-04-M7-feat-g1g2_seat_manual_and_ratchet_next",
+      "title": "真跑前置：席位工单棘轮化 + ratchet_open 路由",
+      "status": "done",
+      "tokens": "真跑前置：席位工单棘轮化 + ratchet_open 路由"
+    },
+    {
+      "path": "docs/tasks/2026-09-04-M7-feat-ratchet_real_run_backlog.md",
+      "type": "tasks",
+      "id": "2026-09-04-M7-feat-ratchet_real_run_backlog",
+      "title": "首案真跑前遗留清单（k3dge 侧）",
+      "status": "idea",
+      "tokens": "首案真跑前遗留清单（k3dge 侧）"
+    },
+    {
+      "path": "docs/tasks/2026-09-04-M7-feat-ratchet_v3_ledger.done.md",
+      "type": "tasks",
+      "id": "2026-09-04-M7-feat-ratchet_v3_ledger.done",
+      "title": "ratchet v3 施工十单封账凭条",
+      "status": "done",
+      "tokens": "ratchet v3 施工十单封账凭条"
+    },
+    {
+      "path": "docs/tasks/2026-09-04-M7-feat-ratchet_v3_ledger.md",
+      "type": "tasks",
+      "id": "2026-09-04-M7-feat-ratchet_v3_ledger",
+      "title": "ratchet v3 exchange implementation ledger",
+      "status": "done",
+      "tokens": "ratchet v3 exchange implementation ledger"
     }
   ]
 }

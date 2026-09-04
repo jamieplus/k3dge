@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-24
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0008: 触发式文档维护与先读已敲定设计

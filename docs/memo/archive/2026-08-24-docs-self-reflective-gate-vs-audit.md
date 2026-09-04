@@ -1,5 +1,9 @@
 # Memo: 人读文档自省体治理 — 审计先行、收敛后升闸
 
+- **归档日期**: 2026-09-03
+- **Superseded-by**: `docs/adr/0021-doc-audit-post-check-non-blocking.md`（机制已落地：`doc-audit` 在 `check` **之后**、非阻断、路由 `k3dit.actions.audit`、以带 Milestone 的 task 兜底）
+- **Legacy note**: 本 memo 自设的晋升条件「累积 3 轮同类自省体审计且模式收敛后出硬正则草案」**尚未满足**（2026-09-03 实测：`docs/reviews/` 内含「自省体|软规则」的文件 0 份）。该残留触发条件保留在此，由 k3dit 侧未来晋升；未去改 `ADR-0021` 正文（Accepted 之后 append-only，且本轮无该授权）。
+
 - **类型**：暂无法落地（方向明确但需 3 轮 audit 观察收敛，且属 `harnesses/audit` 范畴，非 `src/k3dge` 门禁）
 - **念头**：` .agent/README.md` 等人读文档出现 AI 自省体（"读到这里是因为已知路径，不是因为被逛到""主流 harness 不扫这里"）不应在 `gate` 硬拦。`gate` 只拦可正则判定的硬事实（`VERSION_MISMATCH`/`guide-stub`），自省体这类"是否像人话"的软风格应先在 `harnesses/audit` 的 `Pass 3/4` 以 9 列审计抓取（`有意留: 推导已收至 ADR` / `已修: 改为是什么/怎么用`），待累积 3 轮同类且收敛为 2-3 条硬正则后，再晋升为 `DOC_STYLE` 门禁。期间 `.agent/README.md` 保持 `scaffold` 生成件（`assets/agent-readme.md` 锁）以控增量污染，存量自省句暂不追改
 - **触发场景**：在 `GitHub` 推 ` .grok` 误追踪后，讨论"AI 自省式写作如何规范"时提出；用户追问"有明确边界吗？做成 gate 还是 audit 发现"，确认边界后判定不立即可门禁、且部分属并列 `audit` harness

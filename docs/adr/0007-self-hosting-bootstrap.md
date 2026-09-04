@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-24
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0007: k3dge 处于自举开发（dogfood / bootstrap）

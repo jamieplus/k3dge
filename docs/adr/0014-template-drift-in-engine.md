@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-25
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0014: TEMPLATE_DRIFT 锁在 engine，不 import templates

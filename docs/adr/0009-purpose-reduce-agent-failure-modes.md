@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-24
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0009: k3dge 的目的是给后续项目收住 Agent 的常见失败态

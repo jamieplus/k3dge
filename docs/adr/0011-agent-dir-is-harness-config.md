@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-24
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0011: `.agent/` 是 harness 机器配置，不是 Agent 的发现面

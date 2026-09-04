@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-31
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0019: No load-proof; routing formula in AGENTS.md, payload beside the files

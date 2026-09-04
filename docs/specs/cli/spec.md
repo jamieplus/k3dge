@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/cli`
-- **Contract Hash**: `sha256:67fbdd8d2b343964a673f3b775d83e8033aab6ec25f24051e5e2c908d7ddc103`
-- **Last Updated**: 2026-09-02
+- **Contract Hash**: `sha256:3e89ad61c689342c289b8b9cdb8306ef610f9198ab673ce3f28f401f37dbb7f7`
+- **Last Updated**: 2026-09-04
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -30,6 +30,9 @@ cmd_doc(args: argparse.Namespace) -> int
 cmd_task(args: argparse.Namespace) -> int
 cmd_init(args: argparse.Namespace) -> int
 cmd_mcp(args: argparse.Namespace) -> int
+cmd_bundle(args: argparse.Namespace) -> int
+cmd_audit(args: argparse.Namespace) -> int
+cmd_markers(args: argparse.Namespace) -> int
 cmd_milestone(args: argparse.Namespace) -> int
 cmd_search(args: argparse.Namespace) -> int
 cmd_where(args: argparse.Namespace) -> int
@@ -59,6 +62,8 @@ k3dge_milestone_control(action: str, milestone_id: str, workspace_path: Optional
 k3dge_submit_audit_report(milestone_id: str, content: str, workspace_path: Optional[str]=None) -> str
 k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str) -> str
 k3dge_adr_index(workspace_path: Optional[str]=None) -> str
+cache_observability(workspace: Path) -> Optional[Dict[str, Any]]
+lifecycle_next(workspace: Path) -> Any
 workspace_status(workspace: Path) -> Dict[str, Any]
 ```
 <!-- k3dge:interfaces-end -->

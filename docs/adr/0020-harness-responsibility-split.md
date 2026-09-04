@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-09-01
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0020: Harness Responsibility Split (k3dge / k3dit / k3lity)

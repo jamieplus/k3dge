@@ -11,7 +11,7 @@
 
 ## 结论（已定，勿重开设计讨论）
 
-1. **k3dge 不管怎么想，只管证据在不在。** 一致性门禁必须确定性、零 LLM。审计是带透镜的判断，同一份代码可以有不同表；塞进 `k3dge check` 会变软、变慢、被 `--no-verify` 一起绕过。与「质量不进本 harness」（`docs/memo/2026-08-21-code-quality-discussion.md`）同一条线。
+1. **k3dge 不管怎么想，只管证据在不在。** 一致性门禁必须确定性、零 LLM。审计是带透镜的判断，同一份代码可以有不同表；塞进 `k3dge check` 会变软、变慢、被 `--no-verify` 一起绕过。与「质量不进本 harness」（`docs/memo/archive/2026-08-21-code-quality-discussion.md`）同一条线。
 2. **三层分开，不要合成一个全能闸。**
    - L1 一致性 = k3dge（契约哈希、结构、矩阵文件是否存在）
    - L2 质量 = 另 harness（ruff/mypy 等，尚未建）
@@ -96,4 +96,4 @@
 - 独立性判断：本对话「审计是不是也应该提为另一个 harness 保持独立性」
 - 8 维清单：本对话用户给出的五轮全文
 - 祖先五轮：`docs/memo/archive/2026-08-23-5pass-audit-protocol.md`
-- 质量闸先例：`docs/memo/2026-08-21-code-quality-discussion.md`
+- 质量闸先例：`docs/memo/archive/2026-08-21-code-quality-discussion.md`

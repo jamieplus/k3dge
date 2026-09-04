@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-09-02
 Deciders: Core Maintainer (待 k3dit/人 复核后转 Accepted)
+Note: -
 ---
 
 # ADR-0021: doc-audit 后置、非阻断（T-01 的边界）

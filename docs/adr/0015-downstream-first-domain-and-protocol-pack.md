@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-25
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0015: 下游 init 必须能被门禁咬住，协议包不得带本仓特化

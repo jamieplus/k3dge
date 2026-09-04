@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-21
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0002: docs 判据与投影的语义分工（architecture vs generated）

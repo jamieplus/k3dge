@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-09-02
 Deciders: Core Maintainer (待 k3dit/人 复核后转 Accepted)
+Note: -
 ---
 
 # ADR-0022: task 对应审计报告（1 report = 1 task），不再一条 bug 一个 task

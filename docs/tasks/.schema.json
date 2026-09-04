@@ -1,8 +1,19 @@
 {
   "headers": {
-    "Status": ["idea", "deferred", "in-progress", "done"]
+    "Status": [
+      "idea",
+      "deferred",
+      "in-progress",
+      "done"
+    ]
+  },
+  "sections_when": {
+    "-feat-": [
+      "## 边界与拆分"
+    ]
   },
   "codes": {
-    "headers": "TASK_STATUS_INVALID"
+    "headers": "TASK_STATUS_INVALID",
+    "sections_when": "TASK_SECTION_MISSING"
   }
 }

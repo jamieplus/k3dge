@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-23
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0004: 里程碑生命周期治理（Milestone Lifecycle Governance）

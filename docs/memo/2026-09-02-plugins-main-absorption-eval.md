@@ -26,10 +26,10 @@
 | 来源 | 吸收什么（v3 细化） | 状态 | rank |
 |---|---|---|---|
 | thermos 可数半 | 文件行数>阈 → `结构` | ✅ c3860a3 | — |
-| **agent-compatibility** ⬤(skill+validation) | `_score` 升级：`det×0.7 + workflow×0.3`，workflow=avg(startup/validation/docs)；**validation 锚点 93/84/68/27/12**；"工具环境跑不起来 ≠ 仓库缺陷，别罚"；输出=`## Score:N/100`+`Top fixes` 扁平表，不暴露算法 | 🎯 | P1 |
-| **control-cli / control-ui** ⬤ | 填现是 stub 的 `probe`：**优先复用仓库自带 harness**→否则 tmux(new-session/capture-pane/send-keys/kill)、PTY、Node inspector、CDP(`--remote-debugging-port`)、复用已装 Playwright（**别为探针新增依赖**）、选择器用 ARIA/data-* 非坐标 | 🎯 | P1 |
-| **verify-this** ⬤ | `verify` 精化：**可证伪重述(条件+指标+阈)**→选最小可反证面→baseline(merge-base/父提交/旧 repro)→treatment(同命令同环境)→比原始产物→`VERIFIED/NOT/INCONCLUSIVE`；产物 `/tmp/verify-this/<slug>/{claim,timeline,baseline,treatment,diff,verdict}.md`；敏感只留 inline | 🎯 | P2 |
-| cursor-team-kit **deslop** ⬤ / pstack **unslop** | k3lity `deslop` 具体化：多余注释/异常防御式 try-catch/纯绕类型的 `as any`/该早返回的深嵌套；行为不变、最小聚焦改；unslop(写作 AI 腔) 归 k3dge 文档 | 🎯 | P2 |
+| **agent-compatibility** ⬤(skill+validation) | `_score` 升级：`det×0.7 + workflow×0.3`，workflow=avg(startup/validation/docs)；**validation 锚点 93/84/68/27/12**；"工具环境跑不起来 ≠ 仓库缺陷，别罚"；输出=`## Score:N/100`+`Top fixes` 扁平表，不暴露算法 | ✅ k3lity | P1 |
+| **control-cli / control-ui** ⬤ | 填现是 stub 的 `probe`：**优先复用仓库自带 harness**→否则 tmux(new-session/capture-pane/send-keys/kill)、PTY、Node inspector、CDP(`--remote-debugging-port`)、复用已装 Playwright（**别为探针新增依赖**）、选择器用 ARIA/data-* 非坐标 | ✅ k3lity | P1 |
+| **verify-this** ⬤ | `verify` 精化：**可证伪重述(条件+指标+阈)**→选最小可反证面→baseline(merge-base/父提交/旧 repro)→treatment(同命令同环境)→比原始产物→`VERIFIED/NOT/INCONCLUSIVE`；产物 `/tmp/verify-this/<slug>/{claim,timeline,baseline,treatment,diff,verdict}.md`；敏感只留 inline | ✅ k3lity | P2 |
+| cursor-team-kit **deslop** ⬤ / pstack **unslop** | k3lity `deslop` 具体化：多余注释/异常防御式 try-catch/纯绕类型的 `as any`/该早返回的深嵌套；行为不变、最小聚焦改；unslop(写作 AI 腔) 归 k3dge 文档 | ✅ k3lity | P2 |
 | **typescript-exhaustive-switch.mdc / no-inline-imports.mdc** ⬤ | 具体 TS 可检规则（`never` 兜底 switch；import 置顶）→ k3lity TS 检查（配 typescript-best-practices/patterns ⬤：branded type、判别式 union、constructive modeling） | 🎯 | P2 |
 | pstack `hillclimb` / `bug-fix` / `visual-parity` / `prototype` ⬤(部分) | 度量循环纪律（冻结 harness、median-of-N、一测一改一 revert、pixel-diff 才算过）→ k3lity verify/eval 判据 | 📥 | P3 |
 
@@ -64,3 +64,10 @@
 - **P1**：k3dit ← `thermo-nuclear-review`(安全/正确性 + 只审 diff 内 + over-report 校准) + `interrogate/rubric`(并入可维护性透镜)；k3lity ← `agent-compatibility` 评分模型(升级 stub `_score`) + `control-cli/ui`(填 stub `probe`)
 - **P2**：k3lity ← `verify-this`精化/`deslop`+TS .mdc；k3dit ← epistemics 置信分层 + show-me-your-work 留痕；k3che ← continual-learning 增量刷新；k3dge ← technical-writing 软规则 + show-me-your-work closure 格式。**eval 盲测移出 P2**：k3dge 无 compare harness 可修（见上更正），列为"需先立 harness"。
 - **P3**：perf 8 族、hillclimb/bug-fix/visual-parity 度量、principles 细则、reflect/recall、guard-context-window 半条
+
+### 状态更正记录（2026-09-03）
+
+- 第 29, 30, 31, 32 行原标 `🎯`（待吸收），实测**已在 k3lity 落地**，改为 `✅ k3lity` 并附文件:行（逐条见上表）。
+  同批一次口头复核曾把这四行说成「📥 里已实现」——错：`📥`（未开始）与 `🎯`（目标/计划吸收）是两类，实测 `🎯` 14 行、`📥` 6 行。此处留记，免得下次又拿状态符号猜实现。
+- 第 33 行（TS 可检规则 `never` 兜底 switch / import 置顶）**仍未落地**：`../k3lity/src/k3lity/` 只有 `__init__/cli/deslop/harness/mcp/quality`，无 TS 规则实现 ⇒ 保持 `🎯`。
+- 剩余 `📥`/`🎯` 行的归属是 **peer 仓**（k3dit 判据、k3lity 度量、k3che 记忆），不属本仓 backlog。把它们迁进各 peer 自己的 `docs/memo/` 需各仓维护者授权（`ADR-0006` §2.3.7 跨仓改动条），本文件先就地标注归属，不擅动 peers。

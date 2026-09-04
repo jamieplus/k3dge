@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-24
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0012: Agent 对仓库的断言必须带证据链

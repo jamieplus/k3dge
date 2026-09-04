@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- ratchet v3 exchange implementation ledger（施工账本体）
+- ratchet v3 施工十单封账凭条
+- 真跑前置：席位工单棘轮化 + ratchet_open 路由
+- 席位工单棘轮化（G1）＋ `[NEXT] ratchet_open` 路由：编排认识在办工单（G2）
+- ratchet v3 施工账十单全绿（ADR-0026 落地）：bundle 单文件交换原子＋身份/位置分家（②④）；分支工作现场 ensure/advance CAS/merge_back P1＋seal prune 钩子（③⑤⑦）；k3dit 句柄透传零代码落盘、角色门（fixed 仅审计席）、audit-report 机械渲染＋署名结案两步（①⑧⑨）；`k3dge audit` 四动词与 `bundle create`（⑩）；peer_contract v0.6 与 memo 化石条目（⑥）
+- task create duplicate check via cache role
+
+### Fixed
+- k3dge status 抛 NameError 致 [NEXT] 永不输出
+
+- task list 把 docs/tasks/AUTHORING.md 当幽灵任务
+- k3che 检索索引把 docs/*/AUTHORING.md 当语料
 ### Changed
 - `k3dge milestone seal` archives this-milestone reviews to `docs/reviews/archive/<id>/` and rewrites leftover hrefs in `docs/reviews/LEFTOVERS.md`.
 - Move the intentional-leftovers table from `docs/reviews/README.md` to `docs/reviews/LEFTOVERS.md`.
@@ -15,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move per-type structure gates from README comment blocks to `docs/<type>/.schema.json`.
 - Move per-type soft rules from README `## Authoring` to `docs/<type>/AUTHORING.md`.
 
+- ADR-0006 就地修订为入向/出向双向契约 + AUTHORING 例外条款
 ## [0.1.8] - 2026-08-27
 
 ### Fixed

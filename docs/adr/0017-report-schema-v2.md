@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-27
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0017: Audit Report Schema v2 (12 columns)

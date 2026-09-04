@@ -1,5 +1,9 @@
 # Memo: 代码质量与全局优化不归本 harness
 
+- **归档日期**: 2026-09-03（结论已被承接，不是「不再相关「）
+- **Superseded-by**: `docs/adr/0006-mcp-foreign-harness-injection.md` §2.2 并列 harness 表的 `quality` 行 ＋ 独立仓 `../k3lity`（`src/k3lity/cli.py` 实有 score/verify/probe/deslop/quality-report/check-report）
+- **Legacy note**: 本份只记「质量与全局优化不归 k3dge」这一分工判断；若要改判据阈值或加度量，去 `../k3lity` 提，勿在本仓加闸。
+
 - **闪念**：Agent 常陷局部最优、缺全局视野致系统优化不足、重构差；不同 Agent 能力不一，有的堆大量共线性判断与冗余逻辑
 - **触发场景**：讨论"本 harness 能否解决"时提出（`docs/architecture/overview.md` 补全后）
 - **关联度**：与本系统弱相关——属**质量/优化层**，非一致性层

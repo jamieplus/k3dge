@@ -6,6 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-21
 Deciders: Core Maintainer
+Note: -
 ---
 
 # ADR-0003: tasks 与 backlog 合并为单一 tasks 目录

@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:cecdfc8c8cdb31543a9e9bad141fa3e71dfe9c18e5a7060537367072a5820367`
-- **Last Updated**: 2026-09-02
+- **Contract Hash**: `sha256:3d4b1dadb99010e6e866f3c58d65d15c2693100b80161c69a60c19ec374b2f02`
+- **Last Updated**: 2026-09-04
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -33,8 +33,17 @@ reset_for_audit(workspace: Path, milestone_id: Optional[str]=None) -> dict
 get_verify_attempts(workspace: Path) -> int
 bump_verify_attempt(workspace: Path) -> int
 reset_verify_attempts(workspace: Path) -> None
+submit_audit(workspace: Path, milestone_id: str, targets: Optional[list]=None, io=None) -> dict
+collect_audit(workspace: Path, milestone_id: str, io=None) -> dict
+peer_status(workspace: Path, job_id: str, io=None) -> dict
+open_ratchet_jobs(workspace: Path) -> list
+prune_finished(workspace: Path) -> dict
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
 audit_closed(workspace: Path, milestone_id: str) -> bool
+load_bundle_config(workspace: Path) -> dict
+extract_signatures(source: str) -> str
+pack_provenance(workspace: Path, cfg: dict) -> dict
+build_bundle(workspace: Path, targets: List[str], milestone_id: Optional[str]=None, prev_commit: Optional[str]=None) -> dict
 class ContractExtractor
     can_handle(self, path: Path) -> bool
     extract(self, path: Path, include_doc: bool=False) -> str
@@ -80,6 +89,22 @@ class Manifest
     spec_path(self, domain: str) -> Optional[str]
     is_ignored(self, path: str) -> bool
     under_package_root(self, path: str) -> bool
+class Marker
+    file: str
+    line: int
+    kind: str
+    id: str
+    scope: str
+    note: str
+    key(self) -> Tuple[str, str]
+head_block_end(lines: Sequence[str]) -> int
+parse_text(rel: str, text: str) -> Tuple[List[Marker], List[str]]
+parse_sidecar(text: str) -> Tuple[List[Marker], List[str]]
+extract(workspace: Path, roots: Sequence[str]=('src', 'docs')) -> Tuple[List[Marker], List[str]]
+validate(workspace: Path, markers: Sequence[Marker]) -> List[str]
+counts(markers: Iterable[Marker]) -> dict
+open_samples(markers: Sequence[Marker]) -> List[str]
+closure_ok(markers: Sequence[Marker]) -> Tuple[bool, dict]
 parse_frontmatter(content: str) -> dict[str, str]
 get_current_milestone(workspace: Path) -> str
 set_current_milestone(workspace: Path, milestone_id: str) -> None
@@ -139,9 +164,17 @@ class TransportResult
     provider: Optional[str]
     detail: str
     skipped: bool = False
+    downgrades: List[str] = field(default_factory=list)
+    payload: str = ''
 load_pipeline_config(workspace: Path) -> dict
+resolve_role(pipeline: dict, name: str) -> str
 resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]
-run_action(workspace: Path, action_ref: str, *, io=None, timeout_default: int=60) -> TransportResult
+load_mcp_endpoints(workspace: Path) -> Dict[str, Any]
+resolve_endpoint_command(workspace: Path, endpoint: dict) -> Tuple[Optional[str], str]
+build_server_params(workspace: Path, endpoint: dict, command: str) -> dict
+call_mcp_tool(params: dict, tool: str, arguments: dict, timeout: int) -> Tuple[bool, str, List[str], str]
+probe_servers(workspace: Path, timeout: int=20) -> List[Tuple[str, bool, str, List[str]]]
+run_action(workspace: Path, action_ref: str, *, io=None, timeout_default: int=60, arguments: Optional[dict]=None) -> TransportResult
 validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
 write_incident(workspace: Path, target: str | None, task_type: str | None, task_id: str, detail: str) -> Path
 class Location
@@ -156,6 +189,19 @@ where(workspace: Path, symbol: str) -> List[Location]
 search(workspace: Path, query: str, *, snippet: bool=True, context: int=2, max_snippet: int=240) -> List[Location]
 validate_structure(content: str) -> List[str]
 extract_contract_hash(content: str) -> Optional[str]
+class StoreError(RuntimeError)
+class GitStore
+    ensure(self) -> None
+    @property
+    supports_sha256(self) -> bool
+    put_tree(self, files: Dict[str, bytes]) -> str
+    list_tree(self, oid: str) -> List[Tuple[str, str]]
+    get(self, ref: str, dest: Path) -> Path
+    diff(self, ref_a: str, ref_b: str) -> List[Tuple[str, str, str]]
+    commit_snapshot(self, files: Dict[str, bytes], job: str, prev_commit: Optional[str]=None) -> dict
+    bundle_create(self, commit: str, out: Path, has: Optional[str]=None) -> Path
+    @staticmethod
+    bundle_heads(bundle: Path) -> List[tuple]
 parse_version(v: str) -> Tuple[int, int, int]
 format_version(major: int, minor: int, patch: int) -> str
 get_pyproject_version(workspace: Path) -> str | None
@@ -166,6 +212,14 @@ validate_versions(workspace: Path) -> list[Violation]
 bump_version(workspace: Path, part: str='patch', set_version: str | None=None) -> str
 append_changelog(workspace: Path, new_version: str, notes: str | None=None, change_type: str | None=None) -> Path
 consume_unreleased(workspace: Path) -> str
+branch_name(job: str) -> str
+worktree_path(workspace: Path, job: str) -> Path
+ensure(workspace: Path, job: str, base: Optional[str]=None) -> Path
+present(workspace: Path, job: str, commit: Optional[str]=None) -> list
+advance(workspace: Path, job: str) -> Optional[str]
+merge_back(workspace: Path, job: str, accept_dirty: tuple=()) -> dict
+prune(workspace: Path, job: str, bundle_files: list[str]) -> dict
+remove(workspace: Path, job: str) -> None
 ```
 <!-- k3dge:interfaces-end -->
 

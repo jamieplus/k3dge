@@ -52,6 +52,30 @@
 
 依赖：`mcp>=1.0`。自举在 `.[dev]` 里；下游 init 装 `[mcp]`。缺包时先 `pip install -e ".[dev]"` 或 `-e "${K3DGE_SOURCE}[mcp]"`，不要改用别的传输。
 
+## 出向：k3dge 作为客户端连 peers（ADR-0006 §2.3）
+
+上面整篇都是**入向**（别人调 k3dge）。k3dge 也会反过来当 MCP 客户端，用 stdio 拉起 peers 自己发布的 server（`milestone audit` / `seal` / `doc-audit` 三条流程）。两条铁律：
+
+| 铁律 | 事实源 | 落点 |
+| --- | --- | --- |
+| endpoint（`command`/`args`/`env`/`cwd`）只写在 `.mcp.json` | `.mcp.json` 的 `mcpServers.<peer>` | `engine/pipeline_runner.load_mcp_endpoints` |
+| 流程（哪个 stage、调哪个 `tool`、`args`、fallback 链、超时）只写在 `pipeline.toml` | `.agent/pipeline.toml` 的 `[peers.*.actions.*]` | `engine/pipeline_runner.run_action` |
+
+- **身份不借道**：`action_ref` 的第一段就是 peer 名，也是 `.mcp.json` 的键。`k3lity.*` 只会连 k3lity 的 server；早期那版「用 `shutil.which("k3dit")` 冒充所有 peer 的 mcp 传输」已删除，单测 `PeerIsolation` 守住它。
+- **解释器落地会出声**：`.mcp.json` 里写 `"command": "python"`，而本机 PATH 无 `python` 时，客户端回退到 `<workspace>/.venv/bin/python` 并把这件事打在同一条消息里（`resolve_endpoint_command` 的 `(fallback: ...)` 注记），不改写你的配置文件。要把真相写进配置：`command` 用绝对解释器路径 + 显式 `cwd`。
+- **`cwd` 默认 = 消费仓**，所以 `env.PYTHONPATH` 的相对值（如 `../k3che/src`）与外部 harness 读同一份文件时解析一致。
+- **降级不可静默**（§2.4）：从 `mcp` 掉到 `cli`/`manual` 必打 `WARN[DOWNGRADE] action=… from=… to=… reason=…`，reason 带 peer 自己的报错与 stderr 尾行，并追加进 `logs/k3dge.log`；落到 `manual` 时提示语里明写「不是独立审计」。`manual` 不需要事先申请，但你必须在总结里高亮它。
+- **工具的业务失败＝传输失败**：`tools/call` 返回 `is_error`（SDK 2.x 模型是 snake_case，1.x 是 `isError`，两处都读）时按失败处理并降级，绝不记成「lens 可用」。
+
+自检命令（只诊断，不进 `check`）：
+
+```bash
+k3dge mcp probe            # 逐个 server 真握手：ALIVE/DEAD + tools 列表 + 失败原因
+k3dge mcp probe --json     # 同上的机读形态；全活 exit 0，有死 exit 1
+```
+
+> `k3dge check` 不调它（§2.3.2：`check` 是纯静态硬闸，永不调用 agent/透镜/peer 帮忙验证）。
+
 ## 能力清单
 
 | MCP 原语 | 名称 | 委托事实源 | 说明 |
@@ -68,6 +92,10 @@
 | Tool | `k3dge_milestone_control` | `milestone.(status|align|seal)` | `status` 查任务、`align` Full Matrix 回归、`seal` 三闸机原子归档 |
 | Prompt | `k3dge_5pass_audit_prompt` | 优先 `../k3dit/docs/guides/protocol.md`，否则 `docs/protocols/audit_default.md` | 只指路；同一审计入口，按 `target_scope` 路由代码 5-Pass / 文档 Doc Audit（ADR-0020）；不在 k3dge 内维护透镜 |
 | Tool | `k3dge_adr_index` | `engine.doc_catalog.analyze_adr_coverage` | ADR 集合自洽事实（重叠/指针 findings，非判断）；文档审计透镜原料 |
+
+## 入向现状：server 在 `mcp` 2.x 下起不来（已知、未修、不阻断出向）
+
+按维护者决定，本仓作为 stdio server 的修复**先搁置**：`mcp` 2.x 严格校验「resource URI 无模板变量则 handler 不得收参数」，而 `spec://manifest` 的 handler 收了 `workspace_path`（`src/k3dge/cli/mcp.py:57`）→ 注册期 `ValueError`，于是 `FastMCP` 落回 `_DummyMCP`、`k3dge mcp probe` 报 DEAD。外部 harness 目前仍能跑 `k3dge` CLI，但拿不到入向工具面。修法与三选项见 `docs/tasks/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.md`。
 
 ## 路径解析
 
