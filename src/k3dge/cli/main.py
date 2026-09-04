@@ -685,7 +685,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
         r = audit_flow.collect_audit(workspace, tok, args.job or None)
     print(json.dumps({k: v for k, v in r.items() if k in
                       ("ok", "state", "failed", "detail", "job_id", "counts", "pending",
-                       "baseline_ok", "report", "merge", "commit", "error", "message")},
+                       "baseline_ok", "report", "merge", "commit", "present_pushed", "error", "message")},
                      ensure_ascii=False))
     return 0 if r.get("ok") else 1
 
