@@ -32,7 +32,7 @@ _CTRL_NODES = (
 )
 
 
-# k3dit:pending F-7 @line _git_changed_files 与 cli/main.py:_workspace_hints 重复执行 git status --porcelain；同一 post-check 流程内两处独立调用，无共享
+# k3dit:leftover F-7 @line 与 cli 重复 git status（有意留）
 def _git_changed_files(workspace: Path) -> List[str]:
     try:
         out = subprocess.run(

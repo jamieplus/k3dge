@@ -1,4 +1,4 @@
-# k3dit:pending A-1 @file 上帝模块 1547 行跨越 task 生命周期、changelog 回填、review 回填、seal 流程、audit 流程、doc audit 等 6+ 关注点；应拆分以降低圈复杂度
+# k3dit:leftover A-1 @file 上帝模块 1547 行（6+ 关注点），拆分另立票
 """Milestone lifecycle engine: alignment check, test regression, and context compaction."""
 
 from __future__ import annotations
