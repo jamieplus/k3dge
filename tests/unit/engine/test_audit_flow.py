@@ -133,3 +133,11 @@ def test_peer_status_no_peer_is_graceful(tmp_path):
     (tmp_path / ".agent").mkdir()
     r = audit_flow.peer_status(tmp_path, "J-x")
     assert r["ok"] is False and r["state"] == "unknown" and "message" in r
+
+
+def test_push_present_no_job_graceful(tmp_path):
+    from k3dge.engine import audit_flow
+
+    (tmp_path / ".agent").mkdir()
+    r = audit_flow.push_present(tmp_path, "no-such-key")
+    assert r["ok"] is False and "skipped" in r

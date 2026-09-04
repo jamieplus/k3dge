@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- P0 present 推送接线：`audit_flow.push_present`（submit 首程底＋`audit advance` 随程推），pipeline `audit.present`；k3dit 缺口回填见其 gap 单
 - ratchet v3 exchange implementation ledger（施工账本体）
 - ratchet v3 施工十单封账凭条
 - 真跑前置：席位工单棘轮化 + ratchet_open 路由

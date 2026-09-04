@@ -676,7 +676,9 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
         _wt.ensure(workspace, tok or "adhoc")
         try:
-            r = {"ok": True, "commit": _wt.advance(workspace, tok or "adhoc")}
+            commit = _wt.advance(workspace, tok or "adhoc")
+            push = audit_flow.push_present(workspace, tok, commit)   # P0：钉随程走，进程代供
+            r = {"ok": True, "commit": commit, "present_pushed": push.get("markers", push)}
         except RuntimeError as exc:
             r = {"ok": False, "message": str(exc)}
     else:

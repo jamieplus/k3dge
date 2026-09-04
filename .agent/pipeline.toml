@@ -41,6 +41,11 @@ transports = [
   { provider = "mcp", tool = "k3dit_audit_collect", timeout = 15 },
 ]
 
+[peers.k3dit.actions.present]
+transports = [
+  { provider = "mcp", tool = "k3dit_audit_present", timeout = 10 },
+]
+
 [peers.k3dit.actions.status]
 transports = [
   { provider = "mcp", tool = "k3dit_audit_job_status", timeout = 10 },

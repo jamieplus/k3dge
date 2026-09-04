@@ -100,6 +100,8 @@ submit_audit(workspace: Path, milestone_id: str, targets: Optional[list]=None, i
     # doc: produce 阶段：打送检包 → `audit.submit` → 落 `awaiting_audit`。协议调用必须短。
 collect_audit(workspace: Path, milestone_id: str, io=None) -> dict
     # doc: gate 阶段：`audit.collect` → 验壳（kind/基线/12 列）→ 机械落盘 → 数计数。
+push_present(workspace: Path, job_key: str, commit: str='', io=None) -> dict
+    # doc: P0 接线：advance/submit 后进程抽取 worktree markers 推给对端（机械口供）。
 peer_status(workspace: Path, job_id: str, io=None) -> dict
     # doc: 编排侧探针：`audit.status` 查对端状态机位置与计数（正文不出账本，出货走 collect）。
 open_ratchet_jobs(workspace: Path) -> list

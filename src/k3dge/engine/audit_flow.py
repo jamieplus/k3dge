@@ -138,7 +138,12 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
         "submitted_at": datetime.datetime.now().isoformat(timespec="seconds"),
     })
     _save_state(workspace, state)
-    return {"ok": True, "state": "awaiting_audit", "job_id": job_id, "bundle": bundle}
+    try:  # P0：首程存底（无钉则空单，也建底）；推送失败不否决建单
+        push = push_present(workspace, job_id)
+    except Exception:
+        push = {}
+    return {"ok": True, "state": "awaiting_audit", "job_id": job_id, "bundle": bundle,
+            "present_pushed": push.get("markers") if push.get("ok") else None}
 
 
 def collect_audit(workspace: Path, milestone_id: str, io=None) -> dict:
@@ -239,6 +244,28 @@ def collect_audit(workspace: Path, milestone_id: str, io=None) -> dict:
         "seat": prov.get("seat", ""),
         "baseline_ok": True,
     }
+
+
+def push_present(workspace: Path, job_key: str, commit: str = "", io=None) -> dict:
+    """P0 接线：advance/submit 后进程抽取 worktree markers 推给对端（机械口供）。"""
+    from k3dge.engine import worktree as _wt
+
+    state = _load_state(workspace)
+    cands = [j for j in state.get("jobs", [])
+             if j.get("state") not in ("collected", "failed")
+             and job_key in (j.get("job_id"), j.get("milestone_id"))]
+    if not cands:
+        return {"ok": False, "skipped": f"no in-flight job for {job_key!r}"}
+    job = cands[-1]
+    try:
+        markers = _wt.present(workspace, job.get("milestone_id") or "adhoc", commit or None)
+    except Exception as exc:   # 非 git 仓/无 worktree ⇒ 降级：没有机械口供可推，不炸编排
+        return {"ok": False, "skipped": f"present extract failed: {str(exc)[:80]}"}
+    res = run_action(workspace, "audit.present", io=io,
+                     arguments={"job_id": job["job_id"], "present_json": json.dumps(markers),
+                               "commit": commit or ""})
+    return {"ok": res.ok, "job_id": job["job_id"], "markers": len(markers),
+            "detail": getattr(res, "detail", "")}
 
 
 def peer_status(workspace: Path, job_id: str, io=None) -> dict:

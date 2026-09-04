@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:3d4b1dadb99010e6e866f3c58d65d15c2693100b80161c69a60c19ec374b2f02`
+- **Contract Hash**: `sha256:8e114022ebe32ada4bc251c76df0e4ed7f6ac4b68db01d8b0b9144453cab230e`
 - **Last Updated**: 2026-09-04
 
 ## 1. Domain Boundary & Responsibilities
@@ -35,6 +35,7 @@ bump_verify_attempt(workspace: Path) -> int
 reset_verify_attempts(workspace: Path) -> None
 submit_audit(workspace: Path, milestone_id: str, targets: Optional[list]=None, io=None) -> dict
 collect_audit(workspace: Path, milestone_id: str, io=None) -> dict
+push_present(workspace: Path, job_key: str, commit: str='', io=None) -> dict
 peer_status(workspace: Path, job_id: str, io=None) -> dict
 open_ratchet_jobs(workspace: Path) -> list
 prune_finished(workspace: Path) -> dict
