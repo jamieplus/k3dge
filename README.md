@@ -1,5 +1,7 @@
 # k3dge
 
+> 仓库：<https://github.com/jamieplus/k3dge> · 交换协议权威源：[`docs/protocols/peer_contract.md`](https://github.com/jamieplus/k3dge/blob/main/docs/protocols/peer_contract.md)
+
 Spec-gate harness：为 vibecoding agent 提供确定性的契约漂移检测与 git 硬门禁。
 
 当前阶段是 **自举**（ADR 0007）：用本仓的 k3dge 开发本仓，并作为门禁去开发并列的 audit / quality / cache harness（ADR 0006）。不是 PyPI 产品。存在的目的是给后续项目收住 Agent 漂移、幻觉、修局部坏整体等（ADR 0011），不必穷举失败态。

@@ -1,3 +1,7 @@
+[project.urls]
+Repository = "https://github.com/jamieplus/k3dge"
+Protocols = "https://github.com/jamieplus/k3dge/tree/main/docs/protocols"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

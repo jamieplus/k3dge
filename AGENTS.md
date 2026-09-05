@@ -1,5 +1,7 @@
 # Agent Execution Protocol (k3dge Spec-Gate Architecture)
 
+> **权威源**：协议与模板以 <https://github.com/jamieplus/k3dge>（`docs/protocols/peer_contract.md`）为准；本地兄弟仓仅为工作副本。
+
 You are inside a spec-gate harness. `k3dge check` blocks bad commits, not this prompt.
 
 **Read first**: run `k3dge status` for current workspace state; then `docs/architecture/overview.md` + `k3dge doc where ADR-0001` (ADR-0008 for triggers).
