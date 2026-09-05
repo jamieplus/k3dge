@@ -325,6 +325,7 @@ def _load_schema(workspace: Path, typ: str) -> Tuple[Optional[dict], Optional[Vi
     return schema, None
 
 
+# k3dit:pending Q-3 CC40 _validate_file 拆校验分支为子函数
 def _validate_file(workspace: Path, typ: str, path: Path, schema: dict, seen: dict) -> List[Violation]:
     rel = str(path.relative_to(workspace)).replace("\\", "/")
     out: List[Violation] = []

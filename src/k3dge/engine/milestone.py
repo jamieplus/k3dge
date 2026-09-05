@@ -156,6 +156,7 @@ def _append_to_unreleased(workspace: Path, task_path: Path) -> bool:
         return False
 
 
+# k3dit:pending Q-7 CC50 _auto_backfill_reviews 拆回填子流程
 def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, milestone: str | None) -> None:
     """Best-effort auto-backfill for audit reviews when a task is marked done.
 

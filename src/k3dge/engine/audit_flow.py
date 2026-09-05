@@ -148,6 +148,7 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
             "present_pushed": push.get("markers") if push.get("ok") else None}
 
 
+# k3dit:pending Q-2 CC26 collect_audit 提取验证子步骤
 def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = None, io=None) -> dict:
     """gate 阶段：`audit.collect` → 验壳（kind/基线/12 列）→ 机械落盘 → 数计数。
 

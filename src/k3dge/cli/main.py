@@ -725,6 +725,7 @@ def cmd_markers(args: argparse.Namespace) -> int:
 
 
 
+# k3dit:pending Q-5 CC28 cmd_milestone 拆子命令为独立函数
 def cmd_milestone(args: argparse.Namespace) -> int:
     from k3dge.engine import nextstep
     from k3dge.engine.milestone import run_milestone_alignment, seal_milestone, scan_milestone_tasks, run_seal_flow, run_audit_flow, _Prompt

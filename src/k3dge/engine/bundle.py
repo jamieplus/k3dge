@@ -133,6 +133,7 @@ def pack_provenance(workspace: Path, cfg: dict) -> dict:
             "ignore": sorted(cfg["ignore"]), "scrub_keys": sorted(cfg["scrub_keys"])}
 
 
+# k3dit:pending Q-4 CC28 build_bundle 分阶段拆构建流程
 def build_bundle(workspace: Path, targets: List[str], milestone_id: Optional[str] = None,
                  prev_commit: Optional[str] = None) -> dict:
     """打一个确定性送检包，返回契约 §3 的引用结构。

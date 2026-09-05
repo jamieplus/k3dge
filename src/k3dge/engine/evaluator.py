@@ -61,6 +61,7 @@ def _shape_change_documented(workspace: Path, domain: str, spec_content: str, sy
     return False
 
 
+# k3dit:pending Q-8 CC23 _run_batch_tests 提取批次执行逻辑
 def _run_batch_tests(
     workspace: Path,
     manifest: Manifest,
@@ -166,6 +167,7 @@ class ConsistencyEngine:
             return []
         return [p.strip() for p in out.stdout.splitlines() if p.strip()]
 
+    # k3dit:pending Q-1 CC61 evaluate 提取域循环与违规收集子函数
     def evaluate(self, run_tests: bool = False, force_full: bool = False, staged: bool = False) -> GateReport:
         try:
             manifest = Manifest.load(self.workspace_root)
