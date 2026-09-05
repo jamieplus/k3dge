@@ -38,9 +38,13 @@ build_parser() -> argparse.ArgumentParser
 main(argv: Optional[Sequence[str]]=None) -> int
 # mcp.py
 get_manifest_resource() -> str
-    # doc: Read .agent/manifest.json ground truth (workspace = server CWD；mcp 2.x：无模板 URI 不得带参数).
+    # doc: Read .agent/manifest.json ground truth。workspace 取 server CWD（mcp 2.x：无模板 URI 不得带参数）。
+get_manifest_resource_for(ws: Path) -> str
+    # doc: 供测试与内部调用：给定工作区返回 manifest 内容（机验同一行为体）。
 get_domain_spec_resource(domain: str) -> str
-    # doc: Read docs/specs/<domain>/spec.md ground truth contract (workspace = server CWD).
+    # doc: Read docs/specs/<domain>/spec.md ground truth contract。workspace 取 server CWD。
+get_domain_spec_resource_for(domain: str, ws: Path) -> str
+    # doc: 供测试与内部调用：给定工作区与域返回 spec 正文。
 k3dge_check(workspace_path: Optional[str]=None, with_tests: bool=False, force_full: bool=False) -> str
     # doc: Run k3dge consistency gate directly via ConsistencyEngine.
 k3dge_status(workspace_path: Optional[str]=None) -> str

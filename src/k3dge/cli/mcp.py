@@ -62,8 +62,12 @@ else:  # pragma: no cover
 
 @mcp.resource("spec://manifest")
 def get_manifest_resource() -> str:
-    """Read .agent/manifest.json ground truth (workspace = server CWD；mcp 2.x：无模板 URI 不得带参数)."""
-    ws = _find_workspace(Path.cwd())
+    """Read .agent/manifest.json ground truth。workspace 取 server CWD（mcp 2.x：无模板 URI 不得带参数）。"""
+    return get_manifest_resource_for(_find_workspace(Path.cwd()))
+
+
+def get_manifest_resource_for(ws: Path) -> str:
+    """供测试与内部调用：给定工作区返回 manifest 内容（机验同一行为体）。"""
     manifest_path = ws / ".agent" / "manifest.json"
     if not manifest_path.is_file():
         return _err("ManifestNotFound", "manifest.json not found", path=str(manifest_path))
@@ -75,8 +79,12 @@ def get_manifest_resource() -> str:
 
 @mcp.resource("spec://domain/{domain}")
 def get_domain_spec_resource(domain: str) -> str:
-    """Read docs/specs/<domain>/spec.md ground truth contract (workspace = server CWD)."""
-    ws = _find_workspace(Path.cwd())
+    """Read docs/specs/<domain>/spec.md ground truth contract。workspace 取 server CWD。"""
+    return get_domain_spec_resource_for(domain, _find_workspace(Path.cwd()))
+
+
+def get_domain_spec_resource_for(domain: str, ws: Path) -> str:
+    """供测试与内部调用：给定工作区与域返回 spec 正文。"""
     try:
         manifest = Manifest.load(ws)
     except Exception as exc:

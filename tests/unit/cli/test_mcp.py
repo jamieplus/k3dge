@@ -9,7 +9,7 @@ from k3dge.cli import mcp
 class TestMcp(unittest.TestCase):
     def test_manifest_missing_is_error_json(self) -> None:
         with tempfile.TemporaryDirectory() as d:
-            payload = json.loads(mcp.get_manifest_resource(workspace_path=d))
+            payload = json.loads(mcp.get_manifest_resource_for(Path(d)))
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"], "ManifestNotFound")
 
@@ -28,7 +28,7 @@ class TestMcp(unittest.TestCase):
             (root / ".agent" / "manifest.json").write_text(
                 json.dumps({"package_root": "src", "domains": {}})
             )
-            payload = json.loads(mcp.get_domain_spec_resource("nope", workspace_path=d))
+            payload = json.loads(mcp.get_domain_spec_resource_for("nope", Path(d)))
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"], "DomainNotRegistered")
 
