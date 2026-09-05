@@ -417,28 +417,12 @@
       "tokens": "Re-verify Protocol — Default (12 列验收)"
     },
     {
-      "path": "docs/reviews/2026-09-04-M7-audit.md",
+      "path": "docs/reviews/2026-09-05-M7-closure.md",
       "type": "reviews",
-      "id": "2026-09-04-M7-audit",
-      "title": "审计：src（milestone M7）",
+      "id": "2026-09-05-M7-closure",
+      "title": "封板收摊清单（上下文压缩）: M7",
       "status": "",
-      "tokens": "审计：src（milestone M7）"
-    },
-    {
-      "path": "docs/reviews/2026-09-04-M7-quality.md",
-      "type": "reviews",
-      "id": "2026-09-04-M7-quality",
-      "title": "质量报告：src（milestone M7）",
-      "status": "",
-      "tokens": "质量报告：src（milestone M7）"
-    },
-    {
-      "path": "docs/reviews/2026-09-05-M7-align.md",
-      "type": "reviews",
-      "id": "2026-09-05-M7-align",
-      "title": "里程碑对齐与验收报告: M7",
-      "status": "",
-      "tokens": "里程碑对齐与验收报告: M7"
+      "tokens": "封板收摊清单（上下文压缩）: M7"
     },
     {
       "path": "docs/specs/_template/spec.md",
@@ -481,22 +465,6 @@
       "tokens": "Domain Specification: templates"
     },
     {
-      "path": "docs/tasks/2026-09-02-M7-audit-doc_audit_adr_4.done.md",
-      "type": "tasks",
-      "id": "2026-09-02-M7-audit-doc_audit_adr_4.done",
-      "title": "doc-audit: 文档作者合规审计（本轮 docs 改动 26 处）",
-      "status": "done",
-      "tokens": "doc-audit: 文档作者合规审计（本轮 docs 改动 26 处）"
-    },
-    {
-      "path": "docs/tasks/2026-09-02-M7-docs-adr0006_inplace_revise.done.md",
-      "type": "tasks",
-      "id": "2026-09-02-M7-docs-adr0006_inplace_revise.done",
-      "title": "ADR-0006 就地修订为入向/出向双向契约 + AUTHORING 例外条款",
-      "status": "done",
-      "tokens": "ADR-0006 就地修订为入向/出向双向契约 + AUTHORING 例外条款"
-    },
-    {
       "path": "docs/tasks/2026-09-02-M7-docs-align_rules_overview_outbound.md",
       "type": "tasks",
       "id": "2026-09-02-M7-docs-align_rules_overview_outbound",
@@ -521,46 +489,6 @@
       "tokens": "k3che 补 cli 传输面（mcp/cli 成对）"
     },
     {
-      "path": "docs/tasks/2026-09-02-M7-feat-peer_outbound_mcp_client.done.md",
-      "type": "tasks",
-      "id": "2026-09-02-M7-feat-peer_outbound_mcp_client.done",
-      "title": "k3dge 出向 MCP 客户端与 endpoint 唯一事实源",
-      "status": "done",
-      "tokens": "k3dge 出向 MCP 客户端与 endpoint 唯一事实源"
-    },
-    {
-      "path": "docs/tasks/2026-09-02-M7-fix-k3che_indexes_authoring_files.done.md",
-      "type": "tasks",
-      "id": "2026-09-02-M7-fix-k3che_indexes_authoring_files.done",
-      "title": "k3che 检索索引把 docs/*/AUTHORING.md 当语料",
-      "status": "done",
-      "tokens": "k3che 检索索引把 docs/*/AUTHORING.md 当语料"
-    },
-    {
-      "path": "docs/tasks/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.done.md",
-      "type": "tasks",
-      "id": "2026-09-02-M7-fix-k3dge_mcp2_resource_strict.done",
-      "title": "k3dge 自身 MCP server 在 mcp 2.x 下无法启动（resource 严格校验）",
-      "status": "done",
-      "tokens": "k3dge 自身 MCP server 在 mcp 2.x 下无法启动（resource 严格校验）"
-    },
-    {
-      "path": "docs/tasks/2026-09-02-M7-fix-status_nameerror_next.done.md",
-      "type": "tasks",
-      "id": "2026-09-02-M7-fix-status_nameerror_next.done",
-      "title": "k3dge status 抛 NameError 致 [NEXT] 永不输出",
-      "status": "done",
-      "tokens": "k3dge status 抛 NameError 致 [NEXT] 永不输出"
-    },
-    {
-      "path": "docs/tasks/2026-09-02-M7-fix-task_list_ghost_authoring.done.md",
-      "type": "tasks",
-      "id": "2026-09-02-M7-fix-task_list_ghost_authoring.done",
-      "title": "task list 把 docs/tasks/AUTHORING.md 当幽灵任务",
-      "status": "done",
-      "tokens": "task list 把 docs/tasks/AUTHORING.md 当幽灵任务"
-    },
-    {
       "path": "docs/tasks/2026-09-03-M7-feat-archive_tier_contract.md",
       "type": "tasks",
       "id": "2026-09-03-M7-feat-archive_tier_contract",
@@ -575,30 +503,6 @@
       "title": "把出口同构与日志只追加变成机验",
       "status": "idea",
       "tokens": "把出口同构与日志只追加变成机验"
-    },
-    {
-      "path": "docs/tasks/2026-09-03-M7-feat-task_dup_check_via_cache.done.md",
-      "type": "tasks",
-      "id": "2026-09-03-M7-feat-task_dup_check_via_cache.done",
-      "title": "task create duplicate check via cache role",
-      "status": "done",
-      "tokens": "task create duplicate check via cache role"
-    },
-    {
-      "path": "docs/tasks/2026-09-04-M7-audit-audit_job_0300799a8a4a.done.md",
-      "type": "tasks",
-      "id": "2026-09-04-M7-audit-audit_job_0300799a8a4a.done",
-      "title": "audit job 0300799a8a4a: src",
-      "status": "done",
-      "tokens": "audit job 0300799a8a4a: src"
-    },
-    {
-      "path": "docs/tasks/2026-09-04-M7-audit-audit_job_ae911e744eff.done.md",
-      "type": "tasks",
-      "id": "2026-09-04-M7-audit-audit_job_ae911e744eff.done",
-      "title": "audit job ae911e744eff: src",
-      "status": "done",
-      "tokens": "audit job ae911e744eff: src"
     },
     {
       "path": "docs/tasks/2026-09-04-M7-chore-cc_debt_register.md",
@@ -625,36 +529,12 @@
       "tokens": "空 except 治理（质量席 Q-6 转票，36 处）"
     },
     {
-      "path": "docs/tasks/2026-09-04-M7-feat-g1g2_seat_manual_and_ratchet_next.md",
-      "type": "tasks",
-      "id": "2026-09-04-M7-feat-g1g2_seat_manual_and_ratchet_next",
-      "title": "真跑前置：席位工单棘轮化 + ratchet_open 路由",
-      "status": "done",
-      "tokens": "真跑前置：席位工单棘轮化 + ratchet_open 路由"
-    },
-    {
       "path": "docs/tasks/2026-09-04-M7-feat-ratchet_real_run_backlog.md",
       "type": "tasks",
       "id": "2026-09-04-M7-feat-ratchet_real_run_backlog",
       "title": "首案真跑前遗留清单（k3dge 侧）",
       "status": "idea",
       "tokens": "首案真跑前遗留清单（k3dge 侧）"
-    },
-    {
-      "path": "docs/tasks/2026-09-04-M7-feat-ratchet_v3_ledger.done.md",
-      "type": "tasks",
-      "id": "2026-09-04-M7-feat-ratchet_v3_ledger.done",
-      "title": "ratchet v3 施工十单封账凭条",
-      "status": "done",
-      "tokens": "ratchet v3 施工十单封账凭条"
-    },
-    {
-      "path": "docs/tasks/2026-09-04-M7-feat-ratchet_v3_ledger.md",
-      "type": "tasks",
-      "id": "2026-09-04-M7-feat-ratchet_v3_ledger",
-      "title": "ratchet v3 exchange implementation ledger",
-      "status": "done",
-      "tokens": "ratchet v3 exchange implementation ledger"
     }
   ]
 }

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-09-05
+
 ### Added
 - G3 换源：`roles.audit.mode="ratchet"` 幂等步进器（建单/探单/collect/写回重试一体；旧一次性链降为缺省形，quality 腿不变
 - 首案真跑闭环（job ae911e744eff）：席 10 findings＝7 fixed＋3 有意留；主干带回 F-1/F-2/F-5/F-6/A-2/A-3/F-3 修复；vanished×角色门互锁与进程提交绕闸两处活体缺陷当场修
@@ -38,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move per-type soft rules from README `## Authoring` to `docs/<type>/AUTHORING.md`.
 
 - ADR-0006 就地修订为入向/出向双向契约 + AUTHORING 例外条款
+
 ## [0.1.8] - 2026-08-27
 
 ### Fixed

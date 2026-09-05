@@ -101,7 +101,7 @@ stateDiagram-v2
     AUDITING --> AUDITING: audit+quality 待修>0 + agent 修（倒计时默认修；重审各报告）
     AUDITING --> AUDITING: 位置钉 k3dit:pending <ID>（check/status 报 pending=N）
     AUDITING --> ESCALATED: verify 连续 >3 次未闭环 → 转人工
-    AUDITING --> SEAL_READY: audit 与 quality 两份报告均 待修=0（审计闭环=真界限）
+    AUDITING --> SEAL_READY: audit 与 quality 两腿工单均 collected（清零→席**署名**报告→collect 落位+写回）；审计闭环=真界限
     SEAL_READY --> DRAFT: 要不要封? N（里程碑继续挂着）
     SEAL_READY --> SEALED: k3dge milestone seal（align→归档+版本+指针）
     SEALED --> [*]: 收摊=上下文压缩(closure.md → 设计文档 → 提交)
@@ -123,7 +123,8 @@ sequenceDiagram
     Agent->>K3: milestone align（Full Matrix，无人问）
     K3-->>Agent: 问「要审吗？」(无倒计时；N=继续干活)
     Agent->>K3: milestone audit <id>
-    Agent->>Audit: k3dit.actions.audit（mcp→cli→manual；fallback=default 自审须转人工）
+    Agent->>Audit: milestone audit = 棘轮步进：audit.submit 建单→席位 rounds→audit.collect 落签署件→写回主干
+    Note over Agent,Audit: 交换原子=送检包 bundle 单文件（ADR-0026）；席位经机构 seat 连接组件上岗（pi/opencode/…），sign-report 署名才算结案
     Agent->>Quality: k3lity.actions.quality（mcp→cli→manual；人填不造假分）
     Note over Agent,Audit: 外来审计源：人贴报告 → k3dge_submit_audit_report 落盘(--kind audit|quality)
     Audit-->>Agent: 审计 12 列报告（含 待修/有意留/已修）+ 位置钉 k3dit:pending
@@ -135,7 +136,7 @@ sequenceDiagram
     K3->>K3: align→归档+版本+指针；写 *-closure.md 收摊清单（上下文压缩+设计文档由人/agent 补齐）
 ```
 
-> 命令结果末尾统一附 `[NEXT] state=… milestone=…` 一行提示（MCP 同构 JSON `next` 字段），只给合法下一步、不替人决定；优先级 `pending_findings > seal_ready > audit_suggested`，状态与 reasons 的唯一来源在 `engine/nextstep.STATE_OPTIONS` + `engine/audit_trigger.py`，与本节同一张状态机。新建 `src/` 域给 `new_domain`（是否算持久设计、写得对不对仍归 k3dit/人）；`overview.md` 更新已移出钩子、进 closure。
+> 命令结果末尾统一附 `[NEXT] state=… milestone=…` 一行提示（MCP 同构 JSON `next` 字段），只给合法下一步、不替人决定；优先级 `pending_findings > ratchet_open > seal_ready > audit_suggested`，状态与 reasons 的唯一来源在 `engine/nextstep.STATE_OPTIONS` + `engine/audit_trigger.py`，与本节同一张状态机。新建 `src/` 域给 `new_domain`（是否算持久设计、写得对不对仍归 k3dit/人）；`overview.md` 更新已移出钩子、进 closure。
 >
 > **T-01 边界（doc-audit，ADR-0021）**：`check` 恒静态、不跑透镜。docs 改动时 `check` 绿后给 `[NEXT] doc_audit`，由 `k3dge doc-audit`（**之后**、**非阻断**）出 k3dit 报告 + 建带 `Milestone` 的 task；task 进 backlog 由封板「全 done」闸兜底。ADR 冲突/覆盖只在里程碑审计，不进每次 commit。
 

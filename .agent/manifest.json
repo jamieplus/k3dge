@@ -1,6 +1,6 @@
 {
   "name": "k3dge",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "self_hosting": true,
   "package_root": "src/k3dge",
   "domains": {
@@ -14,14 +14,20 @@
       "src": "src/k3dge/cli",
       "spec": "docs/specs/cli/spec.md",
       "tests": "tests/unit/cli",
-      "depends_on": ["engine", "templates", "sync"],
+      "depends_on": [
+        "engine",
+        "templates",
+        "sync"
+      ],
       "description": "本仓终端/CI + 对外 harness（DSH/Codex/Claude Code/OpenCode）的 MCP 注入"
     },
     "sync": {
       "src": "src/k3dge/sync",
       "spec": "docs/specs/sync/spec.md",
       "tests": "tests/unit/sync",
-      "depends_on": ["engine"],
+      "depends_on": [
+        "engine"
+      ],
       "description": "spec 接口块与契约哈希回写；docs/generated 机器文档"
     },
     "templates": {
