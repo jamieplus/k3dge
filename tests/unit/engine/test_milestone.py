@@ -365,3 +365,15 @@ class TestMilestone(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_closure_has_tsv_trail(tmp_path):
+    """show-me-your-work 吸收回归：封板清单带 TSV 决策轨迹（证据=指针）。"""
+    from k3dge.engine import milestone as _m
+
+    (tmp_path / "docs" / "reviews").mkdir(parents=True)
+    (tmp_path / "docs" / "reviews" / "2026-09-04-M9-audit.md").write_text("x", encoding="utf-8")
+    p = _m._write_closure_note(tmp_path, "M9")
+    txt = p.read_text(encoding="utf-8")
+    assert "ts\tphase\tdecision\twhy\tevidence\tresult" in txt
+    assert "2026-09-04-M9-audit.md" in txt

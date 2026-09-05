@@ -1176,6 +1176,15 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
     cannot judge what is unrelated, so it lays down the checklist and stops.
     """
     today = datetime.date.today().isoformat()
+    try:
+        from k3dge.engine.version import get_version
+
+        sealed_version = get_version(workspace) or "?"
+    except Exception:
+        sealed_version = "?"
+    audit_reports = ",".join(
+        sorted(f.name for f in (workspace / "docs" / "reviews").glob(f"*-{milestone_id}-*.md")
+               if f.name.endswith(("-audit.md", "-quality.md")))) or "-"
     p = workspace / "docs" / "reviews" / f"{today}-{milestone_id}-closure.md"
     p.parent.mkdir(parents=True, exist_ok=True)
     if p.exists():
@@ -1201,6 +1210,10 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
                 "",
                 "## 4. 提交里程碑",
                 "- [ ] `k3dge check` 绿 → 提交（归档 + 收摊 + 文档一起进一个 commit）",
+                "",
+                "## 5. 决策轨迹（TSV：show-me-your-work 洁净室移植——ts/phase/decision/why/evidence/result，evidence=指针非散文）",
+                "ts\tphase\tdecision\twhy\tevidence\tresult",
+                f"{today}\tseal\tseal {milestone_id}\t审计双腿闭环\t{audit_reports}\t{sealed_version}",
                 "",
             ]
         ),
