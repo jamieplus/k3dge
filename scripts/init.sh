@@ -66,6 +66,8 @@ else
     echo "[k3dge] Installing editable from K3DGE_HOME: $K3DGE_HOME"
   fi
   .venv/bin/pip install -q ${INSTALL_FLAGS} "$INSTALL_TARGET" pre-commit pytest
+  # 统管落盘：记录本 venv 是哪份 K3DGE_SOURCE 装出来的（运行时一律读它，不猜）
+  printf 'K3DGE_SOURCE=%s\nRESOLVED=%s\n' "${K3DGE_SOURCE:-(unset)}" "$INSTALL_TARGET" > .venv/k3dge-source.txt
 fi
 
 echo "[k3dge] generating harness scaffolding in $TARGET ..."

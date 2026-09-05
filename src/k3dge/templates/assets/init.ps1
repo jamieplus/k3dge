@@ -74,7 +74,8 @@ if ($self) {
     Write-Host "[k3dge] Installing editable from K3DGE_HOME: $K3dgeHome"
   }
   & $Pip install -q @InstallFlags $InstallTarget pre-commit pytest
-}
+  # 统管落盘：记录本 venv 是哪份 K3DGE_SOURCE 装出来的（运行时一律读它，不猜）
+  "K3DGE_SOURCE=$($env:K3DGE_SOURCE)`nRESOLVED=$InstallTarget" | Out-File -FilePath (Join-Path $Target ".venv/k3dge-source.txt") -Encoding utf8
 
 Write-Host "[k3dge] generating harness scaffolding in $Target ..."
 & $PyVenv -m k3dge.templates.scaffold $Target
