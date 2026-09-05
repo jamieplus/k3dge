@@ -61,6 +61,9 @@ if ($self) {
     $InstallTarget = "$($env:K3DGE_SOURCE)[mcp]"
     $InstallFlags += "-e"
     Write-Host "[k3dge] Installing editable from local path: $env:K3DGE_SOURCE"
+  } elseif ($env:K3DGE_SOURCE -match '^(git\+|https://(github\.com|.*\.git))') {
+    $InstallTarget = "k3dge[mcp] @ $($env:K3DGE_SOURCE)"
+    Write-Host "[k3dge] Installing from VCS source (non-editable): $env:K3DGE_SOURCE"
   } else {
     $InstallTarget = "$($env:K3DGE_SOURCE)[mcp]"
     Write-Host "[k3dge] Installing from source/package: $env:K3DGE_SOURCE"

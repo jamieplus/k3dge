@@ -24,5 +24,5 @@
 
 ## 下游仓升级
 
-别的工程用 `K3DGE_SOURCE` 挂本 harness 时：闸和 `k3dge task list` 等工具在 `.venv` 的 k3dge 包里；`AGENTS.md` / `scripts/gate.*` 是 init 当时拷进去的。源更新后怎么升、再跑 init 会不会覆盖，见 [`downstream.md`](downstream.md)。
+别的工程用 `K3DGE_SOURCE` 挂本 harness 时（三种合法源：本地路径＝editable、`git+https://…`＝非 editable 直引、保留词 `pypi`＝包索引）：闸和 `k3dge task list` 等工具在 `.venv` 的 k3dge 包里；`AGENTS.md` / `scripts/gate.*` 是 init 当时拷进去的。源更新后怎么升、再跑 init 会不会覆盖，见 [`downstream.md`](downstream.md)。
 

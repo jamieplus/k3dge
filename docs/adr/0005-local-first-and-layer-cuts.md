@@ -6,7 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-24
 Deciders: Core Maintainer
-Note: -
+Note: 就地修订（补 VCS 源形态）2026-09-05，经 Core Maintainer 本轮显式授权（「resource 指向 GitHub」指令），依 `docs/adr/AUTHORING.md`。
 ---
 
 # ADR-0005: 本地自用、职责切分、审计独立 harness
@@ -21,7 +21,7 @@ k3dge 先在本仓自用，不按 PyPI 发行假设设计（阶段定义见 ADR-
 
 - 在 k3dge 仓内 `./k3dge-init.sh`（cwd 为本仓）：自举，`pip install -e ".[dev]"`。**默认 `k3dge check` 行为未改**（仍要 git、仍只验触及域；`force_full` 仅 align / 显式旗标）。
 - 在空项目目录里执行 **k3dge 仓里的** init：`cd k3dit && /path/to/k3dge/k3dge-init.sh`（脚本在 k3dge 检出里，能发现 `src/k3dge`）。
-- 项目里已有拷贝的 `./k3dge-init.sh` 且不是 k3dge 仓：必须 `K3DGE_SOURCE=/path/to/k3dge`。
+- 项目里已有拷贝的 `./k3dge-init.sh` 且不是 k3dge 仓：必须 `K3DGE_SOURCE=/path/to/k3dge`；`K3DGE_SOURCE` 亦接受 VCS 直引（`git+https://…`，非 editable）与保留词 `pypi`——本地路径仍是开发默认（2026-09-05 就地补记）。
 不依赖 PyPI。
 
 ### 2.2 职责（有完整方案，本轮落地）
