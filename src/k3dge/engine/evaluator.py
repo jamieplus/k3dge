@@ -61,7 +61,7 @@ def _shape_change_documented(workspace: Path, domain: str, spec_content: str, sy
     return False
 
 
-# k3dit:pending Q-8 CC23 _run_batch_tests 提取批次执行逻辑
+# k3dit:leftover Q-8 CC23 _run_batch_tests 提取批次执行逻辑
 def _run_batch_tests(
     workspace: Path,
     manifest: Manifest,

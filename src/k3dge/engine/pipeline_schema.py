@@ -36,7 +36,7 @@ _PIPELINE_REL = ".agent/pipeline.toml"
 PipelineViolation = Tuple[str, str]
 
 
-# k3dit:pending Q-6 CC28 validate_pipeline_config 分拆校验
+# k3dit:leftover Q-6 CC28 validate_pipeline_config 分拆校验
 def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
     """Validate `.agent/pipeline.toml`. Returns [] when valid or file absent.
 
