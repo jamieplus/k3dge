@@ -433,6 +433,14 @@
       "tokens": "质量报告：src（milestone M7）"
     },
     {
+      "path": "docs/reviews/2026-09-05-M7-align.md",
+      "type": "reviews",
+      "id": "2026-09-05-M7-align",
+      "title": "里程碑对齐与验收报告: M7",
+      "status": "",
+      "tokens": "里程碑对齐与验收报告: M7"
+    },
+    {
       "path": "docs/specs/_template/spec.md",
       "type": "specs",
       "id": "spec",
@@ -473,11 +481,11 @@
       "tokens": "Domain Specification: templates"
     },
     {
-      "path": "docs/tasks/2026-09-02-M7-audit-doc_audit_adr_4.md",
+      "path": "docs/tasks/2026-09-02-M7-audit-doc_audit_adr_4.done.md",
       "type": "tasks",
-      "id": "2026-09-02-M7-audit-doc_audit_adr_4",
+      "id": "2026-09-02-M7-audit-doc_audit_adr_4.done",
       "title": "doc-audit: 文档作者合规审计（本轮 docs 改动 26 处）",
-      "status": "idea",
+      "status": "done",
       "tokens": "doc-audit: 文档作者合规审计（本轮 docs 改动 26 处）"
     },
     {
@@ -513,11 +521,11 @@
       "tokens": "k3che 补 cli 传输面（mcp/cli 成对）"
     },
     {
-      "path": "docs/tasks/2026-09-02-M7-feat-peer_outbound_mcp_client.md",
+      "path": "docs/tasks/2026-09-02-M7-feat-peer_outbound_mcp_client.done.md",
       "type": "tasks",
-      "id": "2026-09-02-M7-feat-peer_outbound_mcp_client",
+      "id": "2026-09-02-M7-feat-peer_outbound_mcp_client.done",
       "title": "k3dge 出向 MCP 客户端与 endpoint 唯一事实源",
-      "status": "in-progress",
+      "status": "done",
       "tokens": "k3dge 出向 MCP 客户端与 endpoint 唯一事实源"
     },
     {
@@ -529,11 +537,11 @@
       "tokens": "k3che 检索索引把 docs/*/AUTHORING.md 当语料"
     },
     {
-      "path": "docs/tasks/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.md",
+      "path": "docs/tasks/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.done.md",
       "type": "tasks",
-      "id": "2026-09-02-M7-fix-k3dge_mcp2_resource_strict",
+      "id": "2026-09-02-M7-fix-k3dge_mcp2_resource_strict.done",
       "title": "k3dge 自身 MCP server 在 mcp 2.x 下无法启动（resource 严格校验）",
-      "status": "deferred",
+      "status": "done",
       "tokens": "k3dge 自身 MCP server 在 mcp 2.x 下无法启动（resource 严格校验）"
     },
     {
@@ -577,19 +585,19 @@
       "tokens": "task create duplicate check via cache role"
     },
     {
-      "path": "docs/tasks/2026-09-04-M7-audit-audit_job_0300799a8a4a.md",
+      "path": "docs/tasks/2026-09-04-M7-audit-audit_job_0300799a8a4a.done.md",
       "type": "tasks",
-      "id": "2026-09-04-M7-audit-audit_job_0300799a8a4a",
+      "id": "2026-09-04-M7-audit-audit_job_0300799a8a4a.done",
       "title": "audit job 0300799a8a4a: src",
-      "status": "idea",
+      "status": "done",
       "tokens": "audit job 0300799a8a4a: src"
     },
     {
-      "path": "docs/tasks/2026-09-04-M7-audit-audit_job_ae911e744eff.md",
+      "path": "docs/tasks/2026-09-04-M7-audit-audit_job_ae911e744eff.done.md",
       "type": "tasks",
-      "id": "2026-09-04-M7-audit-audit_job_ae911e744eff",
+      "id": "2026-09-04-M7-audit-audit_job_ae911e744eff.done",
       "title": "audit job ae911e744eff: src",
-      "status": "idea",
+      "status": "done",
       "tokens": "audit job ae911e744eff: src"
     },
     {

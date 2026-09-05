@@ -1,6 +1,6 @@
 ---
 status: idea
-milestone: M7
+milestone: M8
 priority: P1
 date: 2026-09-04
 ---

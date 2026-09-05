@@ -1,5 +1,5 @@
 ---
-status: deferred
+status: done
 milestone: M7
 priority: P0
 date: 2026-09-02
@@ -7,7 +7,7 @@ date: 2026-09-02
 
 # k3dge 自身 MCP server 在 mcp 2.x 下无法启动（resource 严格校验）
 
-- **Status**: deferred
+- **Status**: done
 - **本轮决定**: 维护者指示**搁置**（当前实现不了且不阻断出向链路）；`docs/guides/mcp-bridge.md` 已加「入向现状」节先把事实写清。F1/F2/F3 待后续授权，不占本轮。
 - **Milestone**: M7
 - **Priority**: P0

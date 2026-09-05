@@ -394,6 +394,8 @@ def scan_unfilled_guides(workspace: Path) -> List[str]:
         return []
     out: List[str] = []
     for g in sorted(guides_dir.glob("*.md")):
+        if g.name == "AUTHORING.md":   # 说明书讲桩是元文本，不是桩本身（doc-catalog 先例同形）
+            continue
         try:
             text = g.read_text(encoding="utf-8")
         except UnicodeDecodeError:

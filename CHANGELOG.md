@@ -18,12 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ratchet v3 施工账十单全绿（ADR-0026 落地）：bundle 单文件交换原子＋身份/位置分家（②④）；分支工作现场 ensure/advance CAS/merge_back P1＋seal prune 钩子（③⑤⑦）；k3dit 句柄透传零代码落盘、角色门（fixed 仅审计席）、audit-report 机械渲染＋署名结案两步（①⑧⑨）；`k3dge audit` 四动词与 `bundle create`（⑩）；peer_contract v0.6 与 memo 化石条目（⑥）
 - task create duplicate check via cache role
 
+- k3dge 出向 MCP 客户端与 endpoint 唯一事实源
 ### Fixed
 - 首夜案卷互踩事故：collect 落盘命名按 role；案卷防跨类覆盖闸；签署件自机构账本复原（INC-20260904-AUD-01）
 - k3dge status 抛 NameError 致 [NEXT] 永不输出
 
 - task list 把 docs/tasks/AUTHORING.md 当幽灵任务
 - k3che 检索索引把 docs/*/AUTHORING.md 当语料
+- audit job ae911e744eff: src
+- audit job 0300799a8a4a: src
+- k3dge 自身 MCP server 在 mcp 2.x 下无法启动（resource 严格校验）
+- doc-audit: 文档作者合规审计（本轮 docs 改动 26 处）
 ### Changed
 - `k3dge milestone seal` archives this-milestone reviews to `docs/reviews/archive/<id>/` and rewrites leftover hrefs in `docs/reviews/LEFTOVERS.md`.
 - Move the intentional-leftovers table from `docs/reviews/README.md` to `docs/reviews/LEFTOVERS.md`.

@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 milestone: M7
 priority: P1
 date: 2026-09-02
@@ -7,7 +7,7 @@ date: 2026-09-02
 
 # k3dge 出向 MCP 客户端与 endpoint 唯一事实源
 
-- **Status**: in-progress
+- **Status**: done
 - **Milestone**: M7
 - **Priority**: P1
 - **可检索摘要**: `pipeline_runner._run_mcp_best_effort()` 用 `shutil.which("k3dit")` 冒充全部 peer 的 mcp 传输，需换成真 stdio MCP 客户端，且连接配方只从 `.mcp.json` 取

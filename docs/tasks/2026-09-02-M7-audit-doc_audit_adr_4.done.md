@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M7
 priority: P3
 date: 2026-09-02
@@ -7,7 +7,7 @@ date: 2026-09-02
 
 # doc-audit: 文档作者合规审计（本轮 docs 改动 26 处）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M7
 - **Priority**: P3
 - **可检索摘要**: 2026-09-02 就地修订 `ADR-0006`（入向/出向 + 失败语义）、`docs/adr/AUTHORING.md` 合成 Record lifecycle 一条、`Note:` 字段横展开 22 份 ADR、新增 10 条 M7 task、mcp-bridge guide 加出向与入向现状两节 —— 触发 `k3dge doc-audit`（非阻断）；本 task 承载这批文档的作者合规核对
