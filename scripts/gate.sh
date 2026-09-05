@@ -14,7 +14,7 @@ fi
 # （装时真相 vs 现行政策，打架必须出声——重装或 unset 再走。）
 _SRC_FILE="$ROOT/.venv/k3dge-source.txt"
 if [ -n "${K3DGE_SOURCE:-}" ] && [ -f "$_SRC_FILE" ]; then
-  _REC="$(sed -n 's/^RESOLVED=//p' "$_SRC_FILE" | head -1 | cut -d' ' -f1)"
+  _REC="$(head -1 "$_SRC_FILE" | tr -d ' \t\r\n')"
   _WANT="$K3DGE_SOURCE"
   [ -d "$_WANT" ] && _WANT="$(cd "$_WANT" && pwd)"
   [ -d "$_REC" ] && _REC="$(cd "$_REC" && pwd)"

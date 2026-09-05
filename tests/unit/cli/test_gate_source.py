@@ -15,6 +15,15 @@ class TestGateSource(unittest.TestCase):
         self.assertEqual(r.returncode, 2, r.stderr[-300:])
         self.assertIn("MISMATCH", r.stderr)
 
+    def test_match_proceeds_no_mismatch(self):
+        import sys
+
+        rec = (ROOT / ".venv" / "k3dge-source.txt").read_text(encoding="utf-8").strip()
+        env = dict(os.environ, K3DGE_SOURCE=rec)
+        r = subprocess.run([sys.executable, "scripts/gate.py", "version", "show"], cwd=ROOT,
+                           capture_output=True, text=True, env=env, timeout=60)
+        self.assertNotIn("MISMATCH", r.stdout + r.stderr)
+
     def test_gate_py_mismatch_exits_2(self):
         import sys
 

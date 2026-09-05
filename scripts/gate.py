@@ -13,11 +13,7 @@ args = sys.argv[1:] if len(sys.argv) > 1 else ["check"]
 _src_file = ROOT / ".venv" / "k3dge-source.txt"
 _want = os.environ.get("K3DGE_SOURCE", "").strip()
 if _want and _src_file.is_file():
-    _rec = ""
-    for _ln in _src_file.read_text(encoding="utf-8").splitlines():
-        if _ln.startswith("RESOLVED="):
-            _rec = _ln[len("RESOLVED="):].split(" ", 1)[0]
-            break
+    _rec = _src_file.read_text(encoding="utf-8").splitlines()[0].strip() if _src_file.read_text(encoding="utf-8").strip() else ""
     _w = os.path.realpath(_want) if os.path.isdir(_want) else _want
     _r = os.path.realpath(_rec) if os.path.isdir(_rec) else _rec
     if _w != _r:
