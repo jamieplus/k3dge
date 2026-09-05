@@ -167,7 +167,7 @@ class ConsistencyEngine:
             return []
         return [p.strip() for p in out.stdout.splitlines() if p.strip()]
 
-    # k3dit:pending Q-1 CC61 evaluate 提取域循环与违规收集子函数
+    # k3dit:leftover Q-1 CC61 evaluate 提取域循环与违规收集子函数
     def evaluate(self, run_tests: bool = False, force_full: bool = False, staged: bool = False) -> GateReport:
         try:
             manifest = Manifest.load(self.workspace_root)
