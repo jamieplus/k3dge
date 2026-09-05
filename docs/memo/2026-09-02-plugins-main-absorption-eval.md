@@ -71,3 +71,15 @@
   同批一次口头复核曾把这四行说成「📥 里已实现」——错：`📥`（未开始）与 `🎯`（目标/计划吸收）是两类，实测 `🎯` 14 行、`📥` 6 行。此处留记，免得下次又拿状态符号猜实现。
 - 第 33 行（TS 可检规则 `never` 兜底 switch / import 置顶）**仍未落地**：`../k3lity/src/k3lity/` 只有 `__init__/cli/deslop/harness/mcp/quality`，无 TS 规则实现 ⇒ 保持 `🎯`。
 - 剩余 `📥`/`🎯` 行的归属是 **peer 仓**（k3dit 判据、k3lity 度量、k3che 记忆），不属本仓 backlog。把它们迁进各 peer 自己的 `docs/memo/` 需各仓维护者授权（`ADR-0006` §2.3.7 跨仓改动条），本文件先就地标注归属，不擅动 peers。
+
+### 核对记录（2026-09-05，逐条盘点 ✅ vs 落地）
+
+- **k3dit 0002/0003（pr-review·cli·thermo 三行 ✅）**：文书 ✅（0002/0003 ADR 已立，但**全是 Draft**）；代码 ❌（透镜表仍 5 个通用 pass，无 pr-review 风险排序/Breaking-Race callout、无 cli-for-agent Pass3、无 Approval Bar 落码）。结论：**✅=文书已立，落地未发生**。
+- **k3dit 0004/0005（nuclear·interrogate·rubric·epistemics 🎯）**：ADR 均为 Draft，透镜表无痕迹。结论：**🎯 属实＝真没吸收**，memo 无虚报。
+- **k3lity thermo 可数半 ✅ / verify-this ✅ / deslop ✅**：落码实锤（thermo 字样、`baseline/treatment/VERIFIED`、`as any`/早返回规则）。结论：**真吸收**。
+- **k3lity agent-compatibility ✅**：公式 `det×0.7+workflow×0.3`、`## Score`、`Top fixes` 均在；但 memo 写明的**校验锚点 93/84/68/27/12 不存在**（实为 55/30/15 另一套）。结论：**大半真、数字漂了**。
+- **k3lity control-cli/ui ✅**：`probe` 动词＋tmux/PTY/CDP 指引文本在；完整 CDP 落码未深验。结论：**基本真**。
+- **k3lity TS 规则 🎯**：`find` 无果。结论：**🎯 属实＝真没吸收**（与更正记录一致）。
+- **k3che**：全表无 ✅。结论：**无虚报**（全是计划态）。
+- **k3dge technical-writing 🎯**：memo **少报了**——`templates/assets/rules/01-docs-structure.md:10` 已有 Diátaxis 四层＋三顶规逐字落地（洁净室署名齐）。结论：有机吸收已发生，状态未更新。
+- **k3dge show-me-your-work 🎯**：M7 closure 无 TSV 形态。结论：**🎯 属实＝真没吸收**。
