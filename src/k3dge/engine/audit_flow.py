@@ -76,7 +76,8 @@ def _count_status(report_md: str) -> Dict[str, int]:
 
 # ---------- 两态入口 ----------
 
-def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = None, io=None) -> dict:
+def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = None, io=None,
+                 role: str = "audit") -> dict:
     """produce 阶段：打送检包 → `audit.submit` → 落 `awaiting_audit`。协议调用必须短。"""
     targets = targets or (["src"] if (workspace / "src").is_dir() else ["docs"])
     from k3dge.engine import worktree as _wt
@@ -89,7 +90,7 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
     bundle = build_bundle(workspace, targets, milestone_id=milestone_id)
     res = run_action(
         workspace,
-        "audit.submit",
+        f"{role}.submit",
         io=io,
         arguments={
             "bundle": bundle["ref"],
@@ -110,7 +111,7 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
     if not env.get("ok") or env.get("kind") != "job":
         return {
             "state": "failed",
-            "detail": f"audit.submit 未按契约返回 job 信封: {env.get('error') or env.get('message') or res.detail}",
+            "detail": f"{role}.submit 未按契约返回 job 信封: {env.get('error') or env.get('message') or res.detail}",
             "downgrades": res.downgrades,
         }
     job_id = (env.get("payload") or {}).get("job_id", "")
@@ -128,6 +129,7 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
     state = _load_state(workspace)
     jobs = state.setdefault("jobs", [])
     jobs.append({
+        "role": role,
         "ticket_task": task_path.relative_to(workspace).as_posix() if (ok_t and task_path) else None,
         "job_id": job_id,
         "milestone_id": milestone_id,
@@ -146,18 +148,22 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
             "present_pushed": push.get("markers") if push.get("ok") else None}
 
 
-def collect_audit(workspace: Path, milestone_id: str, io=None) -> dict:
+def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = None, io=None) -> dict:
     """gate 阶段：`audit.collect` → 验壳（kind/基线/12 列）→ 机械落盘 → 数计数。
 
     返回态：`awaiting_audit`（PENDING/无 job）、`failed`（NOT_FOUND/FORMAT/基线不符）、
     `open`（待修>0）、`closed`（待修=0，可谈放行）。
     """
     state = _load_state(workspace)
-    job = _find_awaiting(state, milestone_id)
+    if job_id:
+        job = next((j for j in state.get("jobs", []) if j.get("job_id") == job_id), None)
+    else:
+        job = _find_awaiting(state, milestone_id)
     if job is None:
         return {"state": "awaiting_audit", "detail": "no awaiting audit job; submit first"}
+    role = job.get("role", "audit")
 
-    res = run_action(workspace, "audit.collect", io=io, arguments={"job_id": job["job_id"]})
+    res = run_action(workspace, f"{role}.collect", io=io, arguments={"job_id": job["job_id"]})
     env = _parse_envelope(res)
     if not env.get("ok"):
         err = str(env.get("error") or "")
@@ -257,21 +263,25 @@ def push_present(workspace: Path, job_key: str, commit: str = "", io=None) -> di
              and job_key in (j.get("job_id"), j.get("milestone_id"))]
     if not cands:
         return {"ok": False, "skipped": f"no in-flight job for {job_key!r}"}
-    job = cands[-1]
     try:
-        markers = _wt.present(workspace, job.get("milestone_id") or "adhoc", commit or None)
+        markers = _wt.present(workspace, cands[-1].get("milestone_id") or "adhoc", commit or None)
     except Exception as exc:   # 非 git 仓/无 worktree ⇒ 降级：没有机械口供可推，不炸编排
         return {"ok": False, "skipped": f"present extract failed: {str(exc)[:80]}"}
-    res = run_action(workspace, "audit.present", io=io,
-                     arguments={"job_id": job["job_id"], "present_json": json.dumps(markers),
-                               "commit": commit or ""})
-    return {"ok": res.ok, "job_id": job["job_id"], "markers": len(markers),
-            "detail": getattr(res, "detail", "")}
+    pushed = []
+    for job in cands:   # 两腿共 worktree：present 扇出给每条在办腿
+        res = run_action(workspace, f"{job.get('role', 'audit')}.present", io=io,
+                         arguments={"job_id": job["job_id"], "present_json": json.dumps(markers),
+                                    "commit": commit or ""})
+        pushed.append({"job_id": job["job_id"], "ok": res.ok, "markers": len(markers)})
+    return {"ok": all(p["ok"] for p in pushed), "pushed": pushed, "markers": len(markers)}
 
 
 def peer_status(workspace: Path, job_id: str, io=None) -> dict:
     """编排侧探针：`audit.status` 查对端状态机位置与计数（正文不出账本，出货走 collect）。"""
-    res = run_action(workspace, "audit.status", io=io, arguments={"job_id": job_id})
+    state = _load_state(workspace)
+    rec = next((j for j in state.get("jobs", []) if j.get("job_id") == job_id), None)
+    role = rec.get("role", "audit") if rec else "audit"
+    res = run_action(workspace, f"{role}.status", io=io, arguments={"job_id": job_id})
     if not res.ok:
         return {"ok": False, "state": "unknown", "message": res.detail, "downgrades": res.downgrades}
     env = _parse_envelope(res)

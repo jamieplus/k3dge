@@ -1392,7 +1392,7 @@ def run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]:
     )
 
 
-def _audit_mode(workspace: Path) -> str:
+def _audit_mode(workspace: Path, role: str = "audit") -> str:
     """审计腿形状：`[roles.audit] mode="ratchet"`＝工单模式（ADR-0026）；缺省 scaffold（旧形）。"""
     try:
         try:
@@ -1401,18 +1401,19 @@ def _audit_mode(workspace: Path) -> str:
             import tomli as tomllib  # type: ignore
 
         data = tomllib.loads((workspace / ".agent" / "pipeline.toml").read_text(encoding="utf-8"))
-        return str((data.get("roles") or {}).get("audit", {}).get("mode", "scaffold")).lower()
+        return str((data.get("roles") or {}).get(role, {}).get("mode", "scaffold")).lower()
     except Exception:
         return "scaffold"
 
 
-def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None) -> Tuple[str, str]:
+def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str = "audit") -> Tuple[str, str]:
     """审计腿一步（ratchet）：建单→探单→collect→（merge 欠账幂等重试）。一步一返回，进程不等人。"""
     from k3dge.engine import audit_flow
     from k3dge.engine import worktree as _wt
 
     state = audit_flow._load_state(workspace)
-    mine = [j for j in state.get("jobs", []) if j.get("milestone_id") == milestone_id]
+    mine = [j for j in state.get("jobs", []) if j.get("milestone_id") == milestone_id
+            and j.get("role", "audit") == role]
     pending_merge = [j for j in mine if j.get("state") == "collected" and not j.get("merge_ok", True)]
     if pending_merge:
         j = pending_merge[-1]
@@ -1428,7 +1429,7 @@ def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None) -> Tuple[st
         done = [j for j in mine if j.get("state") == "collected" and j.get("merge_ok", True) and j.get("report")]
         if done:  # 本里程碑已有签署报告且写回闭 ⇒ 审计腿即成（新鲜度与旧链同形：报告在场为凭）
             return "closed", f"本里程碑签署报告已闭环（{done[-1]['report']}；待修 {done[-1].get('counts', {}).get('待修', '?')}）。"
-        r = audit_flow.submit_audit(workspace, milestone_id, io=io)
+        r = audit_flow.submit_audit(workspace, milestone_id, io=io, role=role)
         if not r.get("ok"):
             return "stalled", f"建单失败：{str(r.get('detail') or r.get('state'))[:120]}"
         return "progress", f"棘轮工单已建：{r['job_id']}（席位侧判据在 k3dit，k3dge 不代笔）。"
@@ -1439,7 +1440,7 @@ def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None) -> Tuple[st
     if st.get("escalated"):
         return "stalled", f"工单 {j['job_id']} 有升级条目 {st['escalated']}：等人 k3dit adjudicate。"
     if st.get("state") == "done":
-        c = audit_flow.collect_audit(workspace, milestone_id, j["job_id"], io=io)
+        c = audit_flow.collect_audit(workspace, milestone_id, j["job_id"], io=io)  # role 随工单记录走
         if c.get("ok"):
             if c.get("merge", {}).get("ok") is False:
                 return "stalled", f"报告已落位但写回未闭：{c['merge'].get('message', '')[:90]}"
@@ -1487,6 +1488,16 @@ def run_audit_flow(
     }
     if ratchet:
         streams.pop("audit")
+    # quality 腿同形换源（09-04）：roles.quality.mode="ratchet" ⇒ 与审计腿同一工单步进
+    if _audit_mode(workspace, "quality") == "ratchet":
+        q_status, q_msg = _ratchet_audit_step(workspace, milestone_id, io=prompt.out_stream, role="quality")
+        if q_status != "closed":
+            if q_status == "progress":
+                return "ratchet_open", q_msg + "\n" + nextstep.NextStep.from_state(
+                    "ratchet_open", milestone_id, reasons=["quality 腿: " + q_msg[:100]]).render_cli()
+            return "escalated", q_msg + "\n" + nextstep.NextStep.from_state(
+                "escalated", milestone_id).render_cli()
+        streams.pop("quality", None)
 
     # mandatory audit + fix loop, capped at `max_verify_attempts` verifies.
     while True:

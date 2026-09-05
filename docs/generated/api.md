@@ -96,9 +96,9 @@ get_verify_attempts(workspace: Path) -> int
 bump_verify_attempt(workspace: Path) -> int
 reset_verify_attempts(workspace: Path) -> None
 # audit_flow.py
-submit_audit(workspace: Path, milestone_id: str, targets: Optional[list]=None, io=None) -> dict
+submit_audit(workspace: Path, milestone_id: str, targets: Optional[list]=None, io=None, role: str='audit') -> dict
     # doc: produce 阶段：打送检包 → `audit.submit` → 落 `awaiting_audit`。协议调用必须短。
-collect_audit(workspace: Path, milestone_id: str, io=None) -> dict
+collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str]=None, io=None) -> dict
     # doc: gate 阶段：`audit.collect` → 验壳（kind/基线/12 列）→ 机械落盘 → 数计数。
 push_present(workspace: Path, job_key: str, commit: str='', io=None) -> dict
     # doc: P0 接线：advance/submit 后进程抽取 worktree markers 推给对端（机械口供）。

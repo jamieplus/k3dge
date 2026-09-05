@@ -417,6 +417,14 @@
       "tokens": "审计：src（milestone M7）"
     },
     {
+      "path": "docs/reviews/2026-09-04-M7-quality.md",
+      "type": "reviews",
+      "id": "2026-09-04-M7-quality",
+      "title": "k3lity 质量报告 2026-09-04 M7",
+      "status": "",
+      "tokens": "k3lity 质量报告 2026-09-04 M7"
+    },
+    {
       "path": "docs/specs/_template/spec.md",
       "type": "specs",
       "id": "spec",

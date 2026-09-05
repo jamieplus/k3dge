@@ -462,3 +462,61 @@ class TestRatchetAuditStep(TestCase):
         with mock.patch("k3dge.engine.worktree.merge_back", return_value={"ok": True, "mode": "ff"}):
             st, msg = ms._ratchet_audit_step(ws, "M1")
         assert st == "closed" and "重试成功" in msg
+
+
+class TestQualityRatchetLeg(TestCase):
+    """G3 续：quality 腿同形步进（roles.quality.mode=ratchet）。"""
+
+    _BOTH = ('[roles.audit]\nbind = "k3dit"\nmode = "ratchet"\n[roles.quality]\nbind = "k3lity"\n'
+             'mode = "ratchet"\n')
+
+    def _ws2(self):
+        ws = _ws()
+        (ws / ".agent" / "pipeline.toml").write_text(self._BOTH, encoding="utf-8")
+        return ws
+
+    def test_audit_closed_quality_opens_ticket(self):
+        ws = self._ws2()
+        import json as _j
+
+        (ws / ".agent" / "audit_jobs.json").parent.mkdir(exist_ok=True)
+        (ws / ".agent" / "audit_jobs.json").write_text(_j.dumps({"jobs": [
+            {"job_id": "A-1", "role": "audit", "milestone_id": "M1", "state": "collected",
+             "merge_ok": True, "report": "r.md", "counts": {"待修": 0}}]}), encoding="utf-8")
+        with mock.patch("k3dge.engine.audit_flow.submit_audit",
+                        return_value={"ok": True, "job_id": "Q-9", "state": "awaiting_audit"}):
+            status, msg = ms.run_audit_flow(ws, "M1", prompter=ms._Prompt(answers=["y"]))
+        self.assertEqual(status, "ratchet_open")
+        self.assertIn("Q-9", msg)
+
+    def test_both_legs_closed_is_audited(self):
+        ws = self._ws2()
+        import json as _j
+
+        (ws / ".agent" / "audit_jobs.json").write_text(_j.dumps({"jobs": [
+            {"job_id": "A-1", "role": "audit", "milestone_id": "M1", "state": "collected",
+             "merge_ok": True, "report": "r.md", "counts": {"待修": 0}},
+            {"job_id": "Q-1", "role": "quality", "milestone_id": "M1", "state": "collected",
+             "merge_ok": True, "report": "q.md", "counts": {"待修": 0}}]}), encoding="utf-8")
+        status, msg = ms.run_audit_flow(ws, "M1", prompter=ms._Prompt(answers=["y"]))
+        self.assertEqual(status, "audited")
+
+    def test_push_fans_out_to_both_legs(self):
+        from k3dge.engine import audit_flow
+
+        ws = _ws()
+        import json as _j
+
+        (ws / ".agent" / "audit_jobs.json").write_text(_j.dumps({"jobs": [
+            {"job_id": "J-a", "role": "audit", "milestone_id": "M1", "state": "awaiting"},
+            {"job_id": "J-q", "role": "quality", "milestone_id": "M1", "state": "awaiting"}]}), encoding="utf-8")
+        calls = []
+
+        def fake(_ws, ref, *, io=None, timeout_default=60, arguments=None):
+            calls.append((ref, arguments.get("job_id")))
+            return TransportResult(True, "mcp", "ok")
+
+        with mock.patch("k3dge.engine.worktree.present", return_value=[]), \
+             mock.patch("k3dge.engine.audit_flow.run_action", side_effect=fake):
+            r = audit_flow.push_present(ws, "M1")
+        assert r["ok"] and {c[0] for c in calls} == {"audit.present", "quality.present"}
