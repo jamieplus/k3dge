@@ -141,3 +141,49 @@ def test_push_present_no_job_graceful(tmp_path):
     (tmp_path / ".agent").mkdir()
     r = audit_flow.push_present(tmp_path, "no-such-key")
     assert r["ok"] is False and "skipped" in r
+
+
+def test_collect_role_naming_and_kind_guard(tmp_path):
+    """首夜事故回归：两腿各归各文件；案卷区被**无标记草稿**占位 ⇒ 拒落不覆盖。"""
+    import datetime
+    import json as _j
+    from unittest import mock
+
+    from k3dge.engine import audit_flow
+
+    (tmp_path / ".agent").mkdir()
+    (tmp_path / "docs" / "reviews").mkdir(parents=True)
+    today = datetime.date.today().isoformat()
+    draft = tmp_path / "docs" / "reviews" / f"{today}-M9-quality.md"
+    draft.write_text("# k3lity 质量报告（94 条草稿，无 kind 标记）\n", encoding="utf-8")
+    hdr = (
+        "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
+    (tmp_path / ".agent" / "audit_jobs.json").write_text(_j.dumps({"jobs": [
+        {"job_id": "J-q", "role": "quality", "milestone_id": "M9", "state": "awaiting",
+         "bundle_hash": "sha256:mine", "ticket_task": None}]}), encoding="utf-8")
+
+    class _R:
+        ok, detail, downgrades, payload = True, "", [], ""
+
+    env = {"ok": True, "kind": "report",
+           "payload": {"report_markdown": "<!-- k3dge:kind: quality -->\n# 质量签署件\n\n" + hdr +
+                         "| Q-1 | 2026-09-04 | 低 | P3 | 复杂度 | d | f.py:1 | 有意留 | 有意留 | e | 通过 | seat |\n"},
+           "provenance": {"seat": "s", "baseline": "sha256:mine"}}
+    with mock.patch.object(audit_flow, "run_action", return_value=_R()), \
+         mock.patch.object(audit_flow, "_parse_envelope", return_value=env):
+        r = audit_flow.collect_audit(tmp_path, "M9")
+    assert r.get("ok") is False and "跨类" in r["message"]
+    assert "草稿" in draft.read_text(encoding="utf-8")   # 原文件未动（拒覆盖）
+    # 审计腿命名各走各的，不撞
+    (tmp_path / ".agent" / "audit_jobs.json").write_text(_j.dumps({"jobs": [
+        {"job_id": "J-a", "role": "audit", "milestone_id": "M9", "state": "awaiting",
+         "bundle_hash": "sha256:mine", "ticket_task": None}]}), encoding="utf-8")
+    env2 = {"ok": True, "kind": "report",
+            "payload": {"report_markdown": "# 审计签署件\n\n" + hdr +
+                      "| A-1 | 2026-09-04 | 低 | P3 | 缺陷 | d | f.py:1 | 已修 | 已修 | e | 通过 | seat |\n"},
+            "provenance": {"seat": "s", "baseline": "sha256:mine"}}
+    with mock.patch.object(audit_flow, "run_action", return_value=_R()), \
+         mock.patch.object(audit_flow, "_parse_envelope", return_value=env2):
+        r2 = audit_flow.collect_audit(tmp_path, "M9")
+    assert r2.get("ok") and r2["report"].endswith("-audit.md") and (tmp_path / r2["report"]).is_file()

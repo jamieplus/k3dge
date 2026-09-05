@@ -337,6 +337,14 @@
       "tokens": "INCIDENT REPORT: [M7] 出口同构与审计痕迹只被文字承诺，未被任何一处机验"
     },
     {
+      "path": "docs/incidents/INC-20260904-AUD-case-file-crossover.md",
+      "type": "incidents",
+      "id": "INC-20260904-AUD-case-file-crossover",
+      "title": "INCIDENT REPORT: [M7] 双腿首夜案卷互踩（quality 签署件覆盖审计签署件）",
+      "status": "",
+      "tokens": "INCIDENT REPORT: [M7] 双腿首夜案卷互踩（quality 签署件覆盖审计签署件）"
+    },
+    {
       "path": "docs/memo/2026-08-21-deferred-standards.md",
       "type": "memo",
       "id": "2026-08-21-deferred-standards",
@@ -412,17 +420,17 @@
       "path": "docs/reviews/2026-09-04-M7-audit.md",
       "type": "reviews",
       "id": "2026-09-04-M7-audit",
-      "title": "质量报告：src（milestone M7）",
+      "title": "审计：src（milestone M7）",
       "status": "",
-      "tokens": "质量报告：src（milestone M7）"
+      "tokens": "审计：src（milestone M7）"
     },
     {
       "path": "docs/reviews/2026-09-04-M7-quality.md",
       "type": "reviews",
       "id": "2026-09-04-M7-quality",
-      "title": "k3lity 质量报告 2026-09-04 M7",
+      "title": "质量报告：src（milestone M7）",
       "status": "",
-      "tokens": "k3lity 质量报告 2026-09-04 M7"
+      "tokens": "质量报告：src（milestone M7）"
     },
     {
       "path": "docs/specs/_template/spec.md",

@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - task create duplicate check via cache role
 
 ### Fixed
+- 首夜案卷互踩事故：collect 落盘命名按 role；案卷防跨类覆盖闸；签署件自机构账本复原（INC-20260904-AUD-01）
 - k3dge status 抛 NameError 致 [NEXT] 永不输出
 
 - task list 把 docs/tasks/AUTHORING.md 当幽灵任务

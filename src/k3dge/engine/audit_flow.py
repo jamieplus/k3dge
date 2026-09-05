@@ -203,7 +203,16 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
     reviews = workspace / "docs" / "reviews"
     reviews.mkdir(parents=True, exist_ok=True)
     today = datetime.date.today().isoformat()
-    report_path = reviews / f"{today}-{milestone_id}-audit.md"
+    report_path = reviews / f"{today}-{milestone_id}-{'quality' if role != 'audit' else 'audit'}.md"
+    # 案卷防互踩闸（首夜事故根因）：目标已有**异类或异基线**报告 ⇒ 拒落，不静默覆盖
+    if report_path.is_file():
+        prev = report_path.read_text(encoding="utf-8", errors="ignore")
+        head = prev.lstrip()[:80]
+        prev_quality = head.startswith("<!-- k3dge:kind: quality -->")
+        if prev_quality != (role != "audit"):
+            return {"ok": False, "state": "failed", "error": "FORMAT",
+                    "message": f"拒绝跨类覆盖：{report_path.name} 已是{'质量' if prev_quality else '审计'}案卷"}
+        # （跨单覆盖是重提交设计的一部分，不拦；只拦跨类互踩）
     report_path.write_text(report_md if report_md.endswith("\n") else report_md + "\n", encoding="utf-8")
 
     counts = _count_status(report_md)
