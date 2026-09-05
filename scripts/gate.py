@@ -17,8 +17,8 @@ if _want and _src_file.is_file():
     _w = os.path.realpath(_want) if os.path.isdir(_want) else _want
     _r = os.path.realpath(_rec) if os.path.isdir(_rec) else _rec
     if _w != _r:
-        print(f"[k3dge-source] MISMATCH: K3DGE_SOURCE='{_w}' but this venv was installed from '{_r}'.", file=sys.stderr)
-        print("  用 K3DGE_SOURCE 重装一次（或 unset 回 legacy），再跑闸。", file=sys.stderr)
+        print(f"[k3dge-source] MISMATCH: want='{_w}' (env>pyproject) but installed from '{_r}'.", file=sys.stderr)
+        print("  重装或改政策后再跑闸。", file=sys.stderr)
         sys.exit(2)
 
 # Prefer project venv

@@ -21,8 +21,8 @@
 | `pypi`／空 | 包索引／sibling 回退链 | 包索引，或 init 按脚本位置找兄弟检出 |
 
 运行时只读 `.venv/k3dge-source.txt` 的**单行值**（init 按解析结果落盘：本地路径去 `[mcp]`、URL 原样、`pypi` 记名）；无此文件 = 老 venv，按 editable 本地源理解。
-**环境变量赢过落盘**：若 `K3DGE_SOURCE` 已设且与落盘 `RESOLVED` 不一致，`gate.*` 直接 `exit 2` 拒跑（重装或 unset 后再走）——
-"用的是哪一份"是政策问题，不许静默将就。文档/元数据里的 GitHub 链接是**权威出处声明**，不参与运行时解析——两者分工：出处归声明，运行归落盘文件。
+**政策赢过收据**：`gate.*` 按 `K3DGE_SOURCE 环境（显式覆盖）> 本仓 pyproject `[tool.k3dge].source`（入库政策）` 的顺序求政策值，与落盘单行（装时收据）不一致 ⇒ `exit 2` 拒跑（重装或改政策后再走）——
+"用的是哪一份"是政策问题，不许静默将就；都没设 = legacy（收据即真相）。文档/元数据里的 GitHub 链接是**权威出处声明**，不参与运行时解析——两者分工：出处归声明，运行归落盘文件。
 | **拷进仓的协议与包装** | `AGENTS.md`、`scripts/gate.*`、`scripts/init.sh`、`.pre-commit-config.yaml`、docs 模板 | init **不会覆盖**已有文件（`_write_if_missing`） |
 
 Agent 用的索引工具（`k3dge task list`、MCP `k3dge_task_list` / `k3dge_sync` 等）属于**判定核**，不在下游仓里另存一份脚本。

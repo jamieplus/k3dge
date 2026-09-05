@@ -12,15 +12,23 @@ fi
 
 # K3DGE_SOURCE 统管校验：环境声明的源 vs 本 venv 的装时落盘，不一致即拦。
 # （装时真相 vs 现行政策，打架必须出声——重装或 unset 再走。）
+# 政策读取：K3DGE_SOURCE 环境（显式覆盖，最高）> 本仓 pyproject [tool.k3dge].source（入库政策）；
+# 都没有 = legacy（落盘收据即真相，老 venv）。
+_WANT="${K3DGE_SOURCE:-}"
+if [ -z "$_WANT" ] && [ -f "$ROOT/pyproject.toml" ]; then
+  _WANT="$(python3 -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb")).get("tool",{}).get("k3dge",{}).get("source",""))' 2>/dev/null || true)"
+  if [ -z "$_WANT" ]; then
+    _WANT="$(sed -n '/^\[tool\.k3dge\]$/,/^\[/p' pyproject.toml 2>/dev/null | sed -n 's/^source *= *"\(.*\)".*/\1/p' | head -1)"
+  fi
+fi
 _SRC_FILE="$ROOT/.venv/k3dge-source.txt"
-if [ -n "${K3DGE_SOURCE:-}" ] && [ -f "$_SRC_FILE" ]; then
+if [ -n "$_WANT" ] && [ -f "$_SRC_FILE" ]; then
   _REC="$(head -1 "$_SRC_FILE" | tr -d ' \t\r\n')"
-  _WANT="$K3DGE_SOURCE"
   [ -d "$_WANT" ] && _WANT="$(cd "$_WANT" && pwd)"
   [ -d "$_REC" ] && _REC="$(cd "$_REC" && pwd)"
   if [ "$_WANT" != "$_REC" ]; then
-    echo "[k3dge-source] MISMATCH: K3DGE_SOURCE='$_WANT' but this venv was installed from '$_REC'." >&2
-    echo "  用 K3DGE_SOURCE 重装一次（或 unset 回 legacy），再跑闸。" >&2
+    echo "[k3dge-source] MISMATCH: want='$_WANT'（env>pyproject） but installed from '$_REC'." >&2
+    echo "  重装或改政策后再跑闸。" >&2
     exit 2
   fi
 fi
