@@ -48,3 +48,7 @@ date: 2026-09-04
 - seal 判定源核实为报告计数（`audit_closed`），首案签署报告天然可喂——seal 无需改动。
 - 活体：`milestone audit M7` ⇒ 审计腿认单闭环、quality 腿如实报缺（k3lity 棘轮化＝下一张单，不在本次范围）。
 - 测试 +6（模式检测/建单/等待/收单/认单不重建/merge 债重试/两腿混合全链）。
+
+## VCS 源验收新增（09-05，随 K3DGE_SOURCE=git+https 落地测试发现）
+
+- **scaffold 出生即红**：从 GitHub 源 `k3dge-init.sh` 出的新下游仓，`pipeline.toml` 默认绑 `k3dit/k3lity/k3che`，但脚手架的 `.mcp.json` 不声明它们 ⇒ 首跑 `check` 报 `PIPELINE_PEER_UNWIRED`。修法二选一（M8 定夺）：scaffold 默认生成**无 role 绑定的空 pipeline**（配了 peer 再声明），或 init 在缺 `.mcp.json` 条目时自动注 stub。新用户的第一印象不该是红闸。
