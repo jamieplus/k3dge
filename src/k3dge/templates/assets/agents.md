@@ -34,6 +34,7 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 | New `src/` domain | `manifest` + `spec` + tests |
 | Persistent design | copy `docs/adr/_template.md`; read `docs/adr/AUTHORING.md` |
 | Task done | `Status: done` + `.done.md` |
+| In-flight ratchet job (`[NEXT] ratchet_open`) | 席位流程见契约 §1.4；`k3dge milestone audit <id>` 幂等步进（建单→探单→collect→写回重试），进程不等人 |
 | Milestone all `done` | `k3dge milestone align`(Full Matrix, 无人问) → `[NEXT] audit_suggested`（**不是建议封板**）→ 问「要审吗？(y/N 无倒计时)」→ 是→ `k3dge milestone audit <id>`：audit(k3dit)+quality(k3lity) **各出一份 12 列报告**，待修>0 问「agent 修？(倒计时默认修)」→ 重审（audit→验审计报告，quality→验质量报告）→ 两份都 待修=0 → `[NEXT] seal_ready` → `k3dge milestone seal` 才问「封板？」 |
 | `seal` hook | `pipeline.toml` `pipelines.on_seal_enter` → `k3dit.actions.audit`+`k3lity.actions.quality`(两份必做)；`pipelines.on_pre_seal` → `k3dit.actions.verify`+`k3lity.actions.verify`(各自核对)；`transports` `mcp→cli→manual`/`skip`；verify 尝试走 `.agent/audit_checklist.json` 审计条件缓存计数（`milestone audit` 发起即重置预算）、>3 次未闭环 → `escalated` 转人工；外来审计源经 `k3dge milestone audit-submit`(或 MCP `k3dge_submit_audit_report`，`--kind quality`) 落盘为本版报告 |
 | 审计建议触发（账齐/C2≥5/体积≥8） | `k3dge check`(绿)/`task done`/`align`/`status` 返回 `[NEXT] audit_suggested` + reasons（单一源 `engine/audit_trigger.py`+`nextstep`）。**overview/架构更新不是触发**——收摊(closure)里做；是否算持久设计、写得对不对仍归 k3dit/人 |

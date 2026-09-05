@@ -1,0 +1,20 @@
+{
+  "milestone_id": "M7",
+  "tasks_hash": "a9e6a5209843469fe8dd817403e4db6b72fae5343dc32021e987f9813ca289b3",
+  "generated_at": "2026-09-04T22:34:47",
+  "audit_started_at": "2026-09-04T22:34:47",
+  "verify_attempts": 1,
+  "audit_suggested": false,
+  "reasons": [],
+  "closure": {
+    "audit": {
+      "present": true,
+      "pending": 0
+    },
+    "quality": {
+      "present": false,
+      "pending": null
+    }
+  },
+  "closed": false
+}

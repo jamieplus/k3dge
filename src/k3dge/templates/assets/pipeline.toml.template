@@ -19,6 +19,7 @@
 # 流程引用仍兼容 legacy 直名（k3dit.actions.*）；新流程一律走角色名（audit.*/quality.*/cache.*）。
 [roles.audit]
 bind = "k3dit"
+mode = "ratchet"   # 审计腿=棘轮工单步进（ADR-0026）；缺省 "scaffold" 为旧一次性形
 
 [roles.quality]
 bind = "k3lity"

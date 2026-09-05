@@ -1392,6 +1392,62 @@ def run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]:
     )
 
 
+def _audit_mode(workspace: Path) -> str:
+    """审计腿形状：`[roles.audit] mode="ratchet"`＝工单模式（ADR-0026）；缺省 scaffold（旧形）。"""
+    try:
+        try:
+            import tomllib
+        except ModuleNotFoundError:  # pragma: no cover
+            import tomli as tomllib  # type: ignore
+
+        data = tomllib.loads((workspace / ".agent" / "pipeline.toml").read_text(encoding="utf-8"))
+        return str((data.get("roles") or {}).get("audit", {}).get("mode", "scaffold")).lower()
+    except Exception:
+        return "scaffold"
+
+
+def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None) -> Tuple[str, str]:
+    """审计腿一步（ratchet）：建单→探单→collect→（merge 欠账幂等重试）。一步一返回，进程不等人。"""
+    from k3dge.engine import audit_flow
+    from k3dge.engine import worktree as _wt
+
+    state = audit_flow._load_state(workspace)
+    mine = [j for j in state.get("jobs", []) if j.get("milestone_id") == milestone_id]
+    pending_merge = [j for j in mine if j.get("state") == "collected" and not j.get("merge_ok", True)]
+    if pending_merge:
+        j = pending_merge[-1]
+        r = _wt.merge_back(workspace, j.get("milestone_id") or "adhoc",
+                           accept_dirty=(j.get("report") or "", audit_flow.STATE_REL, "docs/tasks/"))
+        if r.get("ok"):
+            j["merge_ok"] = True
+            audit_flow._save_state(workspace, state)
+            return "closed", f"写回重试成功（{r.get('mode')}）。"
+        return "stalled", f"写回仍未闭（{r.get('mode')}）：{r.get('message', '')[:90]}——人工 rebase 后再跑本命令幂等重试。"
+    inflight = [j for j in mine if j.get("state") not in ("collected", "failed")]
+    if not inflight:
+        done = [j for j in mine if j.get("state") == "collected" and j.get("merge_ok", True) and j.get("report")]
+        if done:  # 本里程碑已有签署报告且写回闭 ⇒ 审计腿即成（新鲜度与旧链同形：报告在场为凭）
+            return "closed", f"本里程碑签署报告已闭环（{done[-1]['report']}；待修 {done[-1].get('counts', {}).get('待修', '?')}）。"
+        r = audit_flow.submit_audit(workspace, milestone_id, io=io)
+        if not r.get("ok"):
+            return "stalled", f"建单失败：{str(r.get('detail') or r.get('state'))[:120]}"
+        return "progress", f"棘轮工单已建：{r['job_id']}（席位侧判据在 k3dit，k3dge 不代笔）。"
+    j = inflight[-1]
+    st = audit_flow.peer_status(workspace, j["job_id"], io=io)
+    if not st.get("ok"):
+        return "progress", f"工单 {j['job_id']} 对端不可探：{str(st.get('message', ''))[:80]}"
+    if st.get("escalated"):
+        return "stalled", f"工单 {j['job_id']} 有升级条目 {st['escalated']}：等人 k3dit adjudicate。"
+    if st.get("state") == "done":
+        c = audit_flow.collect_audit(workspace, milestone_id, j["job_id"], io=io)
+        if c.get("ok"):
+            if c.get("merge", {}).get("ok") is False:
+                return "stalled", f"报告已落位但写回未闭：{c['merge'].get('message', '')[:90]}"
+            return "closed", f"签署报告落位 {c.get('report')}；写回 {c.get('merge', {}).get('mode', 'n/a')}；待修 {c.get('pending')}。"
+        return "progress", f"collect 未通过：{str(c.get('message') or c.get('error') or c.get('state'))[:100]}"
+    return "progress", f"工单 {j['job_id']} 对端态 {st.get('state')}，open={st.get('open', [])}。"
+
+
 def run_audit_flow(
     workspace: Path,
     milestone_id: str,
@@ -1413,11 +1469,24 @@ def run_audit_flow(
     # started_at stamp), whether triggered manually (`milestone audit`) or via a hook.
     ac.reset_for_audit(workspace, milestone_id)
 
-    # kind -> (produce action, verify action)
+    ratchet = _audit_mode(workspace) == "ratchet"
+    if ratchet:
+        # 审计腿＝工单步进（ADR-0026）：一次调用推一步，绝不在闸里等席；步没 closed 就交回 [NEXT]。
+        step_status, step_msg = _ratchet_audit_step(workspace, milestone_id, io=prompt.out_stream)
+        if step_status != "closed":
+            if step_status == "progress":
+                return "ratchet_open", step_msg + "\n" + nextstep.NextStep.from_state(
+                    "ratchet_open", milestone_id, reasons=[step_msg[:120]]).render_cli()
+            return "escalated", step_msg + "\n" + nextstep.NextStep.from_state(
+                "escalated", milestone_id).render_cli()
+
+    # kind -> (produce action, verify action)；ratchet 模式下审计腿已经工单闭环，只剩 quality
     streams = {
         "audit": ("k3dit.actions.audit", "k3dit.actions.verify"),
         "quality": ("k3lity.actions.quality", "k3lity.actions.verify"),
     }
+    if ratchet:
+        streams.pop("audit")
 
     # mandatory audit + fix loop, capped at `max_verify_attempts` verifies.
     while True:

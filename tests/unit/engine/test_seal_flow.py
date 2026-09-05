@@ -381,3 +381,84 @@ class TestDocAudit(TestCase):
         self.assertEqual(status, "reported")
         ct.assert_not_called()  # one task per milestone, not per finding
 
+
+
+class TestRatchetAuditStep(TestCase):
+    """G3：审计腿换源棘轮工单（roles.audit.mode=ratchet）。"""
+
+    _RATCHET = '[roles.audit]\nbind = "k3dit"\nmode = "ratchet"\n\n[peers.k3dit]\nenabled = true\n'
+
+    def _ws_r(self):
+        ws = _ws()
+        (ws / ".agent" / "pipeline.toml").write_text(self._RATCHET, encoding="utf-8")
+        return ws
+
+    def test_mode_detection(self):
+        ws = self._ws_r()
+        self.assertEqual(ms._audit_mode(ws), "ratchet")
+        self.assertEqual(ms._audit_mode(_ws()), "scaffold")
+
+    def test_step_submits_ticket_when_none(self):
+        ws = self._ws_r()
+        with mock.patch("k3dge.engine.audit_flow.submit_audit",
+                        return_value={"ok": True, "job_id": "J-1", "state": "awaiting_audit"}):
+            st, msg = ms._ratchet_audit_step(ws, "M1")
+        self.assertEqual(st, "progress")
+        self.assertIn("J-1", msg)
+
+    def test_step_waits_on_inflight_and_collects_when_done(self):
+        ws = self._ws_r()
+        import json as _json
+
+        (ws / ".agent" / "audit_jobs.json").parent.mkdir(exist_ok=True)
+        (ws / ".agent" / "audit_jobs.json").write_text(_json.dumps(
+            {"jobs": [{"job_id": "J-1", "milestone_id": "M1", "state": "awaiting"}]}), encoding="utf-8")
+        with mock.patch("k3dge.engine.audit_flow.peer_status",
+                        return_value={"ok": True, "state": "open", "open": ["A-1"]}):
+            st, msg = ms._ratchet_audit_step(ws, "M1")
+        assert st == "progress" and "A-1" in msg
+        with mock.patch("k3dge.engine.audit_flow.peer_status", return_value={"ok": True, "state": "done"}), \
+             mock.patch("k3dge.engine.audit_flow.collect_audit",
+                        return_value={"ok": True, "report": "docs/reviews/x.md",
+                                      "merge": {"ok": True, "mode": "ff"}, "pending": 0}):
+            st, msg = ms._ratchet_audit_step(ws, "M1")
+        assert st == "closed" and "ff" in msg
+
+    def test_collected_closes_without_resubmit(self):
+        import json as _json
+
+        ws = self._ws_r()
+        (ws / ".agent" / "audit_jobs.json").write_text(_json.dumps({"jobs": [
+            {"job_id": "J-9", "milestone_id": "M1", "state": "collected", "merge_ok": True,
+             "report": "docs/reviews/M1-audit.md", "counts": {"待修": 0}}]}), encoding="utf-8")
+        with mock.patch("k3dge.engine.audit_flow.submit_audit", side_effect=AssertionError("不该再建单")):
+            st, msg = ms._ratchet_audit_step(ws, "M1")
+        assert st == "closed" and "M1-audit.md" in msg
+
+    def test_full_flow_ratchet_then_quality(self):
+        """审计腿工单闭环后只剩 quality 腿；两腿皆净 ⇒ audited。"""
+        import json as _json
+
+        ws = self._ws_r()
+        (ws / ".agent" / "audit_jobs.json").write_text(_json.dumps({"jobs": [
+            {"job_id": "J-9", "milestone_id": "M1", "state": "collected", "merge_ok": True,
+             "report": "docs/reviews/M1-audit.md", "counts": {"待修": 0}}]}), encoding="utf-8")
+        _clean_report(ws)
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+            status, msg = ms.run_audit_flow(ws, "M1", prompter=ms._Prompt(answers=["y"]))
+        self.assertEqual(status, "audited")
+
+    def test_merge_debt_retries_idempotently(self):
+        import json as _j
+        import os
+
+        ws = self._ws_r()
+        (ws / ".agent" / "audit_jobs.json").write_text(_j.dumps({"jobs": [
+            {"job_id": "J-5", "milestone_id": "M1", "state": "collected", "merge_ok": False,
+             "report": "r.md"}]}), encoding="utf-8")
+        with mock.patch("k3dge.engine.worktree.merge_back", return_value={"ok": False, "mode": "dirty", "message": "m"}):
+            st, msg = ms._ratchet_audit_step(ws, "M1")
+        assert st == "stalled"
+        with mock.patch("k3dge.engine.worktree.merge_back", return_value={"ok": True, "mode": "ff"}):
+            st, msg = ms._ratchet_audit_step(ws, "M1")
+        assert st == "closed" and "重试成功" in msg

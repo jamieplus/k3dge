@@ -215,12 +215,6 @@ def collect_audit(workspace: Path, milestone_id: str, io=None) -> dict:
                 )
         except OSError as exc:  # 回填失败不改判定，但必须可见（工单与审计状态不许静默脱钩）
             print(f"[WARN][TICKET] 工单回填失败: {exc}", file=__import__("sys").stderr)
-    job["state"] = "collected"
-    job["collected_at"] = datetime.datetime.now().isoformat(timespec="seconds")
-    job["report"] = report_path.relative_to(workspace).as_posix()
-    job["counts"] = counts
-    _save_state(workspace, state)
-
     outcome = "open" if counts["待修"] > 0 else "closed"
     merged: Dict[str, Any] = {}
     if outcome == "closed":
@@ -234,6 +228,13 @@ def collect_audit(workspace: Path, milestone_id: str, io=None) -> dict:
             merged = _wt.merge_back(workspace, milestone_id or "adhoc", accept_dirty=tuple(mine))
         except Exception as exc:  # pragma: no cover
             merged = {"ok": False, "mode": "error", "message": str(exc)[:120]}
+    job["state"] = "collected"
+    job["collected_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+    job["report"] = report_path.relative_to(workspace).as_posix()
+    job["counts"] = counts
+    # merge 没闭 ⇒ collected 但 merge_ok=False：棘轮步进器拿着它幂等重试（冲突后的人工重试面）
+    job["merge_ok"] = bool(merged.get("ok", True))
+    _save_state(workspace, state)
     return {
         "merge": merged,
         "state": outcome,

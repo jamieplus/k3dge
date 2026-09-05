@@ -28,7 +28,7 @@ date: 2026-09-04
 
 ## 挂账明细
 
-1. **G3 · seal/`milestone audit` 换源棘轮单**：`on_seal_enter` 改走 `audit_flow.submit_audit` → 工单中间态（`ratchet_open` 已有，但封板状态机不认识"待单"）→ collect 落位后复判。旧 scaffold 链（`k3dit_run_audit_flow`）届时降为 manual 档。验收：`k3dge milestone audit <id>` 全程无 agent 代笔报告。
+1. **G3 · ✅ 09-04 夜落地**（原案保留为史）：`on_seal_enter` 改走 `audit_flow.submit_audit` → 工单中间态（`ratchet_open` 已有，但封板状态机不认识"待单"）→ collect 落位后复判。旧 scaffold 链（`k3dit_run_audit_flow`）届时降为 manual 档。验收：`k3dge milestone audit <id>` 全程无 agent 代笔报告。
 2. **G4 · 号段发放**：`claim_round` 随单发 `next_ids`（A/F 段），账本拒绝无源 ID 与撞号。验收：两席撞号回归测。
 3. **G4 · 席位身份登记**：claim 时登记审计席名；终态翻转（fixed 等）校验"签席 == 登记审计席"。`--role` 自报制的诚实边界收窄（契约"seat 诚实性归人"保留）。
 4. **`.mcp.json` 解释器固化**：k3dit/k3che/k3lity server 由 `"python"`＋landing 改为各仓 venv 绝对路径（demo 已验证该形）。验收：doc-audit/audit 活体各一次，`[PEER-MCP] landed` 警告消失。
@@ -41,3 +41,10 @@ date: 2026-09-04
 - **note ≤80 字符**：席落的三枚钉 note 超宽被 `markers` 判 PROBLEM（闸抓住了，席没看自己的 --check 输出）。修：工单里带"落钉后跑 `markers --check` 自检"。
 - **号段不可增补**：修席的新发现（cache 测试读真实 .k3che 状态＝环境脆弱）因 F 段耗尽无处登记。设计缺：claim 应能按已用号段续发。
 - **冲突重试无动词**：`merge 冲突→人工 rebase→重试` 的重试步只能进引擎手调 `merge_back`；且 worktree rebase 落 detached 需手动 update-ref。缺 `k3dge audit merge <milestone>`（幂等重试）。
+
+## G3 回填（09-04 夜）
+
+- `roles.audit.mode = "ratchet"` 声明式换形（缺省 scaffold，旧链 190 行测试零改动全绿）；`milestone audit <id>` = 幂等步进器：认在办单→探对端→done 即 collect→**merge 欠账幂等重试**（顺带补掉"冲突后无重试动词"的洞——再跑同一命令即是重试）。
+- seal 判定源核实为报告计数（`audit_closed`），首案签署报告天然可喂——seal 无需改动。
+- 活体：`milestone audit M7` ⇒ 审计腿认单闭环、quality 腿如实报缺（k3lity 棘轮化＝下一张单，不在本次范围）。
+- 测试 +6（模式检测/建单/等待/收单/认单不重建/merge 债重试/两腿混合全链）。

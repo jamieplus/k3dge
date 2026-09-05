@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- G3 换源：`roles.audit.mode="ratchet"` 幂等步进器（建单/探单/collect/写回重试一体；旧一次性链降为缺省形，quality 腿不变
 - 首案真跑闭环（job ae911e744eff）：席 10 findings＝7 fixed＋3 有意留；主干带回 F-1/F-2/F-5/F-6/A-2/A-3/F-3 修复；vanished×角色门互锁与进程提交绕闸两处活体缺陷当场修
 - P0 present 推送接线：`audit_flow.push_present`（submit 首程底＋`audit advance` 随程推），pipeline `audit.present`；k3dit 缺口回填见其 gap 单
 - ratchet v3 exchange implementation ledger（施工账本体）
