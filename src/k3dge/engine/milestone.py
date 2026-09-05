@@ -1432,7 +1432,7 @@ def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str =
         r = audit_flow.submit_audit(workspace, milestone_id, io=io, role=role)
         if not r.get("ok"):
             return "stalled", f"建单失败：{str(r.get('detail') or r.get('state'))[:120]}"
-        return "progress", f"棘轮工单已建：{r['job_id']}（席位侧判据在 k3dit，k3dge 不代笔）。"
+        return "progress", f"棘轮工单已建：{r['job_id']}（{role} 腿判据在机构侧席位，k3dge 不代笔）。"
     j = inflight[-1]
     st = audit_flow.peer_status(workspace, j["job_id"], io=io)
     if not st.get("ok"):

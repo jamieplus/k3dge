@@ -569,6 +569,14 @@
       "tokens": "task create duplicate check via cache role"
     },
     {
+      "path": "docs/tasks/2026-09-04-M7-audit-audit_job_0300799a8a4a.md",
+      "type": "tasks",
+      "id": "2026-09-04-M7-audit-audit_job_0300799a8a4a",
+      "title": "audit job 0300799a8a4a: src",
+      "status": "idea",
+      "tokens": "audit job 0300799a8a4a: src"
+    },
+    {
       "path": "docs/tasks/2026-09-04-M7-audit-audit_job_ae911e744eff.md",
       "type": "tasks",
       "id": "2026-09-04-M7-audit-audit_job_ae911e744eff",
