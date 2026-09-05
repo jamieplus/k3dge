@@ -321,4 +321,14 @@ def prune_finished(workspace: Path) -> dict:
     for j in done:
         out.append(_wt.prune(workspace, j.get("milestone_id") or "adhoc",
                              [j["bundle_path"]] if j.get("bundle_path") else []))
-    return {"pruned": len(out), "detail": out}
+    # 弹壳区随收口清空（README 是区规本身，留）——"定期清"是机验，不是自律
+    swept = 0
+    tmpd = workspace / "tmp"
+    if tmpd.is_dir():
+        for junk in tmpd.iterdir():
+            if junk.is_file() and junk.name != "README.md":
+                try:
+                    junk.unlink(); swept += 1
+                except OSError:
+                    pass
+    return {"pruned": len(out), "tmp_swept": swept, "detail": out}

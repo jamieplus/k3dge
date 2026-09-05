@@ -27,3 +27,5 @@ k3dge-audit/
 .k3dge/
 # 编排本地工单账（状态件，可见但不入版本；票据走 docs/tasks）
 .agent/audit_jobs.json
+# 弹壳区：一次性施工脚本，seal 即清
+/tmp/

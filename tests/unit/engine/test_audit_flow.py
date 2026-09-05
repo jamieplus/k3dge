@@ -187,3 +187,19 @@ def test_collect_role_naming_and_kind_guard(tmp_path):
          mock.patch.object(audit_flow, "_parse_envelope", return_value=env2):
         r2 = audit_flow.collect_audit(tmp_path, "M9")
     assert r2.get("ok") and r2["report"].endswith("-audit.md") and (tmp_path / r2["report"]).is_file()
+
+
+def test_prune_sweeps_tmp_shells(tmp_path):
+    """弹壳区：seal 的 prune 顺手清空 tmp/（README 区规除外）。"""
+    import json as _j
+
+    from k3dge.engine import audit_flow
+
+    (tmp_path / ".agent").mkdir()
+    (tmp_path / "tmp").mkdir()
+    (tmp_path / "tmp" / "README.md").write_text("区规", encoding="utf-8")
+    (tmp_path / "tmp" / "apply_x.py").write_text("x", encoding="utf-8")
+    (tmp_path / ".agent" / "audit_jobs.json").write_text(_j.dumps({"jobs": []}), encoding="utf-8")
+    r = audit_flow.prune_finished(tmp_path)
+    assert r["tmp_swept"] == 1 and (tmp_path / "tmp" / "README.md").exists()
+    assert not (tmp_path / "tmp" / "apply_x.py").exists()
