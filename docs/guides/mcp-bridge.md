@@ -95,7 +95,7 @@ k3dge mcp probe --json     # 同上的机读形态；全活 exit 0，有死 exit
 
 ## 入向现状：server 在 `mcp` 2.x 下起不来（已知、未修、不阻断出向）
 
-按维护者决定，本仓作为 stdio server 的修复**先搁置**：`mcp` 2.x 严格校验「resource URI 无模板变量则 handler 不得收参数」，而 `spec://manifest` 的 handler 收了 `workspace_path`（`src/k3dge/cli/mcp.py:57`）→ 注册期 `ValueError`，于是 `FastMCP` 落回 `_DummyMCP`、`k3dge mcp probe` 报 DEAD。外部 harness 目前仍能跑 `k3dge` CLI，但拿不到入向工具面。修法与三选项见 `docs/tasks/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.md`。
+2026-09-05 起本仓 server 复活：mcp 2.x 严格校验「resource URI 无模板变量 ⇒ handler 零参数」，修复形为 **resource 处理函数去 `workspace_path`、workspace 一律按 server CWD 解析**（宿主按项目目录起 server，定位靠 CWD 不靠猜参）。`spec://domain/{domain}` 保留模板变量。历史三选项见 `docs/tasks/archive/M7/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.md`（该票随 M7 封板归档，其"已修"判定当时不成立——M7 closure 补记二已认错）。
 
 ## 路径解析
 

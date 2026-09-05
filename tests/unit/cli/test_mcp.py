@@ -187,3 +187,19 @@ class TestAuditPromptRouting(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_server_alive_under_mcp2():
+    """mcp 2.x 下 k3dge 入向面必须真活着（曾因 resource 严格校验落回 _DummyMCP 而长期 DEAD）。"""
+    import asyncio
+
+    import k3dge.cli.mcp as km
+
+    if km.FastMCP is None or type(km.mcp).__name__ == "_DummyMCP":
+        import pytest
+
+        pytest.skip("mcp package not installed in this env")
+    tools = {x.name for x in asyncio.run(km.mcp.list_tools())}
+    assert "k3dge_check" in tools and "k3dge_status" in tools, tools
+    uris = {r.uri for r in asyncio.run(km.mcp.list_resources())}
+    assert "spec://manifest" in uris, uris

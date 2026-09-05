@@ -37,10 +37,10 @@ cmd_status(args: argparse.Namespace) -> int
 build_parser() -> argparse.ArgumentParser
 main(argv: Optional[Sequence[str]]=None) -> int
 # mcp.py
-get_manifest_resource(workspace_path: Optional[str]=None) -> str
-    # doc: Read .agent/manifest.json ground truth from workspace.
-get_domain_spec_resource(domain: str, workspace_path: Optional[str]=None) -> str
-    # doc: Read docs/specs/<domain>/spec.md ground truth contract.
+get_manifest_resource() -> str
+    # doc: Read .agent/manifest.json ground truth (workspace = server CWD；mcp 2.x：无模板 URI 不得带参数).
+get_domain_spec_resource(domain: str) -> str
+    # doc: Read docs/specs/<domain>/spec.md ground truth contract (workspace = server CWD).
 k3dge_check(workspace_path: Optional[str]=None, with_tests: bool=False, force_full: bool=False) -> str
     # doc: Run k3dge consistency gate directly via ConsistencyEngine.
 k3dge_status(workspace_path: Optional[str]=None) -> str

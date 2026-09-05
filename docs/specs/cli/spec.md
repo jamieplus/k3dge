@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/cli`
-- **Contract Hash**: `sha256:3e89ad61c689342c289b8b9cdb8306ef610f9198ab673ce3f28f401f37dbb7f7`
-- **Last Updated**: 2026-09-04
+- **Contract Hash**: `sha256:e7caa282aa1e614705e1bd2d1549ad0c09d7d5a8b62347e69e6aa9f3f29afd4e`
+- **Last Updated**: 2026-09-05
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -45,8 +45,8 @@ cmd_incident(args: argparse.Namespace) -> int
 cmd_status(args: argparse.Namespace) -> int
 build_parser() -> argparse.ArgumentParser
 main(argv: Optional[Sequence[str]]=None) -> int
-get_manifest_resource(workspace_path: Optional[str]=None) -> str
-get_domain_spec_resource(domain: str, workspace_path: Optional[str]=None) -> str
+get_manifest_resource() -> str
+get_domain_spec_resource(domain: str) -> str
 k3dge_check(workspace_path: Optional[str]=None, with_tests: bool=False, force_full: bool=False) -> str
 k3dge_status(workspace_path: Optional[str]=None) -> str
 k3dge_verify_domain_contract(domain: str, workspace_path: Optional[str]=None) -> str

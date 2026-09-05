@@ -7,13 +7,19 @@ Native humans/CI use ``k3dge.cli.main``, not this module. See ADR-0006.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Optional
 
 try:
     from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 except ImportError as _mcp_exc:  # pragma: no cover
-    FastMCP = None  # type: ignore[assignment]
-    _mcp_import_error = _mcp_exc
+    try:
+        from mcp.server import MCPServer as FastMCP  # mcp 2.x 移除 fastmcp 后的正主（k3dit/k3lity 先例同形）
+    except ImportError:
+        FastMCP = None  # type: ignore[assignment]
+        _mcp_import_error = _mcp_exc
+    else:
+        _mcp_import_error = None
 else:
     _mcp_import_error = None
 
@@ -55,9 +61,9 @@ else:  # pragma: no cover
 
 
 @mcp.resource("spec://manifest")
-def get_manifest_resource(workspace_path: Optional[str] = None) -> str:
-    """Read .agent/manifest.json ground truth from workspace."""
-    ws = _find_workspace(workspace_path=workspace_path)
+def get_manifest_resource() -> str:
+    """Read .agent/manifest.json ground truth (workspace = server CWD；mcp 2.x：无模板 URI 不得带参数)."""
+    ws = _find_workspace(Path.cwd())
     manifest_path = ws / ".agent" / "manifest.json"
     if not manifest_path.is_file():
         return _err("ManifestNotFound", "manifest.json not found", path=str(manifest_path))
@@ -68,9 +74,9 @@ def get_manifest_resource(workspace_path: Optional[str] = None) -> str:
 
 
 @mcp.resource("spec://domain/{domain}")
-def get_domain_spec_resource(domain: str, workspace_path: Optional[str] = None) -> str:
-    """Read docs/specs/<domain>/spec.md ground truth contract."""
-    ws = _find_workspace(workspace_path=workspace_path)
+def get_domain_spec_resource(domain: str) -> str:
+    """Read docs/specs/<domain>/spec.md ground truth contract (workspace = server CWD)."""
+    ws = _find_workspace(Path.cwd())
     try:
         manifest = Manifest.load(ws)
     except Exception as exc:
