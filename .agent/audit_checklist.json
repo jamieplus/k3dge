@@ -1,19 +1,21 @@
 {
   "milestone_id": "M7",
-  "tasks_hash": "a9e6a5209843469fe8dd817403e4db6b72fae5343dc32021e987f9813ca289b3",
-  "generated_at": "2026-09-04T22:50:43",
-  "audit_started_at": "2026-09-04T22:50:43",
+  "tasks_hash": "ff9a7fd00caea9659b78c3d7e2f788c348dd9c09b72385ecdc3781b428e34e19",
+  "generated_at": "2026-09-04T23:08:26",
+  "audit_started_at": "2026-09-04T23:08:26",
   "verify_attempts": 0,
-  "audit_suggested": false,
-  "reasons": [],
+  "audit_suggested": true,
+  "reasons": [
+    "C2 嵌套：触及 src/ 控制流 AST 深度最大 7 ≥ 5"
+  ],
   "closure": {
     "audit": {
-      "present": true,
-      "pending": 0
+      "present": false,
+      "pending": null
     },
     "quality": {
       "present": true,
-      "pending": 94
+      "pending": 0
     }
   },
   "closed": false

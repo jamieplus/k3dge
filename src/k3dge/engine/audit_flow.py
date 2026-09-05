@@ -226,7 +226,8 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
     if outcome == "closed":
         from k3dge.engine import worktree as _wt
 
-        mine = [report_path.relative_to(workspace).as_posix(), STATE_REL, "docs/tasks/"]
+        mine = [report_path.relative_to(workspace).as_posix(), STATE_REL,
+                ".agent/audit_checklist.json", "docs/reviews/", "docs/tasks/"]
         ticket = job.get("ticket_task")
         if ticket:
             mine.append(ticket)
@@ -242,6 +243,7 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
     job["merge_ok"] = bool(merged.get("ok", True))
     _save_state(workspace, state)
     return {
+        "ok": True,
         "merge": merged,
         "state": outcome,
         "pending": counts["待修"],

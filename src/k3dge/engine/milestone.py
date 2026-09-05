@@ -1417,8 +1417,10 @@ def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str =
     pending_merge = [j for j in mine if j.get("state") == "collected" and not j.get("merge_ok", True)]
     if pending_merge:
         j = pending_merge[-1]
+        # 编排自家产物（state/checklist/reviews/tasks）不是"人的未提交"；原则性白名单
         r = _wt.merge_back(workspace, j.get("milestone_id") or "adhoc",
-                           accept_dirty=(j.get("report") or "", audit_flow.STATE_REL, "docs/tasks/"))
+                           accept_dirty=(audit_flow.STATE_REL, ".agent/audit_checklist.json",
+                                         "docs/reviews/", "docs/tasks/"))
         if r.get("ok"):
             j["merge_ok"] = True
             audit_flow._save_state(workspace, state)

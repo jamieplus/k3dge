@@ -412,9 +412,9 @@
       "path": "docs/reviews/2026-09-04-M7-audit.md",
       "type": "reviews",
       "id": "2026-09-04-M7-audit",
-      "title": "审计：src（milestone M7）",
+      "title": "质量报告：src（milestone M7）",
       "status": "",
-      "tokens": "审计：src（milestone M7）"
+      "tokens": "质量报告：src（milestone M7）"
     },
     {
       "path": "docs/reviews/2026-09-04-M7-quality.md",
