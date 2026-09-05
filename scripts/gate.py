@@ -9,6 +9,22 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 args = sys.argv[1:] if len(sys.argv) > 1 else ["check"]
 
+# K3DGE_SOURCE 统管校验：环境声明的源 vs 本 venv 的装时落盘，不一致即拦。
+_src_file = ROOT / ".venv" / "k3dge-source.txt"
+_want = os.environ.get("K3DGE_SOURCE", "").strip()
+if _want and _src_file.is_file():
+    _rec = ""
+    for _ln in _src_file.read_text(encoding="utf-8").splitlines():
+        if _ln.startswith("RESOLVED="):
+            _rec = _ln[len("RESOLVED="):].split(" ", 1)[0]
+            break
+    _w = os.path.realpath(_want) if os.path.isdir(_want) else _want
+    _r = os.path.realpath(_rec) if os.path.isdir(_rec) else _rec
+    if _w != _r:
+        print(f"[k3dge-source] MISMATCH: K3DGE_SOURCE='{_w}' but this venv was installed from '{_r}'.", file=sys.stderr)
+        print("  用 K3DGE_SOURCE 重装一次（或 unset 回 legacy），再跑闸。", file=sys.stderr)
+        sys.exit(2)
+
 # Prefer project venv
 venv_k3dge = ROOT / ".venv" / ("Scripts/k3dge.exe" if os.name == "nt" else "bin/k3dge")
 if venv_k3dge.exists():

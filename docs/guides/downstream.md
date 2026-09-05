@@ -20,7 +20,9 @@
 | `git+https://…` | 无本地检出时的出口 | PEP 508 直引（非 editable，稳定版） |
 | `pypi`／空 | 包索引／sibling 回退链 | 包索引，或 init 按脚本位置找兄弟检出 |
 
-运行时一律以 `.venv/k3dge-source.txt`（init 落盘）为准；无此文件 = 老 venv，按 editable 本地源理解。文档/元数据里的 GitHub 链接是**权威出处声明**，不参与运行时解析——两者分工：出处归声明，运行归落盘文件。
+运行时一律以 `.venv/k3dge-source.txt`（init 落盘）为准；无此文件 = 老 venv，按 editable 本地源理解。
+**环境变量赢过落盘**：若 `K3DGE_SOURCE` 已设且与落盘 `RESOLVED` 不一致，`gate.*` 直接 `exit 2` 拒跑（重装或 unset 后再走）——
+"用的是哪一份"是政策问题，不许静默将就。文档/元数据里的 GitHub 链接是**权威出处声明**，不参与运行时解析——两者分工：出处归声明，运行归落盘文件。
 | **拷进仓的协议与包装** | `AGENTS.md`、`scripts/gate.*`、`scripts/init.sh`、`.pre-commit-config.yaml`、docs 模板 | init **不会覆盖**已有文件（`_write_if_missing`） |
 
 Agent 用的索引工具（`k3dge task list`、MCP `k3dge_task_list` / `k3dge_sync` 等）属于**判定核**，不在下游仓里另存一份脚本。
