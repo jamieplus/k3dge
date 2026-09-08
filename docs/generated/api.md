@@ -15,8 +15,6 @@ cmd_doc(args: argparse.Namespace) -> int
 cmd_task(args: argparse.Namespace) -> int
 cmd_init(args: argparse.Namespace) -> int
 cmd_mcp(args: argparse.Namespace) -> int
-cmd_bundle(args: argparse.Namespace) -> int
-    # doc: 快照存取的用户/席位出口：resolve 物化 / ls 列清单（只读；引用即 `cas://sha256:<oid>`）。
 cmd_audit(args: argparse.Namespace) -> int
     # doc: 棘轮四动词（席位出口，工作区=CWD）：建单/查单/快照推进/取回落位（closure merge 自动附带）。
 cmd_markers(args: argparse.Namespace) -> int
@@ -101,7 +99,7 @@ bump_verify_attempt(workspace: Path) -> int
 reset_verify_attempts(workspace: Path) -> None
 # audit_flow.py
 submit_audit(workspace: Path, milestone_id: str, targets: Optional[list]=None, io=None, role: str='audit') -> dict
-    # doc: produce 阶段：打送检包 → `audit.submit` → 落 `awaiting_audit`。协议调用必须短。
+    # doc: produce 阶段：锁审计线 → 交件 → 落 `awaiting_audit`。协议调用必须短。
 collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str]=None, io=None) -> dict
     # doc: gate 阶段：`audit.collect` → 验壳（kind/基线/12 列）→ 机械落盘 → 数计数。
 push_present(workspace: Path, job_key: str, commit: str='', io=None) -> dict
@@ -111,21 +109,12 @@ peer_status(workspace: Path, job_id: str, io=None) -> dict
 open_ratchet_jobs(workspace: Path) -> list
     # doc: 本地账上未回口的工单（只读本地 state——不为路由去打对端网络）。
 prune_finished(workspace: Path) -> dict
-    # doc: ⑤ seal 收口钩子：清已结案 job 的 worktree 与 bundle 袋（幂等，容错）。
+    # doc: ⑤ seal 收口钩子：清已结案 job 的 worktree 与审计线（幂等，容错）。
 # audit_trigger.py
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
     # doc: Return (suggested, reasons). Only fires on a quantitative event.
 audit_closed(workspace: Path, milestone_id: str) -> bool
     # doc: True iff BOTH the audit (k3dit) and quality (k3lity) reports exist with 待修==0.
-# bundle.py
-load_bundle_config(workspace: Path) -> dict
-    # doc: `.agent/bundle.toml`（可选）覆盖默认值。键：ignore / max_bytes / scrub_keys / mode / format。
-extract_signatures(source: str) -> str
-    # doc: 轻量 AST 头文件：只留类/函数签名与类型注解，去掉函数体（消除跨文件符号幻觉，契约 §3）。
-pack_provenance(workspace: Path, cfg: dict) -> dict
-    # doc: 可复现性元数据：让两轮基线差异可归因（config 变了/ git 版本变了 ⇒ 说得清）。
-build_bundle(workspace: Path, targets: List[str], milestone_id: Optional[str]=None, prev_commit: Optional[str]=None) -> dict
-    # doc: 打一个确定性送检包，返回契约 §3 的引用结构。
 # contract.py
 class ContractExtractor
 # doc: Abstract contract extractor — register per-language implementations.
@@ -331,27 +320,6 @@ search(workspace: Path, query: str, *, snippet: bool=True, context: int=2, max_s
 # spec_schema.py
 validate_structure(content: str) -> List[str]
 extract_contract_hash(content: str) -> Optional[str]
-# store.py
-class StoreError(RuntimeError)
-class GitStore
-# doc: 一个消费仓一个本地裸库；tree OID 即内容哈希。
-    ensure(self) -> None
-    @property
-    supports_sha256(self) -> bool
-    put_tree(self, files: Dict[str, bytes]) -> str
-        # doc: {relpath: bytes} → tree OID。自底向上 mktree，排序稳定 ⇒ 同内容必同 OID。
-    list_tree(self, oid: str) -> List[Tuple[str, str]]
-        # doc: [(mode:blob oid, path)]——resolve/stat 与 diff 的地基。
-    get(self, ref: str, dest: Path) -> Path
-        # doc: `cas://sha256:<oid>` → 物化到 dest/；逐文件 sha 校验不过即抛（库被动过就是事故）。
-    diff(self, ref_a: str, ref_b: str) -> List[Tuple[str, str, str]]
-        # doc: 两快照 [(±, path, ±)]：复审 delta 的原料（新增/删除/变更）。
-    commit_snapshot(self, files: Dict[str, bytes], job: str, prev_commit: Optional[str]=None) -> dict
-        # doc: tree→epoch commit（可带前驱成链）。链住 store 侧 refs/snap/<job>，与主干开发分支互不污染。
-    bundle_create(self, commit: str, out: Path, has: Optional[str]=None) -> Path
-        # doc: bundle 单文件＝交换原子；`has`＝前置 commit（薄包）——同一条 create，形状统一。
-    @staticmethod
-    bundle_heads(bundle: Path) -> List[tuple]
 # version.py
 parse_version(v: str) -> Tuple[int, int, int]
 format_version(major: int, minor: int, patch: int) -> str
@@ -379,8 +347,8 @@ advance(workspace: Path, job: str) -> Optional[str]
     # doc: 轮次前进：worktree 脏 ⇒ 进程代 commit（席位身份由调用方注入 env 或默认进程名）；
 merge_back(workspace: Path, job: str, accept_dirty: tuple=()) -> dict
     # doc: closure 回写主干（P1：默认自动；脏树/冲突 ⇒ 停并升级人工，§1.4）。
-prune(workspace: Path, job: str, bundle_files: list[str]) -> dict
-    # doc: ⑤ end-flow 清理：worktree 与 bundle 袋是派生物；store 与已合并分支史保留。
+prune(workspace: Path, job: str) -> dict
+    # doc: ⑤ 收口：删现场；审计线**仅在已并入主干时**删（闸过删线，ADR-0026 重设计）。
 remove(workspace: Path, job: str) -> None
 ```
 

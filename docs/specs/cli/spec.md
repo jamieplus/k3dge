@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/cli`
-- **Contract Hash**: `sha256:e1dc4b14b1df23b7d6809dfa22e6c0ebef8b26c3c08941b11687b91d4eeecbf0`
-- **Last Updated**: 2026-09-05
+- **Contract Hash**: `sha256:0beaa1c1b4851509995509616648c5b85d6dea1b5d936359089706f3218b2368`
+- **Last Updated**: 2026-09-08
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -30,7 +30,6 @@ cmd_doc(args: argparse.Namespace) -> int
 cmd_task(args: argparse.Namespace) -> int
 cmd_init(args: argparse.Namespace) -> int
 cmd_mcp(args: argparse.Namespace) -> int
-cmd_bundle(args: argparse.Namespace) -> int
 cmd_audit(args: argparse.Namespace) -> int
 cmd_markers(args: argparse.Namespace) -> int
 cmd_milestone(args: argparse.Namespace) -> int

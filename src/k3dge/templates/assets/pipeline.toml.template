@@ -15,7 +15,7 @@
 # explicitly invokes the named actions below (see milestone.run_seal_flow).
 
 # 角色层（peer contract §0）：编排只认角色；角色→实现一处可换（含桩 bind = "dummy"）。
-# 两类角色（v0.3）：gate 类走送检包/工件/基线/两态；service 类同步查询、失败即 skip，永不进放行链。
+# 两类角色（v0.3）：gate 类走审计线/工件/基线/两态；service 类同步查询、失败即 skip，永不进放行链。
 # 流程引用仍兼容 legacy 直名（k3dit.actions.*）；新流程一律走角色名（audit.*/quality.*/cache.*）。
 [roles.audit]
 bind = "k3dit"

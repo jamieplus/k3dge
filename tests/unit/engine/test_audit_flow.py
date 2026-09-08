@@ -28,6 +28,8 @@ transports = [ { provider = "mcp", tool = "dummy_collect", timeout = 60 } ]
 
 
 def _mk_ws(root: Path, pending: str) -> None:
+    import subprocess
+
     (root / ".agent").mkdir(parents=True)
     (root / "src").mkdir()
     (root / "src" / "mod.py").write_text("def f() -> int:\n    return 1\n", encoding="utf-8")
@@ -41,6 +43,11 @@ def _mk_ws(root: Path, pending: str) -> None:
             }
         }
     }), encoding="utf-8")
+    # 审计线模型：消费仓必须是 git 仓且有提交（线从 HEAD 拉起，L=送检基线）
+    subprocess.run(["git", "init", "-qb", "main", str(root)], check=True, capture_output=True)
+    subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "seed"],
+                   cwd=root, check=True, capture_output=True)
 
 
 def _set_pending(root: Path, pending: str) -> None:
@@ -83,9 +90,9 @@ class TestAuditFlowSkeleton(unittest.TestCase):
             ws = Path(d)
             _mk_ws(ws, "0")
             submit_audit(ws, "M1", targets=["src"])
-            # 篡改编排状态里的基线（模拟报告与送检包脱钩）
+            # 篡改编排状态里的基线（模拟报告与审计线锁点脱钩）
             state = json.loads((ws / STATE_REL).read_text(encoding="utf-8"))
-            state["jobs"][-1]["bundle_hash"] = "sha256:" + "0" * 64
+            state["jobs"][-1]["baseline"] = "0" * 40
             (ws / STATE_REL).write_text(json.dumps(state), encoding="utf-8")
             r = collect_audit(ws, "M1")
             self.assertEqual(r["state"], "failed")
@@ -161,7 +168,7 @@ def test_collect_role_naming_and_kind_guard(tmp_path):
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
     (tmp_path / ".agent" / "audit_jobs.json").write_text(_j.dumps({"jobs": [
         {"job_id": "J-q", "role": "quality", "milestone_id": "M9", "state": "awaiting",
-         "bundle_hash": "sha256:mine", "ticket_task": None}]}), encoding="utf-8")
+         "baseline": "sha256:mine", "ticket_task": None}]}), encoding="utf-8")
 
     class _R:
         ok, detail, downgrades, payload = True, "", [], ""
@@ -178,7 +185,7 @@ def test_collect_role_naming_and_kind_guard(tmp_path):
     # 审计腿命名各走各的，不撞
     (tmp_path / ".agent" / "audit_jobs.json").write_text(_j.dumps({"jobs": [
         {"job_id": "J-a", "role": "audit", "milestone_id": "M9", "state": "awaiting",
-         "bundle_hash": "sha256:mine", "ticket_task": None}]}), encoding="utf-8")
+         "baseline": "sha256:mine", "ticket_task": None}]}), encoding="utf-8")
     env2 = {"ok": True, "kind": "report",
             "payload": {"report_markdown": "# 审计签署件\n\n" + hdr +
                       "| A-1 | 2026-09-04 | 低 | P3 | 缺陷 | d | f.py:1 | 已修 | 已修 | e | 通过 | seat |\n"},

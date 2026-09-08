@@ -1,7 +1,8 @@
-"""轮次 worktree（k3dge 进程件，施工账⑦）：真实分支＋可编辑签出＋present 自动供给。
+"""审计线（k3dge 进程件，施工账⑦）：一单一条线——真实分支＋可编辑签出＋present 自动供给。
 
-P2 精化（已记）：轮次分支 `k3dit/<job>` 住**消费仓 .git**（分支是消费侧的物）；快照 commit 链住
-`.k3dge/store.git` 的 refs/snap/*——两套对象各归各命，主仓历史不被快照污染，案卷侧零内容。
+审计线模型（ADR-0026 重设计）：分支 `k3dit/<job>` 从锁点 L 拉起、住**消费仓 .git**，
+worktree `.k3dge/wt/<job>` 即送检现场（对象格式/树布局同主干，merge 即普通 git）。
+Hall 凭 wt 目录拷窗、收回改动经 advance 提版；判读窗永不操作消费仓 .git。
 present 由进程从 worktree 抽取（markers.extract），席位口供退居交叉核对（§ADR-0026 §2.4）。
 """
 from __future__ import annotations
@@ -28,7 +29,7 @@ def worktree_path(workspace: Path, job: str) -> Path:
 
 
 def _exclude_derived(workspace: Path) -> None:
-    """把 .k3dge/（对象库/worktree/bundle）写进仓库本地 exclude——派生物不得污染被审仓的 status。"""
+    """把 .k3dge/（对象库/worktree）写进仓库本地 exclude——派生物不得污染被审仓的 status。"""
     out = _git(workspace, "rev-parse", "--git-common-dir").stdout.strip()
     common = (workspace / out) if out else (workspace / ".git")
     exc = Path(common) / "info" / "exclude"
@@ -107,6 +108,9 @@ def advance(workspace: Path, job: str) -> Optional[str]:
 def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
     """closure 回写主干（P1：默认自动；脏树/冲突 ⇒ 停并升级人工，§1.4）。
 
+    路径：ff 直达；否则把线 (base..br] `rebase --onto` 重演到主干头（线提交全是机械件，
+    重演即普通 git）再 ff；冲突 ⇒ abort 复原＋升级人工。真 merge 不再使用（审计线模型）。
+
     accept_dirty：编排进程自己写的件（工单 task/报告落位/state 文件）——
     守卫防的是"人的未提交工作被卷进去"，不该拦自己刚写的字。
     """
@@ -126,29 +130,42 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
         return {"ok": True, "mode": "already"}
     if _git(workspace, "merge", "--ff-only", br).returncode == 0:
         return {"ok": True, "mode": "ff"}
-    m = _git(workspace, "-c", "user.name=k3dge-process", "-c", "user.email=noreply@k3dge.local",
-             "merge", "--no-edit", "-m", f"audit ratchet {job} merged", br)
-    if m.returncode != 0:
-        if _git(workspace, "merge", "--abort").returncode != 0:   # add/add 等早退场景没有进行中的 merge
-            _git(workspace, "reset", "--hard", "HEAD")            # 兜底恢复干净树（进程件，不碰未跟踪文件）
-        return {"ok": False, "mode": "conflict", "message": "merge 冲突 → 人工 rebase 后重试（§1.4）"}
-    return {"ok": True, "mode": "merge"}
+    main_head = _git(workspace, "rev-parse", "HEAD").stdout.strip()
+    base = _git(workspace, "merge-base", "HEAD", br).stdout.strip()
+    tip = _git(workspace, "rev-parse", br).stdout.strip()
+    if base == tip:
+        # 线上无自有提交（L 本身）：无物可搬，主干先走一步也无妨
+        return {"ok": True, "mode": "already"}
+    wt = ensure(workspace, job)
+    _git(wt, "rebase", "--abort")  # 幂等清场：上次崩溃残留的重演态先复原（无则空操作）
+    rb = _git(wt, "-c", "user.name=k3dge-process", "-c", "user.email=noreply@k3dge.local",
+              "rebase", "--onto", main_head, base)
+    if rb.returncode != 0:
+        _git(wt, "rebase", "--abort")  # 复原现场（进程件；线原位保留供人工）
+        return {"ok": False, "mode": "conflict",
+                "message": f"rebase 冲突（{(rb.stderr or rb.stdout).strip()[:120]}）→ 人工处理后重试（§1.4）"}
+    if _git(workspace, "merge", "--ff-only", br).returncode == 0:
+        return {"ok": True, "mode": "rebase"}
+    return {"ok": False, "mode": "error", "message": "重演后仍无法 ff（异常态，交人工）"}
 
 
-def prune(workspace: Path, job: str, bundle_files: list[str]) -> dict:
-    """⑤ end-flow 清理：worktree 与 bundle 袋是派生物；store 与已合并分支史保留。"""
+def prune(workspace: Path, job: str) -> dict:
+    """⑤ 收口：删现场；审计线**仅在已并入主干时**删（闸过删线，ADR-0026 重设计）。
+
+    未并入（在办/冲突未人工闭环）⇒ 线保留原位，崩溃恢复与幂等重试都靠它。
+    """
     removed = []
     try:
         remove(workspace, job)
         removed.append(f"wt:{job}")
     except Exception:
         pass
-    for bf in bundle_files:
-        try:
-            (workspace / bf).unlink(missing_ok=True)
-            removed.append(bf)
-        except OSError:
-            pass
+    br = branch_name(job)
+    if _git(workspace, "rev-parse", "--verify", "-q", f"refs/heads/{br}").returncode == 0 \
+            and _git(workspace, "merge-base", "--is-ancestor", br, "HEAD").returncode == 0:
+        d = _git(workspace, "branch", "-D", br)
+        if d.returncode == 0:
+            removed.append(f"branch:{br}")
     return {"removed": removed}
 
 

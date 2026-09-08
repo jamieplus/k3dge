@@ -630,38 +630,6 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     return 1
 
 
-def cmd_bundle(args: argparse.Namespace) -> int:
-    """快照存取的用户/席位出口：resolve 物化 / ls 列清单（只读；引用即 `cas://sha256:<oid>`）。"""
-    import sys as _sys
-
-    from k3dge.engine.store import GitStore, StoreError
-
-    workspace = _find_workspace(Path.cwd())
-    if args.bundle_action == "create":
-        from k3dge.engine.bundle import build_bundle
-
-        r = build_bundle(workspace, args.target or ["src"], milestone_id=args.milestone)
-        print(json.dumps({"ref": r["ref"], "bundle_file": r.get("bundle_file"),
-                          "commit": r.get("commit"),
-                          "config_digest": (r.get("manifest", {}).get("pack_provenance") or {}).get("config_digest")},
-                         ensure_ascii=False))
-        return 0
-    st = GitStore(workspace)
-    try:
-        if args.bundle_action == "ls":
-            for blob_oid, path in st.list_tree(args.ref):
-                print(f"{blob_oid[:12]}  {path}")
-        else:
-            dest = Path(args.extract) if args.extract else Path.cwd() / ".k3dge" / "served"
-            st.get(args.ref, dest)
-            print(f"[BUNDLE] {args.ref} → {dest}")
-    except StoreError as exc:
-        print(f"[BUNDLE] {exc}", file=_sys.stderr)
-        return 1
-    return 0
-
-
-
 def cmd_audit(args: argparse.Namespace) -> int:
     """棘轮四动词（席位出口，工作区=CWD）：建单/查单/快照推进/取回落位（closure merge 自动附带）。"""
     from k3dge.engine import audit_flow
@@ -1273,15 +1241,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_mk.add_argument("--check", action="store_true", help="有语法/锚点违规时退出码 1（供 CI）")
     p_mk.set_defaults(func=cmd_markers)
 
-    p_bd = sub.add_parser("bundle", help="送检快照存取（git 对象库）")
-    p_bd.add_argument("bundle_action", choices=["create", "resolve", "ls"])
-    p_bd.add_argument("ref", nargs="?", default="", help="cas://sha256:<tree-oid>（resolve/ls）")
-    p_bd.add_argument("--extract", default="", help="物化目录（默认 .k3dge/served/）")
-    p_bd.add_argument("--milestone", default="", help="create：挂里程碑 id")
-    p_bd.add_argument("--target", action="append", default=[], help="create：送检路径（可多次）")
-    p_bd.set_defaults(func=cmd_bundle)
-
-    p_aud = sub.add_parser("audit", help="证据棘轮：submit/status/advance/close（ADR-0026；工作区=CWD）")
+    p_aud = sub.add_parser("audit", help="审计线棘轮：submit/status/advance/close（ADR-0026；工作区=CWD）")
     p_aud.add_argument("audit_action", choices=["submit", "status", "advance", "close"])
     p_aud.add_argument("job_or_milestone", nargs="?", default="", help="status/advance:job_id；close:milestone")
     p_aud.add_argument("--milestone", default="", help="submit：挂里程碑 id")

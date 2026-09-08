@@ -9,12 +9,12 @@ from k3dge.engine.evaluator import ConsistencyEngine
 
 
 class TestCli(unittest.TestCase):
-    def test_parser_has_audit_and_bundle(self):
+    def test_parser_has_audit(self):
         actions = build_parser()._subparsers._group_actions[0].choices  # type: ignore[attr-defined]
         self.assertIn("audit", actions)
-        self.assertIn("bundle", actions)
+        self.assertNotIn("bundle", actions)   # 审计线模型：bundle 交付面已废
 
-    def test_bundle_create_and_audit_submit_no_peer(self):
+    def test_audit_submit_no_peer(self):
         import os
 
         with tempfile.TemporaryDirectory() as d:
@@ -28,12 +28,6 @@ class TestCli(unittest.TestCase):
             cwd = os.getcwd()
             os.chdir(d)
             try:
-                out = []
-                import contextlib
-
-                with contextlib.redirect_stdout(__import__("io").StringIO()) as buf:
-                    rc = main(["bundle", "create"])
-                self.assertEqual(rc, 0)  # 引擎可达即成（CLI 烟测）
                 rc2 = main(["audit", "submit"])  # 无 .mcp.json ⇒ 对端不可达 ⇒ rc 1，不崩
                 self.assertEqual(rc2, 1)
                 rc3 = main(["audit", "status", "J-ghost"])  # status 半边同样不许 AttributeError

@@ -13,7 +13,6 @@ import json
 from pathlib import Path
 from typing import Dict, Optional
 
-from k3dge.engine.bundle import build_bundle
 from k3dge.engine.pipeline_runner import run_action
 
 STATE_REL = ".agent/audit_jobs.json"
@@ -78,31 +77,35 @@ def _count_status(report_md: str) -> Dict[str, int]:
 
 def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = None, io=None,
                  role: str = "audit") -> dict:
-    """produce 阶段：打送检包 → `audit.submit` → 落 `awaiting_audit`。协议调用必须短。"""
+    """produce 阶段：锁审计线 → 交件 → 落 `awaiting_audit`。协议调用必须短。
+
+    一单一条线（ADR-0026 重设计）：`k3dit/<单>` 分支从 HEAD 拉起，锁点 L=线头 commit；
+    已 checkout 的 worktree 目录即送检物。`targets` 是范围说明（Hall 物化参数），不是内容边界。
+    """
     targets = targets or (["src"] if (workspace / "src").is_dir() else ["docs"])
     from k3dge.engine import worktree as _wt
 
-    try:  # ③ 分支即快照链：先挂 worktree 并把脏改动进程代提交（bundle 内容与分支内容同源）
-        _wt.ensure(workspace, milestone_id or "adhoc")
-        _wt.advance(workspace, milestone_id or "adhoc")
-    except Exception:  # 非 git 仓/异常 ⇒ 不阻断打包（collect 的 merge 会如实报 no-branch/dirty）
-        pass
-    bundle = build_bundle(workspace, targets, milestone_id=milestone_id)
+    job = milestone_id or "adhoc"
+    try:  # ③ 锁线：挂 worktree，脏改动进程代提交（线=现场=送检，ADR-0026 §2.3）
+        _wt.ensure(workspace, job)
+        baseline = _wt.advance(workspace, job)
+    except Exception as exc:  # 非 git 仓 ⇒ 无法锁线，审计不可进行（如实报，不静默）
+        return {"state": "failed", "detail": f"审计线锁线失败（消费仓须为 git 仓）: {str(exc)[:160]}"}
+    if not baseline:
+        return {"state": "failed", "detail": "消费仓无任何提交，无法锁审计线"}
+    branch = _wt.branch_name(job)
     res = run_action(
         workspace,
         f"{role}.submit",
         io=io,
         arguments={
-            "bundle": bundle["ref"],
-            "bundle_hash": bundle["hash"],
+            "baseline": baseline,
             "scope": ",".join(targets),
             "milestone_id": milestone_id,
-            # 席位凭这个找回送检包（cas:// 是消费仓内相对路径的 URI）
-            "consumer": str(workspace.resolve()),
-            # ① 包袋元数据（字符串；k3dit 不开文件，ADR-0026 §2.1 主权表）
-            "bundle_file": bundle.get("bundle_file") or "",
-            "bundle_commit": bundle.get("commit") or "",
-            "config_digest": (bundle.get("manifest", {}).get("pack_provenance") or {}).get("config_digest", ""),
+            # ① 交件句柄（字符串；线归 k3dge，机构凭 wt_dir 读、Hall 收回改动经 advance，
+            #    席位/机构永不直接操作消费仓 .git——ADR-0026 §2.2）
+            "branch": branch,
+            "wt_dir": str(_wt.worktree_path(workspace, job).resolve()),
         },
     )
     if not res.ok:
@@ -133,9 +136,8 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
         "ticket_task": task_path.relative_to(workspace).as_posix() if (ok_t and task_path) else None,
         "job_id": job_id,
         "milestone_id": milestone_id,
-        "bundle_ref": bundle["ref"],
-        "bundle_hash": bundle["hash"],
-        "bundle_path": bundle.get("bundle_file") or bundle.get("path"),
+        "baseline": baseline,
+        "branch": branch,
         "state": "awaiting",
         "submitted_at": datetime.datetime.now().isoformat(timespec="seconds"),
     })
@@ -144,7 +146,8 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
         push = push_present(workspace, job_id)
     except Exception:
         push = {}
-    return {"ok": True, "state": "awaiting_audit", "job_id": job_id, "bundle": bundle,
+    return {"ok": True, "state": "awaiting_audit", "job_id": job_id,
+            "baseline": baseline, "branch": branch,
             "present_pushed": push.get("markers") if push.get("ok") else None}
 
 
@@ -191,13 +194,13 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
         return {"state": "failed", "error": "FORMAT", "detail": "report 缺少 12 列表头（ADR-0017）"}
 
     prov = env.get("provenance") or {}
-    baseline_ok = (prov.get("baseline") or "") == job["bundle_hash"]
+    baseline_ok = (prov.get("baseline") or "") == job["baseline"]
     if not baseline_ok:
-        # 基线不符 = 报告与送检包脱钩：拒收（不静默）
+        # 基线不符 = 报告与审计线锁点脱钩：拒收（不静默）
         job["state"] = "failed"
         _save_state(workspace, state)
         return {"state": "failed", "error": "FORMAT",
-                "detail": f"provenance.baseline 与送检包哈希不符: {prov.get('baseline')!r} != {job['bundle_hash']!r}"}
+                "detail": f"provenance.baseline 与审计线锁点不符: {prov.get('baseline')!r} != {job['baseline']!r}"}
 
     # 机械落盘：对端字节原样写入，k3dge 不补内容（契约 §4）
     reviews = workspace / "docs" / "reviews"
@@ -312,15 +315,17 @@ def open_ratchet_jobs(workspace: Path) -> list:
 
 
 def prune_finished(workspace: Path) -> dict:
-    """⑤ seal 收口钩子：清已结案 job 的 worktree 与 bundle 袋（幂等，容错）。"""
+    """⑤ seal 收口钩子：清已结案 job 的 worktree 与审计线（幂等，容错）。
+
+    收口＝闸过合主干后删线删现场（ADR-0026 重设计）；主干已含线内容，史在 main。
+    """
     from k3dge.engine import worktree as _wt
 
     state = _load_state(workspace)
     done = [j for j in state.get("jobs", []) if j.get("state") == "collected"]
     out = []
     for j in done:
-        out.append(_wt.prune(workspace, j.get("milestone_id") or "adhoc",
-                             [j["bundle_path"]] if j.get("bundle_path") else []))
+        out.append(_wt.prune(workspace, j.get("milestone_id") or "adhoc"))
     # 弹壳区随收口清空（README 是区规本身，留）——"定期清"是机验，不是自律
     swept = 0
     tmpd = workspace / "tmp"

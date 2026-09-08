@@ -56,16 +56,17 @@ def _now() -> str:
 
 
 @mcp.tool()
-def dummy_submit(bundle: str = "", bundle_hash: str = "", scope: str = "", milestone_id: str = "") -> str:
+def dummy_submit(baseline: str = "", scope: str = "", milestone_id: str = "",
+                 branch: str = "", wt_dir: str = "") -> str:
     """Contract §1: validate + enqueue only; the wait lives outside the protocol."""
-    if bundle_hash and not bundle_hash.startswith("sha256:"):
+    if not baseline or not all(c in "0123456789abcdef" for c in baseline) or len(baseline) not in (40, 64):
         return json.dumps(
-            {"ok": False, "error": "BAD_BUNDLE", "message": f"bundle_hash must be sha256:… got {bundle_hash!r}"},
+            {"ok": False, "error": "BAD_BUNDLE", "message": f"baseline must be a commit oid, got {baseline!r}"},
             ensure_ascii=False,
         )
     job_id = uuid.uuid4().hex[:12]
     jobs = _load_jobs()
-    jobs[job_id] = {"baseline": bundle_hash, "scope": scope, "milestone_id": milestone_id}
+    jobs[job_id] = {"baseline": baseline, "scope": scope, "milestone_id": milestone_id}
     _save_jobs(jobs)
     return json.dumps({"ok": True, "kind": "job", "payload": {"job_id": job_id}}, ensure_ascii=False)
 

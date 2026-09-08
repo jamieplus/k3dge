@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:e72dca2083bf2685ffce4ff0b47ff59bb38e8b208b8698981cf77af1f2442493`
-- **Last Updated**: 2026-09-04
+- **Contract Hash**: `sha256:df507ccf1d4ffb687bdc9bb66d8db31b3d9e78d2261686bf49c5a7f9310ce247`
+- **Last Updated**: 2026-09-08
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -41,10 +41,6 @@ open_ratchet_jobs(workspace: Path) -> list
 prune_finished(workspace: Path) -> dict
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
 audit_closed(workspace: Path, milestone_id: str) -> bool
-load_bundle_config(workspace: Path) -> dict
-extract_signatures(source: str) -> str
-pack_provenance(workspace: Path, cfg: dict) -> dict
-build_bundle(workspace: Path, targets: List[str], milestone_id: Optional[str]=None, prev_commit: Optional[str]=None) -> dict
 class ContractExtractor
     can_handle(self, path: Path) -> bool
     extract(self, path: Path, include_doc: bool=False) -> str
@@ -190,19 +186,6 @@ where(workspace: Path, symbol: str) -> List[Location]
 search(workspace: Path, query: str, *, snippet: bool=True, context: int=2, max_snippet: int=240) -> List[Location]
 validate_structure(content: str) -> List[str]
 extract_contract_hash(content: str) -> Optional[str]
-class StoreError(RuntimeError)
-class GitStore
-    ensure(self) -> None
-    @property
-    supports_sha256(self) -> bool
-    put_tree(self, files: Dict[str, bytes]) -> str
-    list_tree(self, oid: str) -> List[Tuple[str, str]]
-    get(self, ref: str, dest: Path) -> Path
-    diff(self, ref_a: str, ref_b: str) -> List[Tuple[str, str, str]]
-    commit_snapshot(self, files: Dict[str, bytes], job: str, prev_commit: Optional[str]=None) -> dict
-    bundle_create(self, commit: str, out: Path, has: Optional[str]=None) -> Path
-    @staticmethod
-    bundle_heads(bundle: Path) -> List[tuple]
 parse_version(v: str) -> Tuple[int, int, int]
 format_version(major: int, minor: int, patch: int) -> str
 get_pyproject_version(workspace: Path) -> str | None
@@ -219,7 +202,7 @@ ensure(workspace: Path, job: str, base: Optional[str]=None) -> Path
 present(workspace: Path, job: str, commit: Optional[str]=None) -> list
 advance(workspace: Path, job: str) -> Optional[str]
 merge_back(workspace: Path, job: str, accept_dirty: tuple=()) -> dict
-prune(workspace: Path, job: str, bundle_files: list[str]) -> dict
+prune(workspace: Path, job: str) -> dict
 remove(workspace: Path, job: str) -> None
 ```
 <!-- k3dge:interfaces-end -->

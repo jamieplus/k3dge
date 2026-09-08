@@ -189,8 +189,24 @@
       "type": "adr",
       "id": "ADR-0026",
       "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Accepted",
+      "status": "Proposed",
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
+    },
+    {
+      "path": "docs/adr/0027-hall-harness-topology.md",
+      "type": "adr",
+      "id": "ADR-0027",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
+      "status": "Proposed",
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
+    },
+    {
+      "path": "docs/architecture/encyclopedia.md",
+      "type": "architecture",
+      "id": "encyclopedia",
+      "title": "k3dge 百科全书 — 知识地图（Encyclopedia / Knowledge Map）",
+      "status": "",
+      "tokens": "k3dge 百科全书 — 知识地图（Encyclopedia / Knowledge Map）"
     },
     {
       "path": "docs/architecture/overview.md",
@@ -377,12 +393,52 @@
       "tokens": "Memo: peer 接线与审计席位的选项账（研究用，不作决策）"
     },
     {
-      "path": "docs/memo/2026-09-02-plugins-main-absorption-eval.md",
+      "path": "docs/memo/2026-09-05-doc-code-misalignment-list.md",
       "type": "memo",
-      "id": "2026-09-02-plugins-main-absorption-eval",
-      "title": "Memo: plugins-main → 四 harness 吸收评估（ledger v3）",
+      "id": "2026-09-05-doc-code-misalignment-list",
+      "title": "Memo: 文档↔代码未对齐清单（2026-09-05 对账，待核实回填）",
       "status": "",
-      "tokens": "Memo: plugins-main → 四 harness 吸收评估（ledger v3）"
+      "tokens": "Memo: 文档↔代码未对齐清单（2026-09-05 对账，待核实回填）"
+    },
+    {
+      "path": "docs/memo/2026-09-05-graph-lens-for-audit-and-qa.md",
+      "type": "memo",
+      "id": "2026-09-05-graph-lens-for-audit-and-qa",
+      "title": "Memo: 图论视角在审计/项目优化上的应用（为 audit vs QA 职责讨论铺底）",
+      "status": "",
+      "tokens": "Memo: 图论视角在审计/项目优化上的应用（为 audit vs QA 职责讨论铺底）"
+    },
+    {
+      "path": "docs/memo/2026-09-05-hall-pattern-discussion.md",
+      "type": "memo",
+      "id": "2026-09-05-hall-pattern-discussion",
+      "title": "Memo: 大厅模式推演账（2026-09-05，为 ADR-0027 与角色分工讨论作废案账）",
+      "status": "",
+      "tokens": "Memo: 大厅模式推演账（2026-09-05，为 ADR-0027 与角色分工讨论作废案账）"
+    },
+    {
+      "path": "docs/memo/2026-09-05-industry-benchmark-vs-4-harness.md",
+      "type": "memo",
+      "id": "2026-09-05-industry-benchmark-vs-4-harness",
+      "title": "Memo: 四 harness vs 行业标准完整对标（缺项清单 + 归属建议）",
+      "status": "",
+      "tokens": "Memo: 四 harness vs 行业标准完整对标（缺项清单 + 归属建议）"
+    },
+    {
+      "path": "docs/memo/2026-09-06-deeptutor-absorption-eval.md",
+      "type": "memo",
+      "id": "2026-09-06-deeptutor-absorption-eval",
+      "title": "Memo: DeepTutor 吸收评估（2026-09-06）",
+      "status": "",
+      "tokens": "Memo: DeepTutor 吸收评估（2026-09-06）"
+    },
+    {
+      "path": "docs/memo/2026-09-06-wikiskill-absorption-eval.md",
+      "type": "memo",
+      "id": "2026-09-06-wikiskill-absorption-eval",
+      "title": "Memo: WikiSkill 论文吸收评估（Google Research, arXiv:2608.27454）",
+      "status": "",
+      "tokens": "Memo: WikiSkill 论文吸收评估（Google Research, arXiv:2608.27454）"
     },
     {
       "path": "docs/protocols/audit_default.md",
@@ -535,6 +591,102 @@
       "title": "首案真跑前遗留清单（k3dge 侧）",
       "status": "idea",
       "tokens": "首案真跑前遗留清单（k3dge 侧）"
+    },
+    {
+      "path": "docs/tasks/2026-09-05-M8-audit-doc_audit_architecture_3.md",
+      "type": "tasks",
+      "id": "2026-09-05-M8-audit-doc_audit_architecture_3",
+      "title": "doc-audit: 文档作者合规审计（architecture 等 3 处）",
+      "status": "idea",
+      "tokens": "doc-audit: 文档作者合规审计（architecture 等 3 处）"
+    },
+    {
+      "path": "docs/tasks/2026-09-05-M8-chore-eval_harness_needed.md",
+      "type": "tasks",
+      "id": "2026-09-05-M8-chore-eval_harness_needed",
+      "title": "eval 盲测纪律待立 harness（memo P2→P3 降级项）",
+      "status": "idea",
+      "tokens": "eval 盲测纪律待立 harness（memo P2→P3 降级项）"
+    },
+    {
+      "path": "docs/tasks/2026-09-05-M8-feat-idle_fuse_counter.md",
+      "type": "tasks",
+      "id": "2026-09-05-M8-feat-idle_fuse_counter",
+      "title": "空转熔断机制化（W6 活性墙的最小实现）",
+      "status": "idea",
+      "tokens": "空转熔断机制化（W6 活性墙的最小实现）"
+    },
+    {
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G1_merge.md",
+      "type": "tasks",
+      "id": "2026-09-06-M8-feat-hall_G1_merge",
+      "title": "G1: 审计模块合并 + 接口冻结（一本账）",
+      "status": "idea",
+      "tokens": "G1: 审计模块合并 + 接口冻结（一本账）"
+    },
+    {
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G2_kernel.md",
+      "type": "tasks",
+      "id": "2026-09-06-M8-feat-hall_G2_kernel",
+      "title": "G2: Hall 内核常驻进程（人肉窗先行）",
+      "status": "idea",
+      "tokens": "G2: Hall 内核常驻进程（人肉窗先行）"
+    },
+    {
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G3_wall.md",
+      "type": "tasks",
+      "id": "2026-09-06-M8-feat-hall_G3_wall",
+      "title": "G3: W1 席目录墙 + 签名钥验签（先 opencode/pi 两宿主）",
+      "status": "idea",
+      "tokens": "G3: W1 席目录墙 + 签名钥验签（先 opencode/pi 两宿主）"
+    },
+    {
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G3b_cli_root_probe.md",
+      "type": "tasks",
+      "id": "2026-09-06-M8-feat-hall_G3b_cli_root_probe",
+      "title": "G3b: CLI root 白名单能力实测（W1 前置探测）",
+      "status": "idea",
+      "tokens": "G3b: CLI root 白名单能力实测（W1 前置探测）"
+    },
+    {
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G4_windows.md",
+      "type": "tasks",
+      "id": "2026-09-06-M8-feat-hall_G4_windows",
+      "title": "G4: 窗版工单 + 工具事实注入 + 复核声明模型",
+      "status": "idea",
+      "tokens": "G4: 窗版工单 + 工具事实注入 + 复核声明模型"
+    },
+    {
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G5_watchdog.md",
+      "type": "tasks",
+      "id": "2026-09-06-M8-feat-hall_G5_watchdog",
+      "title": "G5: W2 轮间清场 + W6 看门狗注入",
+      "status": "idea",
+      "tokens": "G5: W2 轮间清场 + W6 看门狗注入"
+    },
+    {
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G6_cutover.md",
+      "type": "tasks",
+      "id": "2026-09-06-M8-feat-hall_G6_cutover",
+      "title": "G6: 割接（seal hook/消费侧/k3lity 归档）",
+      "status": "idea",
+      "tokens": "G6: 割接（seal hook/消费侧/k3lity 归档）"
+    },
+    {
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G7_tests.md",
+      "type": "tasks",
+      "id": "2026-09-06-M8-feat-hall_G7_tests",
+      "title": "G7: Hall 测试骨架（W1/W2/W6/台账复算）",
+      "status": "idea",
+      "tokens": "G7: Hall 测试骨架（W1/W2/W6/台账复算）"
+    },
+    {
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G8_observe.md",
+      "type": "tasks",
+      "id": "2026-09-06-M8-feat-hall_G8_observe",
+      "title": "G8: 进程侧观测（统计席位+逃逸率+观测行）",
+      "status": "idea",
+      "tokens": "G8: 进程侧观测（统计席位+逃逸率+观测行）"
     }
   ]
 }

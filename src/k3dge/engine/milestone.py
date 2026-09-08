@@ -1638,7 +1638,7 @@ def run_seal_flow(
         return "rejected", msg + "\n" + nextstep.next_for_rejection(milestone_id, msg).render_cli()
     closure = _write_closure_note(workspace, milestone_id)
     msg += f"\n  收摊清单: {closure.relative_to(workspace)}"
-    try:  # ⑤ end-flow 清理钩子：派生件（worktree/bundle）收口即焚，store 与合并后的分支史保留
+    try:  # ⑤ end-flow 清理钩子：派生件（worktree/已并入的审计线）收口即删；史在主干
         from k3dge.engine.audit_flow import prune_finished
 
         pr = prune_finished(workspace)

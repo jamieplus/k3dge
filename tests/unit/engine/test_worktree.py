@@ -68,7 +68,7 @@ def test_merge_back_ff_and_conflict(tmp_path):
     W.ensure(ws, "J1")
     _commit_on_branch(ws, "extra.py", "e = 1\n")
     r = W.merge_back(ws, "J1")
-    assert r["ok"] and r["mode"] in ("ff", "merge")
+    assert r["ok"] and r["mode"] == "ff"
     assert (ws / "extra.py").exists()                          # 修的东西回到主干
     # 冲突：双方修改共同祖先里同一文件（真 merge 冲突路径）
     (ws / "clash.py").write_text("main = 1\n", encoding="utf-8")
@@ -83,6 +83,25 @@ def test_merge_back_ff_and_conflict(tmp_path):
                           text=True).stdout.strip() == ""     # merge --abort 干净退出
 
 
+def test_merge_back_rebase_when_main_moved(tmp_path):
+    # 主干在 L 之后先走一步（无冲突）⇒ 线重演到主干头再 ff，无 merge 提交
+    ws = _repo(tmp_path)
+    W.ensure(ws, "J1")
+    _commit_on_branch(ws, "line.py", "l = 1\n")
+    (ws / "main.py").write_text("m = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=ws, check=True, capture_output=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "main moved"],
+                   cwd=ws, check=True, capture_output=True)
+    r = W.merge_back(ws, "J1")
+    assert r["ok"] and r["mode"] == "rebase", r
+    assert (ws / "line.py").exists() and (ws / "main.py").exists()
+    log = subprocess.run(["git", "log", "--oneline"], cwd=ws, capture_output=True, text=True).stdout
+    assert "merge" not in log.lower()  # 线性史，无 merge 提交
+    out = W.prune(ws, "J1")            # 已并入 ⇒ 删现场删线
+    assert not W.worktree_path(ws, "J1").exists()
+    assert "branch:k3dit/J1" in out["removed"]
+
+
 def test_merge_back_dirty_tree_refuses(tmp_path):
     ws = _repo(tmp_path)
     W.ensure(ws, "J1")
@@ -92,13 +111,17 @@ def test_merge_back_dirty_tree_refuses(tmp_path):
     assert not r["ok"] and r["mode"] == "dirty"
 
 
-def test_prune_removes_derived_keeps_store(tmp_path):
+def test_prune_keeps_unmerged_line_deletes_merged(tmp_path):
     ws = _repo(tmp_path)
     W.ensure(ws, "J1")
-    (ws / ".k3dge" / "bundles").mkdir(parents=True, exist_ok=True)
-    bag = ws / ".k3dge" / "bundles" / "x.bundle"
-    bag.write_text("junk", encoding="utf-8")
-    (ws / ".k3dge" / "store.git").mkdir(parents=True, exist_ok=True)
-    out = W.prune(ws, "J1", [".k3dge/bundles/x.bundle"])
-    assert not bag.exists() and not W.worktree_path(ws, "J1").exists()
-    assert (ws / ".k3dge" / "store.git").is_dir()              # 权威与历史留
+    _commit_on_branch(ws, "keep.py", "k = 1\n")
+    out = W.prune(ws, "J1")                                    # 未并入 ⇒ 线保留原位
+    assert not W.worktree_path(ws, "J1").exists()
+    assert "branch:k3dit/J1" not in out["removed"]
+    assert subprocess.run(["git", "rev-parse", "--verify", "-q", "refs/heads/k3dit/J1"],
+                          cwd=ws, capture_output=True).returncode == 0
+    W.merge_back(ws, "J1")                                     # 闸过合主干
+    out = W.prune(ws, "J1")                                    # 然后删线
+    assert "branch:k3dit/J1" in out["removed"]
+    assert subprocess.run(["git", "rev-parse", "--verify", "-q", "refs/heads/k3dit/J1"],
+                          cwd=ws, capture_output=True).returncode != 0

@@ -11,7 +11,7 @@
 | | gate 类（audit / quality） | service 类（cache） |
 | --- | --- | --- |
 | 定位 | 编排对象：派活→收工件→验→计数→进放行链 | 查询服务：同步一问一答；失败＝能力暂缺，**永不阻断流程**（现消费者：① k3dge doc-audit 相关文档前路由；② `k3dge status` 观测行——`.k3che/` 存在才探活，观测永不进判定；③ `task create` 相似检查（语料含 tasks/archive；只提示不裁决）。证据/台账不归 k3che，见 §7 v0.5 修正） |
-| 输入 | 送检包（§3：一次性、可复现、有基线） | 无送检包——它**持续只读**消费仓文件（同机信任域），尽力而为的新鲜度 |
+| 输入 | 审计线（§3：一单一线一 checkout，锁点 L=基线） | 无送检——它**持续只读**消费仓文件（同机信任域），尽力而为的新鲜度 |
 | 输出 | 工件 `report/findings`，落 `docs/reviews/`，有计数语义 | `hits` + 命中率，**不是门禁工件，不进放行链** |
 | provenance/baseline | 必须（不符即拒收） | 不适用（没有"某次审计的输入快照"可言） |
 | 时序 | `submit/collect` 两态，等待活在协议外（§1） | 同步单次调用（§1 的 `call` 简式） |
@@ -20,7 +20,7 @@
 - 边界清单（硬约束）：
   - k3dge **永不知道**：跑几轮、几席、什么模型、内部怎么分工；
   - peer **永不知道**：k3dge 的闸判据、seal 条件、里程碑状态；
-  - 交换只有两样：事实进（送检包 + 调用方领域事实），工件出（信封包裹的三种工件）。
+  - 交换只有两样：事实进（审计线交件 + 调用方领域事实），工件出（信封包裹的三种工件）。
 
 ## 1. 调用流程：gate 类 submit / collect 两态异步；service 类同步 call
 
@@ -29,7 +29,8 @@
 ### 1.1 gate：submit / collect
 
 ```
-role.submit(bundle, scope, milestone_id) → {ok, kind:"job", payload:{job_id}}    ≤10s，只做校验+入队
+role.submit(baseline, scope, milestone_id, branch, wt_dir)
+                                         → {ok, kind:"job", payload:{job_id}}    ≤10s，只做校验+入队
 role.collect(job_id)                     → {ok, kind:<工件>, payload:{…}}        完成
                                          → {ok:false, error:"PENDING", retry_after:N}
                                          → {ok:false, error:"EXPIRED|NOT_FOUND|INTERNAL|…"}
@@ -37,7 +38,7 @@ role.collect(job_id)                     → {ok, kind:<工件>, payload:{…}} 
 
 - 协议调用必须短；**长等待活在协议外**：k3dge 把 `job_id` 落进编排状态（`.agent/audit_checklist.json`），`[NEXT]` 置 `awaiting_audit`，何时 collect 由外层决定。
 - `job_id` 不透明：job 执行状态在 peer 内部，k3dge 不问、不解释、不据此重试。
-- `collect` 幂等可重试；`EXPIRED / NOT_FOUND` ⇒ 重新 submit ⇒ **强制重建送检包** ⇒ 新 hash ⇒ 旧报告对新基线自动作废。
+- `collect` 幂等可重试；`EXPIRED / NOT_FOUND` ⇒ 重新 submit ⇒ **审计线重新 advance 锁新基线** ⇒ 旧报告对新基线自动作废。
 
 ### 1.4 工单模型＝棘轮（ratchet）：一单 = 一快照（2026-09-04 定稿）
 
@@ -53,7 +54,7 @@ role.collect(job_id)                     → {ok, kind:<工件>, payload:{…}} 
 {"ok": true, "kind": "report|findings|hits",
  "payload": { /* 见 §4 */ },
  "provenance": {"seat": "<格式自由，必须非空>", "generated_at": "<ISO-8601>",
-                "baseline": "sha256:<bundle 内容哈希>", "lens_version": "<audit harness 发布的规则版本>"}}
+                "baseline": "<审计线锁点 L 的 commit oid>", "lens_version": "<audit harness 发布的规则版本>"}}
 // 失败
 {"ok": false, "error": "<封闭枚举>", "message": "<peer 自述，人话>", "detail": { /* 可选 */ }}
 ```
@@ -63,22 +64,17 @@ role.collect(job_id)                     → {ok, kind:<工件>, payload:{…}} 
 - 机验面：信封合法性、`kind` 枚举、**gate 类**另验 `provenance` 三字段、工件格式（§4）＝硬闸；内容质量与 `seat` 诚实性＝k3dit/人。
 - service 类无 provenance 要求；其 `hits` 的排序质量属 k3che 内部事，好坏由命中率统计观察，不进门禁。
 
-## 3. 送检包（Audit Bundle）＝gate 类唯一输入形式（service 类不适用，见 §0 分类表）
+## 3. 审计线（Audit Line）＝gate 类唯一输入形式（service 类不适用，见 §0 分类表）
 
-废除"传仓库路径"：传活路径＝暴露消费仓内部＋审计对象漂移。输入只能是打包好的送检包。
+送检＝在消费仓 `.git` 里为这一单长出一条线（`k3dit/<单>`，自锁点 L 拉起）＋一个 checkout（worktree）。对象格式、树布局与主干天然一致；袋/独立库/打包器全部退役（`ADR-0026` 重设计）。递件分三截，文件怎么递、谁碰 git 写死如下——
 
-- **构成**：
-  - `target/`：待审目标源文件全文；有 git 基线时附变更范围（diff 清单），**避免全量漫游**；
-  - `signatures/`：目标文件依赖的本地模块经轻量 AST（std `ast`，tree-sitter 可选）抽成**签名骨架**——仅函数签名/类结构/类型注解的"头文件"，几 KB，消除对跨文件符号的幻觉；
-  - `MANIFEST.json`：排序清单 + 每文件哈希 + 包哈希（确定性打包：排序、归一 mtime/uid/gid）。
-- **打包器** = k3dge 模块 `engine/bundle.py`（送检范围归调用方所有）；配置 `.agent/bundle.toml`：`ignore`（`__pycache__` / `.DS_Store` / `node_modules` / `logs` 等噪音）、`max_bytes`、`scrub.keys`（指定 key 模式**在出门前**脱敏）、`include / exclude`、`mode = tree|diff`、`format`。
-- **身份与位置分家（v3，ADR-0026）**：身份 = 送检包的 git-tree oid（`cas://sha256:<tree-oid>`，即基线）；位置 = **bundle 单文件**（同机路径）或其 URL（远程）——同一身份两种摆法，协议不分叉、不逐层回源。内容不过 JSON-RPC、不过对端账本：submit/claim 只传引用与**字符串句柄**（file/commit/config_digest）。
-- **bundle 即宇宙**：每份包由进程从 store（`.k3dge/store.git`，专用裸库，sha256 对象格式）的 `refs/snap/<job>` 提交链现建（`git bundle create`；thin 缺段自动补 full）。席位 `git fetch <袋|url>` 一步得全部对象，**永不遍历客户端 store**——结构性隔离，不是礼貌约定。旧 git 无 sha256 支持 ⇒ 回退确定性 tar 袋，ref 格式不变。
-- **工作现场 = 分支**：快照链是消费仓 `k3dit/<job>` 分支上的提交（进程代提交，作者 `k3dge-process`——机械件，非席位署名）；席位在 `.k3dge/wt/<job>` worktree 内读写，`k3dge audit advance` 推进（`git update-ref` CAS，非快进即拒）；closure 时 `merge_back` 回主干（ff 优先，真 merge 兜底，脏树/冲突 ⇒ abort 复原并升级人工）。派生目录自动写进被审仓本地 `info/exclude`。
-- **取件/对比** = `k3dge bundle resolve <ref> [--extract 目录]` / `git ls-tree` 两快照对比（`store.diff`）；end-flow（seal）后 bundle 袋与 worktree 即焚（`prune`），store 与已合并分支史保留。\n- **泄漏准入不变量**：store 只装 scrub 后的派生树，永不写入被审仓 `.git`；孤儿对象随 `git gc` 原生过期。\n- **基线** = 包内容哈希；报告 `provenance.baseline` 必须与之一致，不一致 ⇒ `FORMAT` ⇒ 拒收。
-- **主权（硬约束）**：对端账本只存工单元信息——句柄字符串、findings 正文、席与戳；**一字节客户端代码都不落对端盘**（备份/镜像＝机构运营手段，非协议义务）。打开袋的永远是席位侧。
+- **① k3dge → Hall（递审）**：交件句柄全是字符串——`baseline`（=L，线头 commit oid，即基线；tree 可由 commit 导出）、`branch`、`wt_dir`（已 checkout 的现场目录）、`scope`（送检范围说明——Hall 物化参数，不是内容边界）。内容不过 JSON-RPC、不过对端账本。**Hall 是这个 `.git` 的唯一客户**：checkout、commit、advance 提版全经 k3dge 进程动词；席拿不到仓路径。
+- **② Hall → 席（窗口桌面）**：Hall 从 L（或已 advance 的最新版）checkout 一份，按 scope 裁剪成**审计纯净版**（只含本窗要看的目录；**不带指向仓的 `.git`**），分发给各判读窗（文档→代码→价值，窗序固定——`ADR-0027` §2.2）。席只在这棵目录里按同一套标记规范钉或改，写完交差。Hall 把各窗产出 **merge 成当前版本**（判读 merge，只合判断物，不管代码对错——那是窗的事），经 `k3dge audit advance` 提一版（混排全收，进程代 commit，作者 `k3dge-process`——机械件，非席位署名；`git update-ref` CAS，非快进即拒）；再把当前版本交**修席窗**改，改完提一版；再交**复核窗**验收——验收过则本轮结束，不过则**打回修席**（只回修席，不跳窗、不插队）。判读窗**不改版本、只出版本**。
+- **③ Hall → k3dge（收口）**：`collect` 仍是信封：12 列＋`provenance.baseline == L`。合主干用的不是袋，是线上最终 commit L′：k3dge 对消费仓做 ff，ff 不成则 `rebase --onto <主干头> <base> <线>` 重演再 ff（线提交全是机械件；冲突 ⇒ abort 复原＋升级人工，不自作主张）。闸过合主干后删现场删线（线仅在已并入时删；未并入保留原位供幂等重试与崩溃恢复）。废单＝删分支，主干从未脏。
+- **隔离归属**：审计线不污染主干＝ref + 本地 `info/exclude` + 闸过删线；窗隔离＝Hall 物化拷贝 + CLI 原生 root/deny（`ADR-0027` W1）。数据最小化重心从"打包脱敏"移到"物化裁剪"（同信任域，`ADR-0006` S-13；scrub/target/ 前缀/签名骨架随打包器一并退役）。
+- **基线** = 锁点 L 的 commit oid；报告 `provenance.baseline` 必须与之一致，不一致 ⇒ `FORMAT` ⇒ 拒收。L 之后主干再走 ⇒ closure 合并按 §1.4（ff 失败走真 merge，冲突升人工）。
 - **呈现由进程供给**：`complete_round` 的 present 以 worktree 机械抽取（§8）为准；席位口述仅作交叉核对，口径不符 ⇒ 该轮 `FORMAT` 拒。
-- **待接（与 H2 实现同批）**：送审包应含**契约上下文**——由 cache 角色召回本改动相关的 ADR/Specs 放入 `context/`（随包哈希一起钉死；无 H3 时包照样成立，context 尽力而为）。在此之前该线不预焊。
+- **待接（与 H2 实现同批）**：契约上下文（cache 角色召回本改动相关 ADR/Specs）由 Hall 物化时拼进窗口目录（随 scope 尽力而为；无 H3 时线照样成立）。在此之前该线不预焊。
 
 ## 4. 工件（输出，三种）
 
@@ -102,10 +98,10 @@ k3dge 对通过信封的字节**机械落盘**（`docs/reviews/`，记 hash，�
 - **自动入口**（`[NEXT] audit_suggested` 触发评估）：**不预筛、不短路**。checklist 求值（账齐/C2/体积）是零成本静态扫描；基线未变时条件仍满足就照问审计问题，没有错。短路它省不了成本，反而制造"缓存故障 ⇒ 免审"的通道——预筛只允许发生在人主动要求跑审计的地方。
 - **人工入口**（`k3dge milestone audit <id>`）：预筛。三条件**全部**形式成立 ⇒ 告知"无审计需要执行"（附报告路径与键），提示 `--force`：
   1. 存在 `待修=0` 的闭环 12 列报告；
-  2. 其 `provenance.baseline` == 当场重算的送检包哈希（§3）；
+  2. 其 `provenance.baseline` == 线上基线（§3：L 的 commit oid）；
   3. 其 `provenance.lens_version` == k3dit 当前发布值（peer 只新增这一项义务；**无需新 RPC**）。
 - **存储分层（v0.5 修正：k3che 从证据存储除名）**：预筛来源两级——① k3dit 案卷（其 store 即档案馆，OID 即索引，跨仓复用=同一部署多 consumer 天然命中）；② 消费仓本地 `docs/reviews/`（含 archive）。镜像/备份＝机构自身运维手段，不入协议；k3che 回归 token 经济（检索/观测/查重），不承载证据存储。CAS 层不可用 ⇒ 退化为仅本地检查；任何 CAS 故障**永不**扩大为跳过审计（`ADR-0006`：service 失败=skip，不进判定链）。
-- **痕迹**：预筛命中/落空都写 `logs/k3dge.log` 一行 `PRE-FILTER action=audit verdict=closed|run key=<bundle_hash>@<lens_version> src=<报告路径|cas|absent>`。"静默"只作用于打扰，不作用于痕迹。
+- **痕迹**：预筛命中/落空都写 `logs/k3dge.log` 一行 `PRE-FILTER action=audit verdict=closed|run key=<baseline>@<lens_version> src=<报告路径>`。"静默"只作用于打扰，不作用于痕迹。
 - `--force`：跳过预筛直接全量。审计输出非确定，复用信任必须随时可破。
 - 预筛不制造新状态：闭环与否仍由 `audit_closed()` 判；预筛省的是**重跑成本**，不是判定。seal 的 attest 不因复用继承（不变）。
 - 角色归属（按 §0 表）：lens 版本归 k3dit 发布；blob 存取归 k3che（台账/镜像，只答"有没有"，不答"能不能用"）；三条件比对与流程分叉归 k3dge（纯形式校验，不解释对方内部）。
