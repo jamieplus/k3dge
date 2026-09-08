@@ -124,7 +124,7 @@ sequenceDiagram
     K3-->>Agent: 问「要审吗？」(无倒计时；N=继续干活)
     Agent->>K3: milestone audit <id>
     Agent->>Audit: milestone audit = 棘轮步进：audit.submit 建单→席位 rounds→audit.collect 落签署件→写回主干
-    Note over Agent,Audit: 交换原子=送检包 bundle 单文件（ADR-0026）；席位经机构 seat 连接组件上岗（pi/opencode/…），sign-report 署名才算结案
+    Note over Agent,Audit: 交换物=审计线（分支+现场，ADR-0026 重设计：锁线→交件→merge→删线）；席位经机构 seat 连接组件上岗（pi/opencode/…），sign-report 署名才算结案
     Agent->>Quality: k3lity.actions.quality（mcp→cli→manual；人填不造假分）
     Note over Agent,Audit: 外来审计源：人贴报告 → k3dge_submit_audit_report 落盘(--kind audit|quality)
     Audit-->>Agent: 审计 12 列报告（含 待修/有意留/已修）+ 位置钉 k3dit:pending
