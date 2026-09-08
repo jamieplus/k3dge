@@ -83,3 +83,25 @@
 - **k3che**：全表无 ✅。结论：**无虚报**（全是计划态）。
 - **k3dge technical-writing 🎯**：memo **少报了**——`templates/assets/rules/01-docs-structure.md:10` 已有 Diátaxis 四层＋三顶规逐字落地（洁净室署名齐）。结论：有机吸收已发生，状态未更新。
 - **k3dge show-me-your-work 🎯**：M7 closure 无 TSV 形态。结论：**🎯 属实＝真没吸收**。
+
+## 结项记录（2026-09-05 晚，全账核清 → archive）
+
+> 核对方法：每条要求→产物（文件:行）→消费者（测试/引擎/闸）→到达（AGENTS 路由/脚手架/契约哈希）。缺任一环不算落地。下列逐条为当日实测，非计划复述。
+
+| 账 | 最终状态 | 证据链（产物→消费者→到达） |
+|---|---|---|
+| k3dit 0002/0003/0004/0005（含 P1 nuclear/interrogate、P2 epistemics/show-work） | ✅ 09-04/05 封板夜落地 | 产物 `../k3dit/src/k3dit/mcp.py:39-52`（12 透镜）+ `docs/guides/protocol.md:36-159`；消费者 `../k3dit/tests/unit/k3dit/test_jobs.py:59`（`lens_count==12`）+`test_mcp.py`（53 绿）；到达 flow 工具→`lens_version` 进报告 provenance |
+| k3dit **P3 perf 8 族** | ✅ 本会话 | 产物 `../k3dit/docs/guides/protocol.md`「性能策略 8 族」节+ADR-0006(Draft)；到达 flow `protocol` 字段逐席送达；k3dit 53 测绿 |
+| k3lity agent-compat/control/verify/deslop（P1/P2） | ✅（锚点数字漂移已记于 09-05 核对节，不追） | `../k3lity/src/k3lity/harness.py:104-143`；消费者 cli.py 子命令 + test_harness |
+| k3lity TS 规则（P2） | ✅ 本会话实查已存在（09-05 核对节说"无果"**错**） | `../k3lity/src/k3lity/quality.py:275 _scan_ts_rules` 挂 `scan_quality`；test_quality 绿 |
+| k3lity **P3 度量循环** | ✅ 本会话 | 产物 `../k3lity/docs/guides/measurement.md`+ADR-0002(Draft)；到达 guides 消费路径=席/人；20 测绿 |
+| k3che continual-learning（P2） | ✅ 封板夜 | `../k3che/src/k3che/learn.py`；test_learn 绿；spec 接口块含 learn 函数 |
+| k3che **P3 recall/guard 机械半** | ✅ 本会话 | 产物 `../k3che/src/k3che/recall.py`+ADR-0003(Draft)；消费者 test_recall（5 测）；到达 `k3dge sync` 回写契约哈希（GATE SUCCESS, spec.md:77-78） |
+| k3dge technical-writing | ✅（09-05 核对节已纠"少报"） | `src/k3dge/templates/assets/rules/01-docs-structure.md:10`；到达=PAIRS 镜像闸 + 脚手架进所有下游仓 |
+| k3dge show-me-your-work TSV（P2） | ✅ 09-04 封板夜（09-05 核对节"真没吸收"过期） | `src/k3dge/engine/milestone.py:1214` closure 生成 §5 TSV；到达=seal 流程硬编码 |
+| k3dge **P3 encode-lessons-in-structure** | ✅ 本会话 | 产物 `.agent/rules/10-structure-over-prose.md`+镜像；消费者 `tests/unit/templates/test_template_sync.py`（PAIRS 注册）；到达 AGENTS.md 路由行 + 260 测绿、check 绿 |
+| eval 盲测 | ❌ 维持排除 | 前提不成立（k3dge 无 compare harness）；已转 `docs/tasks/2026-09-05-M8-chore-eval_harness_needed.md` |
+| P3 principles 细则行（21 条中未单列者） | ✅ 已随 0003/0004 判据合并 | protocol.md 结构红旗/幂等/并发/legacy 行 |
+
+- 本会话未改 peer 仓 ADR 状态（Draft→Accepted 归各维护者）；跨仓归属账随本文件归档，peer 侧以各自 ADR/tests 为权威。
+- memo 使命（评估+路由）完毕：**全部行要么落地、要么转 task、要么明确排除**，无遗留 🎯/📥 → 按 Rule 06 archive。encyclopedia:233 索引行同轮更新。
