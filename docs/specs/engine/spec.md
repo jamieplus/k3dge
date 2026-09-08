@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:df507ccf1d4ffb687bdc9bb66d8db31b3d9e78d2261686bf49c5a7f9310ce247`
+- **Contract Hash**: `sha256:994c236beb8f67a51f7746f3365982556e4e68806284fd7c2a3f951455dc0fd6`
 - **Last Updated**: 2026-09-08
 
 ## 1. Domain Boundary & Responsibilities
@@ -36,8 +36,11 @@ reset_verify_attempts(workspace: Path) -> None
 submit_audit(workspace: Path, milestone_id: str, targets: Optional[list]=None, io=None, role: str='audit') -> dict
 collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str]=None, io=None) -> dict
 push_present(workspace: Path, job_key: str, commit: str='', io=None) -> dict
+advance_line(workspace: Path, job_key: str, by: str='manual', io=None) -> dict
 peer_status(workspace: Path, job_id: str, io=None) -> dict
 open_ratchet_jobs(workspace: Path) -> list
+show_job(workspace: Path, job_key: str='') -> dict
+materialize(workspace: Path, job_key: str='', rev: str='', dest: str='') -> dict
 prune_finished(workspace: Path) -> dict
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
 audit_closed(workspace: Path, milestone_id: str) -> bool
@@ -204,6 +207,7 @@ advance(workspace: Path, job: str) -> Optional[str]
 merge_back(workspace: Path, job: str, accept_dirty: tuple=()) -> dict
 prune(workspace: Path, job: str) -> dict
 remove(workspace: Path, job: str) -> None
+materialize(workspace: Path, rev: str, dest: Path) -> Path
 ```
 <!-- k3dge:interfaces-end -->
 

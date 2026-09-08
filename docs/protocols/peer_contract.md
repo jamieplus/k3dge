@@ -69,11 +69,12 @@ role.collect(job_id)                     → {ok, kind:<工件>, payload:{…}} 
 送检＝在消费仓 `.git` 里为这一单长出一条线（`k3dit/<单>`，自锁点 L 拉起）＋一个 checkout（worktree）。对象格式、树布局与主干天然一致；袋/独立库/打包器全部退役（`ADR-0026` 重设计）。递件分三截，文件怎么递、谁碰 git 写死如下——
 
 - **① k3dge → Hall（递审）**：交件句柄全是字符串——`baseline`（=L，线头 commit oid，即基线；tree 可由 commit 导出）、`branch`、`wt_dir`（已 checkout 的现场目录）、`scope`（送检范围说明——Hall 物化参数，不是内容边界）。内容不过 JSON-RPC、不过对端账本。**Hall 是这个 `.git` 的唯一客户**：checkout、commit、advance 提版全经 k3dge 进程动词；席拿不到仓路径。
-- **② Hall → 席（窗口桌面）**：Hall 从 L（或已 advance 的最新版）checkout 一份，按 scope 裁剪成**审计纯净版**（只含本窗要看的目录；**不带指向仓的 `.git`**），分发给各判读窗（文档→代码→价值，窗序固定——`ADR-0027` §2.2）。席只在这棵目录里按同一套标记规范钉或改，写完交差。Hall 把各窗产出 **merge 成当前版本**（判读 merge，只合判断物，不管代码对错——那是窗的事），经 `k3dge audit advance` 提一版（混排全收，进程代 commit，作者 `k3dge-process`——机械件，非席位署名；`git update-ref` CAS，非快进即拒）；再把当前版本交**修席窗**改，改完提一版；再交**复核窗**验收——验收过则本轮结束，不过则**打回修席**（只回修席，不跳窗、不插队）。判读窗**不改版本、只出版本**。
-- **③ Hall → k3dge（收口）**：`collect` 仍是信封：12 列＋`provenance.baseline == L`。合主干用的不是袋，是线上最终 commit L′：k3dge 对消费仓做 ff，ff 不成则 `rebase --onto <主干头> <base> <线>` 重演再 ff（线提交全是机械件；冲突 ⇒ abort 复原＋升级人工，不自作主张）。闸过合主干后删现场删线（线仅在已并入时删；未并入保留原位供幂等重试与崩溃恢复）。废单＝删分支，主干从未脏。
+- **② Hall → 席（窗口桌面）**：Hall 从 L（或已 advance 的最新版）checkout 一份，按 scope 裁剪成**审计纯净版**（只含本窗要看的目录；**不带指向仓的 `.git`**），分发给各判读窗（文档→代码→价值，窗序固定——`ADR-0027` §2.2）。席只在这棵目录里按同一套标记规范钉或改，写完交差。Hall 把各窗产出 **merge 成当前版本**（判读 merge，只合判断物，不管代码对错——那是窗的事），经 `k3dge audit advance` 提一版（混排全收，进程代 commit，作者 `k3dge-process`——机械件，非席位署名；`git update-ref` CAS，非快进即拒；**提版即重钉**：在办单 baseline=新线头，报告按最新基线签；`--by` 记调用方身份落账）；再把当前版本交**修席窗**改，改完提一版；再交**复核窗**验收——验收过则本轮结束，不过则**打回修席**（只回修席，不跳窗、不插队）。判读窗**不改版本、只出版本**。
+- **③ Hall → k3dge（收口）**：`collect` 仍是信封：12 列＋`provenance.baseline` == 在办单基线（最新线头）。合主干用的不是袋，是线上最终 commit L′：k3dge 对消费仓做 ff，ff 不成则 `rebase --onto <主干头> <base> <线>` 重演再 ff（线提交全是机械件；冲突 ⇒ abort 复原＋升级人工，不自作主张）。闸过合主干后删现场删线（线仅在已并入时删；未并入保留原位供幂等重试与崩溃恢复）。废单＝删分支，主干从未脏。
 - **隔离归属**：审计线不污染主干＝ref + 本地 `info/exclude` + 闸过删线；窗隔离＝Hall 物化拷贝 + CLI 原生 root/deny（`ADR-0027` W1）。数据最小化重心从"打包脱敏"移到"物化裁剪"（同信任域，`ADR-0006` S-13；scrub/target/ 前缀/签名骨架随打包器一并退役）。
-- **基线** = 锁点 L 的 commit oid；报告 `provenance.baseline` 必须与之一致，不一致 ⇒ `FORMAT` ⇒ 拒收。L 之后主干再走 ⇒ closure 合并按 §1.4（ff 失败走真 merge，冲突升人工）。
-- **呈现由进程供给**：`complete_round` 的 present 以 worktree 机械抽取（§8）为准；席位口述仅作交叉核对，口径不符 ⇒ 该轮 `FORMAT` 拒。
+- **基线** = 最新线头 commit oid（submit 锁 L，advance 重钉；L 只是首钉）；报告 `provenance.baseline` 必须与在办单基线一致，不一致 ⇒ `FORMAT` ⇒ 拒收。主干在线之后再走 ⇒ closure 合并按 §1.4（ff→重演，冲突升人工）。
+- **呈现由进程供给**：`complete_round` 的 present 以 worktree 机械抽取（§8）为准（送达递增 `present_seq`，对端凭 seq 判新旧）；席位口述仅作交叉核对，口径不符 ⇒ 该轮 `FORMAT` 拒。
+- **Hall 查询动词（不进席）**：`audit show`（读本地账：baseline/branch/merge_ok/advances/present_seq＋本地降级尾——`status` 查的是对端）；`audit materialize`（按 oid 只读物化，无 `.git`、不碰线）。
 - **待接（与 H2 实现同批）**：契约上下文（cache 角色召回本改动相关 ADR/Specs）由 Hall 物化时拼进窗口目录（随 scope 尽力而为；无 H3 时线照样成立）。在此之前该线不预焊。
 
 ## 4. 工件（输出，三种）

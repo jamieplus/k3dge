@@ -171,3 +171,25 @@ def prune(workspace: Path, job: str) -> dict:
 
 def remove(workspace: Path, job: str) -> None:
     _git(workspace, "worktree", "remove", "--force", str(worktree_path(workspace, job)))
+
+
+def materialize(workspace: Path, rev: str, dest: Path) -> Path:
+    """只读物化：把 rev 的树解到 dest（内容物，无 `.git`；不碰线/worktree/分支）。
+
+    供 Hall 按基线 oid 取旧版——此前只能自己对消费仓 `.git` 下手。
+    未知 rev ⇒ RuntimeError（不静默给错版）。
+    """
+    import io
+    import tarfile
+
+    if _git(workspace, "rev-parse", "--verify", "-q", f"{rev}^{{commit}}").returncode != 0:
+        raise RuntimeError(f"未知版本（无法物化）: {rev!r}")
+    dest = Path(dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    p = subprocess.run(["git", "archive", "--format=tar", rev], cwd=str(workspace),
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if p.returncode != 0:
+        raise RuntimeError(f"物化失败: {p.stderr.decode('utf-8', 'replace').strip()[:160]}")
+    with tarfile.open(fileobj=io.BytesIO(p.stdout)) as tf:
+        tf.extractall(dest, filter="data")
+    return dest

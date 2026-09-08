@@ -32,6 +32,11 @@ class TestCli(unittest.TestCase):
                 self.assertEqual(rc2, 1)
                 rc3 = main(["audit", "status", "J-ghost"])  # status 半边同样不许 AttributeError
                 self.assertEqual(rc3, 1)
+                rc4 = main(["audit", "show"])  # 读本地账，无单也 ok
+                self.assertEqual(rc4, 0)
+                rc5 = main(["audit", "materialize", "--oid", "HEAD", "--dest", "mat"])
+                self.assertEqual(rc5, 0)  # 只读物化，不碰线
+                self.assertTrue((d / "mat" / "src" / "a.py").is_file())
             finally:
                 os.chdir(cwd)
 

@@ -111,6 +111,22 @@ def test_merge_back_dirty_tree_refuses(tmp_path):
     assert not r["ok"] and r["mode"] == "dirty"
 
 
+def test_materialize_readonly_snapshot(tmp_path):
+    ws = _repo(tmp_path)
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws,
+                          capture_output=True, text=True).stdout.strip()
+    dest = tmp_path / "mat"
+    out = W.materialize(ws, head, dest)
+    assert out == dest and (dest / "src" / "m.py").is_file()
+    assert not (dest / ".git").exists()                            # 纯内容，无库
+    assert subprocess.run(["git", "worktree", "list"], cwd=ws,
+                          capture_output=True, text=True).stdout.strip().count("\n") == 0  # 无新 worktree 登记
+    assert subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws,
+                          capture_output=True, text=True).stdout.strip() == head
+    with pytest.raises(RuntimeError, match="未知版本"):
+        W.materialize(ws, "0" * 40, tmp_path / "mat2")
+
+
 def test_prune_keeps_unmerged_line_deletes_merged(tmp_path):
     ws = _repo(tmp_path)
     W.ensure(ws, "J1")

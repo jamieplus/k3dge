@@ -16,7 +16,7 @@ cmd_task(args: argparse.Namespace) -> int
 cmd_init(args: argparse.Namespace) -> int
 cmd_mcp(args: argparse.Namespace) -> int
 cmd_audit(args: argparse.Namespace) -> int
-    # doc: 棘轮四动词（席位出口，工作区=CWD）：建单/查单/快照推进/取回落位（closure merge 自动附带）。
+    # doc: 审计线动词（工作区=CWD）：submit 锁线建单 / status 问对端 / show 读本地账 /
 cmd_markers(args: argparse.Namespace) -> int
     # doc: 树侧 findings 一览：三锚点计数、语法违规、结项判据（只读；从不改写）。
 cmd_milestone(args: argparse.Namespace) -> int
@@ -104,10 +104,16 @@ collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str]=None, io
     # doc: gate 阶段：`audit.collect` → 验壳（kind/基线/12 列）→ 机械落盘 → 数计数。
 push_present(workspace: Path, job_key: str, commit: str='', io=None) -> dict
     # doc: P0 接线：advance/submit 后进程抽取 worktree markers 推给对端（机械口供）。
+advance_line(workspace: Path, job_key: str, by: str='manual', io=None) -> dict
+    # doc: Hall 管线收拢动词：提版 → 重钉在办单基线 → 推 present。
 peer_status(workspace: Path, job_id: str, io=None) -> dict
     # doc: 编排侧探针：`audit.status` 查对端状态机位置与计数（正文不出账本，出货走 collect）。
 open_ratchet_jobs(workspace: Path) -> list
     # doc: 本地账上未回口的工单（只读本地 state——不为路由去打对端网络）。
+show_job(workspace: Path, job_key: str='') -> dict
+    # doc: Hall 查询动词：读本地账（不打对端网络）＋ 本地降级尾。
+materialize(workspace: Path, job_key: str='', rev: str='', dest: str='') -> dict
+    # doc: Hall 只读物化：把 rev（缺=在办单基线）的树解到 dest（不带 .git，不碰线/worktree）。
 prune_finished(workspace: Path) -> dict
     # doc: ⑤ seal 收口钩子：清已结案 job 的 worktree 与审计线（幂等，容错）。
 # audit_trigger.py
@@ -350,6 +356,8 @@ merge_back(workspace: Path, job: str, accept_dirty: tuple=()) -> dict
 prune(workspace: Path, job: str) -> dict
     # doc: ⑤ 收口：删现场；审计线**仅在已并入主干时**删（闸过删线，ADR-0026 重设计）。
 remove(workspace: Path, job: str) -> None
+materialize(workspace: Path, rev: str, dest: Path) -> Path
+    # doc: 只读物化：把 rev 的树解到 dest（内容物，无 `.git`；不碰线/worktree/分支）。
 ```
 
 ## sync — `src/k3dge/sync`

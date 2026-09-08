@@ -38,7 +38,7 @@ Note: 2026-09-07 两次就地修订（Proposed 未定稿，AUTHORING「过早 Ac
 
 - **形状**：线＝分支 `k3dit/<单>`（自锁点 L 拉起，住消费仓 `.git`）＋ worktree 现场（`.k3dge/wt/<单>`）。送检＝锁线（`ensure`＋`advance`，脏改动进程代提交）；交件＝字符串句柄（baseline=L/branch/wt_dir/scope）；取件＝机构内部读现场。独立库、打包器、袋、sha256 特殊对象格式——全部退役。
 - **隔离是三层拼出来的**：审计线 vs 主干（ref＋本地 exclude＋闸过删线，未并入线原位保留）；窗 vs 窗（Hall 按 scope 拷窗＋CLI 原生 root/deny）；席位 vs 消费仓 `.git`（席位/机构永不直接操作，改动经 Hall 收回、进程 advance 提版）。
-- **身份**＝L 的 commit oid（主干血统、可复算、可 `git log`）。案内版本史载体是线本身＋账本判读记录。
+- **身份**＝最新线头 commit oid（主干血统、可复算、可 `git log`）。submit 锁 L 只是首钉；Hall 管线每提版（advance）在办单基线即重钉——报告按最新基线签，判读在旧 L 下的工作由复核窗覆盖。案内版本史载体是线本身＋账本判读记录。
 - **代价（承认）**：不再有包级脱敏（scrub/target/ 前缀/签名骨架随打包器退役）——审计线是全树 checkout，secret 随现场直穿机构全程；送检范围 targets 退为 Hall 物化参数。同信任域可接受（§1），跨信任域 ⇒ Reopen（§Reopen-when ①）。
 
 ### 2.3 写回拓扑：线上最终版合入主干（P1/P2 已拍板 2026-09-04；重演路径 2026-09-07）

@@ -286,9 +286,52 @@ def push_present(workspace: Path, job_key: str, commit: str = "", io=None) -> di
     for job in cands:   # 两腿共 worktree：present 扇出给每条在办腿
         res = run_action(workspace, f"{job.get('role', 'audit')}.present", io=io,
                          arguments={"job_id": job["job_id"], "present_json": json.dumps(markers),
-                                    "commit": commit or ""})
-        pushed.append({"job_id": job["job_id"], "ok": res.ok, "markers": len(markers)})
+                                    "commit": commit or "",
+                                    "present_seq": job.get("present_seq", 0) + 1})
+        entry = {"job_id": job["job_id"], "ok": res.ok, "markers": len(markers)}
+        if res.ok:  # 送达才加版本号：对端凭 seq 判口供新旧
+            job["present_seq"] = job.get("present_seq", 0) + 1
+            entry["seq"] = job["present_seq"]
+        pushed.append(entry)
+    _save_state(workspace, state)
     return {"ok": all(p["ok"] for p in pushed), "pushed": pushed, "markers": len(markers)}
+
+
+def advance_line(workspace: Path, job_key: str, by: str = "manual", io=None) -> dict:
+    """Hall 管线收拢动词：提版 → 重钉在办单基线 → 推 present。
+
+    基线连续钉（线即主体）：提版后的新线头即在办单的新 baseline，报告按最新基线签；
+    判读窗在旧 L 下的工作由复核窗覆盖（审计线模型，契约 §3）。
+    `by` 记录调用方身份（hall/修席窗/人），G2 主权线可审计。
+    """
+    from k3dge.engine import worktree as _wt
+
+    job = job_key or "adhoc"
+    try:
+        commit = _wt.advance(workspace, job)
+    except RuntimeError as exc:
+        return {"ok": False, "message": str(exc)}
+    if not commit:
+        return {"ok": False, "message": "消费仓无任何提交，无法提版"}
+    state = _load_state(workspace)
+    repinned = []
+    for j in state.get("jobs", []):
+        if j.get("state") not in ("collected", "failed") \
+                and job_key in (j.get("job_id"), j.get("milestone_id")):
+            j["baseline"] = commit
+            j.setdefault("advances", []).append({
+                "at": datetime.datetime.now().isoformat(timespec="seconds"),
+                "by": by, "commit": commit})
+            repinned.append(j["job_id"])
+    _save_state(workspace, state)
+    try:
+        push = push_present(workspace, job_key, commit, io=io)
+    except Exception:
+        push = {}
+    return {"ok": True, "commit": commit, "baseline": commit, "by": by,
+            "repinned": repinned,
+            "present_pushed": push.get("markers") if push.get("ok") else None,
+            "pushed": push.get("pushed")}
 
 
 def peer_status(workspace: Path, job_id: str, io=None) -> dict:
@@ -312,6 +355,49 @@ def open_ratchet_jobs(workspace: Path) -> list:
     """本地账上未回口的工单（只读本地 state——不为路由去打对端网络）。"""
     state = _load_state(workspace)
     return [j for j in state.get("jobs", []) if j.get("state") not in ("collected", "failed")]
+
+
+def show_job(workspace: Path, job_key: str = "") -> dict:
+    """Hall 查询动词：读本地账（不打对端网络）＋ 本地降级尾。
+
+    对应缺口：`audit status` 查的是对端；Hall 要 k3dge 侧 baseline/branch/merge_ok
+    此前只能 parse JSON 文件。输出含最近降级行，供 Hall 通告牌（W3）。
+    """
+    state = _load_state(workspace)
+    jobs = [j for j in state.get("jobs", [])
+            if not job_key or job_key in (j.get("job_id"), j.get("milestone_id"))]
+    return {"ok": True, "jobs": jobs, "recent_downgrades": _recent_downgrades(workspace)}
+
+
+def _recent_downgrades(workspace: Path, limit: int = 20) -> list:
+    """`logs/k3dge.log` 尾部 WARN[DOWNGRADE] 行（本仓自有格式，Hall 侧只读展示）。"""
+    try:
+        lines = (workspace / "logs" / "k3dge.log").read_text(encoding="utf-8", errors="ignore").splitlines()
+    except OSError:
+        return []
+    out = [ln.strip() for ln in lines if "WARN[DOWNGRADE]" in ln]
+    return out[-limit:]
+
+
+def materialize(workspace: Path, job_key: str = "", rev: str = "", dest: str = "") -> dict:
+    """Hall 只读物化：把 rev（缺=在办单基线）的树解到 dest（不带 .git，不碰线/worktree）。
+
+    对应缺口：wt 是活物，Hall 按 oid 取旧基线此前只能自己对消费仓 `.git` 下手。
+    """
+    from k3dge.engine import worktree as _wt
+
+    state = _load_state(workspace)
+    job = next((j for j in state.get("jobs", [])
+                if job_key and job_key in (j.get("job_id"), j.get("milestone_id"))), None)
+    rev = rev or (job or {}).get("baseline", "") or "HEAD"
+    slug = (job or {}).get("milestone_id") or "adhoc"
+    out = Path(dest) if dest else workspace / ".k3dge" / "mat" / slug / rev[:12]
+    try:
+        path = _wt.materialize(workspace, rev, out)
+    except RuntimeError as exc:
+        return {"ok": False, "message": str(exc)}
+    return {"ok": True, "rev": rev, "dest": path.relative_to(workspace).as_posix()
+            if path.is_relative_to(workspace) else str(path)}
 
 
 def prune_finished(workspace: Path) -> dict:

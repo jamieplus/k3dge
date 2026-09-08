@@ -107,6 +107,85 @@ class TestAuditFlowSkeleton(unittest.TestCase):
             self.assertEqual(r["state"], "awaiting_audit")
             self.assertIn("submit first", r["detail"])
 
+    def test_advance_repins_baseline_and_records_actor(self) -> None:
+        # P0：提版即重钉——判读在 L、修后线到 L1，报告须按 L1 签；by 落账
+        from k3dge.engine.audit_flow import advance_line, materialize, show_job
+
+        with TemporaryDirectory() as d:
+            ws = Path(d)
+            _mk_ws(ws, "0")
+            r1 = submit_audit(ws, "M1", targets=["src"])
+            old = r1["baseline"]
+            wt = ws / ".k3dge" / "wt" / "M1"
+            (wt / "src" / "mod.py").write_text("def f() -> int:\n    return 2\n", encoding="utf-8")
+            r = advance_line(ws, "M1", by="hall")
+            self.assertTrue(r["ok"] and r["baseline"] != old, r)
+            self.assertEqual(r["repinned"], [r1["job_id"]])
+            state = json.loads((ws / STATE_REL).read_text(encoding="utf-8"))
+            job = state["jobs"][-1]
+            self.assertEqual(job["baseline"], r["baseline"])
+            self.assertEqual(job["advances"][-1]["by"], "hall")
+            # dummy 仍回 submit 时旧基线 ⇒ 拒收如实（真 Hall 会按新基线重签）
+            r2 = collect_audit(ws, "M1")
+            self.assertEqual(r2["state"], "failed")
+            self.assertIn("baseline", r2["detail"])
+
+    def test_show_reads_local_ledger(self) -> None:
+        from k3dge.engine.audit_flow import show_job
+
+        with TemporaryDirectory() as d:
+            ws = Path(d)
+            _mk_ws(ws, "0")
+            r1 = submit_audit(ws, "M1", targets=["src"])
+            out = show_job(ws, "M1")
+            self.assertTrue(out["ok"] and len(out["jobs"]) == 1)
+            self.assertEqual(out["jobs"][0]["job_id"], r1["job_id"])
+            self.assertIsInstance(out["recent_downgrades"], list)
+
+    def test_materialize_snapshot_without_touching_line(self) -> None:
+        import subprocess
+
+        from k3dge.engine.audit_flow import materialize
+
+        with TemporaryDirectory() as d:
+            ws = Path(d)
+            _mk_ws(ws, "0")
+            r1 = submit_audit(ws, "M1", targets=["src"])
+            before = subprocess.run(["git", "rev-parse", "k3dit/M1"], cwd=ws,
+                                    capture_output=True, text=True).stdout.strip()
+            out = materialize(ws, "M1")
+            self.assertTrue(out["ok"], out)
+            dest = ws / out["dest"]
+            self.assertTrue((dest / "src" / "mod.py").is_file())
+            self.assertFalse((dest / ".git").exists())
+            after = subprocess.run(["git", "rev-parse", "k3dit/M1"], cwd=ws,
+                                   capture_output=True, text=True).stdout.strip()
+            self.assertEqual(before, after)                       # 线原位未动
+            self.assertEqual(out["rev"], r1["baseline"])          # 缺 oid 即基线
+            bad = materialize(ws, "M1", rev="0" * 40)
+            self.assertFalse(bad["ok"])
+
+    def test_present_seq_bumps_only_on_delivery(self) -> None:
+        from unittest import mock
+
+        import k3dge.engine.audit_flow as audit_flow
+
+        with TemporaryDirectory() as d:
+            ws = Path(d)
+            _mk_ws(ws, "0")
+            r1 = submit_audit(ws, "M1", targets=["src"])
+
+            class _Ok:
+                ok, detail, downgrades, payload = True, "", [], ""
+
+            with mock.patch.object(audit_flow, "run_action", return_value=_Ok()):
+                p1 = audit_flow.push_present(ws, r1["job_id"])
+                p2 = audit_flow.push_present(ws, r1["job_id"])
+            self.assertTrue(p1["ok"] and p1["pushed"][0]["seq"] == 1)
+            self.assertEqual(p2["pushed"][0]["seq"], 2)
+            state = json.loads((ws / STATE_REL).read_text(encoding="utf-8"))
+            self.assertEqual(state["jobs"][-1]["present_seq"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -631,7 +631,8 @@ def cmd_mcp(args: argparse.Namespace) -> int:
 
 
 def cmd_audit(args: argparse.Namespace) -> int:
-    """棘轮四动词（席位出口，工作区=CWD）：建单/查单/快照推进/取回落位（closure merge 自动附带）。"""
+    """审计线动词（工作区=CWD）：submit 锁线建单 / status 问对端 / show 读本地账 /
+    advance 提版重钉基线 / materialize 只读物化 / close 取回落位（closure merge 自动附带）。"""
     from k3dge.engine import audit_flow
 
     workspace = _find_workspace(Path.cwd())
@@ -640,21 +641,21 @@ def cmd_audit(args: argparse.Namespace) -> int:
         r = audit_flow.submit_audit(workspace, args.milestone, targets=args.target or None)
     elif args.audit_action == "status":
         r = audit_flow.peer_status(workspace, tok)
+    elif args.audit_action == "show":
+        r = audit_flow.show_job(workspace, tok or "")
+    elif args.audit_action == "materialize":
+        r = audit_flow.materialize(workspace, tok or "", getattr(args, "oid", "") or "",
+                                   getattr(args, "dest", "") or "")
     elif args.audit_action == "advance":
-        from k3dge.engine import worktree as _wt
-
-        _wt.ensure(workspace, tok or "adhoc")
-        try:
-            commit = _wt.advance(workspace, tok or "adhoc")
-            push = audit_flow.push_present(workspace, tok, commit)   # P0：钉随程走，进程代供
-            r = {"ok": True, "commit": commit, "present_pushed": push.get("markers", push)}
-        except RuntimeError as exc:
-            r = {"ok": False, "message": str(exc)}
+        r = audit_flow.advance_line(workspace, tok or "adhoc",
+                                    by=getattr(args, "by", "") or "manual")  # 提版+重钉+推 present
     else:
         r = audit_flow.collect_audit(workspace, tok, args.job or None)
     print(json.dumps({k: v for k, v in r.items() if k in
-                      ("ok", "state", "failed", "detail", "job_id", "counts", "pending",
-                       "baseline_ok", "report", "merge", "commit", "present_pushed", "error", "message")},
+                      ("ok", "state", "failed", "detail", "job_id", "jobs", "counts", "pending",
+                       "baseline_ok", "report", "merge", "commit", "baseline", "by", "repinned",
+                       "present_pushed", "pushed", "rev", "dest", "recent_downgrades",
+                       "error", "message")},
                      ensure_ascii=False))
     return 0 if r.get("ok") else 1
 
@@ -1241,12 +1242,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_mk.add_argument("--check", action="store_true", help="有语法/锚点违规时退出码 1（供 CI）")
     p_mk.set_defaults(func=cmd_markers)
 
-    p_aud = sub.add_parser("audit", help="审计线棘轮：submit/status/advance/close（ADR-0026；工作区=CWD）")
-    p_aud.add_argument("audit_action", choices=["submit", "status", "advance", "close"])
-    p_aud.add_argument("job_or_milestone", nargs="?", default="", help="status/advance:job_id；close:milestone")
+    p_aud = sub.add_parser("audit", help="审计线棘轮：submit/status/show/advance/materialize/close（ADR-0026；工作区=CWD）")
+    p_aud.add_argument("audit_action", choices=["submit", "status", "show", "advance", "materialize", "close"])
+    p_aud.add_argument("job_or_milestone", nargs="?", default="", help="status/show/materialize:job_id 或里程碑；advance:线名；close:milestone")
     p_aud.add_argument("--milestone", default="", help="submit：挂里程碑 id")
     p_aud.add_argument("--target", action="append", default=[], help="submit：送检路径（可多次）")
     p_aud.add_argument("--job", default="", help="close：指定 job id（默认取该里程碑最新在办单）")
+    p_aud.add_argument("--by", default="manual", help="advance：调用方身份（hall/修席窗/人），落账可审计")
+    p_aud.add_argument("--oid", default="", help="materialize：版本（缺=在办单基线）")
+    p_aud.add_argument("--dest", default="", help="materialize：物化目录（默认 .k3dge/mat/<单>/<oid12>）")
     p_aud.set_defaults(func=cmd_audit)
     p_mcp.set_defaults(func=cmd_mcp)
 
