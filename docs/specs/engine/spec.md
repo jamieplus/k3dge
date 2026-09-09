@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:994c236beb8f67a51f7746f3365982556e4e68806284fd7c2a3f951455dc0fd6`
-- **Last Updated**: 2026-09-08
+- **Contract Hash**: `sha256:20b8626fb92445a0eb174735b549f48a390a4f7bc76cdd9773ba096597bc838f`
+- **Last Updated**: 2026-09-09
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -204,6 +204,7 @@ worktree_path(workspace: Path, job: str) -> Path
 ensure(workspace: Path, job: str, base: Optional[str]=None) -> Path
 present(workspace: Path, job: str, commit: Optional[str]=None) -> list
 advance(workspace: Path, job: str) -> Optional[str]
+strip_pins(workspace: Path, job: str) -> dict
 merge_back(workspace: Path, job: str, accept_dirty: tuple=()) -> dict
 prune(workspace: Path, job: str) -> dict
 remove(workspace: Path, job: str) -> None

@@ -141,3 +141,34 @@ def test_prune_keeps_unmerged_line_deletes_merged(tmp_path):
     assert "branch:k3dit/J1" in out["removed"]
     assert subprocess.run(["git", "rev-parse", "--verify", "-q", "refs/heads/k3dit/J1"],
                           cwd=ws, capture_output=True).returncode != 0
+
+
+def test_strip_pins_full_line_only(tmp_path):
+    ws = _repo(tmp_path)
+    wt = W.ensure(ws, "J9")
+    (wt / "src" / "m.py").write_text(
+        "def f():\n    # k3dit:pending A-1 x\n    return 1\n", encoding="utf-8")
+    (wt / "note.md").write_text("# t\n<!-- k3dit:fixnote F-2 -->\n", encoding="utf-8")
+    (wt / "keep.py").write_text("y = 2  # k3dit:pending T-3 trailing\n", encoding="utf-8")
+    out = W.strip_pins(ws, "J9")
+    assert out["stripped_lines"] == 2 and len(out["stripped_files"]) == 2
+    assert out["suspicious"] == ["keep.py:1"]            # 行尾钉不动，只上报
+    assert "# k3dit" not in (wt / "src" / "m.py").read_text(encoding="utf-8")
+    assert "y = 2" in (wt / "keep.py").read_text(encoding="utf-8")
+    again = W.strip_pins(ws, "J9")
+    assert again["stripped_lines"] == 0                  # 幂等
+
+
+def test_merge_back_strips_before_ff(tmp_path):
+    ws = _repo(tmp_path)
+    W.ensure(ws, "J9")
+    wt = W.worktree_path(ws, "J9")
+    (wt / "src" / "m.py").write_text(
+        "def f():\n    # k3dit:pending A-1 x\n    return 2\n", encoding="utf-8")
+    W.advance(ws, "J9")                                  # 钉随线提交
+    r = W.merge_back(ws, "J9")
+    assert r["ok"] and r["mode"] == "ff", r
+    assert r["stripped"]["stripped_lines"] == 1
+    assert "# k3dit" not in (ws / "src" / "m.py").read_text(encoding="utf-8")  # 主干无钉
+    log = subprocess.run(["git", "log", "--oneline"], cwd=ws, capture_output=True, text=True).stdout
+    assert "merge" not in log.lower()

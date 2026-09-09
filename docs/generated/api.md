@@ -351,6 +351,8 @@ present(workspace: Path, job: str, commit: Optional[str]=None) -> list
     # doc: worktree 同步到给定 commit（缺=分支头）后，进程抽取 markers 作 present。
 advance(workspace: Path, job: str) -> Optional[str]
     # doc: 轮次前进：worktree 脏 ⇒ 进程代 commit（席位身份由调用方注入 env 或默认进程名）；
+strip_pins(workspace: Path, job: str) -> dict
+    # doc: 收官去钉：删审计线 worktree 里独占一行的钉；行尾钉不动（只上报）。
 merge_back(workspace: Path, job: str, accept_dirty: tuple=()) -> dict
     # doc: closure 回写主干（P1：默认自动；脏树/冲突 ⇒ 停并升级人工，§1.4）。
 prune(workspace: Path, job: str) -> dict

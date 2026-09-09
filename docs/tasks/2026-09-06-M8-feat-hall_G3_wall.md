@@ -10,7 +10,7 @@ date: 2026-09-06
 - **Status**: idea
 - **Milestone**: M8
 - **Priority**: P1
-- **可检索摘要**: Hall spawn 窗口时建专属目录+deny-by-default 权限配置+env 清洗并校验，做"Hall 解袋按窗 scope 落目录"取代"席自己开袋"；每窗一钥文件，collect验签、不匹配拒收；前置依赖 G3b 探测结论
+- **可检索摘要**: Hall spawn 窗口时建专属目录+deny-by-default 权限配置+env 清洗并校验，做"Hall 按窗 scope 把审计线现场拷进各窗"取代"席碰仓"；每窗一钥文件，collect验签、不匹配拒收；前置依赖 G3b 探测结论
 - **Date**: 2026-09-06
 
 ## Intent

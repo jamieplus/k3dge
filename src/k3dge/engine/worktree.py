@@ -105,11 +105,53 @@ def advance(workspace: Path, job: str) -> Optional[str]:
     raise RuntimeError("non-fast-forward: worktree 与分支真分叉，停——交人工裁决（§1.4）")
 
 
+def strip_pins(workspace: Path, job: str) -> dict:
+    """收官去钉：删审计线 worktree 里独占一行的钉；行尾钉不动（只上报）。
+    钉永不进主干。返回 {stripped_files, stripped_lines, suspicious}。
+    扫描面是全树（present 的 roots 限定之外也得兜住）。"""
+    from k3dge.engine.markers import _SCAN_SUFFIXES, _SKIP_DIR_PARTS, parse_text
+
+    wt = ensure(workspace, job)
+    files: list = []
+    lines = 0
+    suspicious: list = []
+    for p in sorted(wt.rglob("*")):
+        if not p.is_file() or p.suffix.lower() not in _SCAN_SUFFIXES:
+            continue
+        rel = p.relative_to(wt).as_posix()
+        if set(p.relative_to(wt).parts) & set(_SKIP_DIR_PARTS):
+            continue
+        try:
+            text = p.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        ms, _ = parse_text(rel, text)
+        if not ms:
+            continue
+        src = text.splitlines()
+        drop = set()
+        for m in ms:
+            if src[m.line - 1].lstrip().startswith(("#", "//", "<!--")):
+                drop.add(m.line)
+            else:
+                suspicious.append(f"{rel}:{m.line}")
+        if drop:
+            out = [ln for i, ln in enumerate(src, 1) if i not in drop]
+            try:
+                p.write_text("\n".join(out) + "\n", encoding="utf-8")
+            except OSError:
+                continue
+            files.append(rel)
+            lines += len(drop)
+    return {"stripped_files": files, "stripped_lines": lines, "suspicious": suspicious}
+
+
 def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
     """closure 回写主干（P1：默认自动；脏树/冲突 ⇒ 停并升级人工，§1.4）。
 
-    路径：ff 直达；否则把线 (base..br] `rebase --onto` 重演到主干头（线提交全是机械件，
-    重演即普通 git）再 ff；冲突 ⇒ abort 复原＋升级人工。真 merge 不再使用（审计线模型）。
+    路径：先去钉（钉永不进主干，去钉产物提版）→ ff 直达；ff 不成则把线
+    (base..br] `rebase --onto` 重演到主干头（线提交全是机械件，重演即普通 git）
+    再 ff；冲突 ⇒ abort 复原＋升级人工。真 merge 不再使用（审计线模型）。
 
     accept_dirty：编排进程自己写的件（工单 task/报告落位/state 文件）——
     守卫防的是"人的未提交工作被卷进去"，不该拦自己刚写的字。
@@ -128,8 +170,13 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
                 "message": f"工作树有未提交的人工改动（{dirty[:3]}）：merge 停，交人工处理（P1 例外）"}
     if _git(workspace, "merge-base", "--is-ancestor", br, "HEAD").returncode == 0:
         return {"ok": True, "mode": "already"}
+    strip = strip_pins(workspace, job)
+    try:
+        advance(workspace, job)  # 去钉产物提版；干净即 no-op
+    except RuntimeError as exc:
+        return {"ok": False, "mode": "error", "message": f"去钉提版失败：{exc}"}
     if _git(workspace, "merge", "--ff-only", br).returncode == 0:
-        return {"ok": True, "mode": "ff"}
+        return {"ok": True, "mode": "ff", "stripped": strip}
     main_head = _git(workspace, "rev-parse", "HEAD").stdout.strip()
     base = _git(workspace, "merge-base", "HEAD", br).stdout.strip()
     tip = _git(workspace, "rev-parse", br).stdout.strip()
