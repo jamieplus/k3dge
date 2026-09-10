@@ -147,16 +147,18 @@ def test_strip_pins_full_line_only(tmp_path):
     ws = _repo(tmp_path)
     wt = W.ensure(ws, "J9")
     (wt / "src" / "m.py").write_text(
-        "def f():\n    # k3dit:pending A-1 x\n    return 1\n", encoding="utf-8")
+        "def f():\n    # k3dit:pending A-1 x\n    # k3dit:leftover L-1 有意留\n    return 1\n", encoding="utf-8")
     (wt / "note.md").write_text("# t\n<!-- k3dit:fixnote F-2 -->\n", encoding="utf-8")
     (wt / "keep.py").write_text("y = 2  # k3dit:pending T-3 trailing\n", encoding="utf-8")
     out = W.strip_pins(ws, "J9")
-    assert out["stripped_lines"] == 2 and len(out["stripped_files"]) == 2
-    assert out["suspicious"] == ["keep.py:1"]            # 行尾钉不动，只上报
-    assert "# k3dit" not in (wt / "src" / "m.py").read_text(encoding="utf-8")
-    assert "y = 2" in (wt / "keep.py").read_text(encoding="utf-8")
+    assert out["stripped_lines"] == 2 and len(out["stripped_files"]) == 2   # pending A-1 + fixnote F-2
+    assert out["kept"] == 1                                                  # leftover L-1 保留（长期文献）
+    assert out["suspicious"] == ["keep.py:1"]                                # 行尾钉不动，只上报
+    txt = (wt / "src" / "m.py").read_text(encoding="utf-8")
+    assert "# k3dit:pending" not in txt and "y = 2" in (wt / "keep.py").read_text(encoding="utf-8")
+    assert "k3dit:leftover L-1 有意留" in txt                                 # leftover 随文件留
     again = W.strip_pins(ws, "J9")
-    assert again["stripped_lines"] == 0                  # 幂等
+    assert again["stripped_lines"] == 0 and again["kept"] == 1               # 幂等
 
 
 def test_merge_back_strips_before_ff(tmp_path):
@@ -172,3 +174,34 @@ def test_merge_back_strips_before_ff(tmp_path):
     assert "# k3dit" not in (ws / "src" / "m.py").read_text(encoding="utf-8")  # 主干无钉
     log = subprocess.run(["git", "log", "--oneline"], cwd=ws, capture_output=True, text=True).stdout
     assert "merge" not in log.lower()
+
+
+def test_present_reattaches_branch(tmp_path):
+    import subprocess
+
+    ws = _repo(tmp_path)
+    wt = W.ensure(ws, "J9")
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True, text=True).stdout.strip()
+    W.present(ws, "J9", commit=head)
+    sym = subprocess.run(["git", "-C", str(wt), "symbolic-ref", "-q", "HEAD"],
+                         capture_output=True, text=True).stdout.strip()
+    assert sym == "refs/heads/k3dit/J9"  # 看完切回，不留 detached
+
+
+def test_merge_back_after_detached_present(tmp_path):
+    import subprocess
+
+    ws = _repo(tmp_path)
+    wt = W.ensure(ws, "J9")
+    (wt / "extra.py").write_text("e = 1\n", encoding="utf-8")
+    W.advance(ws, "J9")
+    W.present(ws, "J9", commit=W.advance(ws, "J9"))  # 曾经的毒化路径：detach 残留
+    subprocess.run(["git", "-C", str(wt), "checkout", "-q", "--detach", "HEAD"],
+                   check=True, capture_output=True)  # 模拟旧 present 遗留的 detached
+    (ws / "main.py").write_text("m = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=ws, check=True, capture_output=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "main moved"],
+                   cwd=ws, check=True, capture_output=True)
+    r = W.merge_back(ws, "J9")
+    assert r["ok"] and r["mode"] == "rebase", r
+    assert (ws / "extra.py").exists() and (ws / "main.py").exists()

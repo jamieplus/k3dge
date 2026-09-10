@@ -15,7 +15,7 @@ date: 2026-09-06
 
 ## Intent
 
-W1 从散文变成机制：目录墙 + 钥验签。先两宿主（opencode/pi），其余宿主按 G3b 矩阵后续扩展。席用原 seats 机制经配置自动起（`launch`/fire-and-forget 已有），本 task 只加墙（目录+钥+校验），不新建派席机制。本 task 与 G2 同为 ADR-0027 Accepted 双门之一。
+W1 从散文变成机制：目录墙 + 钥验签。先两宿主（opencode/pi），其余宿主按 G3b 矩阵后续扩展。席用原 seats 机制经配置自动起（`launch`/fire-and-forget 已有），本 task 只加墙（目录+钥+校验），不新建派席机制。本 task 与 G2 同为 ADR-0025 Accepted 双门之一。
 
 ## Notes
 

@@ -289,3 +289,18 @@ def test_prune_sweeps_tmp_shells(tmp_path):
     r = audit_flow.prune_finished(tmp_path)
     assert r["tmp_swept"] == 1 and (tmp_path / "tmp" / "README.md").exists()
     assert not (tmp_path / "tmp" / "apply_x.py").exists()
+
+
+def test_collect_closed_pins_baseline_ref(tmp_path):
+    import subprocess
+
+    from k3dge.engine.audit_flow import STATE_REL, collect_audit, submit_audit
+
+    ws = Path(tmp_path)
+    _mk_ws(ws, "0")
+    r1 = submit_audit(ws, "M1", targets=["src"])
+    r2 = collect_audit(ws, "M1")
+    assert r2["state"] == "closed" and r2["baseline_pinned"] is True
+    out = subprocess.run(["git", "rev-parse", f"refs/audit-baseline/{r1['job_id']}"],
+                         cwd=ws, capture_output=True, text=True).stdout.strip()
+    assert out == r1["baseline"]  # 报告引用的基线钉 ref 留存，重演悬空也不丢

@@ -29,7 +29,7 @@
 | 13 | k3che 第二消费者（status 观测行，观测不判定）＋索引 RLock（反证：去锁 3/3 复崩） | `../k3che/docs/tasks/2026-09-03-fix-index_locks.md`；`cli/status.cache_observability`＋6 例测试 |
 | 14 | k3che 第三消费者＝第一个"真被需要"的：`task create` 相似检查（语料含 archive，只提示不裁决） | `docs/tasks/2026-09-03-M7-feat-task_dup_check_via_cache.md`；首跑即翻出 archive 同域缺陷簇，并暴露 ADR 标题提取被 front-matter 注释骗的副缺陷（待授权） |
 | 15 | **audit 真链首跑通**（submit→claim→席位实检→complete→collect→落盘回流；席位=手工 CLI，零 mock） | `../k3dit/docs/tasks/2026-09-04-feat-audit_job_protocol.md`；下一步＝生产状态机换轨（`milestone audit`→两态） |
-| 16 | **findings 交换介质定稿为标记语法 v1（棘轮：一单一快照，单内审↔修交替；报告=结项 join 渲染）**，k3dge 半边已落 | 契约 §1.4/§8；`engine/markers.py`＋`k3dge markers`＋`[NEXT]` 口径扩为 open 三态；k3dit 半边（发号/账本正文/合成报告）等其仓授权。首跑自曝：未锚定行首时解析器最先"发现"的 2 处全是我仓文档示例——锚定规则由此而来 |
+| 16 | **findings 交换介质定稿为钉语法 v1（棘轮：一单一快照，单内审↔修交替；报告=结项 join 渲染）**，k3dge 半边已落 | 契约 §1.4/§8；`engine/markers.py`＋`k3dge markers`＋`[NEXT]` 口径扩为 open 三态；k3dit 半边（发号/账本正文/合成报告）等其仓授权。首跑自曝：未锚定行首时解析器最先"发现"的 2 处全是我仓文档示例——锚定规则由此而来 |
 | 17 | k3dit 棘轮半边落账（发号/vanished 裁决/结构化正文/结项 join；rounds 模块 44 测全绿） | `../k3dit/docs/tasks/2026-09-04-feat-ratchet_rounds.md`；k3dge 轨 A（milestone audit 换轨 rounds）为下一步 |
 
 ### 2.1 审计席位的落地强度 —— **已按分治定案（2026-09-03）**
@@ -157,7 +157,7 @@ $ run_action("k3lity.actions.quality") / ("k3che.search")   → provider=mcp，�
 
 ## 化石追加（v3 施工期史实，09-04）
 
-- **否决留痕**：v2 的 tar 袋（自研 zip 编目）连同独立租约心跳被 ADR-0026 取代。真因不是性能：`file://` 指库在演示当场泄漏整仓历史（含 `.git`），"位置当身份"是病根。bundle 单文件的结构性隔离（封闭袋即宇宙）才是正解；旧 libgit 环境的 tar 回退通道保留，ref 格式不变。
+- **否决留痕**：v2 的 tar 袋（自研 zip 编目）连同独立租约心跳被 ADR-0024 取代。真因不是性能：`file://` 指库在演示当场泄漏整仓历史（含 `.git`），"位置当身份"是病根。bundle 单文件的结构性隔离（封闭袋即宇宙）才是正解；旧 libgit 环境的 tar 回退通道保留，ref 格式不变。
 - **守卫第一次生效是防到自己**：`merge_back` 脏守卫把编排自己落盘的报告/工单/state 判成"人的未提交改动"。修法＝进程件白名单＋**双向前缀**（porcelain 会把未跟踪目录折成 `docs/`，单向匹配漏放）。
 - **派生物必须隐身**：`.k3dge/` 自动写进被审仓本地 `info/exclude`；陈旧 worktree 登记由 `ensure` 自愈（`worktree prune`＋重试）。审计证据不得污染案发现场的 status。
 - **错误码不许过头**：`EXPIRED`/`NO_TARGET` 自 v0.6 起由"声明有"降为"预留未实现"（审计 L-1 处置）。
@@ -165,4 +165,4 @@ $ run_action("k3lity.actions.quality") / ("k3che.search")   → provider=mcp，�
 ## 封板夜补（M7 seal 前，09-05）
 
 - **未采用**：自动拉席做首跑审计席（`seat pi` 当时仅一次性模型——先人工后组件的次序被真案验证：组件版出来后首案照跑）；「调阈值让 quality 过闸」被质量席自己判为不当（有意留+登记票）；k3lity 草稿直写案卷区被事故否决（`--out /tmp` 断源）。
-- **兑现**：ADR-0026 全链两案落地（审计 10 判 + 质量 8 判/94 材料）；「账本=唯一权威副本」在案卷互踩夜完成救援演示。
+- **兑现**：ADR-0024 全链两案落地（审计 10 判 + 质量 8 判/94 材料）；「账本=唯一权威副本」在案卷互踩夜完成救援演示。

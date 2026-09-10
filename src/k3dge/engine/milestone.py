@@ -1409,7 +1409,7 @@ def run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]:
 
 
 def _audit_mode(workspace: Path, role: str = "audit") -> str:
-    """审计腿形状：`[roles.audit] mode="ratchet"`＝工单模式（ADR-0026）；缺省 scaffold（旧形）。"""
+    """审计腿形状：`[roles.audit] mode="ratchet"`＝工单模式（ADR-0024）；缺省 scaffold（旧形）。"""
     try:
         try:
             import tomllib
@@ -1461,8 +1461,8 @@ def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str =
         c = audit_flow.collect_audit(workspace, milestone_id, j["job_id"], io=io)  # role 随工单记录走
         if c.get("ok"):
             if c.get("merge", {}).get("ok") is False:
-                return "stalled", f"报告已落位但写回未闭：{c['merge'].get('message', '')[:90]}"
-            return "closed", f"签署报告落位 {c.get('report')}；写回 {c.get('merge', {}).get('mode', 'n/a')}；待修 {c.get('pending')}。"
+                return "stalled", f"报告已落盘但写回未闭：{c['merge'].get('message', '')[:90]}"
+            return "closed", f"签署报告落盘 {c.get('report')}；写回 {c.get('merge', {}).get('mode', 'n/a')}；待修 {c.get('pending')}。"
         return "progress", f"collect 未通过：{str(c.get('message') or c.get('error') or c.get('state'))[:100]}"
     return "progress", f"工单 {j['job_id']} 对端态 {st.get('state')}，open={st.get('open', [])}。"
 
@@ -1490,7 +1490,7 @@ def run_audit_flow(
 
     ratchet = _audit_mode(workspace) == "ratchet"
     if ratchet:
-        # 审计腿＝工单步进（ADR-0026）：一次调用推一步，绝不在闸里等席；步没 closed 就交回 [NEXT]。
+        # 审计腿＝工单步进（ADR-0024）：一次调用推一步，绝不在闸里等席；步没 closed 就交回 [NEXT]。
         step_status, step_msg = _ratchet_audit_step(workspace, milestone_id, io=prompt.out_stream)
         if step_status != "closed":
             if step_status == "progress":

@@ -40,8 +40,8 @@ L2 入场券须逐条确认（agent 进车间前绑定到任务）：
 **触发**：文档改动时（非里程碑）。**T-01**：`k3dge check` 是静态硬闸、不跑透镜；doc-audit 在 **check 之后**经 `k3dge doc-audit` 触发（非阻断），走同一条 `k3dit.actions.audit` 链、`target_scope` 为文档时套用本节，产 12 列报告 + 建一个带 `Milestone` 的 `doc-audit` task（本轮不改，封板轮也得闭环，ADR-0021）。**只有 ADR 冲突/覆盖这一项留在里程碑审计**（`k3dge_adr_index` 事实 + k3dit 判，ADR-0020），不在每次 commit 的 doc-audit 里做。
 
 **per-type 透镜**：
-- **ADR — 集合自洽（冲突 / 覆盖）**：两篇 *未 superseded* 的 ADR 不应无声共享 scope / decision-topic（冗余）；指针须完整——`Supersedes`/`Related` 不悬空、被取代的 ADR 不再被当现行引用。事实来自 `k3dge_adr_index`（AdrIndex + O(n) 重叠/指针 findings，**非判断**）；冲突/冗余由 k3dit 判。
-- **通用 — AUTHORING 规则合规**：改动文档须符合其类型 `AUTHORING.md`（结构已由 `.schema.json` 硬闸；此处审"是否真按软规则写"）。
+- **ADR — 集合自洽（冲突 / 覆盖 / 正交）**：两篇 *未 superseded* 的 ADR 不应无声共享 scope / decision-topic（冗余）；**正交性**——Decision 不得复述其它 ADR 的规范正文（复述＝第二源），跨篇事实应以 `见 ADR-XXXX §Y` 指针引用、单一 owner；指针须完整——`Supersedes`/`Related` 不悬空、被取代的 ADR 不再被当现行引用。事实来自 `k3dge_adr_index`（AdrIndex + O(n) 重叠/指针 findings，**非判断**）；冲突/冗余/正交由 k3dit 判。
+- **通用 — AUTHORING 规则合规**：改动文档须符合其类型 `AUTHORING.md`（结构已由 `.schema.json` 硬闸；此处审"是否真按软规则写"）。ADR 的 `Note:` 只有一个字段（默认 `-`），多次操作按 ① ② ③ 编号续写、不并列多行；动用例外（就地修订 / 物理删除 / 改名）必须留痕，含授权席位与过闸口径（real lens | manual fallback + 可复跑证据）。**正文不写修订史**（「修正（date）」「原稿 / 旧句 / 现稿」层归 `Note:`；沿革与授权在 Note，正文只留现行决策）。**人读优先**：决策先行；一行一点（行宽 ~100 字）；函数名/路径/步骤序等实现细节下沉 `docs/specs/` 或 task；引用放句末；标题用名词短语、不堆斜杠。
 
 **不审**：文本质量（写得好不好 → k3dit LLM 部分）、思想是否值得（→ k3lity 里程碑软审）。文档审查 ≠ 给思想打分。
 

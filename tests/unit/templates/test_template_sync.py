@@ -57,6 +57,7 @@ class TestTemplateSync(unittest.TestCase):
             "rules/06-memo.md",
             "rules/07-audit.md",
             "rules/09-absorption.md",
+            "rules/10-structure-over-prose.md",
             "agent-readme.md",
             "protocols/audit_default.md",
             "protocols/verify_default.md",

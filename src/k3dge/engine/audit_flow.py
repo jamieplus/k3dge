@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -79,14 +80,14 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
                  role: str = "audit") -> dict:
     """produce 阶段：锁审计线 → 交件 → 落 `awaiting_audit`。协议调用必须短。
 
-    一单一条线（ADR-0026 重设计）：`k3dit/<单>` 分支从 HEAD 拉起，锁点 L=线头 commit；
+    一单一条线（ADR-0024 重设计）：`k3dit/<单>` 分支从 HEAD 拉起，锁点 L=线头 commit；
     已 checkout 的 worktree 目录即送检物。`targets` 是范围说明（Hall 物化参数），不是内容边界。
     """
     targets = targets or (["src"] if (workspace / "src").is_dir() else ["docs"])
     from k3dge.engine import worktree as _wt
 
     job = milestone_id or "adhoc"
-    try:  # ③ 锁线：挂 worktree，脏改动进程代提交（线=现场=送检，ADR-0026 §2.3）
+    try:  # ③ 锁线：挂 worktree，脏改动进程代提交（线=现场=送检，ADR-0024 §2.3）
         _wt.ensure(workspace, job)
         baseline = _wt.advance(workspace, job)
     except Exception as exc:  # 非 git 仓 ⇒ 无法锁线，审计不可进行（如实报，不静默）
@@ -103,9 +104,12 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
             "scope": ",".join(targets),
             "milestone_id": milestone_id,
             # ① 交件句柄（字符串；线归 k3dge，机构凭 wt_dir 读、Hall 收回改动经 advance，
-            #    席位/机构永不直接操作消费仓 .git——ADR-0026 §2.2）
-            "branch": branch,
-            "wt_dir": str(_wt.worktree_path(workspace, job).resolve()),
+            #    席位/机构永不直接操作消费仓 .git——ADR-0024 §2.2）
+        "branch": branch,
+        "wt_dir": str(_wt.worktree_path(workspace, job).resolve()),
+        # 结案前 Retest 硬门（ADR-0025 §2.7）：被审仓自带 verify 命令，k3dit Hall 只执行。
+        # k3dge 线 = 本仓 worktree，跑自己全套件 + check（改坏测试不许结案）。可用 env 覆盖。
+        "verify": os.environ.get("K3DGE_VERIFY_CMD", "python -m pytest -q tests && k3dge check"),
         },
     )
     if not res.ok:
@@ -254,6 +258,14 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
     job["counts"] = counts
     # merge 没闭 ⇒ collected 但 merge_ok=False：棘轮步进器拿着它幂等重试（冲突后的人工重试面）
     job["merge_ok"] = bool(merged.get("ok", True))
+    pinned = False
+    if outcome == "closed":
+        try:  # 闭环基线留存：报告引用的 commit 经重演可能悬空，钉 ref 防 gc；失败不否决闭环
+            from k3dge.engine import worktree as _wt2
+
+            pinned = bool(_wt2.pin_baseline(workspace, job["job_id"], job["baseline"]))
+        except Exception:
+            pinned = False
     _save_state(workspace, state)
     return {
         "ok": True,
@@ -265,6 +277,7 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
         "report": job["report"],
         "seat": prov.get("seat", ""),
         "baseline_ok": True,
+        "baseline_pinned": pinned,
     }
 
 
@@ -403,7 +416,7 @@ def materialize(workspace: Path, job_key: str = "", rev: str = "", dest: str = "
 def prune_finished(workspace: Path) -> dict:
     """⑤ seal 收口钩子：清已结案 job 的 worktree 与审计线（幂等，容错）。
 
-    收口＝闸过合主干后删线删现场（ADR-0026 重设计）；主干已含线内容，史在 main。
+    收口＝闸过合主干后删线删现场（ADR-0024 重设计）；主干已含线内容，史在 main。
     """
     from k3dge.engine import worktree as _wt
 

@@ -37,6 +37,7 @@ PAIRS: list[tuple[str, str]] = [
     ("rules/07-audit.md", ".agent/rules/07-audit.md"),
     ("rules/08-design-discipline.md", ".agent/rules/08-design-discipline.md"),
     ("rules/09-absorption.md", ".agent/rules/09-absorption.md"),
+    ("rules/10-structure-over-prose.md", ".agent/rules/10-structure-over-prose.md"),
     ("docs.toml.template", ".agent/docs.toml"),
     ("pipeline.toml.template", ".agent/pipeline.toml"),
     ("spec.md.template", "docs/specs/_template/spec.md"),

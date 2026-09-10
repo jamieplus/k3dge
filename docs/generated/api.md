@@ -194,6 +194,9 @@ class Marker
     id: str
     scope: str
     note: str
+    sev: str = ''
+    prio: str = ''
+    type: str = ''
     key(self) -> Tuple[str, str]
 head_block_end(lines: Sequence[str]) -> int
     # doc: 首个连续注释块（含空行）的结束行号（0-based 开区间）。允许 shebang/encoding。
@@ -356,8 +359,10 @@ strip_pins(workspace: Path, job: str) -> dict
 merge_back(workspace: Path, job: str, accept_dirty: tuple=()) -> dict
     # doc: closure 回写主干（P1：默认自动；脏树/冲突 ⇒ 停并升级人工，§1.4）。
 prune(workspace: Path, job: str) -> dict
-    # doc: ⑤ 收口：删现场；审计线**仅在已并入主干时**删（闸过删线，ADR-0026 重设计）。
+    # doc: ⑤ 收口：删现场；审计线**仅在已并入主干时**删（闸过删线，ADR-0024 重设计）。
 remove(workspace: Path, job: str) -> None
+pin_baseline(workspace: Path, name: str, oid: str) -> bool
+    # doc: 留存被引用的审计基线（报告引用的 commit 经 rebase 后可能悬空，gc 即不可复验）。
 materialize(workspace: Path, rev: str, dest: Path) -> Path
     # doc: 只读物化：把 rev 的树解到 dest（内容物，无 `.git`；不碰线/worktree/分支）。
 ```

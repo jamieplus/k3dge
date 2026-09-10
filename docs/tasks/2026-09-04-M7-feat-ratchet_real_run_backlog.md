@@ -28,7 +28,7 @@ date: 2026-09-04
 
 ## 挂账明细
 
-1. **G3 · ✅ 09-04 夜落地**（原案保留为史）：`on_seal_enter` 改走 `audit_flow.submit_audit` → 工单中间态（`ratchet_open` 已有，但封板状态机不认识"待单"）→ collect 落位后复判。旧 scaffold 链（`k3dit_run_audit_flow`）届时降为 manual 档。验收：`k3dge milestone audit <id>` 全程无 agent 代笔报告。
+1. **G3 · ✅ 09-04 夜落地**（原案保留为史）：`on_seal_enter` 改走 `audit_flow.submit_audit` → 工单中间态（`ratchet_open` 已有，但封板状态机不认识"待单"）→ collect 落盘后复判。旧 scaffold 链（`k3dit_run_audit_flow`）届时降为 manual 档。验收：`k3dge milestone audit <id>` 全程无 agent 代笔报告。
 2. **G4 · 号段发放**：`claim_round` 随单发 `next_ids`（A/F 段），账本拒绝无源 ID 与撞号。验收：两席撞号回归测。
 3. **G4 · 席位身份登记**：claim 时登记审计席名；终态翻转（fixed 等）校验"签席 == 登记审计席"。`--role` 自报制的诚实边界收窄（契约"seat 诚实性归人"保留）。
 4. **`.mcp.json` 解释器固化**：k3dit/k3che/k3lity server 由 `"python"`＋landing 改为各仓 venv 绝对路径（demo 已验证该形）。验收：doc-audit/audit 活体各一次，`[PEER-MCP] landed` 警告消失。

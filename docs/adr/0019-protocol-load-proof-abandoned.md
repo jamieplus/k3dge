@@ -6,21 +6,26 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-31
 Deciders: Core Maintainer
-Note: -
+Note: ① 就地修订（正交去重：payload/routing 复述改指 ADR-0018 §2.3）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。
+      ② 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
 ---
 
 # ADR-0019: No load-proof; routing formula in AGENTS.md, payload beside the files
 
 ## 1. 上下文 (Context)
 
-A path-routed protocol loader (`k3dge protocol`, MCP `k3dge_protocol_*`, `get`/`edit`/`put`, challenge/ticket, `.agent/protocols.toml`) tried to prove the agent had loaded a type protocol before writing. Agents can bypass any artifact they can see. Pre-tool hard gates would require owning the agent runtime (ADR-0006). The middle layer added code without incrementally constraining a determined agent. Commit + CI already supply the hard floor.
+- A path-routed protocol loader (`k3dge protocol`, MCP `k3dge_protocol_*`, `get`/`edit`/`put`, challenge/ticket, `.agent/protocols.toml`) tried to prove the agent had loaded a type protocol before writing.
+- Agents can bypass any artifact they can see; pre-tool hard gates would require owning the agent runtime (ADR-0006).
+- The middle layer added code without incrementally constraining a determined agent; commit + CI already supply the hard floor.
 
 ## 2. 决策 (Decision)
 
 1. **Do not restore** protocol resolve / attend / challenge / exclusive IO / `protocols.toml`. `engine.protocol` keeps `write_incident` only.
-2. **Payload stays in the type directory** (`AUTHORING.md`, `_template.md`; structure gate `.schema.json`) as ADR-0018. **The routing formula stays in `AGENTS.md`** (write: `docs/<type>/` → `AUTHORING.md`; find: `doc list` / `where`; no grep of `docs/`). The formula is addressing, not load-proof.
+2. **Payload and routing per ADR-0018 §2.3** (type directory pieces; `AGENTS.md` carries the formula).
+   - The formula is addressing, not load-proof.
 3. **Peer fallbacks only:** `docs/protocols/audit_default.md` and `verify_default.md`, referenced from `.agent/pipeline.toml`, existence-checked as `PIPELINE_PROTOCOL_NOT_FOUND`.
-4. **Hard floor remains server-side:** `scripts/pre-commit` + CI `k3dge check`. `k3dge-commit:` dictionary tokens are hook details (missing = WARN), not cryptography, and must not be upgraded into a proof-of-read protocol.
+4. **Hard floor remains server-side:** `scripts/pre-commit` + CI `k3dge check`.
+   - `k3dge-commit:` dictionary tokens are hook details (missing = WARN), not cryptography; do not upgrade them into a proof-of-read protocol.
 5. Skipping Authoring is not a machine event. Cost is structure-gate red + k3dit text-quality findings, not a captcha.
 
 ## 3. 产生后果 (Consequences)

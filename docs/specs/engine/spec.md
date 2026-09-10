@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:20b8626fb92445a0eb174735b549f48a390a4f7bc76cdd9773ba096597bc838f`
-- **Last Updated**: 2026-09-09
+- **Contract Hash**: `sha256:e7ff97cd0ac2990f14dcbaece71c5e5809cae4279ff6b850f0d8b0bfaf9f634b`
+- **Last Updated**: 2026-09-10
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -96,6 +96,9 @@ class Marker
     id: str
     scope: str
     note: str
+    sev: str = ''
+    prio: str = ''
+    type: str = ''
     key(self) -> Tuple[str, str]
 head_block_end(lines: Sequence[str]) -> int
 parse_text(rel: str, text: str) -> Tuple[List[Marker], List[str]]
@@ -208,6 +211,7 @@ strip_pins(workspace: Path, job: str) -> dict
 merge_back(workspace: Path, job: str, accept_dirty: tuple=()) -> dict
 prune(workspace: Path, job: str) -> dict
 remove(workspace: Path, job: str) -> None
+pin_baseline(workspace: Path, name: str, oid: str) -> bool
 materialize(workspace: Path, rev: str, dest: Path) -> Path
 ```
 <!-- k3dge:interfaces-end -->

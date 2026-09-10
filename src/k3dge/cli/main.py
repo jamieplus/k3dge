@@ -632,7 +632,7 @@ def cmd_mcp(args: argparse.Namespace) -> int:
 
 def cmd_audit(args: argparse.Namespace) -> int:
     """审计线动词（工作区=CWD）：submit 锁线建单 / status 问对端 / show 读本地账 /
-    advance 提版重钉基线 / materialize 只读物化 / close 取回落位（closure merge 自动附带）。"""
+    advance 提版重钉基线 / materialize 只读物化 / close 取回落盘（closure merge 自动附带）。"""
     from k3dge.engine import audit_flow
 
     workspace = _find_workspace(Path.cwd())
@@ -1237,12 +1237,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_mcp.add_argument("--timeout", type=int, default=20, help="probe: per-server handshake timeout (s)")
     p_mcp.add_argument("--json", dest="json", action="store_true", help="probe: emit JSON")
 
-    p_mk = sub.add_parser("markers", help="审计标记一览（只读：计数/违规/结项判据）")
+    p_mk = sub.add_parser("markers", help="审计钉一览（只读：计数/违规/结项判据）")
     p_mk.add_argument("--json", action="store_true")
     p_mk.add_argument("--check", action="store_true", help="有语法/锚点违规时退出码 1（供 CI）")
     p_mk.set_defaults(func=cmd_markers)
 
-    p_aud = sub.add_parser("audit", help="审计线棘轮：submit/status/show/advance/materialize/close（ADR-0026；工作区=CWD）")
+    p_aud = sub.add_parser("audit", help="审计线棘轮：submit/status/show/advance/materialize/close（ADR-0024；工作区=CWD）")
     p_aud.add_argument("audit_action", choices=["submit", "status", "show", "advance", "materialize", "close"])
     p_aud.add_argument("job_or_milestone", nargs="?", default="", help="status/show/materialize:job_id 或里程碑；advance:线名；close:milestone")
     p_aud.add_argument("--milestone", default="", help="submit：挂里程碑 id")

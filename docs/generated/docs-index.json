@@ -185,17 +185,17 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
-      "path": "docs/adr/0026-audit-evidence-exchange-topology.md",
+      "path": "docs/adr/0024-audit-evidence-exchange-topology.md",
       "type": "adr",
-      "id": "ADR-0026",
+      "id": "ADR-0024",
       "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Proposed",
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
-      "path": "docs/adr/0027-hall-harness-topology.md",
+      "path": "docs/adr/0025-hall-harness-topology.md",
       "type": "adr",
-      "id": "ADR-0027",
+      "id": "ADR-0025",
       "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Proposed",
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
@@ -412,9 +412,9 @@
       "path": "docs/memo/2026-09-05-hall-pattern-discussion.md",
       "type": "memo",
       "id": "2026-09-05-hall-pattern-discussion",
-      "title": "Memo: 大厅模式推演账（2026-09-05，为 ADR-0027 与角色分工讨论作废案账）",
+      "title": "Memo: 大厅模式推演账（2026-09-05，为 ADR-0025 与角色分工讨论作废案账）",
       "status": "",
-      "tokens": "Memo: 大厅模式推演账（2026-09-05，为 ADR-0027 与角色分工讨论作废案账）"
+      "tokens": "Memo: 大厅模式推演账（2026-09-05，为 ADR-0025 与角色分工讨论作废案账）"
     },
     {
       "path": "docs/memo/2026-09-05-industry-benchmark-vs-4-harness.md",
@@ -676,9 +676,9 @@
       "path": "docs/tasks/2026-09-06-M8-feat-hall_G7_tests.md",
       "type": "tasks",
       "id": "2026-09-06-M8-feat-hall_G7_tests",
-      "title": "G7: Hall 测试骨架（W1/W2/W6/台账复算）",
+      "title": "G7: Hall 测试骨架（W1/W2/W6/账本复算）",
       "status": "idea",
-      "tokens": "G7: Hall 测试骨架（W1/W2/W6/台账复算）"
+      "tokens": "G7: Hall 测试骨架（W1/W2/W6/账本复算）"
     },
     {
       "path": "docs/tasks/2026-09-06-M8-feat-hall_G8_observe.md",
@@ -687,6 +687,30 @@
       "title": "G8: 进程侧观测（统计席位+逃逸率+观测行）",
       "status": "idea",
       "tokens": "G8: 进程侧观测（统计席位+逃逸率+观测行）"
+    },
+    {
+      "path": "docs/tasks/2026-09-10-M8-chore-audit_module_doc_align.md",
+      "type": "tasks",
+      "id": "2026-09-10-M8-chore-audit_module_doc_align",
+      "title": "k3dge 侧文档/配置对齐合并审计模块（单份 12 列报告、无独立 quality fallback）",
+      "status": "idea",
+      "tokens": "k3dge 侧文档/配置对齐合并审计模块（单份 12 列报告、无独立 quality fallback）"
+    },
+    {
+      "path": "docs/tasks/2026-09-10-M8-feat-fix_seat_diff_accept.md",
+      "type": "tasks",
+      "id": "2026-09-10-M8-feat-fix_seat_diff_accept",
+      "title": "修席接受改由快照 diff 推断（禁二值空翻已修）",
+      "status": "idea",
+      "tokens": "修席接受改由快照 diff 推断（禁二值空翻已修）"
+    },
+    {
+      "path": "docs/tasks/2026-09-10-M8-fix-judge_skip_leftover.md",
+      "type": "tasks",
+      "id": "2026-09-10-M8-fix-judge_skip_leftover",
+      "title": "判读席禁止重提已 leftover",
+      "status": "idea",
+      "tokens": "判读席禁止重提已 leftover"
     }
   ]
 }

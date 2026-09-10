@@ -6,47 +6,58 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-19
 Deciders: Core Maintainer
-Note: -
+Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit` 无输出，no live lens）。
 ---
 
 # ADR-0001: k3dge 架构设计与工程治理基线
 
 ## 1. 上下文 (Context)
-在基于 LLM 的自主编码与 Vibe Coding 流程中，Agent 容易出现跨会话语义漂移、随意修改
-底层抽象以及"代码与文档脱节"的问题。现存方案多依赖 Soft Prompting 约束，缺乏机器
-层面的确定性硬门禁。
+在基于 LLM 的自主编码与 Vibe Coding 流程中，Agent 容易出现跨会话语义漂移、随意修改底层抽象，以及"代码与文档脱节"。
+现存方案多依赖 Soft Prompting 约束，缺乏机器层面的确定性硬门禁。
 
 ## 2. 决策 (Decision)
-构建 `k3dge`——一套基于 Python 3.10+ 标准库（核心零依赖，tree-sitter 为可选 extra）、
-支持"目录契约 + 双向一致性校验 + Git 门禁拦截"的轻量级工程治理 Harness。
+构建 `k3dge`——一套轻量级工程治理 Harness。
+它基于 Python 3.10+ 标准库（核心零依赖，tree-sitter 为可选 extra），支持"目录契约 + 双向一致性校验 + Git 门禁拦截"。
 
 ### 核心架构约束：
-1. **标准源码布局**：采用 `src/k3dge/` 布局，按 `engine`、`cli`、`sync`、`templates`
-   严格划分模块子域。
+1. **标准源码布局**：采用 `src/k3dge/` 布局，按 `engine`、`cli`、`sync`、`templates` 严格划分模块子域。
 2. **分层门禁**：
    - L0 结构门禁：spec 章节完整性（正则/结构校验，非字符串匹配）。
-   - L1 契约门禁：公开接口签名归一化哈希（内容寻址绑定），Python 用 stdlib `ast`，
-     TypeScript 用 tree-sitter（可选依赖）。**L1 同时产出符号级 diff**（`GateReport` `--json` 可读）：
-     增 / 删 / 改名 / 改参的公开符号列表——哈希只证「未同步」，符号 diff 证「改了契约」。形状变化须留人写痕迹（见决策点 6），否则仅刷新指纹不算闭环。
-   - L2 行为门禁：Verification Matrix 关联真实测试；执行口径（矩阵测试存在 + `--with-tests` 跑触及域
-     + `align` 跑 Full Matrix）见 ADR-0004。**矩阵行带稳定 `id` 且可解析到具体测试**（函数名 / marker / 显式 id）；
-     文件在、场景不在即红（属 L0 家族，非定理证明）。某域公开哈希变化时，跑 `manifest` 中声明 `depends_on` 该域的域测试，而非全仓 pytest。
-3. **确定性双向绑定**：代码为源，`spec` 为锁。任何对 `src/k3dge/<domain>/` 公开接口的改动，必须使
-    `docs/specs/<domain>/spec.md` 的 Contract Hash 与代码派生的哈希一致——哈希是锁而非自由编辑的真相；
-    spec 的 §1/§3 人读段仅供人与 Agent 阅读，`check` 不解析自然语言。
-4. **按 branch 门禁**：校验基准为 `merge-base(main, HEAD)`，code 可先落地，spec 在
-   分支内收敛即可；不做"同 commit 强制绑定"。
-5. **确定性自愈**：`k3dge sync` 从代码生成 spec 的接口块（投影）与哈希，自愈的是投影，不是批准改抽象——
-    `Agent 只审阅不发明` 仍在，但审阅本身没有工具面（属实现，不在本 ADR 展开）。
+   - L1 契约门禁：公开接口签名归一化哈希（内容寻址绑定）。
+     - Python 用 stdlib `ast`，TypeScript 用 tree-sitter（可选依赖）。
+     - **L1 同时产出符号级 diff**：`GateReport` `--json` 可读，列出增 / 删 / 改名 / 改参的公开符号。
+     - 哈希只证「未同步」，符号 diff 证「改了契约」。
+     - 形状变化须留人（维护者）写痕迹，见决策点 6；否则仅刷新指纹不算闭环。
+   - L2 行为门禁：Verification Matrix 关联真实测试。
+     - 执行口径：矩阵测试存在 + `--with-tests` 跑触及域 + `align` 跑 Full Matrix；见 ADR-0004。
+     - **矩阵行带稳定 `id` 且可解析到具体测试**：函数名 / marker / 显式 id。
+     - 文件在、场景不在即红（属 L0 家族，非定理证明）。
+     - 某域公开哈希变化时，跑 `manifest` 中声明 `depends_on` 该域的域测试，而非全仓 pytest。
+3. **确定性双向绑定**：代码为源，`spec` 为锁。
+   - 任何对 `src/k3dge/<domain>/` 公开接口的改动，必须使 Contract Hash 与代码派生的哈希一致。
+     - Contract Hash 在 `docs/specs/<domain>/spec.md`。
+   - 哈希是锁，而非自由编辑的真相。
+   - spec 的 §1/§3 人读段仅供人与 Agent 阅读，`check` 不解析自然语言。
+4. **按 branch 门禁**：校验基准为 `merge-base(main, HEAD)`。
+   - code 可先落地，spec 在分支内收敛即可；不做"同 commit 强制绑定"。
+5. **确定性自愈**：`k3dge sync` 从代码生成 spec 的接口块（投影）与哈希。
+   - 自愈的是投影，不是批准改抽象；`Agent 只审阅不发明` 仍在。
+   - 审阅本身没有工具面（属实现，不在本 ADR 展开）。
 6. **契约边界的机器消费者（补全规格闸）**：`spec` 的 §1 边界 / §3 不变量 / §4 矩阵必须有消费者，不能只锁 §2 哈希。
-   - **域依赖声明**：`manifest.domains[].depends_on` 声明可达依赖方向；engine 机检逆向 import 禁止（将现有 `engine ↛ templates` 的 `TEMPLATE_DRIFT` 特例升为通用规则）。`overview.md` 的依赖图按 ADR-0002 仍是判据，可执行副本在 manifest。
-   - **不变量具名（书写约定，未机检）**：§3 每条不变量应具名；理想上每条都对应某 Verification Matrix 行（有名字无测试 = 结构红）。该「具名不变量须出现在矩阵行」的对应关系当前未机检，仅作书写约定，不阻断。
-   - **形状变化留痕**：增 / 删 / 改名 / 改参公开符号属形状变化，须伴 `CHANGELOG.md ## [Unreleased]` 一行或 `spec` §1 边界句（提及该域与符号）；仅刷新指纹不算闭环。首版为 `WARN` 不阻断，避免合法重构被罚。
+   - **域依赖声明**：`manifest.domains[].depends_on` 声明可达依赖方向。
+     - engine 机检逆向 import 禁止；将现有 `engine ↛ templates` 的 `TEMPLATE_DRIFT` 特例升为通用规则。
+     - `overview.md` 的依赖图仍是判据，可执行副本在 manifest；见 ADR-0002。
+   - **不变量具名（书写约定，未机检）**：§3 每条不变量应具名。
+     - 理想上每条都对应某 Verification Matrix 行；有名字无测试 = 结构红。
+     - 该「具名不变量须出现在矩阵行」的对应关系当前未机检，仅作书写约定，不阻断。
+   - **形状变化留痕**：增 / 删 / 改名 / 改参公开符号属形状变化。
+     - 须伴 `CHANGELOG.md ## [Unreleased]` 一行或 `spec` §1 边界句，提及该域与符号；仅刷新指纹不算闭环。
+     - 首版为 `WARN` 不阻断，避免合法重构被罚。
 
-目的语言（减少漂移、幻觉、修局部坏整体等，不必穷举）见 ADR-0009；本 ADR 只定实现。
+本 ADR 只定实现；目的语言（减少漂移、幻觉、修局部坏整体等，不必穷举）见 ADR-0009。
 
 ## 3. 产生后果 (Consequences)
 - **正面影响**：阻断 LLM 的无意识抽象破坏；跨会话状态下 100% 可追溯的规格说明书。
-- **负面影响 / 权衡**：变更公开接口需额外跑一次 `k3dge sync`；跨语言契约校验依赖
-  可选 tree-sitter 依赖。
-- **何时重开**：要把质量/审计/检索做成门禁出口码，或 L1 从签名哈希扩到函数体；在那之前不把透镜或语义检索长进 `src/k3dge`。
+- **负面影响 / 权衡**：变更公开接口需额外跑一次 `k3dge sync`；跨语言契约校验依赖可选 tree-sitter 依赖。
+- **何时重开**：要把质量/审计/检索做成门禁出口码，或 L1 从签名哈希扩到函数体。
+  - 在那之前，不把透镜或语义检索长进 `src/k3dge`。

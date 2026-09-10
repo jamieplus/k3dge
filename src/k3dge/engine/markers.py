@@ -1,11 +1,13 @@
-"""审计标记语法 v1 —— findings 的树侧介质（棘轮循环；契约 §8）。
+"""审计钉语法 v2 —— findings 的树侧介质（棘轮循环；契约 §8）。
 
-角色：树上只放**指针＋状态**（一行），正文住在 k3dit 账本；本模块只解析、校验、计数——
-**永不改写**任何文件（apply 是编排动作，属 milestone/audit_flow 侧，且永远由补丁驱动）。
+角色：树上放**指针＋状态＋判读四格**（一行），账本/报告由 k3dit 收成投影（ADR-0025 §2.7）；
+本模块只解析、校验结构、计数——**永不改写**任何文件（去钉在 worktree、apply 属编排侧）。
+判读四格 sev/prio/type 的闭集权威在 k3dit `rounds`（本模块不复校词表，避免反向依赖）。
 
 kind:     pending | leftover | disputed | fixnote（修席顺手发现，须审席复核）
 open :=   pending + disputed + fixnote            # 结项判据 = open 计零
 scope:    @line(缺省) | @file(文件头块内) | @repo(只准住 AUDIT.md)
+attr:     [sev=..] [prio=..] [type=..]（v2 固定序，其后为 desc）
 """
 from __future__ import annotations
 
@@ -14,32 +16,40 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
 
-KINDS = ("pending", "leftover", "disputed", "fixnote")
-OPEN_KINDS = frozenset({"pending", "disputed", "fixnote"})
+KINDS = ("pending", "leftover", "disputed", "fixnote", "fixed")
+OPEN_KINDS = frozenset({"pending", "disputed", "fixnote"})   # fixed=复核背书待 Hall 拔，非 open
 SCOPES = ("line", "file", "repo")
 SIDECAR = "AUDIT.md"
 
 # 注释宿主前缀不参与匹配语义（提取只认核心串），但校验头部块归属要用它认注释行。
 # 宿主分型：md/html 只认 <!-- -->（反引号里的示例绝不自触发）；代码文件允许行尾注释
 #（案发现场就在行尾——指针必须钉得起）。
+# v2（ADR-0025 §2.7）：kind 后、desc 前，可选属性段 sev= prio= type=（固定序、闭集；闭集
+# 权威在 k3dit rounds，此处只解析结构、不复校词表，避免 k3dge 反向依赖 k3dit）。
+_ATTRS = r"(?:[ \t]+sev=(?P<sev>\S+))?(?:[ \t]+prio=(?P<prio>\S+))?(?:[ \t]+type=(?P<type>\S+))?"
 MARKER_RE = re.compile(
-    r"(?:#|//|<!--)[ \t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote)\s+"
-    r"(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)\s*"
-    r"(?:@(?P<scope>line|file|repo))?\s*"
-    r"(?P<note>.*?)\s*(?:-->)?\s*$",
+    r"(?:#|//|<!--)[ \t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \t]+"
+    r"(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \t]*@(?P<scope>line|file|repo))?"
+    + _ATTRS +
+    r"[ \t]*(?P<note>[^\n]*?)[ \t]*(?:-->)?[ \t]*$",
     re.M,
 )
 _COMMENT_LINE_RE = re.compile(r"^\s*(?:#|//|<!--)")
 MARKER_RE_MD = re.compile(
-    r"<!--[ \t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote)\s+"
-    r"(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)\s*(?:@(?P<scope>line|file|repo))?(?P<note>[^\n]*?)\s*-->\s*$",
+    r"<!--[ \t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \t]+"
+    r"(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \t]*@(?P<scope>line|file|repo))?"
+    + _ATTRS +
+    r"(?P<note>[^\n]*?)[ \t]*-->[ \t]*$",
     re.M,
 )
 _SCAN_SUFFIXES = frozenset(
     {".py", ".md", ".js", ".ts", ".tsx", ".go", ".rs", ".java", ".rb", ".toml", ".yaml", ".yml", ".php", ".kt", ".swift", ".c", ".h", ".cc", ".sh"}
 )
 _SKIP_DIR_PARTS = ("archive", ".git", ".venv", "node_modules", "__pycache__")
+# note 上限按 kind：pending 只活在线上、ff 前去钉剥净不上主干，可放宽到 500（够 value/design 理据）；
+# 其余 kind（leftover 上主干当长期文献）维持 ≤80（防正文漂）。超 ⇒ 拆成多条钉。
 _MAX_NOTE = 80
+_MAX_NOTE_PENDING = 500
 
 
 @dataclass
@@ -50,6 +60,9 @@ class Marker:
     id: str
     scope: str
     note: str
+    sev: str = ""    # v2 判读四格（结构解析；闭集校验在 k3dit harvest）
+    prio: str = ""
+    type: str = ""
 
     def key(self) -> Tuple[str, str]:
         return (self.id, self.kind)
@@ -92,18 +105,24 @@ def parse_text(rel: str, text: str) -> Tuple[List[Marker], List[str]]:
     rx = MARKER_RE_MD if rel.endswith((".md", ".html")) else MARKER_RE
     for m in rx.finditer(text):
         line_no = text.count("\n", 0, m.start()) + 1
+        kind = m.group("kind")
         note = m.group("note") or ""
-        if len(note) > _MAX_NOTE:
-            problems.append(f"{rel}:{line_no} note 超 {_MAX_NOTE} 字符（正文应入账本）")
-            note = note[:_MAX_NOTE] + "…"
+        cap = _MAX_NOTE_PENDING if kind == "pending" else _MAX_NOTE
+        if len(note) > cap:
+            problems.append(f"{rel}:{line_no} note 超 {cap} 字符（pending≤{_MAX_NOTE_PENDING}，"
+                            f"其余≤{_MAX_NOTE}；正文超应拆多条钉）")
+            note = note[:cap] + "…"
         markers.append(
             Marker(
                 file=rel,
                 line=line_no,
-                kind=m.group("kind"),
+                kind=kind,
                 id=m.group("id"),
                 scope=m.group("scope") or "line",
                 note=note.strip(),
+                sev=(m.group("sev") or "").strip(),
+                prio=(m.group("prio") or "").strip(),
+                type=(m.group("type") or "").strip(),
             )
         )
     # scope↔位置一致性（规则 3）
@@ -123,7 +142,7 @@ def parse_sidecar(text: str) -> Tuple[List[Marker], List[str]]:
         if raw.startswith("## "):
             body = "## " + raw[3:]
             m = re.search(
-                r"k3dit:(?P<kind>pending|leftover|disputed|fixnote)\s+(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)\s*"
+                r"k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)\s+(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)\s*"
                 r"(?:@(?P<scope>line|file|repo))?(?P<note>.*?)\s*$",
                 raw[3:],
             )

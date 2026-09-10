@@ -61,8 +61,47 @@ def test_note_overflow_and_placeholder_not_matched():
     assert len(ms) == 1 and ms[0].id == "A-7"
     assert [x for x in problems if "note 超" in x]
 
+def test_note_overflow_and_placeholder_not_matched():
+    """§2.7 note 上限按 kind：pending≤500（120 放行）、其余≤80（leftover 120 报超）；占位符不自匹配。"""
+    ws = _ws({"docs/x.md": "示例语法 `# k3dit:pending <ID>@line ...` 不算发现\n"
+                           f"<!-- k3dit:pending A-7 {'很长' * 60} -->\n"          # 120 字 pending ≤500 → 放行
+                           f"<!-- k3dit:leftover B-7 {'超长' * 60} -->\n"})         # 120 字 leftover >80 → 报超
+    ms, problems = K.extract(ws)
+    ids = {m.id for m in ms}
+    assert {"A-7", "B-7"} <= ids and all("<" not in i for i in ids)  # 占位符不匹配
+    overflow = [x for x in problems if "note 超" in x]
+    assert len(overflow) == 1 and "超 80 字符" in overflow[0]        # 仅 leftover 触发（pending 未超 500）
+
+
+def test_pending_note_up_to_500_ok():
+    ws = _ws({"src/a.py": f"# k3dit:pending A-50 {'x' * 500}\nz=1\n"})
+    ms, problems = K.extract(ws)
+    assert ms and ms[0].id == "A-50" and not [p for p in problems if "note 超" in p]
+
+
+def test_attrs_v2_parsed():
+    """§2.7 判读四格：sev/prio/type 属性段解析回结构（闭集校验在 k3dit harvest，此处不复校）。"""
+    from k3dge.engine.markers import parse_text
+
+    ms, probs = parse_text("a.py", "code\n# k3dit:pending code-9 sev=高 prio=P1 type=复杂度 未设超时\n")
+    assert ms[0].id == "code-9" and (ms[0].sev, ms[0].prio, ms[0].type) == ("高", "P1", "复杂度")
+    assert ms[0].note == "未设超时" and not probs
+
+    ms2, _ = parse_text("r.md", "<!-- k3dit:pending doc-3 sev=低 prio=P3 type=设计 摘要 -->\n")
+    assert ms2[0].type == "设计" and ms2[0].note == "摘要" and ms2[0].sev == "低"
+
+
 def test_scan_backward_shape_open_kinds_counted():
     ws = _ws({"src/a.py": "# k3dit:leftover A-8 有意留\nz=1\n",
               "src/f.py": "def h():\n    # k3dit:pending A-9 x\n    pass\n"})
     count, samples = scan_pending_findings(ws)
     assert count == 1 and samples == ["src/f.py#A-9"]   # leftover 不计；pending 计
+
+
+def test_adjacent_pins_last_line_not_swallowed():
+    from k3dge.engine.markers import parse_text
+
+    text = "import ast\n# k3dit:pending P-1\n# k3dit:pending P-2 note here\n"
+    ms, _ = parse_text("a.py", text)
+    assert [(m.id, m.line) for m in ms] == [("P-1", 2), ("P-2", 3)]
+    assert [m.note for m in ms] == ["", "note here"]  # note 是本行内容，不是下一行

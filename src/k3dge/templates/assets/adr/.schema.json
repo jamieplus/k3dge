@@ -13,9 +13,7 @@
       "Draft",
       "Proposed",
       "Deprecated",
-      "Rejected",
-      "Amended by ADR-\\d{4}",
-      "Superseded by ADR-\\d{4}"
+      "Rejected"
     ],
     "Date": "date"
   },

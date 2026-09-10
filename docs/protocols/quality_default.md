@@ -4,7 +4,7 @@
 
 ## 一轮"审过一遍" = 两份报告
 
-一次收口的界定是：**审计报告（k3dit）+ 质量报告（k3lity）都各到 `待修=0`**。改之后按报告各自复审：`k3dit.actions.verify` 核审计报告、`k3lity.actions.verify` 核质量报告，互不串。
+一次闭环的界定是：**审计报告（k3dit）+ 质量报告（k3lity）都各到 `待修=0`**。改之后按报告各自复审：`k3dit.actions.verify` 核审计报告、`k3lity.actions.verify` 核质量报告，互不串。
 
 ## 交付
 

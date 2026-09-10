@@ -69,9 +69,9 @@
 | **Milestone 状态机** | `DRAFT → ALIGNED → AUDIT_SUGGESTED → AUDITING → SEAL_READY → SEALED`（+`ESCALATED`） | [`overview.md`](overview.md) §6 |
 | **`[NEXT]` 提示** | 命令末尾只给合法下一步；优先级 `pending_findings > ratchet_open > seal_ready > audit_suggested`；唯一来源在 `engine/nextstep` + `engine/audit_trigger` | [`overview.md`](overview.md) §7 |
 | **审计闭环（封板界限）** | audit + quality 两份 **12 列报告**都到 `待修=0`；未审计调 seal → `audit_needed` | ADR-0017；[`overview.md`](overview.md) §6 |
-| **标记语法 markers** | `k3dit:<kind> <ID>[@scope] <一句话≤80字>`；kind ∈ `pending/leftover/disputed/fixnote`；scope ∈ `line/file/repo`；开放=前三态，结项须清零 | [`docs/protocols/peer_contract.md`](../protocols/peer_contract.md) §8；`engine/markers.py` |
+| **钉语法 markers** | `k3dit:<kind> <ID>[@scope] <一句话≤80字>`；kind ∈ `pending/leftover/disputed/fixnote`；scope ∈ `line/file/repo`；开放=前三态，结项须清零 | [`docs/protocols/peer_contract.md`](../protocols/peer_contract.md) §8；`engine/markers.py` |
 | **pending_findings** | `k3dit:pending` 钉计数（check/status 报 `pending=N`，最高优先）；处置以 12 列+tasks 为准，理由写报告不入正文 | AGENTS.md §12；`peer_contract §8` |
-| **送检包 Bundle** | gate 类唯一输入形式：`target/ + signatures/ + MANIFEST.json`；身份=`cas://sha256:<git-tree-oid>`，位置=单文件袋；打包器 `engine/bundle.py`，配置 `.agent/bundle.toml` | ADR-0026；`peer_contract §3` |
+| **送检包 Bundle** | gate 类唯一输入形式：`target/ + signatures/ + MANIFEST.json`；身份=`cas://sha256:<git-tree-oid>`，位置=单文件袋；打包器 `engine/bundle.py`，配置 `.agent/bundle.toml` | ADR-0024；`peer_contract §3` |
 | **棘轮 Ratchet** | 一工单 = 一快照，单内审↔修可多程；submit/collect 两态；`claim` 即续租；快照推进一律 `git update-ref` CAS | `peer_contract §1.4` |
 | **席位 seat** | 审计机构经 seat 连接组件上岗；`sign-report` 署名才算结案 | `peer_contract §1.4` / §2 |
 | **doc-audit** | `check` 后、**非阻断**的文档作者合规审计：k3dit 报告 + 建带 Milestone 的 task | ADR-0021 |
@@ -94,7 +94,7 @@
 | 术语 | 一句话 | 出处 |
 | --- | --- | --- |
 | **MCP 注入面** | k3dge 以 MCP stdio 把 engine 事实交给 DSH/Codex/Claude Code/OpenCode；外部禁止私有重实现门禁 | ADR-0006；`docs/guides/mcp-bridge.md` |
-| **Peer Contract v0.6** | k3dge ↔ 外部 harness 机器契约（信封/工件/标记/棘轮）；**权威源在 GitHub**，本地为工作副本 | `docs/protocols/peer_contract.md` |
+| **Peer Contract v0.6** | k3dge ↔ 外部 harness 机器契约（信封/工件/钉/棘轮）；**权威源在 GitHub**，本地为工作副本 | `docs/protocols/peer_contract.md` |
 | **角色 model** | 只认 `audit / quality / cache`；gate 类（送检包+两态+provenance）vs service 类（同步查询、失败=skip） | `peer_contract §0` |
 | **`.mcp.json`** | endpoint（command/args/env/cwd）唯一登记表，不得在 pipeline.toml 重复 | `peer_contract §0`；`mcp-bridge.md` |
 | **`.agent/pipeline.toml`** | 流程编排：roles → peers → actions → transports（mcp→cli→manual fallback 链） | `specs/engine §5.1`；`mcp-bridge.md` |
@@ -138,7 +138,7 @@
 | ADR-0018 | doc-readme-anchor-governance | 每种文档类型 README 锚点 + AUTHORING 寻址治理 |
 | ADR-0019 | protocol-load-proof-abandoned | 协议加载证明废弃；`PIPELINE_PROTOCOL_NOT_FOUND` 静态守卫 |
 | ADR-0023 | low-authority-archive-tier | 低权威归档层（挪走不删） |
-| ADR-0026 | audit-evidence-exchange-topology | 送检包拓扑：git-tree oid 身份 + 单文件位置 + 棘轮交换 |
+| ADR-0024 | audit-evidence-exchange-topology | 送检包拓扑：git-tree oid 身份 + 单文件位置 + 棘轮交换 |
 
 ### 生命周期
 | ID | 主题（文件名） | 一句话 |
@@ -186,7 +186,7 @@
 | 文档寻址 | `k3dge doc list` / `k3dge doc where <id>` / `k3dge doc grep <word> [--line]` |
 | 文档审计 | `k3dge doc-audit`（check 之后、非阻断，ADR-0021） |
 | 符号定位 | `k3dge where <symbol>`（file:line）；`k3dge search` / `k3dge index` |
-| 审计标记 | `k3dge markers [--json|--check]` |
+| 审计钉 | `k3dge markers [--json|--check]` |
 | 送检与棘轮 | `k3dge audit <submit|status|advance|close>`（审计线：锁线→交件→验→merge→删线） |
 | MCP | `k3dge mcp probe [--json]`（诊断，不进 check） |
 | 版本 | `k3dge version show` / `k3dge version bump --patch|-m` |
@@ -207,11 +207,11 @@ DRAFT →(milestone align: Full Matrix, 无人问)→ ALIGNED
 ```
 
 要点（判据见 [`overview.md`](overview.md) §6–7 与 `peer_contract`）：
-- **审计环收口 = 封板唯一界限**；自动触发只服务「要不要审」，「要不要封」只在闭环后出现一次。
-- 交换介质 = 审计线（分支+现场）+ 标记（§3.2/§3.4）；`sign-report` 署名才算结案；`collect` 幂等可重试，`EXPIRED/NOT_FOUND` ⇒ 锁新基线重送。
+- **审计闭环 = 封板唯一界限**；自动触发只服务「要不要审」，「要不要封」只在闭环后出现一次。
+- 交换介质 = 审计线（分支+现场）+ 钉（§3.2/§3.4）；`sign-report` 署名才算结案；`collect` 幂等可重试，`EXPIRED/NOT_FOUND` ⇒ 锁新基线重送。
 - `on_seal_enter`（audit+quality 两份必做）与 `on_pre_seal`（各自 verify）配置在 `.agent/pipeline.toml`；两条腿都验完 seal 才放行。
 - 外来审计源经 `k3dge milestone audit-submit`（MCP `k3dge_submit_audit_report`，`--kind quality` 同理）落盘即计入闭环。
-- 发现用 `k3dit:pending <ID>` 钉在位置（仅指针）；已修删标，有意留改 `k3dit:leftover`。
+- 发现用 `k3dit:pending <ID>` 钉在位置（仅指针）；已修删钉，有意留改 `k3dit:leftover`。
 
 ## 8. 开放问题与活文档
 

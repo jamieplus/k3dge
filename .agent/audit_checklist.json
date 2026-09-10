@@ -1,20 +1,20 @@
 {
-  "milestone_id": "M7",
-  "tasks_hash": "d146e290ae0fa9407e11977b9b2db5aff2f3a19cb50bbddb35847b2f40af21ce",
-  "generated_at": "2026-09-05T00:26:51",
-  "audit_started_at": "2026-09-05T00:26:51",
+  "milestone_id": "M8",
+  "tasks_hash": "c5ab74e16a1b43143ac6eed70a2d2af5cf9b7bfb3dce42f7affea4bc05cd39d6",
+  "generated_at": "2026-09-09T03:39:17",
+  "audit_started_at": "2026-09-09T03:39:18",
   "verify_attempts": 0,
   "audit_suggested": false,
   "reasons": [],
   "closure": {
     "audit": {
-      "present": true,
-      "pending": 0
+      "present": false,
+      "pending": null
     },
     "quality": {
-      "present": true,
-      "pending": 0
+      "present": false,
+      "pending": null
     }
   },
-  "closed": true
+  "closed": false
 }

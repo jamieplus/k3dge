@@ -1,9 +1,9 @@
 """审计线（k3dge 进程件，施工账⑦）：一单一条线——真实分支＋可编辑签出＋present 自动供给。
 
-审计线模型（ADR-0026 重设计）：分支 `k3dit/<job>` 从锁点 L 拉起、住**消费仓 .git**，
+审计线模型（ADR-0024 重设计）：分支 `k3dit/<job>` 从锁点 L 拉起、住**消费仓 .git**，
 worktree `.k3dge/wt/<job>` 即送检现场（对象格式/树布局同主干，merge 即普通 git）。
 Hall 凭 wt 目录拷窗、收回改动经 advance 提版；判读窗永不操作消费仓 .git。
-present 由进程从 worktree 抽取（markers.extract），席位口供退居交叉核对（§ADR-0026 §2.4）。
+present 由进程从 worktree 抽取（markers.extract），席位口供退居交叉核对（§ADR-0024 §2.4）。
 """
 from __future__ import annotations
 
@@ -71,16 +71,24 @@ def ensure(workspace: Path, job: str, base: Optional[str] = None) -> Path:
 
 
 def present(workspace: Path, job: str, commit: Optional[str] = None) -> list:
-    """worktree 同步到给定 commit（缺=分支头）后，进程抽取 markers 作 present。"""
+    """worktree 同步到给定 commit（缺=分支头）后，进程抽取 markers 作 present。
+    只读比对不动分支：detach 看完即切回（detached 残留会毒化后续 rebase——分支 ref 原地踏步）。"""
     wt = ensure(workspace, job)
+    br = branch_name(job)
     if commit:
-        r = _git(wt, "checkout", "-q", "--detach" if commit else commit)
-        # 席位提交后，编排侧只读比对：detach 到具体 commit 即可
-    ms, _problems = extract(wt)
-    return [
-        {"file": m.file, "line": m.line, "kind": m.kind, "id": m.id, "scope": m.scope, "note": m.note}
-        for m in ms
-    ]
+        r = _git(wt, "checkout", "-q", "--detach", commit)
+        if r.returncode != 0:
+            _git(wt, "checkout", "-q", br)
+            raise RuntimeError(f"present checkout {commit[:12]} 失败")
+    try:
+        ms, _problems = extract(wt)
+        return [
+            {"file": m.file, "line": m.line, "kind": m.kind, "id": m.id, "scope": m.scope, "note": m.note}
+            for m in ms
+        ]
+    finally:
+        if commit:
+            _git(wt, "checkout", "-q", br)  # 复位：后人（advance/rebase）都在分支上干活
 
 
 def advance(workspace: Path, job: str) -> Optional[str]:
@@ -107,13 +115,14 @@ def advance(workspace: Path, job: str) -> Optional[str]:
 
 def strip_pins(workspace: Path, job: str) -> dict:
     """收官去钉：删审计线 worktree 里独占一行的钉；行尾钉不动（只上报）。
-    钉永不进主干。返回 {stripped_files, stripped_lines, suspicious}。
-    扫描面是全树（present 的 roots 限定之外也得兜住）。"""
+    **除 leftover 外**的钉永不进主干（§3③）——leftover 作有意留的长期文献随文件留下，故不删。
+    扫描面是全树（present 的 roots 限定之外也得兜住）。返回 {stripped_files, stripped_lines, suspicious, kept}。"""
     from k3dge.engine.markers import _SCAN_SUFFIXES, _SKIP_DIR_PARTS, parse_text
 
     wt = ensure(workspace, job)
     files: list = []
     lines = 0
+    kept = 0
     suspicious: list = []
     for p in sorted(wt.rglob("*")):
         if not p.is_file() or p.suffix.lower() not in _SCAN_SUFFIXES:
@@ -131,6 +140,9 @@ def strip_pins(workspace: Path, job: str) -> dict:
         src = text.splitlines()
         drop = set()
         for m in ms:
+            if m.kind == "leftover":        # 长期文献，随文件上主干，不删
+                kept += 1
+                continue
             if src[m.line - 1].lstrip().startswith(("#", "//", "<!--")):
                 drop.add(m.line)
             else:
@@ -143,7 +155,7 @@ def strip_pins(workspace: Path, job: str) -> dict:
                 continue
             files.append(rel)
             lines += len(drop)
-    return {"stripped_files": files, "stripped_lines": lines, "suspicious": suspicious}
+    return {"stripped_files": files, "stripped_lines": lines, "suspicious": suspicious, "kept": kept}
 
 
 def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
@@ -153,7 +165,7 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
     (base..br] `rebase --onto` 重演到主干头（线提交全是机械件，重演即普通 git）
     再 ff；冲突 ⇒ abort 复原＋升级人工。真 merge 不再使用（审计线模型）。
 
-    accept_dirty：编排进程自己写的件（工单 task/报告落位/state 文件）——
+    accept_dirty：编排进程自己写的件（工单 task/报告落盘/state 文件）——
     守卫防的是"人的未提交工作被卷进去"，不该拦自己刚写的字。
     """
     br = branch_name(job)
@@ -185,6 +197,8 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
         return {"ok": True, "mode": "already"}
     wt = ensure(workspace, job)
     _git(wt, "rebase", "--abort")  # 幂等清场：上次崩溃残留的重演态先复原（无则空操作）
+    if _git(wt, "checkout", "-q", br).returncode != 0:  # 挂回分支再重演（detached 上 rebase 空转）
+        return {"ok": False, "mode": "error", "message": "worktree 挂回分支失败，交人工"}
     rb = _git(wt, "-c", "user.name=k3dge-process", "-c", "user.email=noreply@k3dge.local",
               "rebase", "--onto", main_head, base)
     if rb.returncode != 0:
@@ -197,7 +211,7 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
 
 
 def prune(workspace: Path, job: str) -> dict:
-    """⑤ 收口：删现场；审计线**仅在已并入主干时**删（闸过删线，ADR-0026 重设计）。
+    """⑤ 收口：删现场；审计线**仅在已并入主干时**删（闸过删线，ADR-0024 重设计）。
 
     未并入（在办/冲突未人工闭环）⇒ 线保留原位，崩溃恢复与幂等重试都靠它。
     """
@@ -218,6 +232,14 @@ def prune(workspace: Path, job: str) -> dict:
 
 def remove(workspace: Path, job: str) -> None:
     _git(workspace, "worktree", "remove", "--force", str(worktree_path(workspace, job)))
+
+
+def pin_baseline(workspace: Path, name: str, oid: str) -> bool:
+    """留存被引用的审计基线（报告引用的 commit 经 rebase 后可能悬空，gc 即不可复验）。
+    ref 与审计线共存亡之外的另一条命：只增（每单一条），清理由留存策略定，不在收口删。"""
+    if not oid or _git(workspace, "cat-file", "-t", oid).stdout.strip() != "commit":
+        return False
+    return _git(workspace, "update-ref", f"refs/audit-baseline/{name}", oid).returncode == 0
 
 
 def materialize(workspace: Path, rev: str, dest: Path) -> Path:

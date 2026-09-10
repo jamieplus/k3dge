@@ -1,6 +1,7 @@
 # Architecture — 系统全貌（System Overview）
 
 > 人写常驻 + `k3dge sync` 聚合校验。域级契约在 `docs/specs/<domain>/spec.md`，本文件只讲**域间关系与全局不变量**。
+> 想快速定向 / 查术语 / 找文档入口，先看 [`encyclopedia.md`](encyclopedia.md)（知识地图，非第二套叙事）。
 > 本文档遵循 **Diátaxis**（`guides`=教程/操作指南、`generated`=Reference 自动生成、`architecture` 本文件=`解释`）与 **C4-C1** 上下文视图。
 
 ## 0. C4-C1 系统上下文
@@ -101,7 +102,7 @@ stateDiagram-v2
     AUDITING --> AUDITING: audit+quality 待修>0 + agent 修（倒计时默认修；重审各报告）
     AUDITING --> AUDITING: 位置钉 k3dit:pending <ID>（check/status 报 pending=N）
     AUDITING --> ESCALATED: verify 连续 >3 次未闭环 → 转人工
-    AUDITING --> SEAL_READY: audit 与 quality 两腿工单均 collected（清零→席**署名**报告→collect 落位+写回）；审计闭环=真界限
+    AUDITING --> SEAL_READY: audit 与 quality 两腿工单均 collected（清零→席**署名**报告→collect 落盘+写回）；审计闭环=真界限
     SEAL_READY --> DRAFT: 要不要封? N（里程碑继续挂着）
     SEAL_READY --> SEALED: k3dge milestone seal（align→归档+版本+指针）
     SEALED --> [*]: 收摊=上下文压缩(closure.md → 设计文档 → 提交)
@@ -124,7 +125,7 @@ sequenceDiagram
     K3-->>Agent: 问「要审吗？」(无倒计时；N=继续干活)
     Agent->>K3: milestone audit <id>
     Agent->>Audit: milestone audit = 棘轮步进：audit.submit 建单→席位 rounds→audit.collect 落签署件→写回主干
-    Note over Agent,Audit: 交换物=审计线（分支+现场，ADR-0026 重设计：锁线→交件→merge→删线）；席位经机构 seat 连接组件上岗（pi/opencode/…），sign-report 署名才算结案
+    Note over Agent,Audit: 交换物=审计线（分支+现场，ADR-0024 重设计：锁线→交件→merge→删线）；席位经机构 seat 连接组件上岗（pi/opencode/…），sign-report 署名才算结案
     Agent->>Quality: k3lity.actions.quality（mcp→cli→manual；人填不造假分）
     Note over Agent,Audit: 外来审计源：人贴报告 → k3dge_submit_audit_report 落盘(--kind audit|quality)
     Audit-->>Agent: 审计 12 列报告（含 待修/有意留/已修）+ 位置钉 k3dit:pending

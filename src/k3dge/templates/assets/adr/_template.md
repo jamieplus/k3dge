@@ -7,9 +7,10 @@ Amended-by: -
 Date: YYYY-MM-DD
 Deciders: Core Maintainer
 Note: -
-# Note: default `-`. Carries the non-metadata trace of this record — e.g. an authorized
-# in-place revision (who/when) and how it actually passed the gate (real lens vs manual
-# fallback). See docs/adr/AUTHORING.md.
+# Note: default `-`. Exactly one `Note:` field per ADR. Record each authorized operation
+# as a numbered segment (① ② ③ …): who/when authorized and how it actually passed the
+# gate (real lens vs manual fallback). Append segments; do not erase old traces.
+# See docs/adr/AUTHORING.md.
 ---
 
 # ADR-NNNN: <title>
@@ -19,6 +20,12 @@ Section-number rule (hard-gated by `k3dge check`, code ADR_SECTION_ORDER):
 numbered sections must ascend in document order — ## 1, ## 2, ### 2.1, ### 2.1.1, …
 Never insert a new subsection out of order or reuse a number; appending a decision is
 its own ADR (Supersedes), not a renumbering of an Accepted one.
+-->
+<!--
+Readability (soft; k3dit audits it — docs/adr/AUTHORING.md "人读优先"):
+decision-first; one point per line (~100 chars); implementation details (function
+names, paths, command sequences) go to docs/specs or tasks; cross-refs at end of
+sentence; titles are noun phrases, no slash-stacking.
 -->
 
 ## 1. 上下文 (Context)
