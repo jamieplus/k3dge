@@ -197,6 +197,20 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 **Hall 依赖**
 - 物化时留只读原快照（修/核用；修席窗无 `.git`）；不得为 diff 给窗塞 `.git`。
 
+### 2.8 窗×透镜对口与类型/严重度域（规范；代码为可执行镜像）
+
+> 这是**决策级规范**：窗分域、各窗类型域、严重度带在此定。可执行镜像＝`mcp._PASS_FOCUS`（透镜焦点）、`hall.JUDGE_TYPE_DOMAIN`（类型域）、`rounds.TYPE_SEV_CAP/TYPE_PRIO_CAP`（严重度/优先级带）、`rounds.TYPES/SEVERITIES/PRIORITIES`（枚举单一源）——改本表须同步代码（结构律、规则 10）。判断**方法散文**在 `k3dit/docs/guides/protocol.md`（输出型指南，不称事实源）。
+
+| 窗 | 对口透镜/节 | 类型域（越域 harvest 拒） | 严重度带（按 type 夹回上限） | 工具面输入（确定性事实，席不重算） |
+| --- | --- | --- | --- | --- |
+| 文档审计窗 | Doc Audit：ADR 冲突/覆盖/正交 + authoring 软合规 | 规范·冲突·覆盖·悬空指针·设计 | 规范≤低/P3 | `k3dge_adr_index` |
+| 代码审计窗 | Pass 1-4 + 安全/正确性深审 + 性能8族 + 反例/边界 | 安全·正确性·缺陷·竞态·破坏性·隐蔽·冲突·覆盖 | 无上限（真阻断） | diff/trace 指针、数据流/污点、锁图 |
+| 价值窗 | code-judo / Approval Bar / 结构红旗（判"该不该阻断"） | 复杂度·结构·冗余·性能·设计 | 复杂度·结构·冗余·性能≤中/P2 | k3lity scan_facts（CC/行数/重复度） |
+| 修席窗（行动窗，非透镜） | 无（改码 + 翻 `fixnote`/`leftover`/`disputed`；见 §2.7） | — | — | 待关 findings + 窗内 `pending` 钉 + `.orig` |
+| 复核窗（独立钥） | Retest：看 `present.md`（修席 `.orig→现` diff）+ conformance/LTL | — | — | findings 账本 + present diff + 结案 `verify` 命令 |
+
+价值窗独立于代码窗：前者审"设计值不值"（含工具预计算事实）、后者审"这段贵不贵/对不对"（diff 内），对照面不同、不共钥。
+
 ## 3. 产生后果 (Consequences)
 
 - **Up**：形式冗余消除（少一套 harness 面 / 接口 / 运输）；判断权威不因合并降级；墙从约定变机制（进程 + 目录 + CLI 原生隔离可测）。
