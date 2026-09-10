@@ -1,6 +1,6 @@
 # Audit Protocol — Default (5-Pass / 8 维)
 
-> **事实源**：`k3dge` 仅验"报告有无"（`k3dge check`），透镜判断在本文件；`k3dit` 的 `protocol.md` 优先于本文件。
+> **事实源**：`k3dge` 仅验"报告有无"（`k3dge check`），透镜判断在本文件；`k3dit` 的 `audit-method.md` 优先于本文件。
 
 ## 交付
 
@@ -47,4 +47,4 @@ L2 入场券须逐条确认（agent 进车间前绑定到任务）：
 
 **k3dge 提供的事实工具**：`k3dge_adr_index`（ADR 索引 + 重叠/指针 findings JSON，**非判断**；冲突/冗余由 k3dit 判）。
 
-> **k3dit 可达时**：k3dit 应使用含本节的同源协议（其 `protocol.md` 须含本节，与本文同源）；k3dit 不可达时回退到本仓 `docs/protocols/audit_default.md`（即本节所在文件）。
+> **k3dit 可达时**：k3dit 应使用含本节的同源协议（其 `audit-method.md` 须含本节，与本文同源）；k3dit 不可达时回退到本仓 `docs/protocols/audit_default.md`（即本节所在文件）。

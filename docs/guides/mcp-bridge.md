@@ -90,7 +90,7 @@ k3dge mcp probe --json     # 同上的机读形态；全活 exit 0，有死 exit
 | Tool | `k3dge_task_create` | `milestone.create_task` | 写入 living task 文件 |
 | Tool | `k3dge_task_done` | `milestone.mark_task_done` | 优先 `list` 返回的 path |
 | Tool | `k3dge_milestone_control` | `milestone.(status|align|seal)` | `status` 查任务、`align` Full Matrix 回归、`seal` 三闸机原子归档 |
-| Prompt | `k3dge_5pass_audit_prompt` | 优先 `../k3dit/docs/guides/protocol.md`，否则 `docs/protocols/audit_default.md` | 只指路；同一审计入口，按 `target_scope` 路由代码 5-Pass / 文档 Doc Audit（ADR-0020）；不在 k3dge 内维护透镜 |
+| Prompt | `k3dge_5pass_audit_prompt` | 优先 `../k3dit/docs/guides/audit-method.md`，否则 `docs/protocols/audit_default.md` | 只指路；同一审计入口，按 `target_scope` 路由代码 5-Pass / 文档 Doc Audit（ADR-0020）；不在 k3dge 内维护透镜 |
 | Tool | `k3dge_adr_index` | `engine.doc_catalog.analyze_adr_coverage` | ADR 集合自洽事实（重叠/指针 findings，非判断）；文档审计透镜原料 |
 
 ## 入向现状：server 在 `mcp` 2.x 下起不来（已知、未修、不阻断出向）

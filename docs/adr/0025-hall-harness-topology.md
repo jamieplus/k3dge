@@ -50,7 +50,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 
 - 合并＝把 audit/quality 的内容**精细编排为一个模块**（同屋檐、多窗多席），不是两套东西塞进一个目录。
 - 基本责任单元是**窗口**：签名钥、scope、方法论全部落窗口级。
-- 方法论正文可同源（如 protocol.md）；独立的是判断权，不是文本。
+- 方法论正文可同源（如 audit-method.md）；独立的是判断权，不是文本。
 - k3dit / k3lity 作为历史来源消失，能力资产按窗口重分，旧名不再作为模块内划分依据。
 - **分离锚点**（独立性的全部载体，缺一即角色扮演）：① W1 目录墙；② 各判读窗签名钥互不相同；③ W5 章在人手。
 - 独立性不依赖独立工件或独立发布轨（一个模块同一构建可签多产物），但三载体必须真实存在且可测。
@@ -147,7 +147,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 - 落点：`markers.py` 超限检查、`worktree.strip_pins` 按 kind 分支。
 
 **枚举单一源**
-- 权威表＝k3dit `rounds.py`（`TYPES/SEVERITIES/PRIORITIES`）；`protocol.md` / §8 / 12 列 / `markers --check` 全镜像。
+- 权威表＝k3dit `rounds.py`（`TYPES/SEVERITIES/PRIORITIES`）；`audit-method.md` / §8 / 12 列 / `markers --check` 全镜像。
 - 并表必须先于钉语法落地；现 `TYPES` 缺席实吐 {设计,悬空指针,正确性,结构}，闸一上即 FORMAT。
 
 **验收闸**
@@ -199,7 +199,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 
 ### 2.8 窗×透镜对口与类型/严重度域（规范；代码为可执行镜像）
 
-> 这是**决策级规范**：窗分域、各窗类型域、严重度带在此定。可执行镜像＝`mcp._PASS_FOCUS`（透镜焦点）、`hall.JUDGE_TYPE_DOMAIN`（类型域）、`rounds.TYPE_SEV_CAP/TYPE_PRIO_CAP`（严重度/优先级带）、`rounds.TYPES/SEVERITIES/PRIORITIES`（枚举单一源）——改本表须同步代码（结构律、规则 10）。判断**方法散文**在 `k3dit/docs/guides/protocol.md`（输出型指南，不称事实源）。
+> 这是**决策级规范**：窗分域、各窗类型域、严重度带在此定。可执行镜像＝`mcp._PASS_FOCUS`（透镜焦点）、`hall.JUDGE_TYPE_DOMAIN`（类型域）、`rounds.TYPE_SEV_CAP/TYPE_PRIO_CAP`（严重度/优先级带）、`rounds.TYPES/SEVERITIES/PRIORITIES`（枚举单一源）——改本表须同步代码（结构律、规则 10）。判断**方法散文**在 `k3dit/docs/guides/audit-method.md`（输出型指南，不称事实源）。
 
 | 窗 | 对口透镜/节 | 类型域（越域 harvest 拒） | 严重度带（按 type 夹回上限） | 工具面输入（确定性事实，席不重算） |
 | --- | --- | --- | --- | --- |

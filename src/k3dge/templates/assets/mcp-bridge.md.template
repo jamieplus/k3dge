@@ -66,7 +66,7 @@
 | Tool | `k3dge_task_create` | 写入 living task |
 | Tool | `k3dge_task_done` | 优先 list 返回的 path |
 | Tool | `k3dge_milestone_control` | status / align / seal |
-| Prompt | `k3dge_5pass_audit_prompt` | 优先 `../k3dit/docs/guides/protocol.md`，否则 `docs/protocols/audit_default.md` | 只指路；同一审计入口，按 `target_scope` 路由代码 5-Pass / 文档 Doc Audit（ADR-0020）；透镜在 k3dit 或本仓 `docs/protocols/audit_default.md`，不在 k3dge 包内 |
+| Prompt | `k3dge_5pass_audit_prompt` | 优先 `../k3dit/docs/guides/audit-method.md`，否则 `docs/protocols/audit_default.md` | 只指路；同一审计入口，按 `target_scope` 路由代码 5-Pass / 文档 Doc Audit（ADR-0020）；透镜在 k3dit 或本仓 `docs/protocols/audit_default.md`，不在 k3dge 包内 |
 | Tool | `k3dge_adr_index` | `engine.doc_catalog.analyze_adr_coverage` | ADR 集合自洽事实（重叠/指针 findings，非判断）；文档审计透镜原料 |
 
 公开签名变更后调 `k3dge_sync`（或 CLI `k3dge sync`）。

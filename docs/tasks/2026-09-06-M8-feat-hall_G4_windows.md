@@ -19,7 +19,7 @@ date: 2026-09-06
 
 ## Notes
 
-- claim 分版：4 窗各一版 instruction（对口 protocol.md 窗口对口表）。
+- claim 分版：4 窗各一版 instruction（对口 audit-method.md 窗口对口表）。
 - 注入管线：Hall 在 claim 前跑 k3lity 扫描 + blocking 环/状态机可达性（stdlib graphlib），结果文件落窗目录；席只消费。
 - 边表抽取器（DeepTutor 吸收条目 1）：import 图边表 `import_graph()`（洁净室自 DeepTutor `scripts/check_architecture.py`，Apache-2.0：ast.walk 全量扫含函数内 import + 相对导入解析，stdlib 零依赖），喂 SCC/拓扑序；是注入管线的前置事实源，随本 task 落地。
 - 声明模型：`state-machine.yaml`（rounds 状态 + 允许跃迁 + 时序不可逆声明），复核窗 conformance 的对照物；放审计模块内，版本随账本盖章。

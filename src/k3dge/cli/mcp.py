@@ -505,15 +505,15 @@ def _audit_protocol_with_fallback(workspace_path: Optional[str] = None) -> tuple
     """Resolve audit protocol per Rule 07 with fallback detection.
 
     Returns (protocol_path, used_fallback, reason). Highlights fallback to default.
-    Priority: ../k3dit/docs/guides/protocol.md → docs/protocols/audit_default.md (local docs/guides/protocol.md deprecated per Diátaxis)
+    Priority: ../k3dit/docs/guides/audit-method.md → docs/protocols/audit_default.md (local docs/guides/audit-method.md deprecated per Diátaxis)
     Also checks .mcp.json for k3dit harness availability (required for actual k3dit_run_audit call).
     """
     import json
 
     ws = _find_workspace(workspace_path=workspace_path)
     candidates = [
-        (ws.parent / "k3dit" / "docs" / "guides" / "protocol.md", "k3dit"),
-        (ws / ".." / "k3dit" / "docs" / "guides" / "protocol.md", "k3dit alt"),
+        (ws.parent / "k3dit" / "docs" / "guides" / "audit-method.md", "k3dit"),
+        (ws / ".." / "k3dit" / "docs" / "guides" / "audit-method.md", "k3dit alt"),
     ]
     fallback = ws / "docs" / "protocols" / "audit_default.md"
     fell_back = True

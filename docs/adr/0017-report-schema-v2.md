@@ -12,7 +12,7 @@ Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一
 # ADR-0017: Audit Report Schema v2 (12 columns)
 
 - **Supersedes**: 9-column report contract.
-  - Implicit in `k3dit` `protocol.md` + `k3dge` `audit_default.md`.
+  - Implicit in `k3dit` `audit-method.md` + `k3dge` `audit_default.md`.
 
 ## 1. 上下文 (Context)
 
@@ -64,4 +64,4 @@ k3dge gates existence; k3dit gates lens + format, consistent with ADR-0001.
 ## References
 
 - `k3dge` `docs/protocols/audit_default.md`, `docs/protocols/verify_default.md`, `rules/07-audit.md`
-- `k3dit` `docs/guides/protocol.md`, `src/k3dit/report.py`
+- `k3dit` `docs/guides/audit-method.md`, `src/k3dit/report.py`
