@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import datetime
 import json
-import os
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -113,11 +112,10 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
             "milestone_id": milestone_id,
             # ① 交件句柄（字符串；线归 k3dge，机构凭 wt_dir 读、Hall 收回改动经 advance，
             #    席位/机构永不直接操作消费仓 .git——ADR-0024 §2.2）
-        "branch": branch,
-        "wt_dir": str(_wt.worktree_path(workspace, job).resolve()),
-        # 结案前 Retest 硬门（ADR-0025 §2.7）：被审仓自带 verify 命令，k3dit Hall 只执行。
-        # k3dge 线 = 本仓 worktree，跑自己全套件 + check（改坏测试不许结案）。可用 env 覆盖。
-        "verify": os.environ.get("K3DGE_VERIFY_CMD", "python -m pytest -q tests && k3dge check"),
+            "branch": branch,
+            "wt_dir": str(_wt.worktree_path(workspace, job).resolve()),
+            # 机械闸不在审计侧（ADR-0025 Note ㉖）：`fixed`＝复核背书；代码能跑/过闸归消费侧
+            # 落点（本仓 pre-commit `check` + CI `pytest`/`check --with-tests`），k3dit Hall 不执行。
         },
     )
     if not res.ok:
