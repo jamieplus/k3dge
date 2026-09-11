@@ -127,6 +127,7 @@ scope ∈ line(缺省) | file(只准文件头部注释块) | repo(只准仓根 A
 - **写源纪律**：判读四格（严重度/优先级/类型/描述）**写源＝钉**（树上），账本、12 列报告＝钉的**投影**（每轮 harvest 重生成、非席手填 → 无第二独立写入 → 无漂移）。生命周期格（处置/验证/复审/验收）由修/核翻钉 kind 或写 `how` 承载，不回填判读钉。示例（占位符 `<ID>` 故意不可匹配，防本文自触发扫描）：`# k3dit:pending <ID>@line sev=高 prio=P1 type=复杂度 未设超时`。
 - **状态机**（席只增/翻钉，**拔钉＝Hall 按账本机械执行**；`fixed` 需复核正向背书 + verify 绿；细见 `ADR-0025` §2.7）：`pending`（判读钉）→ 修席翻 `fixnote` 主张（附改法；Hall 验 `.orig` diff≠∅，无码差＝谎报 ⇒ FORMAT）→ 复核**认可＝翻 `fixnote→fixed`（沉默＝未验，不算）**／不认可＝翻 `fixnote→pending` 打回 → **closing 前 Hall 跑被审仓 verify（随送审信封带入）绿** → **Hall 拔 `fixed` 钉 ⇒ 账本 `fixed`**。修席亦可 `pending→leftover`（有意留）／`pending→disputed`（误报，审席裁决）。`pending/disputed/fixnote` 属 open（结项清零）；`fixed`＝待拔终态、`leftover` 长期文献。同 ID 往返 disputed ≤3。
 - **逐条 evidence retest**：`fixed` 且带 `evidence=` 的发现，结案前 Hall 逐条在审计线跑该命令，非零 ⇒ 该笔不结案（回退 `pending` 打回，超 MAX_BOUNCE 升级）；仓级 `verify` 为兜底（`ADR-0025` §2.7）。复核理由须落到具体符号/调用点/测试名，纯复述 diff 判 FORMAT。
+- **处置/验证分写 + 盲对比**：修席 `fixnote` note＝报告 `处置`（对复核不可见）；复核独立写 `fixed` note＝报告 `验证`；Hall 并置粗判（零交集公示，不阻断）。
 - **ID 发放**：claim 时 k3dit 随包发号段（A 段审席发现 / F 段修席发现）；无源 ID＝违规（`k3dge markers --check` 可拦，CI 用）。
 - **一发现一主锚**（leftover 例外随文件走）；多文件发现**只住 AUDIT.md**，不散钉。
 - k3dge 消费面：`[NEXT] pending_findings` 计数口径＝open 三态（历史 pending-only 的扩展，leftover 仍不计时）；`k3dge markers [--json|--check]` 为人和 CI 提供同一视图。k3dit 复审＝diff 两快照的抽取结果，只裁 新增/仍在/消失 三类。
