@@ -73,7 +73,7 @@ role.collect(job_id)                     → {ok, kind:<工件>, payload:{…}} 
 - **③ Hall → k3dge（闭环）**：`collect` 仍是信封：12 列＋`provenance.baseline` == 在办单基线（最新线头）。合主干前 k3dge 先**去钉**（**除 leftover 外**的钉永不进主干；pending/disputed/fixnote 独占行删、行尾钉上报、**leftover 随文件留作长期文献**），去钉产物提版后再 ff（ff 不成则 `rebase --onto <主干头> <base> <线>` 重演再 ff；冲突 ⇒ abort 复原＋升级人工）。闸过合主干后删现场删线（线仅在已并入时删；未并入保留原位供幂等重试与崩溃恢复）。闭环基线钉 `refs/audit-baseline/<job>` 留存（报告引用的 commit 经重演可能悬空，钉 ref 防 gc）。废单＝删分支，主干从未脏。
 - **隔离归属**：审计线不污染主干＝ref + 本地 `info/exclude` + 闸过删线；窗隔离＝Hall 物化拷贝 + CLI 原生 root/deny（`ADR-0025` W1）。数据最小化重心从"打包脱敏"移到"物化裁剪"（同信任域，`ADR-0006` S-13；scrub/target/ 前缀/签名骨架随打包器一并退役）。
 - **基线** = 最新线头 commit oid（submit 锁 L，advance 重钉；L 只是首钉）；报告 `provenance.baseline` 必须与在办单基线一致，不一致 ⇒ `FORMAT` ⇒ 拒收。主干在线之后再走 ⇒ closure 合并按 §1.4（ff→重演，冲突升人工）。
-- **呈现由进程供给**：`complete_round` 的 present 以 worktree 机械抽取（§8）为准（送达递增 `present_seq`，对端凭 seq 判新旧）；席位口述仅作交叉核对，口径不符 ⇒ 该轮 `FORMAT` 拒。
+- **呈现由进程供给**：present 以 worktree 机械抽取（§8）为准（送达递增 `present_seq`，对端凭 seq 判新旧）；席位口述仅作交叉核对，口径不符 ⇒ 该轮 `FORMAT` 拒。
 - **Hall 查询动词（不进席）**：`audit show`（读本地账：baseline/branch/merge_ok/advances/present_seq＋本地降级尾——`status` 查的是对端）；`audit materialize`（按 oid 只读物化，无 `.git`、不碰线）。
 - **待接（与 H2 实现同批）**：契约上下文（cache 角色召回本改动相关 ADR/Specs）由 Hall 物化时拼进窗口目录（随 scope 尽力而为；无 H3 时线照样成立）。在此之前该线不预焊。
 
@@ -94,7 +94,7 @@ k3dge 对通过信封的字节**机械落盘**（`docs/reviews/`，记 hash，�
 
 ## 7. 审计复用（CAS）与锁——预筛只作用于人工入口（v0.3.1；锁 v0.6）
 
-- **锁与租约（v3）**：`claim_round` 即续租（无独立心跳/续期 RPC）；快照推进与分支更新一律 `git update-ref <ref> <new> <old>` CAS（进程内 jobs 锁）。
+- **锁与租约（v3）**：present 版本化即续租（无独立心跳/续期 RPC）；快照推进与分支更新一律 `git update-ref <ref> <new> <old>` CAS（进程内 jobs 锁）。
 
 - **自动入口**（`[NEXT] audit_suggested` 触发评估）：**不预筛、不短路**。checklist 求值（账齐/C2/体积）是零成本静态扫描；基线未变时条件仍满足就照问审计问题，没有错。短路它省不了成本，反而制造"缓存故障 ⇒ 免审"的通道——预筛只允许发生在人主动要求跑审计的地方。
 - **人工入口**（`k3dge milestone audit <id>`）：预筛。三条件**全部**形式成立 ⇒ 告知"无审计需要执行"（附报告路径与键），提示 `--force`：

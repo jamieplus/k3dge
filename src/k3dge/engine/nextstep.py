@@ -37,7 +37,7 @@ STATE_OPTIONS: dict = {
     },
     "ratchet_open": {
         "note": "有在办棘轮工单（ADR-0024）：进程不等人，但账必须可见",
-        "if_y": "k3dge audit status <job> 查对端；席位侧一圈见契约 §1.4（claim-round→落钉→complete-round→sign-report→close）",
+        "if_y": "k3dge audit status <job> 查对端；席位侧一圈见契约 §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）",
     },
     "doc_audit": {
         "note": "docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断——`k3dge doc-audit` 出报告(k3dit)+建里程碑 task（本轮不改，封板轮也得闭环）",
