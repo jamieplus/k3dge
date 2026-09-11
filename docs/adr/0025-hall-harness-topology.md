@@ -25,6 +25,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
       ⑰ 复核加硬（Proposed 段）2026-09-10，经 Core Maintainer 授权，依 `docs/adr/AUTHORING.md`：① 钉加可选尾段 `evidence=<可复跑命令>`，结案前 Hall 逐条 retest；② 复核输入补 `facts/verify.txt`/`tests.json`；③ `fixed` 理由须落到具体符号/调用点/测试名，纯复述 diff 判 FORMAT；④ 复核与修/判用**不同模型**（第二双眼睛）；⑤ verify/evidence 红改「`fixed` 回退 `pending` + 打回」，超 MAX_BOUNCE 才升级。过闸口径 = manual fallback（Core Maintainer 会话授权，agent 代改字）。
       ⑱ §2.7 处置/验证分写 + 盲对比（Proposed 段，覆盖同日"处置＝复核署名"试作）2026-09-10，经 Core Maintainer 授权：修席 `fixnote` note＝报告**处置**（对复核盲：物化 `_blind_fixnotes` 抹 note、`findings.json` 的 `how` 置空）；复核独立写 `fixed` note＝报告**验证**；Hall 并置两侧 `_text_overlap` 粗判（零交集仅公示不阻断）。过闸口径 = manual fallback（Core Maintainer 会话授权）。
       ⑲ §2.2 职责卡单一源（Proposed 段）2026-09-10，经 Core Maintainer 授权：窗职责/焦点/协议/样例＝入库 `src/k3dit/windows/<窗>.md`；Hall 写进窗 `README.md`+`facts/instruction.md`，`seat_prompt` 只指路（"先读职责卡"）不复述，消 prompt/instruction 双源（曾致 C1 提示与 harvest 不一致）。过闸口径 = manual fallback。
+      ⑳ §2.7 两阶段复核 + 拔钉后移（Proposed 段）2026-09-10，经 Core Maintainer 授权：R1 盲写验证、**不拔钉**；新增 `compare` 相位，Hall 并置 `处置‖验证` 交**复核席**裁决（`复审:通过` 才通过，沉默/驳回⇒回退 `pending` 打回）；Hall 只封/并/识别标记，不判语义（`_text_overlap` 退役）；**拔钉移到 `_finish`（R2 通过 + verify 绿后）**——`fixed` 是终态，R1 拔早会让 R2 无对比对象、且把终态提前。过闸口径 = manual fallback。
 # Note: default `-`. Exactly one `Note:` field per ADR. Record each authorized operation
 # as a numbered segment (① ② ③ …): who/when authorized and how it actually passed the
 # gate (real lens vs manual fallback). Append segments; do not erase old traces.
@@ -174,7 +175,8 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 - 钉/树驱动，不设 `accepted` 二值；**任何席都不删钉**——删除＝账本结论的机械后果，归 Hall；席删＝自证 + 毁锚。
 - 修席（行动窗，不签）逐条：**接受并改＝改码 + 翻 `pending→fixnote`（note=改法）**（主张"这条改了、待独立验"，仍 open、不结案）；有意留＝翻 `pending→leftover`（how）；误报＝翻 `pending→disputed`（how）；不碰＝留 `pending`。不产 items、不删钉。
 - 复核窗（独立钥）：**输入＝账本（findings 行）+ `facts/present.md`（`.orig→现线` 代码 diff）+ `facts/verify.txt`（机械底现状）+ `facts/tests.json`（相关测试）**——没这份料，"独立 retest"就是空话（真跑坐实：复核窗只有"已修"声明、零可核材料 → 只能信或瞎翻）。逐条判真伪——**认可＝翻 `fixnote→fixed` 且给具体依据（符号/调用点/测试名 + 反证尝试；纯复述 diff 或空理由＝该窗 FORMAT）、不认可＝翻 `fixnote→pending`（打回，受 MAX_BOUNCE）**。**沉默（留 fixnote）＝未验 ⇒ 不算通过**。复核**不删钉**（删除归 Hall）。复核与修/判用**不同模型**（第二双眼睛）。
-- **处置/验证＝两窗署名 + 盲对比**：修席 `fixnote` note＝报告 `处置` 栏（改了什么/为什么）；**复核看不到它**（物化抹 note、`findings.json` 的 `how` 置空），须独立写 `fixed` note＝报告 `验证` 栏。Hall 并置两侧，`_text_overlap` 粗判是否零交集（仅公示，不阻断）。杜绝机械"已修"，且复核无法抄修席结论。
+- **处置/验证＝两窗署名 + 盲对比（两阶段复核）**：修席 `fixnote` note＝报告 `处置`（改了什么/为什么）；R1 复核**看不到它**（物化抹 note、`how` 置空），独立写 `fixed` note＝报告 `验证`。**R2** Hall 才把 `处置‖验证` 并置（`compare.md`）交**复核席**裁决：一致 ⇒ 追写 `复审:通过`；不一致 ⇒ 翻 `pending` 打回；沉默＝未裁。Hall 只**封/并/识别标记**，不判语义（`_text_overlap` 退役）。
+- **拔钉在 R2 通过 + verify 绿之后**（`_finish`），不在 R1：`fixed` 是四门齐备后的终态，R1 拔早会让 R2 无对比对象。
 
 > 正向背书治"不碰"，present diff 治"没料查"，`fixed` 必须带 diff 指向理由治"碰了但没看"——三层缺一仍是橡皮章。verify 命令是机械底（catch 改坏测试），catch 不了"没核对设计根因"，故与 present 互补。
 
