@@ -143,7 +143,8 @@ def _python_search(workspace: Path, query: str) -> List[str]:
     out: List[str] = []
     pat = query
     for path in workspace.rglob("*"):
-        if not path.is_file() or ".git" in path.parts or "docs/generated" in path.parts:
+        rel_parts = path.relative_to(workspace).parts
+        if not path.is_file() or ".git" in path.parts or rel_parts[:2] == ("docs", "generated"):
             continue
         try:
             if path.stat().st_size > 1_000_000:   # 体积闸：超大文件不整读（A-2）

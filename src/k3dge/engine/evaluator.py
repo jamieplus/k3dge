@@ -16,6 +16,19 @@ from k3dge.engine.pairs import PAIRS
 
 _TEST_REF_RE = re.compile(r"`(tests/[^\s`]+)`")
 _VERIFICATION_MATRIX_RE = re.compile(r"^#{2,3}\s+.*Verification Matrix", re.MULTILINE)
+_PIN_LINE_RE = re.compile(
+    r"^[ \t]*(?:#|//|<!--)[ \t]*k3dit:(?:pending|leftover|disputed|fixnote|fixed)\b"
+)
+
+
+def _without_pins(text: str) -> str:
+    """Drop whole-line k3dit marker lines so transient audit pins don't trip TEMPLATE_DRIFT.
+
+    Pins live at the finding's location on the audit line and are harvested out by Hall before
+    merge (peer_contract §8 / ADR-0025 §2.7). A pin on a byte-locked PAIRS file is an audit-time
+    artifact, not drift (ADR-0004 §2.1.6), so normalize both sides before comparing.
+    """
+    return "\n".join(ln for ln in text.splitlines() if not _PIN_LINE_RE.match(ln))
 
 
 def _verification_matrix_section(content: str) -> str:
@@ -61,7 +74,6 @@ def _shape_change_documented(workspace: Path, domain: str, spec_content: str, sy
     return False
 
 
-# k3dit:leftover Q-8 CC23 _run_batch_tests 提取批次执行逻辑
 def _run_batch_tests(
     workspace: Path,
     manifest: Manifest,
@@ -167,7 +179,6 @@ class ConsistencyEngine:
             return []
         return [p.strip() for p in out.stdout.splitlines() if p.strip()]
 
-    # k3dit:leftover Q-1 CC61 evaluate 提取域循环与违规收集子函数
     def evaluate(self, run_tests: bool = False, force_full: bool = False, staged: bool = False) -> GateReport:
         try:
             manifest = Manifest.load(self.workspace_root)
@@ -358,11 +369,11 @@ class ConsistencyEngine:
                         asset_path = assets_root / asset
                         if not asset_path.is_file():
                             continue
-                        asset_text = asset_path.read_text(encoding="utf-8").rstrip("\n")
+                        asset_text = _without_pins(asset_path.read_text(encoding="utf-8")).rstrip("\n")
                         repo_path = self.workspace_root / rel
                         if not repo_path.is_file():
                             continue
-                        repo_text = repo_path.read_text(encoding="utf-8").rstrip("\n")
+                        repo_text = _without_pins(repo_path.read_text(encoding="utf-8")).rstrip("\n")
                         if asset_text != repo_text:
                             violations.append(
                                 Violation(
@@ -453,10 +464,20 @@ class ConsistencyEngine:
         )
 
     def _check_domain(self, domain: str, manifest: Manifest) -> List[Violation]:
-        spec_rel = manifest.spec_path(domain)
-        src_rel = manifest.src_path(domain)
-        out: List[Violation] = []
+        out, spec_path, content = self._load_domain_spec(domain, manifest)
+        if content is None:
+            return out
+        out.extend(self._check_verification_matrix(domain, manifest, spec_path, content))
+        contract_out, fatal = self._check_domain_contract(domain, manifest, spec_path, content)
+        out.extend(contract_out)
+        if fatal:
+            return out
+        out.extend(self._check_domain_imports(domain, manifest))
+        return out
 
+    def _load_domain_spec(self, domain: str, manifest: Manifest):
+        """Spec content, or the NOT_FOUND/DECODE violations that block it (content=None)."""
+        spec_rel = manifest.spec_path(domain)
         if not spec_rel:
             return [
                 Violation(
@@ -464,7 +485,7 @@ class ConsistencyEngine:
                     f"domain '{domain}' has no spec path in manifest",
                     domain=domain,
                 )
-            ]
+            ], None, None
 
         spec_path = self.workspace_root / spec_rel
         if not spec_path.exists():
@@ -475,7 +496,7 @@ class ConsistencyEngine:
                     domain=domain,
                     file_path=str(spec_path),
                 )
-            ]
+            ], None, None
 
         try:
             content = spec_path.read_text(encoding="utf-8")
@@ -487,7 +508,13 @@ class ConsistencyEngine:
                     domain=domain,
                     file_path=str(spec_path),
                 )
-            ]
+            ], None, None
+        return [], spec_path, content
+
+    def _check_verification_matrix(
+        self, domain: str, manifest: Manifest, spec_path: Path, content: str
+    ) -> List[Violation]:
+        out: List[Violation] = []
         for err in spec_schema.validate_structure(content):
             out.append(
                 Violation("SPEC_MISSING_SECTION", err, domain=domain, file_path=str(spec_path))
@@ -540,64 +567,71 @@ class ConsistencyEngine:
                         file_path=str(spec_path),
                     )
                 )
-        if src_rel:
-            src_dir = self.workspace_root / src_rel
-            try:
-                ok, expected, actual = contract.verify_contract(
-                    src_dir, content, manifest, self.workspace_root
-                )
-            except _ExtractError as exc:
-                out.append(
-                    Violation(
-                        "CONTRACT_EXTRACT_FAILED",
-                        str(exc),
-                        domain=domain,
-                        file_path=str(spec_path),
-                    )
-                )
-                return out
-            if expected is None:
-                out.append(
-                    Violation(
-                        "CONTRACT_HASH_MISSING",
-                        "no contract hash in spec; run 'k3dge sync'",
-                        domain=domain,
-                        file_path=str(spec_path),
-                    )
-                )
-            elif not ok:
-                detail = None
-                try:
-                    detail = contract.symbol_diff(content, src_dir, manifest, self.workspace_root)
-                except Exception:
-                    detail = None
-                if detail and any(detail.get(k) for k in ("added", "removed", "changed")):
-                    if not _shape_change_documented(self.workspace_root, domain, content, detail):
-                        import sys
-
-                        print(
-                            f"[WARN][CONTRACT_SHAPE_NO_TRACE] domain '{domain}' changed contract symbols "
-                            f"{detail} but no CHANGELOG '## [Unreleased]' line or spec §1 boundary mentions it; "
-                            f"sync still required and a human trace is expected (ADR-0001 decision 6)",
-                            file=sys.stderr,
-                        )
-                out.append(
-                    Violation(
-                        "CONTRACT_DRIFT",
-                        f"public interface changed (spec={expected[:12]}..., code={actual[:12]}...); "
-                        "run 'k3dge sync'",
-                        domain=domain,
-                        file_path=str(spec_path),
-                        detail={
-                            "symbol_diff": detail,
-                            "expected_hash": expected,
-                            "actual_hash": actual,
-                        },
-                    )
-                )
-
-        out.extend(self._check_domain_imports(domain, manifest))
         return out
+
+    def _check_domain_contract(
+        self, domain: str, manifest: Manifest, spec_path: Path, content: str
+    ):
+        """Contract check. Returns (violations, fatal); fatal=True stops further checks."""
+        out: List[Violation] = []
+        src_rel = manifest.src_path(domain)
+        if not src_rel:
+            return out, False
+        src_dir = self.workspace_root / src_rel
+        try:
+            ok, expected, actual = contract.verify_contract(
+                src_dir, content, manifest, self.workspace_root
+            )
+        except _ExtractError as exc:
+            out.append(
+                Violation(
+                    "CONTRACT_EXTRACT_FAILED",
+                    str(exc),
+                    domain=domain,
+                    file_path=str(spec_path),
+                )
+            )
+            return out, True
+        if expected is None:
+            out.append(
+                Violation(
+                    "CONTRACT_HASH_MISSING",
+                    "no contract hash in spec; run 'k3dge sync'",
+                    domain=domain,
+                    file_path=str(spec_path),
+                )
+            )
+        elif not ok:
+            detail = None
+            try:
+                detail = contract.symbol_diff(content, src_dir, manifest, self.workspace_root)
+            except Exception:
+                detail = None
+            if detail and any(detail.get(k) for k in ("added", "removed", "changed")):
+                if not _shape_change_documented(self.workspace_root, domain, content, detail):
+                    import sys
+
+                    print(
+                        f"[WARN][CONTRACT_SHAPE_NO_TRACE] domain '{domain}' changed contract symbols "
+                        f"{detail} but no CHANGELOG '## [Unreleased]' line or spec §1 boundary mentions it; "
+                        f"sync still required and a human trace is expected (ADR-0001 decision 6)",
+                        file=sys.stderr,
+                    )
+            out.append(
+                Violation(
+                    "CONTRACT_DRIFT",
+                    f"public interface changed (spec={expected[:12]}..., code={actual[:12]}...); "
+                    "run 'k3dge sync'",
+                    domain=domain,
+                    file_path=str(spec_path),
+                    detail={
+                        "symbol_diff": detail,
+                        "expected_hash": expected,
+                        "actual_hash": actual,
+                    },
+                )
+            )
+        return out, False
 
     def _check_domain_imports(self, domain: str, manifest: Manifest) -> List[Violation]:
         """Reverse-import ban: a domain may import another domain only if declared in depends_on (ADR-0001 decision 6)."""

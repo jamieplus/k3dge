@@ -1,4 +1,3 @@
-# k3dit:leftover A-1 @file 上帝模块 1547 行（6+ 关注点），拆分另立票
 """Milestone lifecycle engine: alignment check, test regression, and context compaction."""
 
 from __future__ import annotations
@@ -156,7 +155,6 @@ def _append_to_unreleased(workspace: Path, task_path: Path) -> bool:
         return False
 
 
-# k3dit:leftover Q-7 CC50 _auto_backfill_reviews 拆回填子流程
 def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, milestone: str | None) -> None:
     """Best-effort auto-backfill for audit reviews when a task is marked done.
 
@@ -583,16 +581,8 @@ def _report_open_findings(workspace: Path, report_rel: str) -> Optional[List[str
     return _parse_audit_stats(text).get("_ids_待修", [])
 
 
-def mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]:
-    """Mark one living task done. Prefer exact path from list_tasks; else unique filename substring."""
-    ident = ident.strip().replace("\\", "/")
-    if not ident:
-        return False, "done requires a path or unique filename substring", None
-    tasks_dir = workspace / "docs" / "tasks"
-    archive_dir = tasks_dir / "archive"
-    if not tasks_dir.is_dir():
-        return False, "docs/tasks/ missing", None
-    target: Optional[Path] = None
+def _resolve_task_target(workspace: Path, ident: str, tasks_dir: Path, archive_dir: Path) -> Tuple[Optional[Path], Optional[str]]:
+    """Resolve a done target from an exact path or unique filename substring; (path, error)."""
     raw = Path(ident)
     cand = raw if raw.is_absolute() else (workspace / ident)
     try:
@@ -602,31 +592,64 @@ def mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Pat
         if archive_dir.exists():
             try:
                 resolved.relative_to(archive_dir.resolve())
-                return False, f"cannot modify archived task: {ident}", None
+                return None, f"cannot modify archived task: {ident}"
             except ValueError:
                 pass
         if resolved.is_file() and not _is_doc_aux(resolved.name):
-            target = resolved
+            return resolved, None
     except (ValueError, OSError):
-        target = None
-    if target is None:
-        name_only = Path(ident).name
-        matches = [
-            p
-            for p in sorted(tasks_dir.glob("*.md"))
-            if not _is_doc_aux(p.name) and (ident in p.name or ident in p.stem or name_only == p.name)
-        ]
-        if not matches:
-            return False, f"no task matching '{ident}'", None
-        if len(matches) > 1:
-            names = ", ".join(p.name for p in matches)
-            return False, f"multiple matches for '{ident}': {names}", None
-        target = matches[0]
+        pass
+    name_only = Path(ident).name
+    matches = [
+        p
+        for p in sorted(tasks_dir.glob("*.md"))
+        if not _is_doc_aux(p.name) and (ident in p.name or ident in p.stem or name_only == p.name)
+    ]
+    if not matches:
+        return None, f"no task matching '{ident}'"
+    if len(matches) > 1:
+        names = ", ".join(p.name for p in matches)
+        return None, f"multiple matches for '{ident}': {names}"
+    return matches[0], None
+
+
+def _rename_task_done(target: Path) -> Path:
+    """Rename to `.done.md` unless already done or the target name is taken."""
+    if target.name.endswith(".done.md"):
+        return target
+    new_path = target.parent / (target.name[:-3] + ".done.md")
+    if new_path.exists():
+        return target
+    target.rename(new_path)
+    return new_path
+
+
+def _append_task_changelog(workspace: Path, target: Path) -> None:
+    """Append the task title to CHANGELOG Unreleased; warn (non-blocking) on failure."""
+    if not _append_to_unreleased(workspace, target):
+        import sys
+
+        print(f"[WARN] mark_task_done: CHANGELOG update failed for {target.name}", file=sys.stderr)
+
+
+def _backfill_task_reviews(workspace: Path, target: Path) -> None:
+    """Best-effort audit-review backfill when a task closes (never raises)."""
     try:
-        content = target.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        return False, str(exc), target
-    fm = parse_frontmatter(content)
+        t_content = target.read_text(encoding="utf-8")
+        t_m = TITLE_RE.search(t_content)
+        t_title = t_m.group(1).strip() if t_m else target.stem
+        fm2 = parse_frontmatter(t_content)
+        t_ms = fm2.get("milestone", "").strip() if fm2 else ""
+        if not t_ms:
+            mm = MILESTONE_RE.search(t_content)
+            t_ms = mm.group(1).strip() if mm else ""
+        _auto_backfill_reviews(workspace, target, t_title, t_ms)
+    except Exception:
+        pass
+
+
+def _finalize_task_done(workspace: Path, target: Path, content: str, fm: dict) -> Tuple[bool, str, Optional[Path]]:
+    """Report gate -> flip status -> rename -> changelog -> review backfill."""
     # ADR-0022: a task bound to an audit report can only close when that report has
     # no open 待修 findings (1 report = 1 task; closing the task == audit closure).
     report_rel = _task_report_pointer(content)
@@ -659,32 +682,29 @@ def mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Pat
         if new_content == content:
             return False, f"no Status field in {target.name}", target
         target.write_text(new_content, encoding="utf-8")
-    if not target.name.endswith(".done.md"):
-        new_path = target.parent / (target.name[:-3] + ".done.md")
-        if not new_path.exists():
-            target.rename(new_path)
-            target = new_path
-    # Directly append human summary to CHANGELOG.md Unreleased (no separate draft file)
-    ok_append = _append_to_unreleased(workspace, target)
-    if not ok_append:
-        import sys
-
-        print(f"[WARN] mark_task_done: CHANGELOG update failed for {target.name}", file=sys.stderr)
-    # Auto-backfill audit reviews (light, not blocking)
-    try:
-        # Extract title/milestone for backfill matching
-        t_content = target.read_text(encoding="utf-8")
-        t_m = TITLE_RE.search(t_content)
-        t_title = t_m.group(1).strip() if t_m else target.stem
-        fm2 = parse_frontmatter(t_content)
-        t_ms = fm2.get("milestone", "").strip() if fm2 else ""
-        if not t_ms:
-            mm = MILESTONE_RE.search(t_content)
-            t_ms = mm.group(1).strip() if mm else ""
-        _auto_backfill_reviews(workspace, target, t_title, t_ms)
-    except Exception:
-        pass
+    target = _rename_task_done(target)
+    _append_task_changelog(workspace, target)
+    _backfill_task_reviews(workspace, target)
     return True, f"marked done: {target.name}", target
+
+
+def mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]:
+    """Mark one living task done. Prefer exact path from list_tasks; else unique filename substring."""
+    ident = ident.strip().replace("\\", "/")
+    if not ident:
+        return False, "done requires a path or unique filename substring", None
+    tasks_dir = workspace / "docs" / "tasks"
+    archive_dir = tasks_dir / "archive"
+    if not tasks_dir.is_dir():
+        return False, "docs/tasks/ missing", None
+    target, err = _resolve_task_target(workspace, ident, tasks_dir, archive_dir)
+    if target is None:
+        return False, err or f"no task matching '{ident}'", None
+    try:
+        content = target.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return False, str(exc), target
+    return _finalize_task_done(workspace, target, content, parse_frontmatter(content))
 
 
 def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]:
@@ -767,29 +787,9 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
     return True, msg, tasks
 
 
-def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
-    id_err = _validate_milestone_id(milestone_id)
-    if id_err:
-        return False, id_err
-
-    tasks = scan_milestone_tasks(workspace, milestone_id)
-    if not tasks:
-        return False, f"No tasks to seal for milestone '{milestone_id}'."
-
-    invalid = [t for t in tasks if t.status not in _ALLOWED_STATUS]
-    if invalid:
-        return False, (
-            f"Cannot seal milestone '{milestone_id}'. Invalid Status: "
-            f"{[t.path.name for t in invalid]}"
-        )
-
-    pending = [t for t in tasks if t.status != "done"]
-    if pending:
-        return False, f"Cannot seal milestone '{milestone_id}'. Tasks not done: {[t.path.name for t in pending]}"
-
+def _seal_review_gate(workspace: Path, milestone_id: str, tasks: List[MilestoneTask]) -> Optional[str]:
+    """Gate 1: a filled audit review listing every task. Returns rejection msg or None."""
     reviews_dir = workspace / "docs" / "reviews"
-
-    # 闸机 1: 必须存在填完的审计报告（align 自动桩 <!-- k3dge:align-stub --> 不算）且正文列出全部任务
     matching_reviews = []
     stub_reviews = []
     missing_pass = []
@@ -817,42 +817,39 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
                 incomplete_reviews.append(f)
                 continue
             matching_reviews.append(f)
-    if not matching_reviews:
-        if stub_reviews:
-            return False, (
-                f"[SEAL REJECTED] Review for milestone '{milestone_id}' is still an align stub.\n"
-                f"  Remove `{_ALIGN_STUB_MARKER}` after filling docs/reviews/ (keep `{pass_mark}`)."
-            )
-        if missing_pass:
-            return False, (
-                f"[SEAL REJECTED] Review for milestone '{milestone_id}' has no align-pass marker.\n"
-                f"  Run 'k3dge milestone align {milestone_id}' (writes `{pass_mark}`) then fill the stub."
-            )
-        if incomplete_reviews:
-            return False, (
-                f"[SEAL REJECTED] Review for milestone '{milestone_id}' does not list all tasks.\n"
-                f"  Missing in {incomplete_reviews[0].name}: {[t.path.name for t in tasks if t.path.name not in incomplete_reviews[0].read_text(encoding='utf-8')]}"
-            )
-        return False, (
-            f"[SEAL REJECTED] Missing audit review document for milestone '{milestone_id}'.\n"
-            f"  Run 'k3dge milestone align {milestone_id}' and fill docs/reviews/ before sealing."
+    if matching_reviews:
+        return None
+    if stub_reviews:
+        return (
+            f"[SEAL REJECTED] Review for milestone '{milestone_id}' is still an align stub.\n"
+            f"  Remove `{_ALIGN_STUB_MARKER}` after filling docs/reviews/ (keep `{pass_mark}`)."
         )
-
-    # 闸机 2: docs/guides/ 不得残留 k3dge:guide-stub
-    unfilled = scan_unfilled_guides(workspace)
-    if unfilled:
-        return False, (
-            f"[SEAL REJECTED] Unfilled guide stubs detected in docs/guides/: {unfilled}.\n"
-            f"  Complete the documentation before milestone seal."
+    if missing_pass:
+        return (
+            f"[SEAL REJECTED] Review for milestone '{milestone_id}' has no align-pass marker.\n"
+            f"  Run 'k3dge milestone align {milestone_id}' (writes `{pass_mark}`) then fill the stub."
         )
+    if incomplete_reviews:
+        return (
+            f"[SEAL REJECTED] Review for milestone '{milestone_id}' does not list all tasks.\n"
+            f"  Missing in {incomplete_reviews[0].name}: {[t.path.name for t in tasks if t.path.name not in incomplete_reviews[0].read_text(encoding='utf-8')]}"
+        )
+    return (
+        f"[SEAL REJECTED] Missing audit review document for milestone '{milestone_id}'.\n"
+        f"  Run 'k3dge milestone align {milestone_id}' and fill docs/reviews/ before sealing."
+    )
 
+
+def _seal_archive(workspace: Path, milestone_id: str, tasks: List[MilestoneTask]) -> Tuple[bool, str]:
+    """Move tasks/reviews into archive (collision-checked, rollback on failure) + bump."""
+    reviews_dir = workspace / "docs" / "reviews"
+    pass_mark = _align_pass_marker(milestone_id)
     task_archive, err = _safe_archive_dir(workspace, "tasks", milestone_id)
     if task_archive is None:
         return False, err
     review_archive, err = _safe_archive_dir(workspace, "reviews", milestone_id)
     if review_archive is None:
         return False, err
-
     to_archive_reviews = _reviews_to_archive(reviews_dir, milestone_id, pass_mark)
     collisions = [t.path.name for t in tasks if (task_archive / t.path.name).exists()]
     collisions.extend(rev.name for rev in to_archive_reviews if (review_archive / rev.name).exists())
@@ -860,7 +857,6 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
         return False, (
             f"Cannot seal milestone '{milestone_id}': archive target already exists: {collisions}"
         )
-
     leftover_path = reviews_dir / "LEFTOVERS.md"
     leftover_orig: str | None = None
     if leftover_path.is_file():
@@ -868,11 +864,9 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
             leftover_orig = leftover_path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             leftover_orig = None
-
     task_archive.mkdir(parents=True, exist_ok=True)
     if to_archive_reviews:
         review_archive.mkdir(parents=True, exist_ok=True)
-
     moved_records: list[tuple[Path, Path]] = []
     try:
         for t in tasks:
@@ -902,7 +896,6 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
                 f"rollback incomplete: {rollback_errors}"
             )
         return False, f"Failed to seal milestone '{milestone_id}', rolled back: {exc}"
-
     review_note = (
         f" and {len(to_archive_reviews)} reviews to docs/reviews/archive/{milestone_id}/"
         if to_archive_reviews
@@ -917,6 +910,41 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
         return True, f"{sealed} Next milestone: {nxt}"
     except Exception:
         return True, f"{sealed} (milestone bump failed)"
+
+
+def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
+    id_err = _validate_milestone_id(milestone_id)
+    if id_err:
+        return False, id_err
+
+    tasks = scan_milestone_tasks(workspace, milestone_id)
+    if not tasks:
+        return False, f"No tasks to seal for milestone '{milestone_id}'."
+
+    invalid = [t for t in tasks if t.status not in _ALLOWED_STATUS]
+    if invalid:
+        return False, (
+            f"Cannot seal milestone '{milestone_id}'. Invalid Status: "
+            f"{[t.path.name for t in invalid]}"
+        )
+
+    pending = [t for t in tasks if t.status != "done"]
+    if pending:
+        return False, f"Cannot seal milestone '{milestone_id}'. Tasks not done: {[t.path.name for t in pending]}"
+
+    gate_err = _seal_review_gate(workspace, milestone_id, tasks)
+    if gate_err:
+        return False, gate_err
+
+    # 闸机 2: docs/guides/ 不得残留 k3dge:guide-stub
+    unfilled = scan_unfilled_guides(workspace)
+    if unfilled:
+        return False, (
+            f"[SEAL REJECTED] Unfilled guide stubs detected in docs/guides/: {unfilled}.\n"
+            f"  Complete the documentation before milestone seal."
+        )
+
+    return _seal_archive(workspace, milestone_id, tasks)
 
 
 # ---------------------------------------------------------------------------

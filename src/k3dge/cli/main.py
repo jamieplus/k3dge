@@ -521,112 +521,151 @@ def _ensure_peer_pythonpath(existing: dict, pythonpath: Optional[str]) -> bool:
     return True
 
 
-def cmd_mcp(args: argparse.Namespace) -> int:
+def _load_tomllib():
+    """tomllib (py3.11+) or tomli fallback; None when neither is importable."""
+    try:
+        import tomllib
+        return tomllib
+    except ImportError:
+        try:
+            import tomli  # type: ignore[import-not-found]
+            return tomli
+        except ImportError:
+            return None
+
+
+def _mcp_servers(workspace: Path) -> dict:
+    """.mcp.json `mcpServers` map (read-only); {} when absent/broken."""
+    import json as _json
+
+    mcp_path = workspace / ".mcp.json"
+    try:
+        data = _json.loads(mcp_path.read_text(encoding="utf-8")) if mcp_path.is_file() else {}
+    except Exception:
+        data = {}
+    if not isinstance(data, dict) or not isinstance(data.get("mcpServers"), dict):
+        return {}
+    return data["mcpServers"]
+
+
+def _sync_peers_into_mcp(workspace: Path, cfg: dict) -> Optional[str]:
+    """Merge enabled peers from pipeline.toml into .mcp.json. Returns error string or None."""
+    import json as _json
+
+    mcp_path = workspace / ".mcp.json"
+    try:
+        data = _json.loads(mcp_path.read_text(encoding="utf-8")) if mcp_path.is_file() else {"mcpServers": {}}
+        if not isinstance(data, dict):
+            data = {"mcpServers": {}}
+    except Exception:
+        data = {"mcpServers": {}}
+    if "mcpServers" not in data or not isinstance(data["mcpServers"], dict):
+        data["mcpServers"] = {}
+    changed = False
+    for pid, pcfg in cfg.get("peers", {}).items():
+        if pid == "k3dge" or not pcfg.get("enabled", True):
+            continue
+        probe, mod, py_path = _probe_peer_mcp(workspace, pid)
+        if probe is None or mod is None:
+            if pid not in data["mcpServers"]:
+                sibling = workspace.parent / pid
+                alt_sibling = workspace / pid
+                _peer_fallback_warn(pid, f"sibling not found at {sibling} nor {alt_sibling} or no mcp module", _peer_fallback(pcfg))
+            continue
+        existing = data["mcpServers"].get(pid)
+        if existing is None:
+            data["mcpServers"][pid] = _peer_mcp_entry(mod, py_path)
+            changed = True
+            print(f"[MCP] auto-added peer '{pid}' from sibling {probe} as python -m {mod}", file=sys.stderr)
+        elif _ensure_peer_pythonpath(existing, py_path):
+            changed = True
+            print(f"[MCP] filled PYTHONPATH for peer '{pid}' -> {py_path}", file=sys.stderr)
+    if changed:
+        try:
+            tmp = mcp_path.with_suffix(".tmp")
+            tmp.write_text(_json.dumps(data, indent=2) + "\n", encoding="utf-8")
+            tmp.replace(mcp_path)
+        except Exception as exc:
+            return f"[MCP] peer merge write failed: {exc}"
+    return None
+
+
+def _warn_missing_peer_servers(workspace: Path, cfg: dict) -> None:
+    """Warn for enabled pipeline peers absent from .mcp.json (no sibling / not synced)."""
+    servers = _mcp_servers(workspace)
+    for pid, pcfg in cfg.get("peers", {}).items():
+        if pid == "k3dge" or not pcfg.get("enabled", True):
+            continue
+        if pid not in servers:
+            _peer_fallback_warn(pid, "enabled in pipeline.toml but missing in .mcp.json (no sibling or not synced via 'k3dge mcp sync')", _peer_fallback(pcfg))
+
+
+def _cmd_mcp_sync(workspace: Path) -> int:
     from k3dge.templates.scaffold import ensure_mcp_config
 
+    ok_mcp = ensure_mcp_config(workspace)
+    if not ok_mcp:
+        print("[MCP] .mcp.json skipped due to corruption, see WARN above; not overwriting", file=sys.stderr)
+    # Peer merging from pipeline.toml is best-effort; report if pipeline is unreadable
+    # tomllib is 3.11+, tomli is fallback for 3.10; neither present → skip peer merging gracefully
+    tomllib_mod = _load_tomllib()
+    if tomllib_mod is None:
+        _peer_fallback_warn("pipeline", "tomllib/tomli not available (py<3.11 without tomli)", "skip peer merging, keep k3dge only")
+    else:
+        cfg_path = workspace / ".agent" / "pipeline.toml"
+        if cfg_path.is_file():
+            try:
+                cfg = tomllib_mod.loads(cfg_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                print(f"[MCP] pipeline.toml parse failed: {exc}", file=sys.stderr)
+                return 1
+            try:
+                err = _sync_peers_into_mcp(workspace, cfg)
+            except Exception as exc:
+                err = f"[MCP] pipeline handling failed: {exc}"
+            if err:
+                print(err, file=sys.stderr)
+                return 1
+        else:
+            _peer_fallback_warn("pipeline", ".agent/pipeline.toml not found", "keep k3dge only")
+    print(f"[MCP] synced {workspace / '.mcp.json'}")
+    return 0
+
+
+def _cmd_mcp_probe(args: argparse.Namespace, workspace: Path) -> int:
+    # Live handshake per declared server. Deliberately NOT part of `check`:
+    # `check` is a pure static hard gate (ADR-0006 §2.3.2).
+    from k3dge.engine.pipeline_runner import load_mcp_endpoints, probe_servers
+
+    timeout = int(getattr(args, "timeout", 20) or 20)
+    servers = load_mcp_endpoints(workspace)
+    if not servers:
+        print(f"[MCP] no servers declared in {workspace / '.mcp.json'}", file=sys.stderr)
+        return 1
+    rows = probe_servers(workspace, timeout=timeout)
+    as_json = getattr(args, "json", False)
+    if as_json:
+        print(json.dumps({"ok": all(r[1] for r in rows), "servers": [
+            {"name": n, "ok": ok, "detail": d, "tools": t} for n, ok, d, t in rows
+        ]}, indent=2, ensure_ascii=False))
+        return 0 if all(r[1] for r in rows) else 1
+    alive = 0
+    for name, ok, detail, tools in rows:
+        alive += 1 if ok else 0
+        print(f"  [{'ALIVE' if ok else 'DEAD '}] {name:8s} tools={tools if tools else '-'} {(':: ' + detail) if detail else ''}")
+    print(f"[MCP] probed {len(rows)} declared server(s): {alive} alive, {len(rows) - alive} dead ({workspace / '.mcp.json'})")
+    if alive < len(rows):
+        print("WARN[DOWNGRADE] any audit/quality action on a DEAD server falls back to manual,\n"
+              "                and a manual report is NOT an independent audit (ADR-0006 §2.4)", file=sys.stderr)
+    return 0 if alive == len(rows) else 1
+
+
+def cmd_mcp(args: argparse.Namespace) -> int:
     workspace = _find_workspace(Path.cwd())
     if args.mcp_action == "sync":
-        ok_mcp = ensure_mcp_config(workspace)
-        if not ok_mcp:
-            print("[MCP] .mcp.json skipped due to corruption, see WARN above; not overwriting", file=sys.stderr)
-        # Peer merging from pipeline.toml is best-effort; report if pipeline is unreadable
-        # tomllib is 3.11+, tomli is fallback for 3.10; neither present → skip peer merging gracefully
-        try:
-            tomllib_mod = None
-            try:
-                import tomllib as tomllib_mod  # py 3.11+
-            except ImportError:
-                try:
-                    import tomli as tomllib_mod  # type: ignore[import-not-found]
-                except ImportError:
-                    tomllib_mod = None
-            if tomllib_mod is None:
-                _peer_fallback_warn("pipeline", "tomllib/tomli not available (py<3.11 without tomli)", "skip peer merging, keep k3dge only")
-            else:
-                cfg_path = workspace / ".agent" / "pipeline.toml"
-                if cfg_path.is_file():
-                    try:
-                        cfg = tomllib_mod.loads(cfg_path.read_text(encoding="utf-8"))
-                    except Exception as exc:
-                        print(f"[MCP] pipeline.toml parse failed: {exc}", file=sys.stderr)
-                        return 1
-                    # Peer merging: ensure enabled peers have an .mcp.json entry if sibling exists
-                    import json as _json
-
-                    mcp_path = workspace / ".mcp.json"
-                    try:
-                        data = _json.loads(mcp_path.read_text(encoding="utf-8")) if mcp_path.is_file() else {"mcpServers": {}}
-                        if not isinstance(data, dict):
-                            data = {"mcpServers": {}}
-                    except Exception:
-                        data = {"mcpServers": {}}
-                    if "mcpServers" not in data or not isinstance(data["mcpServers"], dict):
-                        data["mcpServers"] = {}
-                    changed = False
-                    for pid, pcfg in cfg.get("peers", {}).items():
-                        if pid == "k3dge":
-                            continue
-                        if not pcfg.get("enabled", True):
-                            continue
-                        probe, mod, py_path = _probe_peer_mcp(workspace, pid)
-                        if probe is None or mod is None:
-                            if pid not in data["mcpServers"]:
-                                sibling = workspace.parent / pid
-                                alt_sibling = workspace / pid
-                                fallback = _peer_fallback(pcfg)
-                                _peer_fallback_warn(pid, f"sibling not found at {sibling} nor {alt_sibling} or no mcp module", fallback)
-                            continue
-                        existing = data["mcpServers"].get(pid)
-                        if existing is None:
-                            data["mcpServers"][pid] = _peer_mcp_entry(mod, py_path)
-                            changed = True
-                            print(f"[MCP] auto-added peer '{pid}' from sibling {probe} as python -m {mod}", file=sys.stderr)
-                        elif _ensure_peer_pythonpath(existing, py_path):
-                            changed = True
-                            print(f"[MCP] filled PYTHONPATH for peer '{pid}' -> {py_path}", file=sys.stderr)
-                    if changed:
-                        try:
-                            tmp = mcp_path.with_suffix(".tmp")
-                            tmp.write_text(_json.dumps(data, indent=2) + "\n", encoding="utf-8")
-                            tmp.replace(mcp_path)
-                        except Exception as exc:
-                            print(f"[MCP] peer merge write failed: {exc}", file=sys.stderr)
-                            return 1
-                else:
-                    _peer_fallback_warn("pipeline", ".agent/pipeline.toml not found", "keep k3dge only")
-        except Exception as exc:
-            print(f"[MCP] pipeline handling failed: {exc}", file=sys.stderr)
-            return 1
-        print(f"[MCP] synced {workspace / '.mcp.json'}")
-        return 0
-
+        return _cmd_mcp_sync(workspace)
     if args.mcp_action == "probe":
-        # Live handshake per declared server. Deliberately NOT part of `check`:
-        # `check` is a pure static hard gate (ADR-0006 §2.3.2).
-        from k3dge.engine.pipeline_runner import load_mcp_endpoints, probe_servers
-
-        timeout = int(getattr(args, "timeout", 20) or 20)
-        servers = load_mcp_endpoints(workspace)
-        if not servers:
-            print(f"[MCP] no servers declared in {workspace / '.mcp.json'}", file=sys.stderr)
-            return 1
-        rows = probe_servers(workspace, timeout=timeout)
-        as_json = getattr(args, "json", False)
-        if as_json:
-            print(json.dumps({"ok": all(r[1] for r in rows), "servers": [
-                {"name": n, "ok": ok, "detail": d, "tools": t} for n, ok, d, t in rows
-            ]}, indent=2, ensure_ascii=False))
-            return 0 if all(r[1] for r in rows) else 1
-        alive = 0
-        for name, ok, detail, tools in rows:
-            alive += 1 if ok else 0
-            print(f"  [{'ALIVE' if ok else 'DEAD '}] {name:8s} tools={tools if tools else '-'} {(':: ' + detail) if detail else ''}")
-        print(f"[MCP] probed {len(rows)} declared server(s): {alive} alive, {len(rows) - alive} dead ({workspace / '.mcp.json'})")
-        if alive < len(rows):
-            print("WARN[DOWNGRADE] any audit/quality action on a DEAD server falls back to manual,\n"
-                  "                and a manual report is NOT an independent audit (ADR-0006 §2.4)", file=sys.stderr)
-        return 0 if alive == len(rows) else 1
-
+        return _cmd_mcp_probe(args, workspace)
     return 1
 
 
@@ -694,7 +733,6 @@ def cmd_markers(args: argparse.Namespace) -> int:
 
 
 
-# k3dit:leftover Q-5 CC28 cmd_milestone 拆子命令为独立函数
 def cmd_milestone(args: argparse.Namespace) -> int:
     from k3dge.engine import nextstep
     from k3dge.engine.milestone import (
@@ -736,36 +774,12 @@ def cmd_milestone(args: argparse.Namespace) -> int:
         # Peer pipeline availability check: highlight fallback to default when external peer missing
         if ok:
             try:
-                import json as _js
-                tomllib_mod2 = None
-                try:
-                    import tomllib as tomllib_mod2
-                except ImportError:
-                    try:
-                        import tomli as tomllib_mod2
-                    except ImportError:
-                        tomllib_mod2 = None
+                tomllib_mod2 = _load_tomllib()
                 if tomllib_mod2 is not None:
                     cfg_path2 = workspace / ".agent" / "pipeline.toml"
                     if cfg_path2.is_file():
-                        try:
-                            cfg2 = tomllib_mod2.loads(cfg_path2.read_text(encoding="utf-8"))
-                            mcp_path2 = workspace / ".mcp.json"
-                            try:
-                                data2 = _js.loads(mcp_path2.read_text(encoding="utf-8")) if mcp_path2.is_file() else {}
-                            except Exception:
-                                data2 = {}
-                            mcp_servers = data2.get("mcpServers", {}) if isinstance(data2, dict) else {}
-                            for pid, pcfg in cfg2.get("peers", {}).items():
-                                if not pcfg.get("enabled", True):
-                                    continue
-                                if pid == "k3dge":
-                                    continue
-                                if pid not in mcp_servers:
-                                    fallback = _peer_fallback(pcfg)
-                                    _peer_fallback_warn(pid, f"enabled in pipeline.toml but missing in .mcp.json (no sibling or not synced via 'k3dge mcp sync')", fallback)
-                        except Exception:
-                            pass
+                        cfg2 = tomllib_mod2.loads(cfg_path2.read_text(encoding="utf-8"))
+                        _warn_missing_peer_servers(workspace, cfg2)
             except Exception:
                 pass
         return 0 if ok else 1
@@ -912,12 +926,15 @@ def cmd_search(args: argparse.Namespace) -> int:
     workspace = _find_workspace(Path.cwd())
     if getattr(args, "path", None):
         # Path-listing mode: list files matching the glob (scoped alternative to `find`).
-        matches = sorted(
-            str(p.relative_to(workspace)).replace("\\", "/")
-            for p in workspace.glob(args.path)
-            if p.is_file()
-        )
-        for m in matches:
+        matches = []
+        for p in workspace.glob(args.path):
+            try:
+                safe = _rel_within_workspace(workspace, str(p))
+            except ValueError:
+                continue  # SEC-01: `../*` or symlink escape -> drop
+            if safe.is_file():
+                matches.append(safe.relative_to(workspace.resolve()).as_posix())
+        for m in sorted(matches):
             print(m)
         return 0
     locs = search(workspace, args.query, snippet=not args.no_snippet, context=args.context)

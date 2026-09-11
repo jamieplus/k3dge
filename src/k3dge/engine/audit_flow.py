@@ -90,6 +90,11 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
     from k3dge.engine import worktree as _wt
 
     job = milestone_id or "adhoc"
+    from k3dge.engine.milestone import _validate_milestone_id
+
+    id_err = _validate_milestone_id(job)
+    if id_err:
+        return {"state": "failed", "detail": id_err}
     try:  # ③ 锁线：挂 worktree，脏改动进程代提交（线=现场=送检，ADR-0024 §2.3）
         _wt.ensure(workspace, job)
         baseline = _wt.advance(workspace, job)
@@ -158,7 +163,6 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
             "present_pushed": push.get("markers") if push.get("ok") else None}
 
 
-# k3dit:leftover Q-2 CC26 collect_audit 提取验证子步骤
 def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = None, io=None) -> dict:
     """gate 阶段：`audit.collect` → 验壳（kind/基线/12 列）→ 机械落盘 → 数计数。
 
