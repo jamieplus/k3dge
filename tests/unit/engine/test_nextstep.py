@@ -208,3 +208,19 @@ class TestLifecycleNext(TestCase):
         self.assertEqual(ns.state, "pending_findings")
         self.assertEqual(ns.pending, 1)
         self.assertTrue(any("A-11" in r for r in ns.reasons))
+
+
+class TestIncompleteReport(TestCase):
+    def test_incomplete_report_never_closes(self) -> None:
+        """未尽项报告（`<!-- k3dge:incomplete -->`）即便 待修=0 也不构成闭环。"""
+        from k3dge.engine import audit_trigger
+
+        ws = _base_ws()
+        _clean = (
+            "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+            "| A1 | x | s | p | t | d | l | 已修 | - | - | - | - |\n"
+        )
+        p = ws / "docs" / "reviews" / "2026-09-01-M7-audit.md"
+        p.write_text("<!-- k3dge:incomplete -->\n" + _clean, encoding="utf-8")
+        self.assertFalse(audit_trigger.audit_closed(ws, "M7"))

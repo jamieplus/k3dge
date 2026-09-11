@@ -241,7 +241,11 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
                 )
         except OSError as exc:  # 回填失败不改判定，但必须可见（工单与审计状态不许静默脱钩）
             print(f"[WARN][TICKET] 工单回填失败: {exc}", file=__import__("sys").stderr)
-    outcome = "open" if counts["待修"] > 0 else "closed"
+    # 未尽项报告（`<!-- k3dge:incomplete -->`）：无论计数，绝不闭环/不 merge，交人工
+    if "<!-- k3dge:incomplete -->" in report_md:
+        outcome = "open"
+    else:
+        outcome = "open" if counts["待修"] > 0 else "closed"
     merged: Dict[str, Any] = {}
     if outcome == "closed":
         from k3dge.engine import worktree as _wt

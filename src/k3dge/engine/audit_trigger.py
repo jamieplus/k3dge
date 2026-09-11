@@ -101,4 +101,8 @@ def audit_closed(workspace: Path, milestone_id: str) -> bool:
     from k3dge.engine.milestone import _find_report, _parse_audit_stats
 
     found = _find_report(workspace, milestone_id, "audit")
-    return found is not None and _parse_audit_stats(found[1])["待修"] == 0
+    if found is None:
+        return False
+    if "<!-- k3dge:incomplete -->" in found[1]:
+        return False   # 未尽项报告永不构成闭环
+    return _parse_audit_stats(found[1])["待修"] == 0
