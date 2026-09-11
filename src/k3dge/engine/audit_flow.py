@@ -366,7 +366,8 @@ def peer_status(workspace: Path, job_id: str, io=None) -> dict:
     payload = env.get("payload") if isinstance(env.get("payload"), dict) else env
     out = {"ok": bool(env.get("ok", True)), "job_id": job_id}
     out.update({k: payload.get(k) for k in
-                ("state", "open", "counts", "escalated", "rounds", "lens_version", "error", "message")
+                ("state", "open", "counts", "escalated", "rounds", "lens_version", "error", "message",
+                 "total_dur_s", "tries", "bounces", "incomplete", "line")
                 if payload.get(k) is not None})
     return out
 
