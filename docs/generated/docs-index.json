@@ -735,6 +735,22 @@
       "title": "判读席禁止重提已 leftover",
       "status": "idea",
       "tokens": "判读席禁止重提已 leftover"
+    },
+    {
+      "path": "docs/tasks/2026-09-11-M8-fix-audit_scope_template_drift.md",
+      "type": "tasks",
+      "id": "2026-09-11-M8-fix-audit_scope_template_drift",
+      "title": "审计 scope=src 时模板 pairs 不可同步致 verify TEMPLATE_DRIFT 假红",
+      "status": "idea",
+      "tokens": "审计 scope=src 时模板 pairs 不可同步致 verify TEMPLATE_DRIFT 假红"
+    },
+    {
+      "path": "docs/tasks/2026-09-11-M8-fix-ratchet_pending_misjudge.md",
+      "type": "tasks",
+      "id": "2026-09-11-M8-fix-ratchet_pending_misjudge",
+      "title": "核 milestone 棘轮对 collect=open(待修>0) 是否误判 closed",
+      "status": "idea",
+      "tokens": "核 milestone 棘轮对 collect=open(待修>0) 是否误判 closed"
     }
   ]
 }

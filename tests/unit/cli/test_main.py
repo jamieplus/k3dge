@@ -40,6 +40,30 @@ class TestCli(unittest.TestCase):
             finally:
                 os.chdir(cwd)
 
+    def test_milestone_audit_submit_persists(self):
+        """回归（真跑 M8 发现 code-1）：`milestone audit-submit` 曾引未定义的 `ms` → NameError。"""
+        import os
+
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            subprocess.run(["git", "init", "-qb", "main", str(d)], check=True, capture_output=True)
+            (d / "docs" / "reviews").mkdir(parents=True)
+            rpt = d / "r.md"
+            rpt.write_text(
+                "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+                "| X1 | 2026-09-11 | 低 | P3 | 规范 | d | l | 已修 | - | - | - | - |\n",
+                encoding="utf-8",
+            )
+            cwd = os.getcwd()
+            os.chdir(d)
+            try:
+                rc = main(["milestone", "audit-submit", "M1", "--file", str(rpt)])
+            finally:
+                os.chdir(cwd)
+            self.assertEqual(rc, 0)
+            self.assertTrue(any((d / "docs" / "reviews").glob("*M1*audit*.md")))
+
     def test_parser_has_check_sync_milestone(self):
         parser = build_parser()
         actions = [a for a in parser._subparsers._group_actions[0].choices]  # type: ignore[attr-defined]

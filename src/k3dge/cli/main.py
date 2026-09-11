@@ -697,7 +697,15 @@ def cmd_markers(args: argparse.Namespace) -> int:
 # k3dit:leftover Q-5 CC28 cmd_milestone 拆子命令为独立函数
 def cmd_milestone(args: argparse.Namespace) -> int:
     from k3dge.engine import nextstep
-    from k3dge.engine.milestone import run_milestone_alignment, seal_milestone, scan_milestone_tasks, run_seal_flow, run_audit_flow, _Prompt
+    from k3dge.engine.milestone import (
+        run_milestone_alignment,
+        seal_milestone,
+        scan_milestone_tasks,
+        run_seal_flow,
+        run_audit_flow,
+        persist_external_audit_report,
+        _Prompt,
+    )
 
     workspace = _find_workspace(Path.cwd())
     action = args.action
@@ -774,7 +782,7 @@ def cmd_milestone(args: argparse.Namespace) -> int:
         if not raw or not raw.strip():
             print("[AUDIT] no content provided (use --file <path> or pipe via stdin '-')", file=sys.stderr)
             return 1
-        path = ms.persist_external_audit_report(workspace, m_id, raw, kind=getattr(args, "kind", "audit") or "audit")
+        path = persist_external_audit_report(workspace, m_id, raw, kind=getattr(args, "kind", "audit") or "audit")
         print(f"[AUDIT] persisted external audit report -> {path}")
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone audit-submit -> {m_id} -> {path}")
         # Landed report may close the audit loop -> unlock the seal question.
