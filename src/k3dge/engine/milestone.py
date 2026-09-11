@@ -1465,6 +1465,10 @@ def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str =
     if st.get("state") == "done":
         c = audit_flow.collect_audit(workspace, milestone_id, j["job_id"], io=io)  # role 随工单记录走
         if c.get("ok"):
+            if c.get("state") == "open":
+                # 报告已落盘但 `待修>0`（未尽项完结 / 未清）⇒ 不闭环、不 merge；交回 [NEXT] audit_open
+                return "open", (f"未尽项报告已落盘 {c.get('report')}（待修 {c.get('pending')}）："
+                                "需人工/CLI agent 处理未关项后重审（如配对文件只需 `k3dge sync`）。")
             if c.get("merge", {}).get("ok") is False:
                 return "stalled", f"报告已落盘但写回未闭：{c['merge'].get('message', '')[:90]}"
             return "closed", f"签署报告落盘 {c.get('report')}；写回 {c.get('merge', {}).get('mode', 'n/a')}；待修 {c.get('pending')}。"
@@ -1501,6 +1505,9 @@ def run_audit_flow(
             if step_status == "progress":
                 return "ratchet_open", step_msg + "\n" + nextstep.NextStep.from_state(
                     "ratchet_open", milestone_id, reasons=[step_msg[:120]]).render_cli()
+            if step_status == "open":
+                return "audit_open", step_msg + "\n" + nextstep.NextStep.from_state(
+                    "audit_open", milestone_id, reasons=[step_msg[:160]]).render_cli()
             return "escalated", step_msg + "\n" + nextstep.NextStep.from_state(
                 "escalated", milestone_id).render_cli()
 

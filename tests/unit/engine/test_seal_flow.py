@@ -418,6 +418,21 @@ class TestRatchetAuditStep(TestCase):
             st, msg = ms._ratchet_audit_step(ws, "M1")
         assert st == "closed" and "ff" in msg
 
+    def test_collected_incomplete_surfaces_audit_open(self):
+        """未尽项报告 collect（待修>0）⇒ open，不谎报 closed。"""
+        ws = self._ws_r()
+        import json as _json
+
+        (ws / ".agent" / "audit_jobs.json").parent.mkdir(exist_ok=True)
+        (ws / ".agent" / "audit_jobs.json").write_text(_json.dumps(
+            {"jobs": [{"job_id": "J-1", "milestone_id": "M1", "state": "awaiting"}]}), encoding="utf-8")
+        with mock.patch("k3dge.engine.audit_flow.peer_status", return_value={"ok": True, "state": "done"}), \
+             mock.patch("k3dge.engine.audit_flow.collect_audit",
+                        return_value={"ok": True, "state": "open", "report": "docs/reviews/x.md",
+                                      "pending": 2, "merge": {}}):
+            st, msg = ms._ratchet_audit_step(ws, "M1")
+        assert st == "open" and "待修 2" in msg
+
     def test_collected_closes_without_resubmit(self):
         import json as _json
 
