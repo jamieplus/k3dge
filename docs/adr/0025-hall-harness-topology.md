@@ -22,6 +22,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
        ⑭ §2.7 复核须正向背书 + 结案前 verify 硬门（Proposed 段，覆盖 ⑬ 的"认可不动即 fixed"）2026-09-10，经 Core Maintainer 授权，依 `docs/adr/AUTHORING.md`：真跑坐实"沉默/正向背书都挡不住改坏测试"（M8 线 version.py 原子写改崩 test_bump_is_atomic）。改定：`fixed`＝**修主张(fixnote∧真码差) ∧ 复核正向背书(翻 `fixnote→fixed`，沉默＝未验不算) ∧ 结案前 Hall 跑被审仓自带 verify 命令绿 ∧ Hall 拔 `fixed`** 四合；新增 `fixed` 钉 kind（非 open）；verify 命令经 `k3dit_audit_submit(verify=…)` 由被审仓带入、Hall 只执行。授权人：Core Maintainer。
       ⑮ 正文按审计结论收紧（信任模型/W1 env 面/W6 签名/pin-only 对齐/verify 执行面/修订纪律/scope 面）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（Core Maintainer 会话授权，agent 代改字，未经 k3dit 文审）。
       ⑯ D-1..D-3 独立文审回填 2026-09-10，经 Core Maintainer 本轮授权，依 `docs/adr/AUTHORING.md`：① §2.2/§2.3 旧生命周期措辞抹平到 §2.7（复核翻 `fixnote→fixed`、Hall 拔；消同篇自相抵）；② Note 旧号改事件表述（消 `pointer_dangling`）；③ 补独立文审证据——本轮就地修订经 k3dit Doc Audit 透镜独立复核，报告 `docs/reviews/2026-09-10-doc-audit-docs.md`（首轮待修 7，修后复审至 0）；过闸口径 = real lens（独立 agent 执行，非自审）。
+      ⑰ 复核加硬（Proposed 段）2026-09-10，经 Core Maintainer 授权，依 `docs/adr/AUTHORING.md`：① 钉加可选尾段 `evidence=<可复跑命令>`，结案前 Hall 逐条 retest；② 复核输入补 `facts/verify.txt`/`tests.json`；③ `fixed` 理由须落到具体符号/调用点/测试名，纯复述 diff 判 FORMAT；④ 复核与修/判用**不同模型**（第二双眼睛）；⑤ verify/evidence 红改「`fixed` 回退 `pending` + 打回」，超 MAX_BOUNCE 才升级。过闸口径 = manual fallback（Core Maintainer 会话授权，agent 代改字）。
 # Note: default `-`. Exactly one `Note:` field per ADR. Record each authorized operation
 # as a numbered segment (① ② ③ …): who/when authorized and how it actually passed the
 # gate (real lens vs manual fallback). Append segments; do not erase old traces.
@@ -169,13 +170,13 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 **收钉（修/核）——席只增/翻，拔钉归 Hall**
 - 钉/树驱动，不设 `accepted` 二值；**任何席都不删钉**——删除＝账本结论的机械后果，归 Hall；席删＝自证 + 毁锚。
 - 修席（行动窗，不签）逐条：**接受并改＝改码 + 翻 `pending→fixnote`（note=改法）**（主张"这条改了、待独立验"，仍 open、不结案）；有意留＝翻 `pending→leftover`（how）；误报＝翻 `pending→disputed`（how）；不碰＝留 `pending`。不产 items、不删钉。
-- 复核窗（独立钥）：**输入＝账本（findings 行）+ `facts/present.md`（每条待验 finding 按其 location 归的 `.orig→现线` 代码 diff，由 Hall 在修席定稿时算出并注入）**——没这份料，"独立 retest"就是空话（真跑坐实：复核窗只有"已修"声明、零可核材料 → 只能信或瞎翻）。逐条判真伪——**认可＝翻 `fixnote→fixed` 且带一句指向该 diff 的理由（空理由＝该窗 FORMAT：没看 diff 就写不出具体依据）、不认可＝翻 `fixnote→pending`（打回，受 MAX_BOUNCE）**。**沉默（留 fixnote）＝未验 ⇒ 不算通过**。复核**不删钉**（删除归 Hall）。
+- 复核窗（独立钥）：**输入＝账本（findings 行）+ `facts/present.md`（`.orig→现线` 代码 diff）+ `facts/verify.txt`（机械底现状）+ `facts/tests.json`（相关测试）**——没这份料，"独立 retest"就是空话（真跑坐实：复核窗只有"已修"声明、零可核材料 → 只能信或瞎翻）。逐条判真伪——**认可＝翻 `fixnote→fixed` 且给具体依据（符号/调用点/测试名 + 反证尝试；纯复述 diff 或空理由＝该窗 FORMAT）、不认可＝翻 `fixnote→pending`（打回，受 MAX_BOUNCE）**。**沉默（留 fixnote）＝未验 ⇒ 不算通过**。复核**不删钉**（删除归 Hall）。复核与修/判用**不同模型**（第二双眼睛）。
 
 > 正向背书治"不碰"，present diff 治"没料查"，`fixed` 必须带 diff 指向理由治"碰了但没看"——三层缺一仍是橡皮章。verify 命令是机械底（catch 改坏测试），catch 不了"没核对设计根因"，故与 present 互补。
 
 **结案前机械 verify（Retest 独立硬门）**
 - `verify` 命令**由被审仓随送审信封带入**（`k3dit_audit_submit(verify=…)` 存入工单；k3dge 默认 `k3dge check` + `python -m pytest -q`），Hall **只执行、不拟定**。
-- Hall 在**进入 closing 前**在已 advance 的审计线上跑 `verify`；**非零/超时 ⇒ 本笔不得结案**：把失败的 `fixed` 回退为 `pending`（打回）或升级（超 MAX_BOUNCE），失败测试名入账本/通告牌。正向背书 + 真码差 + verify 绿，三者齐才 `fixed`。
+- Hall 在**进入 closing 前**在已 advance 的审计线上跑**逐条 `evidence`（`fixed` 且带证据者）+ 仓级 `verify`**；**任一非零/超时 ⇒ 本笔不得结案**：把 `fixed` 回退 `pending`（打回，并重钉回线供修席再翻）或超 MAX_BOUNCE 升级，失败项入账本/通告牌。逐条证据把"机械底"从仓级一条细化到每条发现；正向背书 + 真码差 + 机械底绿，三者齐才 `fixed`。
 - **代码执行面（承认）**：verify 是被审仓自带命令，Hall 只执行、不拟定——同信任域下的受控执行（§1）；限定 `cwd`＝审计线现场、超时封顶（默认 1800s）、命令与结果入账。
 
 **state 推导（Hall，含机械拔钉）**
