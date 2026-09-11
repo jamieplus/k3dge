@@ -27,6 +27,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
       ⑲ §2.2 职责卡单一源（Proposed 段）2026-09-10，经 Core Maintainer 授权：窗职责/焦点/协议/样例＝入库 `src/k3dit/windows/<窗>.md`；Hall 写进窗 `README.md`+`facts/instruction.md`，`seat_prompt` 只指路（"先读职责卡"）不复述，消 prompt/instruction 双源（曾致 C1 提示与 harvest 不一致）。过闸口径 = manual fallback。
       ⑳ §2.7 两阶段复核 + 拔钉后移（Proposed 段）2026-09-10，经 Core Maintainer 授权：R1 盲写验证、**不拔钉**；新增 `compare` 相位，Hall 并置 `处置‖验证` 交**复核席**裁决（`复审:通过` 才通过，沉默/驳回⇒回退 `pending` 打回）；Hall 只封/并/识别标记，不判语义（`_text_overlap` 退役）；**拔钉移到 `_finish`（R2 通过 + verify 绿后）**——`fixed` 是终态，R1 拔早会让 R2 无对比对象、且把终态提前。过闸口径 = manual fallback。
       ㉑ 未尽项完结 + scope 含 docs（Proposed 段）2026-09-10，经 Core Maintainer 授权：① 反复打回/verify 连续红达 MAX_BOUNCE ⇒ 不再 kill；未关留 `pending`，出 `<!-- k3dge:incomplete -->` 报告、工单 `done` 供 collect——`待修>0` 自然过不了 k3dge `audit_closed`/封板 verify，与既有闸"合流"，人据 `[NEXT]` 授意 CLI agent 处理（如模板对只需 `k3dge sync`）。② 送检 scope 默认含 `src`+`docs`、**不含 `.agent` 等隐藏配置**（隐藏文件不进审计；无 docs 的文档审无意义）。过闸口径 = manual fallback。
+      ㉒ 审计耗时统计（Proposed 段）2026-09-10，经 Core Maintainer 授权：进程侧记 `collect`/`compare`/`verify` 事件 `dur_s`（spawn→收成墙钟），`observe` 聚合逐窗/合计，报告附录同源——只出事实、不判定、不占判读窗（G8 观测的一部分；统计席位仍待后续）。
 # Note: default `-`. Exactly one `Note:` field per ADR. Record each authorized operation
 # as a numbered segment (① ② ③ …): who/when authorized and how it actually passed the
 # gate (real lens vs manual fallback). Append segments; do not erase old traces.
