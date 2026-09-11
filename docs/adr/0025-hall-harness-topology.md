@@ -29,6 +29,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
       ㉑ 未尽项完结 + scope 含 docs（Proposed 段）2026-09-10，经 Core Maintainer 授权：① 反复打回/verify 连续红达 MAX_BOUNCE ⇒ 不再 kill；未关留 `pending`，出 `<!-- k3dge:incomplete -->` 报告、工单 `done` 供 collect——`待修>0` 自然过不了 k3dge `audit_closed`/封板 verify，与既有闸"合流"，人据 `[NEXT]` 授意 CLI agent 处理（如模板对只需 `k3dge sync`）。② 送检 scope 默认含 `src`+`docs`、**不含 `.agent` 等隐藏配置**（隐藏文件不进审计；无 docs 的文档审无意义）。过闸口径 = manual fallback。
       ㉒ 审计耗时统计（Proposed 段）2026-09-10，经 Core Maintainer 授权：进程侧记 `collect`/`compare`/`verify` 事件 `dur_s`（spawn→收成墙钟），`observe` 聚合逐窗/合计，报告附录同源——只出事实、不判定、不占判读窗（G8 观测的一部分；统计席位仍待后续）。
       ㉓ 统计席位（部分，Proposed 段）2026-09-10，经 Core Maintainer 授权：事件记座位 `tries`/成功 `model`；`observe` 汇总 counts/tries/models/`verify_fail`/`bounces`/耗时并出**观测行 `line`**；`job_status` 回带 `line`/`total_dur_s`/`tries`，`peer_status` 透传给 `k3dge audit status`。只出事实、不判定；逃逸/误诊口径与跨单汇总仍待定。
+      ㉔ 统计口径 + 统计账（Proposed 段）2026-09-10，经 Core Maintainer 授权：k3dit 记 **append-only 统计账** `ledger/stats.jsonl`（每单终态一条：counts/findings/windows/tries/models/bounces/verify_fail/耗时/rounds）；口径（可数、不判定）＝误诊率 disputed/total、有意留率 leftover/total、打回率 bounces/rounds、座位重试率 Σtries/窗运行数、逃逸代理「重提率」见 `metrics.recurrence()`；`k3dit stats --by {milestone,job,date,type,severity,priority,state,window,model}` **任意维度聚合**（账是唯一源，报告/观测行是投影）。
 # Note: default `-`. Exactly one `Note:` field per ADR. Record each authorized operation
 # as a numbered segment (① ② ③ …): who/when authorized and how it actually passed the
 # gate (real lens vs manual fallback). Append segments; do not erase old traces.
