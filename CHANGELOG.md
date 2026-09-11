@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- doc-audit: 文档作者合规审计（architecture 等 3 处）
+
 ## [0.1.9] - 2026-09-05
 
 ### Added

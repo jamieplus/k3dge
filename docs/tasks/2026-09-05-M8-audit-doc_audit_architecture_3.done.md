@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P3
 date: 2026-09-05
@@ -7,7 +7,7 @@ date: 2026-09-05
 
 # doc-audit: 文档作者合规审计（architecture 等 3 处）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P3
 - **Date**: 2026-09-05
@@ -24,7 +24,7 @@ doc-audit: 文档作者合规审计（architecture 等 3 处）
 <!-- k3che-hints -->
 ## 相关文档提示（k3che · 服务性前路由，非判定；由审计席位取舍）
 
-- `docs/adr/0006-mcp-foreign-harness-injection.md` — Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
-- `docs/tasks/archive/M7/2026-09-02-M7-audit-doc_audit_adr_4.done.md` — doc-audit: 文档作者合规审计（本轮 docs 改动 26 处）
-- `docs/specs/engine/spec.md` — Domain Specification: engine
+- `docs/adr/0025-hall-harness-topology.md` — Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
+- `docs/tasks/2026-09-10-M8-feat-hall_harvest_repo_scope.md` — Hall 收成接入 AUDIT.md 侧车 + @file/@repo v2 钉
+- `docs/tasks/2026-09-10-M8-chore-audit_module_doc_align.md` — k3dge 侧文档/配置对齐合并审计模块（单份 12 列报告、无独立 quality fallback）
 <!-- /k3che-hints -->
