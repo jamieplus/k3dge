@@ -83,7 +83,10 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
     一单一条线（ADR-0024 重设计）：`k3dit/<单>` 分支从 HEAD 拉起，锁点 L=线头 commit；
     已 checkout 的 worktree 目录即送检物。`targets` 是范围说明（Hall 物化参数），不是内容边界。
     """
-    targets = targets or (["src"] if (workspace / "src").is_dir() else ["docs"])
+    if not targets:
+        # 送检范围：src（代码）+ docs（文档）——不含 .agent 等隐藏配置（真实世界不审隐藏文件）；
+        # 没有 docs 的文档审计是审寂寞（doc 窗只看得到 src 内的模板）。
+        targets = [t for t in ("src", "docs") if (workspace / t).is_dir()] or ["docs"]
     from k3dge.engine import worktree as _wt
 
     job = milestone_id or "adhoc"

@@ -26,6 +26,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
       ⑱ §2.7 处置/验证分写 + 盲对比（Proposed 段，覆盖同日"处置＝复核署名"试作）2026-09-10，经 Core Maintainer 授权：修席 `fixnote` note＝报告**处置**（对复核盲：物化 `_blind_fixnotes` 抹 note、`findings.json` 的 `how` 置空）；复核独立写 `fixed` note＝报告**验证**；Hall 并置两侧 `_text_overlap` 粗判（零交集仅公示不阻断）。过闸口径 = manual fallback（Core Maintainer 会话授权）。
       ⑲ §2.2 职责卡单一源（Proposed 段）2026-09-10，经 Core Maintainer 授权：窗职责/焦点/协议/样例＝入库 `src/k3dit/windows/<窗>.md`；Hall 写进窗 `README.md`+`facts/instruction.md`，`seat_prompt` 只指路（"先读职责卡"）不复述，消 prompt/instruction 双源（曾致 C1 提示与 harvest 不一致）。过闸口径 = manual fallback。
       ⑳ §2.7 两阶段复核 + 拔钉后移（Proposed 段）2026-09-10，经 Core Maintainer 授权：R1 盲写验证、**不拔钉**；新增 `compare` 相位，Hall 并置 `处置‖验证` 交**复核席**裁决（`复审:通过` 才通过，沉默/驳回⇒回退 `pending` 打回）；Hall 只封/并/识别标记，不判语义（`_text_overlap` 退役）；**拔钉移到 `_finish`（R2 通过 + verify 绿后）**——`fixed` 是终态，R1 拔早会让 R2 无对比对象、且把终态提前。过闸口径 = manual fallback。
+      ㉑ 未尽项完结 + scope 含 docs（Proposed 段）2026-09-10，经 Core Maintainer 授权：① 反复打回/verify 连续红达 MAX_BOUNCE ⇒ 不再 kill；未关留 `pending`，出 `<!-- k3dge:incomplete -->` 报告、工单 `done` 供 collect——`待修>0` 自然过不了 k3dge `audit_closed`/封板 verify，与既有闸"合流"，人据 `[NEXT]` 授意 CLI agent 处理（如模板对只需 `k3dge sync`）。② 送检 scope 默认含 `src`+`docs`、**不含 `.agent` 等隐藏配置**（隐藏文件不进审计；无 docs 的文档审无意义）。过闸口径 = manual fallback。
 # Note: default `-`. Exactly one `Note:` field per ADR. Record each authorized operation
 # as a numbered segment (① ② ③ …): who/when authorized and how it actually passed the
 # gate (real lens vs manual fallback). Append segments; do not erase old traces.
@@ -184,6 +185,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 - `verify` 命令**由被审仓随送审信封带入**（`k3dit_audit_submit(verify=…)` 存入工单；k3dge 默认 `k3dge check` + `python -m pytest -q`），Hall **只执行、不拟定**。
 - Hall 在**进入 closing 前**在已 advance 的审计线上跑**逐条 `evidence`（`fixed` 且带证据者）+ 仓级 `verify`**；**任一非零/超时 ⇒ 本笔不得结案**：把 `fixed` 回退 `pending`（打回，并重钉回线供修席再翻）或超 MAX_BOUNCE 升级，失败项入账本/通告牌。逐条证据把"机械底"从仓级一条细化到每条发现；正向背书 + 真码差 + 机械底绿，三者齐才 `fixed`。
 - **代码执行面（承认）**：verify 是被审仓自带命令，Hall 只执行、不拟定——同信任域下的受控执行（§1）；限定 `cwd`＝审计线现场、超时封顶（默认 1800s）、命令与结果入账。
+- **未尽项完结（不升级的出口）**：反复打回达 MAX_BOUNCE / verify 连续红 ⇒ **不 kill**；未关条目留 `pending`，出报告（`<!-- k3dge:incomplete -->` + 未尽项清单 + 人工旗）、工单 `done` 供 k3dge collect——`待修>0` ⇒ 不闭环、封板照堵。人据 `[NEXT]` 授意 CLI agent 处理（如"模板对只需 `k3dge sync`"）。判据机械＝达 MAX_BOUNCE；用于"硬限制（scope 外/隐藏文件对）修不全"这类。
 
 **state 推导（Hall，含机械拔钉）**
 - 判读后：见心跳 → `harvest_pins(窗 src)`，逐条 `pending` 钉收成 items。
