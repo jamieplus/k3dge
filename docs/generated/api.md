@@ -120,7 +120,7 @@ prune_finished(workspace: Path) -> dict
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
     # doc: Return (suggested, reasons). Only fires on a quantitative event.
 audit_closed(workspace: Path, milestone_id: str) -> bool
-    # doc: True iff BOTH the audit (k3dit) and quality (k3lity) reports exist with 待修==0.
+    # doc: True iff the single audit report exists with 待修==0.
 # contract.py
 class ContractExtractor
 # doc: Abstract contract extractor — register per-language implementations.
@@ -247,7 +247,7 @@ persist_external_audit_report(workspace: Path, milestone_id: str, content: str, 
 run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]
     # doc: Non-blocking doc-audit, run AFTER the hard gate (never inside `check`).
 run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
-    # doc: Independent audit entry: BOTH k3dit.audit and k3lity.quality produce 12-col
+    # doc: Independent audit entry: the merged audit module (ADR-0025) produces ONE
 run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
     # doc: Seal = archive + version + pointer. Requires a *closed* audit first.
 # models.py

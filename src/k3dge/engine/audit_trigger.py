@@ -93,15 +93,12 @@ def compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]:
 
 
 def audit_closed(workspace: Path, milestone_id: str) -> bool:
-    """True iff BOTH the audit (k3dit) and quality (k3lity) reports exist with 待修==0.
+    """True iff the single audit report exists with 待修==0.
 
-    One "audit pass" = audit + quality each produce a 12-col report and each reach
-    待修==0; the fix cycle re-verifies audit→audit report, quality→quality report.
+    One "audit pass" = the merged audit module (ADR-0025) produces ONE 12-col
+    report; there is no independent quality peer/report any more.
     """
     from k3dge.engine.milestone import _find_report, _parse_audit_stats
 
-    for kind in ("audit", "quality"):
-        found = _find_report(workspace, milestone_id, kind)
-        if found is None or _parse_audit_stats(found[1])["待修"] != 0:
-            return False
-    return True
+    found = _find_report(workspace, milestone_id, "audit")
+    return found is not None and _parse_audit_stats(found[1])["待修"] == 0

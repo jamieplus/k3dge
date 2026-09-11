@@ -1,14 +1,14 @@
 # Peer Contract — k3dge ↔ 外部 harness 接口协议 (v0.6)
 
-> **事实源**: k3dge 与 peers（audit / quality / cache）之间的编排接口机器契约。k3dge 只验信封与形式，不验内容。本页改动＝契约变更：`k3dge sync` + 下游四仓跟随。相关决策：`ADR-0006` §2.3（方向/角色/动作级）、`ADR-0017`（12 列报告）、`ADR-0005`（本地优先）。
+> **事实源**: k3dge 与 peers（audit / cache）之间的编排接口机器契约。k3dge 只验信封与形式，不验内容。本页改动＝契约变更：`k3dge sync` + 下游四仓跟随。相关决策：`ADR-0006` §2.3（方向/角色/动作级）、`ADR-0017`（12 列报告）、`ADR-0005`（本地优先）。
 
 ## 0. 定位与角色模型
 
 - 协议层 = MCP stdio；每仓一个 server；endpoint 登记表 = `.mcp.json`（唯一，不得在 `pipeline.toml` 重复 `command/args/env/cwd`）。
-- k3dge 只认三个**角色**：`audit / quality / cache`。`[roles.<role>] bind = "<server>"` 一行完成角色→具体 harness 绑定；**k3dge 代码不出现具体 harness 名**。
+- k3dge 只认两个**角色**：`audit / cache`（quality 已并入 audit 模块，不再是独立角色，见 `ADR-0025`）。`[roles.<role>] bind = "<server>"` 一行完成角色→具体 harness 绑定；**k3dge 代码不出现具体 harness 名**。
 - 角色分**两类**，契约按类分化（v0.3；把 cache 硬套 gate 模型是 v0.2 的分类错误）：
 
-| | gate 类（audit / quality） | service 类（cache） |
+| | gate 类（audit） | service 类（cache） |
 | --- | --- | --- |
 | 定位 | 编排对象：派活→收工件→验→计数→进放行链 | 查询服务：同步一问一答；失败＝能力暂缺，**永不阻断流程**（现消费者：① k3dge doc-audit 相关文档前路由；② `k3dge status` 观测行——`.k3che/` 存在才探活，观测永不进判定；③ `task create` 相似检查（语料含 tasks/archive；只提示不裁决）。证据/账本不归 k3che，见 §7 v0.5 修正） |
 | 输入 | 审计线（§3：一单一线一 checkout，锁点 L=基线） | 无送检——它**持续只读**消费仓文件（同机信任域），尽力而为的新鲜度 |
@@ -82,7 +82,7 @@ role.collect(job_id)                     → {ok, kind:<工件>, payload:{…}} 
 | kind | payload | 机验 | 产出方 |
 | --- | --- | --- | --- |
 | `report` | 12 列表格 markdown ＋ 元信息行（审计人/透镜来源/基线/范围） | `ADR-0017` `*_check_report` ＋ 待修/有意留/已修 计数自洽 | audit 席 |
-| `findings` | `[{id,severity,type,desc,path,line}]` ＋ summary 计数 | 字段齐、枚举合法 | quality |
+| `findings` | `[{id,severity,type,desc,path,line}]` ＋ summary 计数 | 字段齐、枚举合法 | audit 模块内判读窗 |
 | `hits` | `[{path,title,score}]` ＋ `hit_rate` | 结构齐（**service 类：观测指标，不参与放行判定**） | cache |
 
 k3dge 对通过信封的字节**机械落盘**（`docs/reviews/`，记 hash，绝不补写或改写内容），然后只数计数、决定放行。
@@ -90,7 +90,7 @@ k3dge 对通过信封的字节**机械落盘**（`docs/reviews/`，记 hash，�
 ## 5. 兼容与桩
 
 - 骨架期：`bind = "dummy"`（`tests/fixtures/dummy_peer.py`，同契约、canned 工件：一份 `待修=2`、一份 `待修=0`）。真 peer 在各自仓内替换，**k3dge 一行不改**。
-- 过渡：legacy `k3dit.actions.*` / `k3lity.actions.*` 调用名映射到 `audit.* / quality.*`；角色绑定全量落地后废弃。
+- 过渡：legacy `k3dit.actions.*` 调用名映射到 `audit.*`；`k3lity.actions.*` 随合并退役（无 quality 角色）。
 
 ## 7. 审计复用（CAS）与锁——预筛只作用于人工入口（v0.3.1；锁 v0.6）
 

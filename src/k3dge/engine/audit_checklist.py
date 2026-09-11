@@ -3,7 +3,7 @@
 Records whether the *audit conditions* are met for the current milestone and the
 state of the audit loop — not "can I seal". The checklist holds:
   - the quantifiable suggestion snapshot (audit_trigger: 账齐 / C2 / 体积) -> reasons
-  - report closure: audit + quality 12-col reports' 待修 (k3dit + k3lity)
+  - report closure: the single audit 12-col report's 待修 (merged audit module, ADR-0025)
   - verify_attempts: the >3-loop escalation counter (reset on each audit initiation)
   - audit_started_at: when the current audit pass was initiated (manual or auto)
 
@@ -43,13 +43,13 @@ def _snapshot(workspace: Path, milestone_id: str) -> dict:
     from k3dge.engine.milestone import _find_report, _parse_audit_stats
 
     suggested, reasons = compute_audit_suggestion(workspace)
-    closure = {}
-    for kind in ("audit", "quality"):
-        found = _find_report(workspace, milestone_id, kind)
-        closure[kind] = {
+    found = _find_report(workspace, milestone_id, "audit")
+    closure = {
+        "audit": {
             "present": found is not None,
             "pending": (_parse_audit_stats(found[1])["待修"] if found else None),
-        }
+        },
+    }
     return {
         "audit_suggested": suggested,
         "reasons": reasons,

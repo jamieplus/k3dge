@@ -126,12 +126,19 @@ class TestAuditTrigger(TestCase):
             "| A1 | x | s | p | t | d | l | 已修 | - | - | - | - |\n"
         )
         (ws / "docs" / "reviews" / "2026-09-01-M7-audit.md").write_text(_clean, encoding="utf-8")
-        # quality report still missing -> not closed
-        self.assertFalse(audit_trigger.audit_closed(ws, "M7"))
-        (ws / "docs" / "reviews" / "2026-09-01-M7-quality.md").write_text(
-            "<!-- k3dge:kind: quality -->\n" + _clean, encoding="utf-8"
-        )
+        # 单报告（ADR-0025）：no quality peer -> audit clean is enough
         self.assertTrue(audit_trigger.audit_closed(ws, "M7"))
+
+    def test_milestone_less_report_does_not_close(self) -> None:
+        """C-new：无里程碑归属的 12 列报告（如 doc-audit 通稿）不得冒充某里程碑审计闭环。"""
+        ws = _base_ws()
+        _clean = (
+            "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+            "| A1 | x | s | p | t | d | l | 已修 | - | - | - | - |\n"
+        )
+        (ws / "docs" / "reviews" / "2026-09-10-doc-audit-docs.md").write_text(_clean, encoding="utf-8")
+        self.assertFalse(audit_trigger.audit_closed(ws, "M7"))
 
 
 class TestWorkspaceHints(TestCase):

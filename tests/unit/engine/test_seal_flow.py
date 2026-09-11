@@ -115,19 +115,13 @@ _AUDIT_CLEAN = _AUDIT.replace("待修", "已修").replace("有意留", "已修")
 
 
 def _clean_report(ws, mid="M1"):
-    """Both streams (audit + quality) closed: each a 12-col report with 待修=0."""
+    """Single merged audit report (ADR-0025) with 待修=0; a stray quality file must be ignored."""
     (ws / "docs" / "reviews" / f"2026-09-01-{mid}-audit.md").write_text(_AUDIT_CLEAN, encoding="utf-8")
-    (ws / "docs" / "reviews" / f"2026-09-01-{mid}-quality.md").write_text(
-        "<!-- k3dge:kind: quality -->\n" + _AUDIT_CLEAN, encoding="utf-8"
-    )
 
 
 def _open_report(ws, mid="M1"):
-    """Both streams present but each still has 待修>0 (audit loop not closed)."""
+    """Single audit report still has 待修>0 (audit loop not closed)."""
     (ws / "docs" / "reviews" / f"2026-09-01-{mid}-audit.md").write_text(_AUDIT, encoding="utf-8")
-    (ws / "docs" / "reviews" / f"2026-09-01-{mid}-quality.md").write_text(
-        "<!-- k3dge:kind: quality -->\n" + _AUDIT, encoding="utf-8"
-    )
 
 
 class TestAuditFlow(TestCase):
@@ -464,52 +458,30 @@ class TestRatchetAuditStep(TestCase):
         assert st == "closed" and "重试成功" in msg
 
 
-class TestQualityRatchetLeg(TestCase):
-    """G3 续：quality 腿同形步进（roles.quality.mode=ratchet）。"""
+class TestSingleAuditReport(TestCase):
+    """ADR-0025 合并审计模块：一轮 = 一份 12 列；无独立 quality peer/leg。"""
 
-    _BOTH = ('[roles.audit]\nbind = "k3dit"\nmode = "ratchet"\n[roles.quality]\nbind = "k3lity"\n'
-             'mode = "ratchet"\n')
-
-    def _ws2(self):
-        ws = _ws()
-        (ws / ".agent" / "pipeline.toml").write_text(self._BOTH, encoding="utf-8")
-        return ws
-
-    def test_audit_closed_quality_opens_ticket(self):
-        ws = self._ws2()
+    def test_audit_ratchet_closed_is_audited_without_quality(self):
         import json as _j
 
+        ws = _ws()
         (ws / ".agent" / "audit_jobs.json").parent.mkdir(exist_ok=True)
         (ws / ".agent" / "audit_jobs.json").write_text(_j.dumps({"jobs": [
             {"job_id": "A-1", "role": "audit", "milestone_id": "M1", "state": "collected",
              "merge_ok": True, "report": "r.md", "counts": {"待修": 0}}]}), encoding="utf-8")
-        with mock.patch("k3dge.engine.audit_flow.submit_audit",
-                        return_value={"ok": True, "job_id": "Q-9", "state": "awaiting_audit"}):
+        (ws / "docs" / "reviews" / "2026-09-01-M1-audit.md").write_text(_AUDIT_CLEAN, encoding="utf-8")
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
             status, msg = ms.run_audit_flow(ws, "M1", prompter=ms._Prompt(answers=["y"]))
-        self.assertEqual(status, "ratchet_open")
-        self.assertIn("Q-9", msg)
+        self.assertEqual(status, "audited")  # 单一审计腿闭环即可，无需 quality 票
 
-    def test_both_legs_closed_is_audited(self):
-        ws = self._ws2()
-        import json as _j
-
-        (ws / ".agent" / "audit_jobs.json").write_text(_j.dumps({"jobs": [
-            {"job_id": "A-1", "role": "audit", "milestone_id": "M1", "state": "collected",
-             "merge_ok": True, "report": "r.md", "counts": {"待修": 0}},
-            {"job_id": "Q-1", "role": "quality", "milestone_id": "M1", "state": "collected",
-             "merge_ok": True, "report": "q.md", "counts": {"待修": 0}}]}), encoding="utf-8")
-        status, msg = ms.run_audit_flow(ws, "M1", prompter=ms._Prompt(answers=["y"]))
-        self.assertEqual(status, "audited")
-
-    def test_push_fans_out_to_both_legs(self):
+    def test_push_present_audit_leg(self):
         from k3dge.engine import audit_flow
 
         ws = _ws()
         import json as _j
 
         (ws / ".agent" / "audit_jobs.json").write_text(_j.dumps({"jobs": [
-            {"job_id": "J-a", "role": "audit", "milestone_id": "M1", "state": "awaiting"},
-            {"job_id": "J-q", "role": "quality", "milestone_id": "M1", "state": "awaiting"}]}), encoding="utf-8")
+            {"job_id": "J-a", "role": "audit", "milestone_id": "M1", "state": "awaiting"}]}), encoding="utf-8")
         calls = []
 
         def fake(_ws, ref, *, io=None, timeout_default=60, arguments=None):
@@ -519,4 +491,4 @@ class TestQualityRatchetLeg(TestCase):
         with mock.patch("k3dge.engine.worktree.present", return_value=[]), \
              mock.patch("k3dge.engine.audit_flow.run_action", side_effect=fake):
             r = audit_flow.push_present(ws, "M1")
-        assert r["ok"] and {c[0] for c in calls} == {"audit.present", "quality.present"}
+        assert r["ok"] and {c[0] for c in calls} == {"audit.present"}

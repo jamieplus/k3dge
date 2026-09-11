@@ -361,6 +361,14 @@
       "tokens": "INCIDENT REPORT: [M7] 双腿首夜案卷互踩（quality 签署件覆盖审计签署件）"
     },
     {
+      "path": "docs/incidents/INC-20260910-CON-audit-merge-doc-drift.md",
+      "type": "incidents",
+      "id": "INC-20260910-CON-audit-merge-doc-drift",
+      "title": "Incident: 合并审计模块/postmortem 落地后设计文档滞后于已决行为",
+      "status": "closed",
+      "tokens": "Incident: 合并审计模块/postmortem 落地后设计文档滞后于已决行为"
+    },
+    {
       "path": "docs/memo/2026-08-21-deferred-standards.md",
       "type": "memo",
       "id": "2026-08-21-deferred-standards",
@@ -460,9 +468,9 @@
       "path": "docs/protocols/quality_default.md",
       "type": "protocols",
       "id": "quality_default",
-      "title": "Quality Protocol — Default (k3lity 12 列)",
+      "title": "Quality Protocol — 已并入合并审计模块（legacy 指针）",
       "status": "",
-      "tokens": "Quality Protocol — Default (k3lity 12 列)"
+      "tokens": "Quality Protocol — 已并入合并审计模块（legacy 指针）"
     },
     {
       "path": "docs/protocols/verify_default.md",
@@ -479,6 +487,14 @@
       "title": "封板收摊清单（上下文压缩）: M7",
       "status": "",
       "tokens": "封板收摊清单（上下文压缩）: M7"
+    },
+    {
+      "path": "docs/reviews/2026-09-10-doc-audit-docs.md",
+      "type": "reviews",
+      "id": "2026-09-10-doc-audit-docs",
+      "title": "审计：文档审计（ADR-0024/0025 + AGENTS/rules/pipeline/protocols/tasks + k3dit spec）",
+      "status": "",
+      "tokens": "审计：文档审计（ADR-0024/0025 + AGENTS/rules/pipeline/protocols/tasks + k3dit spec）"
     },
     {
       "path": "docs/specs/_template/spec.md",
@@ -593,11 +609,11 @@
       "tokens": "首案真跑前遗留清单（k3dge 侧）"
     },
     {
-      "path": "docs/tasks/2026-09-05-M8-audit-doc_audit_architecture_3.md",
+      "path": "docs/tasks/2026-09-05-M8-audit-doc_audit_architecture_3.done.md",
       "type": "tasks",
-      "id": "2026-09-05-M8-audit-doc_audit_architecture_3",
+      "id": "2026-09-05-M8-audit-doc_audit_architecture_3.done",
       "title": "doc-audit: 文档作者合规审计（architecture 等 3 处）",
-      "status": "idea",
+      "status": "done",
       "tokens": "doc-audit: 文档作者合规审计（architecture 等 3 处）"
     },
     {
@@ -703,6 +719,14 @@
       "title": "修席接受改由快照 diff 推断（禁二值空翻已修）",
       "status": "idea",
       "tokens": "修席接受改由快照 diff 推断（禁二值空翻已修）"
+    },
+    {
+      "path": "docs/tasks/2026-09-10-M8-feat-hall_harvest_repo_scope.md",
+      "type": "tasks",
+      "id": "2026-09-10-M8-feat-hall_harvest_repo_scope",
+      "title": "Hall 收成接入 AUDIT.md 侧车 + @file/@repo v2 钉",
+      "status": "idea",
+      "tokens": "Hall 收成接入 AUDIT.md 侧车 + @file/@repo v2 钉"
     },
     {
       "path": "docs/tasks/2026-09-10-M8-fix-judge_skip_leftover.md",

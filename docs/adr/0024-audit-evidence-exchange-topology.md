@@ -10,9 +10,11 @@ Note: ① 2026-09-07 两次就地修订（Proposed 未定稿，AUTHORING「过�
       ② 2026-09-10 就地修订（Proposed 段）：删除悬空引用 `ADR-0023 §7`（该 ADR 无 §7）。授权人：Core Maintainer。
       ③ 2026-09-10 正交去重（Proposed 段）：P3 裁决签名/钉收钉细节改指 ADR-0025 §2.2/§2.3/§2.7，本 ADR 只留主权四章与审计线形状。授权人：Core Maintainer。
       ④ 2026-09-10 正交收尾（Proposed 段）：报告落盘与 ADR-0025 §2.7 对齐（k3dge 进程落盘 / Hall 只 join）。授权人：Core Maintainer。
-      ⑤ 2026-09-10 经 Core Maintainer 本轮显式授权，改名/平移编号 ADR-0026→ADR-0024（填 0024 空缺；全仓引用同步；旧体系 0024 曾→0019，按 ADR-0023 §2.3 不建对照表）。依 `docs/adr/AUTHORING.md`。
+      ⑤ 2026-09-10 经 Core Maintainer 本轮显式授权，改名/平移编号（重排前该文件占另一号 → 本号 ADR-0024，填空缺；全仓引用同步；按 ADR-0023 §2.3 不建旧号对照表）。依 `docs/adr/AUTHORING.md`。
       ⑥ 去 changelog 化（Context 只留约束：删「早期推演 / 重设计（两次收敛）」时间线）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
       ⑦ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与章节号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
+      ⑧ §2.1 主权表按阶段拆分「审计意见 / 报告 join / 报告落盘」三行（消除与 ADR-0025 §2.7 的表面冲突：署名在窗、join 在 Hall、落盘在 k3dge，属不同阶段）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（Core Maintainer 会话授权，agent 代改字，未经 k3dit 文审）。
+      ⑨ D-2/D-3 独立文审回填 2026-09-10，经 Core Maintainer 本轮授权，依 `docs/adr/AUTHORING.md`：① Note 旧号改事件表述（消 `pointer_dangling`）；② 补独立文审证据——本轮就地修订（⑧ 及 §2.1 措辞）经 k3dit Doc Audit 透镜独立复核，报告 `docs/reviews/2026-09-10-doc-audit-docs.md`（首轮待修 7，修后复审至 0）；过闸口径 = real lens（独立 agent 执行，非自审）。
 ---
 
 # ADR-0024: 审计证据交换拓扑（审计线 · 一单一条 · 树上钉 · 分支写回）
@@ -33,7 +35,8 @@ Note: ① 2026-09-07 两次就地修订（Proposed 未定稿，AUTHORING「过�
 | 证据本体（分支 `k3dit/<单>` + worktree）与 GC | **k3dge**（消费仓）：线自锁点 L 拉起；闸过合主干后删现场删线（仅已并入时）；废单删分支——主干从未脏 | 被审物不迁主权；线是消费侧的物 |
 | 工单（findings / 裁决史 / 状态机 / 报告） | **审计模块**：账本只存机构判断物 + 引用（baseline / branch / scope），不存一字节客户代码 | 数据最小化 |
 | 阅件 | **席位**：submit 得 `{baseline, branch, wt_dir, scope}`；Hall 按 scope 拷窗，轮毕即清；席位/机构永不直接操作消费仓 `.git` | 处理≠归档 |
-| 报告 | **审计席位/人**产出并签署；渲染＝机械抽取（账本⋈delta），不重打字 | 署名见 ADR-0025 §2.2/§2.7 |
+| 审计意见（findings/裁决） | **判读窗/复核窗**各自署名（窗钥签本窗收成）；窗产出即意见，Hall 不代笔 | ADR-0025 §2.2/§2.7 |
+| 报告 join | **Hall 进程**把各窗署名收成机械合并成 12 列（账本⋈delta，不判断、不重打字） | ADR-0025 §2.7 |
 | 报告落盘 | **k3dge 进程**机械放置 `docs/reviews/`（可复算、不产判断）；Hall 只 join/验签 | ADR-0006 §2.3.6 |
 
 **裁决签名规则（P3）**：翻转与署名机制以 ADR-0025 §2.2/§2.3/§2.7 为准（章笔分离；修席只改物，人或席位署名）。

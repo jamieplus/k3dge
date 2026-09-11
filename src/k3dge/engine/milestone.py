@@ -997,9 +997,14 @@ def _find_report(workspace: Path, milestone_id: str, kind: str = "audit"):
             continue
         if _report_kind(f.name, text) != kind:
             continue
-        if milestone_id and not _has_milestone_token(text, milestone_id):
+        if milestone_id:
             fn_ms = _filename_milestone(f.name)
-            if fn_ms and fn_ms != milestone_id:
+            if fn_ms:
+                if fn_ms != milestone_id:
+                    continue
+            elif not _has_milestone_token(text, milestone_id):
+                # 报告既无里程碑文件名、正文也无该里程碑 token（如 doc-audit 通稿）：
+                # 不得充当任一里程碑的审计闭环（否则 seal_ready 假阳）。
                 continue
         candidates.append((f.stat().st_mtime, f, text))
     if not candidates:
@@ -1474,11 +1479,11 @@ def run_audit_flow(
     prompter: Optional[_Prompt] = None,
     max_verify_attempts: int = 3,
 ) -> Tuple[str, str]:
-    """Independent audit entry: BOTH k3dit.audit and k3lity.quality produce 12-col
-    reports, each must reach 待修==0 to count as "audited once". Verify is
-    per-report (audit→audit report, quality→quality report). Returns
-    (status, message); status ∈ {audited, rejected, escalated}. Seal unlocks only
-    after this closes (`run_seal_flow`).
+    """Independent audit entry: the merged audit module (ADR-0025) produces ONE
+    12-col report (k3dit audit leg; quality is a window inside the module, not an
+    independent peer). 待修==0 counts as "audited once"; verify checks that one
+    report. Returns (status, message); status ∈ {audited, rejected, escalated}.
+    Seal unlocks only after this closes (`run_seal_flow`).
     """
     from k3dge.engine import audit_checklist as ac, nextstep
     from k3dge.engine.pipeline_runner import run_action
@@ -1499,23 +1504,11 @@ def run_audit_flow(
             return "escalated", step_msg + "\n" + nextstep.NextStep.from_state(
                 "escalated", milestone_id).render_cli()
 
-    # kind -> (produce action, verify action)；ratchet 模式下审计腿已经工单闭环，只剩 quality
-    streams = {
-        "audit": ("k3dit.actions.audit", "k3dit.actions.verify"),
-        "quality": ("k3lity.actions.quality", "k3lity.actions.verify"),
-    }
+    # 单报告（ADR-0025 合并审计模块）：一轮 = 一份 12 列；quality 是模块内窗口，
+    # 不再是独立 peer/report。ratchet 模式下审计腿已由步进器闭环，streams 空。
+    streams = {"audit": ("k3dit.actions.audit", "k3dit.actions.verify")}
     if ratchet:
         streams.pop("audit")
-    # quality 腿同形换源（09-04）：roles.quality.mode="ratchet" ⇒ 与审计腿同一工单步进
-    if _audit_mode(workspace, "quality") == "ratchet":
-        q_status, q_msg = _ratchet_audit_step(workspace, milestone_id, io=prompt.out_stream, role="quality")
-        if q_status != "closed":
-            if q_status == "progress":
-                return "ratchet_open", q_msg + "\n" + nextstep.NextStep.from_state(
-                    "ratchet_open", milestone_id, reasons=["quality 腿: " + q_msg[:100]]).render_cli()
-            return "escalated", q_msg + "\n" + nextstep.NextStep.from_state(
-                "escalated", milestone_id).render_cli()
-        streams.pop("quality", None)
 
     # mandatory audit + fix loop, capped at `max_verify_attempts` verifies.
     while True:
@@ -1578,10 +1571,10 @@ def run_audit_flow(
             return "rejected", msg + "\n" + nextstep.NextStep(
                 state="rejected", milestone=milestone_id, note="stop / 转人工干预（待修未修复且 agent 拒绝修复）"
             ).render_cli()
-        # agent fixes externally -> loop re-runs audit AND quality, each verifying its own report
+        # agent fixes externally -> loop re-runs the audit report
         continue
 
-    # verify phase: per-report secondary cross-check (audit→audit, quality→quality).
+    # verify phase: secondary cross-check of the audit report.
     for _kind, (_produce_action, verify_action) in streams.items():
         # Verify is per-report and needs to be told *which* report (the check tools take a
         # path); without this the mcp transport can never succeed and falls to manual.
@@ -1594,7 +1587,7 @@ def run_audit_flow(
         except Exception:
             pass
     ac.reset_verify_attempts(workspace)
-    msg = f"Milestone {milestone_id}: 审计闭环（audit + quality 报告 待修=0），可以谈封板。"
+    msg = f"Milestone {milestone_id}: 审计闭环（合并审计模块 12 列报告 待修=0），可以谈封板。"
     return "audited", msg + "\n" + nextstep.NextStep.from_state("seal_ready", milestone_id).render_cli()
 
 

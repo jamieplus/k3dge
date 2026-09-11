@@ -16,14 +16,11 @@
 
 # 角色层（peer contract §0）：编排只认角色；角色→实现一处可换（含桩 bind = "dummy"）。
 # 两类角色（v0.3）：gate 类走审计线/工件/基线/两态；service 类同步查询、失败即 skip，永不进放行链。
-# 流程引用仍兼容 legacy 直名（k3dit.actions.*）；新流程一律走角色名（audit.*/quality.*/cache.*）。
+# 流程引用仍兼容 legacy 直名（k3dit.actions.*）；新流程一律走角色名（audit.*/cache.*）。
+# 质量不在角色表：它是合并审计模块内的窗口（ADR-0025），无独立 peer。
 [roles.audit]
 bind = "k3dit"
 mode = "ratchet"   # 审计腿=棘轮工单步进（ADR-0024）；缺省 "scaffold" 为旧一次性形
-
-[roles.quality]
-bind = "k3lity"
-mode = "ratchet"   # 质量腿同形棘轮（09-04 移植内核）
 
 [roles.cache]
 bind = "k3che"
@@ -66,43 +63,8 @@ transports = [
   { provider = "manual", protocol = "docs/protocols/verify_default.md" },
 ]
 
-# k3lity (quality) produces a SECOND 12-col report in the same audit pass:
-# one "audited once" = audit report (k3dit) + quality report (k3lity), each 待修==0.
-# Chain mcp→cli→manual (manual = fill quality report per protocol; no fake auto-score).
-[peers.k3lity]
-enabled = true
-
-[peers.k3lity.actions.submit]
-transports = [
-  { provider = "mcp", tool = "k3lity_audit_submit", timeout = 15 },
-]
-
-[peers.k3lity.actions.collect]
-transports = [
-  { provider = "mcp", tool = "k3lity_audit_collect", timeout = 15 },
-]
-
-[peers.k3lity.actions.status]
-transports = [
-  { provider = "mcp", tool = "k3lity_audit_job_status", timeout = 10 },
-]
-
-[peers.k3lity.actions.present]
-transports = [
-  { provider = "mcp", tool = "k3lity_audit_present", timeout = 10 },
-]
-
-[peers.k3lity.actions.quality]
-transports = [
-  { provider = "mcp", tool = "k3lity_score", timeout = 30 },
-  { provider = "manual", protocol = "docs/protocols/quality_default.md" },
-]
-
-[peers.k3lity.actions.verify]
-transports = [
-  { provider = "mcp", tool = "k3lity_check_report", timeout = 15 },
-  { provider = "manual", protocol = "docs/protocols/quality_default.md" },
-]
+# 质量是合并审计模块内的窗口（ADR-0025），不再是独立 peer：
+# 无 [peers.k3lity]、无 quality report/verify 腿。一份 12 列报告即一轮。
 
 # Optional cache lens — NOT on the mandatory seal path. Degrades to `skip`.
 [peers.k3che]
@@ -120,16 +82,14 @@ transports = [
   { provider = "skip" },
 ]
 
-# 1) Entering seal triggers BOTH mandatory reports: audit (k3dit) + quality (k3lity).
+# 1) Entering seal triggers the single mandatory audit (merged audit module, ADR-0025).
 [pipelines.on_seal_enter]
 stages = [
   "k3dit.actions.audit",
-  "k3lity.actions.quality",
 ]
 
-# 2) Pre-seal verify is per-report closure (audit→audit report, quality→quality report).
+# 2) Pre-seal verify checks that one report.
 [pipelines.on_pre_seal]
 stages = [
   "k3dit.actions.verify",
-  "k3lity.actions.verify",
 ]

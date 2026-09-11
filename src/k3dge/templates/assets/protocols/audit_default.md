@@ -6,9 +6,9 @@
 
 `docs/reviews/YYYY-MM-DD-<scope>.md`，表头 12 列 `ID|日期|严重度|优先级|类型|问题描述|位置|状态|处置|验证|复审|验收`（`状态∈{已修,待修,有意留}`；`复审∈{待复审,通过,驳回}`；`验收` 为 `验收人 YYYY-MM-DD [#reason]`）。
 
-> **位置钉子**：在每行 `位置` 那处代码/文档旁钉一行短标记 `# k3dit:pending <ID>`（文档用 `<!-- k3dit:pending <ID> -->`），让修的人打开文件即见（`k3dge check` 扫到并在 `[NEXT]` 报 `pending=N`）。**标记只是指针**：理由/改法/验收只写本表，不写进正文（防第三份事实漂移）。已修删标记、有意留改 `k3dit:leftover <ID>`。
+> **位置钉子（写源）**：在每行 `位置` 处钉 v2 钉 `# k3dit:pending <ID> sev=.. prio=.. type=.. <描述>`（文档用 `<!-- ... -->`）。判读四格写源＝钉；账本与 12 列报告＝钉的投影（每轮 harvest 重生成，非手填）；`k3dge check` 扫到并在 `[NEXT]` 报 `pending=N`。生命周期：修席翻 `fixnote`、复核背书翻 `fixed`、有意留翻 `leftover`，**拔钉归 Hall**（peer_contract §8 / ADR-0025 §2.7）。
 
-> **一轮 = 两份报告**：本审计层（k3dit）出审计报告外，质量层（k3lity）另出 `...-quality.md`（`k3dge:kind: quality` 标类，见 `quality_default.md`）。两份都 `待修=0` 才算"审过一遍"；复审各自核对各自报告。
+> **一轮 = 一份报告**：合并审计模块（ADR-0025）出**一份** 12 列报告——文档审计与代码/价值/复核各窗产出后 join 成这一份；`待修=0` 才算"审过一遍"。质量不再是独立 peer/报告（`quality_default.md` 仅存历史指针）。
 
 ## 5-Pass 透镜（一次一轮）
 
@@ -43,7 +43,7 @@ L2 入场券须逐条确认（agent 进车间前绑定到任务）：
 - **ADR — 集合自洽（冲突 / 覆盖 / 正交）**：两篇 *未 superseded* 的 ADR 不应无声共享 scope / decision-topic（冗余）；**正交性**——Decision 不得复述其它 ADR 的规范正文（复述＝第二源），跨篇事实应以 `见 ADR-XXXX §Y` 指针引用、单一 owner；指针须完整——`Supersedes`/`Related` 不悬空、被取代的 ADR 不再被当现行引用。事实来自 `k3dge_adr_index`（AdrIndex + O(n) 重叠/指针 findings，**非判断**）；冲突/冗余/正交由 k3dit 判。
 - **通用 — AUTHORING 规则合规**：改动文档须符合其类型 `AUTHORING.md`（结构已由 `.schema.json` 硬闸；此处审"是否真按软规则写"）。ADR 的 `Note:` 只有一个字段（默认 `-`），多次操作按 ① ② ③ 编号续写、不并列多行；动用例外（就地修订 / 物理删除 / 改名）必须留痕，含授权席位与过闸口径（real lens | manual fallback + 可复跑证据）。**正文不写修订史**（「修正（date）」「原稿 / 旧句 / 现稿」层归 `Note:`；沿革与授权在 Note，正文只留现行决策）。**人读优先**：决策先行；一行一点（行宽 ~100 字）；函数名/路径/步骤序等实现细节下沉 `docs/specs/` 或 task；引用放句末；标题用名词短语、不堆斜杠。
 
-**不审**：文本质量（写得好不好 → k3dit LLM 部分）、思想是否值得（→ k3lity 里程碑软审）。文档审查 ≠ 给思想打分。
+**不审**：文本质量（写得好不好 → k3dit LLM 部分）、思想是否值得（→ 合并审计模块内的价值窗，非独立 peer）。文档审查 ≠ 给思想打分。
 
 **k3dge 提供的事实工具**：`k3dge_adr_index`（ADR 索引 + 重叠/指针 findings JSON，**非判断**；冲突/冗余由 k3dit 判）。
 
