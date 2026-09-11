@@ -30,6 +30,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
       ㉒ 审计耗时统计（Proposed 段）2026-09-10，经 Core Maintainer 授权：进程侧记 `collect`/`compare`/`verify` 事件 `dur_s`（spawn→收成墙钟），`observe` 聚合逐窗/合计，报告附录同源——只出事实、不判定、不占判读窗（G8 观测的一部分；统计席位仍待后续）。
       ㉓ 统计席位（部分，Proposed 段）2026-09-10，经 Core Maintainer 授权：事件记座位 `tries`/成功 `model`；`observe` 汇总 counts/tries/models/`verify_fail`/`bounces`/耗时并出**观测行 `line`**；`job_status` 回带 `line`/`total_dur_s`/`tries`，`peer_status` 透传给 `k3dge audit status`。只出事实、不判定；逃逸/误诊口径与跨单汇总仍待定。
       ㉔ 统计口径 + 统计账（Proposed 段）2026-09-10，经 Core Maintainer 授权：k3dit 记 **append-only 统计账** `ledger/stats.jsonl`（每单终态一条：counts/findings/windows/tries/models/bounces/verify_fail/耗时/rounds）；口径（可数、不判定）＝误诊率 disputed/total、有意留率 leftover/total、打回率 bounces/rounds、座位重试率 Σtries/窗运行数、逃逸代理「重提率」见 `metrics.recurrence()`；`k3dit stats --by {milestone,job,date,type,severity,priority,state,window,model}` **任意维度聚合**（账是唯一源，报告/观测行是投影）。
+      ㉕ 模型维度（Proposed 段）2026-09-10，经 Core Maintainer 授权：事件记**失败档链** `tried=["<model>: <why>", …]`；判读发现打**产出模型** `finding.model`、修/核记 `last_model`；`stats.jsonl` 的 findings 带 `model`；`k3dit stats --by model`＝发现级聚合；`--models` 出按模型度量（发现数/误诊率/有意留率/窗运行数/重试/耗时/失败档），供模型选型。只出事实、不判定。
 # Note: default `-`. Exactly one `Note:` field per ADR. Record each authorized operation
 # as a numbered segment (① ② ③ …): who/when authorized and how it actually passed the
 # gate (real lens vs manual fallback). Append segments; do not erase old traces.
