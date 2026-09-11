@@ -16,7 +16,7 @@
 | provenance/baseline | 必须（不符即拒收） | 不适用（没有"某次审计的输入快照"可言） |
 | 时序 | `submit/collect` 两态，等待活在协议外（§1） | 同步单次调用（§1 的 `call` 简式） |
 | 失败终态 | 降级 → `escalated` → 人确认 | `skip` 即正确终态（`mcp → skip` 合法）；同样要 `WARN[DOWNGRADE]` 如实可见 |
-| 绑定声明 | `[roles.audit] bind = "…" kind = "gate"`（默认） | `[roles.cache] bind = "…" kind = "service"` |接口与协议对得上即可换实现（含桩：`bind = "dummy"`）。
+| 绑定声明 | `[roles.audit] bind = "…" kind = "gate"`（默认） | `[roles.cache] bind = "…" kind = "service"`（接口与协议对得上即可换实现，含桩 `bind = "dummy"`） |
 - 边界清单（硬约束）：
   - k3dge **永不知道**：跑几轮、几席、什么模型、内部怎么分工；
   - peer **永不知道**：k3dge 的闸判据、seal 条件、里程碑状态；
@@ -92,6 +92,10 @@ k3dge 对通过信封的字节**机械落盘**（`docs/reviews/`，记 hash，�
 - 骨架期：`bind = "dummy"`（`tests/fixtures/dummy_peer.py`，同契约、canned 工件：一份 `待修=2`、一份 `待修=0`）。真 peer 在各自仓内替换，**k3dge 一行不改**。
 - 过渡：legacy `k3dit.actions.*` 调用名映射到 `audit.*`；`k3lity.actions.*` 随合并退役（无 quality 角色）。
 
+## 6. 违反契约时
+
+- 信封不过 / 工件不过 / `baseline` 不符 ⇒ 该次传输记失败 ⇒ `WARN[DOWNGRADE] action=… reason=…` ⇒ 走 `pipeline.toml` 链上下一档；全败 ⇒ `escalated`，`seal` 不放行。**不存在"静默收下不合格工件"**。
+
 ## 7. 审计复用（CAS）与锁——预筛只作用于人工入口（v0.3.1；锁 v0.6）
 
 - **锁与租约（v3）**：present 版本化即续租（无独立心跳/续期 RPC）；快照推进与分支更新一律 `git update-ref <ref> <new> <old>` CAS（进程内 jobs 锁）。
@@ -106,10 +110,6 @@ k3dge 对通过信封的字节**机械落盘**（`docs/reviews/`，记 hash，�
 - `--force`：跳过预筛直接全量。审计输出非确定，复用信任必须随时可破。
 - 预筛不制造新状态：闭环与否仍由 `audit_closed()` 判；预筛省的是**重跑成本**，不是判定。seal 的 attest 不因复用继承（不变）。
 - 角色归属（按 §0 表）：lens 版本归 k3dit 发布；blob 存取归 k3che（账本/镜像，只答"有没有"，不答"能不能用"）；三条件比对与流程分叉归 k3dge（纯形式校验，不解释对方内部）。
-
-## 6. 违反契约时
-
-- 信封不过 / 工件不过 / `baseline` 不符 ⇒ 该次传输记失败 ⇒ `WARN[DOWNGRADE] action=… reason=…` ⇒ 走 `pipeline.toml` 链上下一档；全败 ⇒ `escalated`，`seal` 不放行。**不存在"静默收下不合格工件"**。
 
 ## 8. 钉语法 v2（findings 的树侧介质；权威实现 `src/k3dge/engine/markers.py`）
 

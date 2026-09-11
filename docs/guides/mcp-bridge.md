@@ -83,19 +83,24 @@ k3dge mcp probe --json     # 同上的机读形态；全活 exit 0，有死 exit
 | Resource | `spec://manifest` | `.agent/manifest.json` | 实时读盘，UTF-8 字符串返回 |
 | Resource | `spec://domain/{domain}` | `docs/specs/<domain>/spec.md` | 单域契约事实源 |
 | Tool | `k3dge_check` | `ConsistencyEngine.evaluate()` | `with_tests` = selective L2；`force_full` = 校验全部 `manifest.domains`（L0/L1），与 git diff 解耦，不隐含跑测试 |
+| Tool | `k3dge_status` | `cli.status.workspace_status` | 合成工作区状态：domains / drift / pipeline / 未完成任务 |
 | Tool | `k3dge_verify_domain_contract` | `contract.verify_contract()` | 单域 `expected_hash` / `actual_hash` / `current_interface` |
 | Tool | `k3dge_sync` | `sync.generator.sync_all` | 回写 spec 接口块与哈希 |
 | Tool | `k3dge_version` | `version.show/bump` | 与 CLI `version` 同语义 |
 | Tool | `k3dge_task_list` | `milestone.list_tasks` | 顶层 `docs/tasks/*.md` 索引（title/status/milestone/priority），不含正文、不含 archive |
 | Tool | `k3dge_task_create` | `milestone.create_task` | 写入 living task 文件 |
 | Tool | `k3dge_task_done` | `milestone.mark_task_done` | 优先 `list` 返回的 path |
+| Tool | `k3dge_doc_list` | `doc_catalog.list_docs` | 文档目录薄索引（path/id/title/status/tokens），不回正文 |
+| Tool | `k3dge_doc_where` | `doc_catalog.where_doc` | 文档 id 解析为目录卡片（只回 path） |
+| Tool | `k3dge_doc_grep` | `doc_catalog.grep_docs` | 扫托管文档正文，只回 path（可选 line），不回 snippet |
 | Tool | `k3dge_milestone_control` | `milestone.(status|align|seal)` | `status` 查任务、`align` Full Matrix 回归、`seal` 三闸机原子归档 |
+| Tool | `k3dge_submit_audit_report` | `milestone.persist_external_audit_report` | 外来审计报告机械落盘为在档报告 |
 | Prompt | `k3dge_5pass_audit_prompt` | 优先 `../k3dit/docs/guides/audit-method.md`，否则 `docs/protocols/audit_default.md` | 只指路；同一审计入口，按 `target_scope` 路由代码 5-Pass / 文档 Doc Audit（ADR-0020）；不在 k3dge 内维护透镜 |
 | Tool | `k3dge_adr_index` | `engine.doc_catalog.analyze_adr_coverage` | ADR 集合自洽事实（重叠/指针 findings，非判断）；文档审计透镜原料 |
 
-## 入向现状：server 在 `mcp` 2.x 下起不来（已知、未修、不阻断出向）
+## 入向现状：server 已复活（2026-09-05，mcp 2.x 严格资源校验已修）
 
-2026-09-05 起本仓 server 复活：mcp 2.x 严格校验「resource URI 无模板变量 ⇒ handler 零参数」，修复形为 **resource 处理函数去 `workspace_path`、workspace 一律按 server CWD 解析**（宿主按项目目录起 server，定位靠 CWD 不靠猜参）。`spec://domain/{domain}` 保留模板变量。历史三选项见 `docs/tasks/archive/M7/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.md`（该票随 M7 封板归档，其"已修"判定当时不成立——M7 closure 补记二已认错）。
+2026-09-05 起本仓 server 复活：mcp 2.x 严格校验「resource URI 无模板变量 ⇒ handler 零参数」，修复形为 **resource 处理函数去 `workspace_path`、workspace 一律按 server CWD 解析**（宿主按项目目录起 server，定位靠 CWD 不靠猜参）。`spec://domain/{domain}` 保留模板变量。历史三选项见 `docs/tasks/archive/M7/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.done.md`（该票随 M7 封板归档，其"已修"判定当时不成立——M7 closure 补记二已认错）。
 
 ## 路径解析
 

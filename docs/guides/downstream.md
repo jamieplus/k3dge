@@ -11,6 +11,7 @@
 | 层 | 是什么 | 升什么 |
 | --- | --- | --- |
 | **判定核** | `.venv` 里按 `K3DGE_SOURCE` 装上的包 | `k3dge` CLI、`python -m k3dge.cli.mcp`、门禁/`task list`/`sync` 全部走这里 |
+| **拷进仓的协议与包装** | `AGENTS.md`、`scripts/gate.*`、`scripts/init.sh`、`.pre-commit-config.yaml`、docs 模板 | init **不会覆盖**已有文件（`_write_if_missing`） |
 
 ## 用的是哪一份 k3dge（K3DGE_SOURCE 统管裁决表）
 
@@ -23,7 +24,6 @@
 运行时只读 `.venv/k3dge-source.txt` 的**单行值**（init 按解析结果落盘：本地路径去 `[mcp]`、URL 原样、`pypi` 记名）；无此文件 = 老 venv，按 editable 本地源理解。
 **政策赢过收据**：`gate.*` 按 `K3DGE_SOURCE 环境（显式覆盖）> 本仓 pyproject `[tool.k3dge].source`（入库政策）` 的顺序求政策值，与落盘单行（装时收据）不一致 ⇒ `exit 2` 拒跑（重装或改政策后再走）——
 "用的是哪一份"是政策问题，不许静默将就；都没设 = legacy（收据即真相）。文档/元数据里的 GitHub 链接是**权威出处声明**，不参与运行时解析——两者分工：出处归声明，运行归落盘文件。
-| **拷进仓的协议与包装** | `AGENTS.md`、`scripts/gate.*`、`scripts/init.sh`、`.pre-commit-config.yaml`、docs 模板 | init **不会覆盖**已有文件（`_write_if_missing`） |
 
 Agent 用的索引工具（`k3dge task list`、MCP `k3dge_task_list` / `k3dge_sync` 等）属于**判定核**，不在下游仓里另存一份脚本。
 

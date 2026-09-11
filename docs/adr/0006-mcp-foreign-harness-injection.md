@@ -18,7 +18,7 @@ Note: ① 就地修订（非 Amend/Supersede）2026-09-02，经 Core Maintainer 
 > **Related**: ADR-0005（本地自用 / 职责切分）、ADR-0010（rules 切片）、ADR-0016（吸收纪律）、ADR-0021（doc-audit 非阻断）
 >
 > **`Status: Draft` 的保留理由**：
-> - ① 入向（本仓 server）在 `mcp` 2.x 下起不来，先搁置（`docs/tasks/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.md`）。
+> - ① 入向（本仓 server）在 `mcp` 2.x 下起不来，先搁置（`docs/tasks/archive/M7/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.done.md`）。
 > - ② §2.4 的"降级不可静默"只有规范，报告由谁执笔落盘尚未定席。
 > - ③ 未跑通的流程不顶 `Accepted`（闸按文档状态区分登记在 `docs/tasks/2026-09-02-M7-feat-check_gate_by_doc_status.md`）。
 
@@ -114,5 +114,5 @@ MCP 有两个方向，**互不借道、互不背书**：
 - **Down**：k3dge 开始持有子进程生命周期（spawn / 超时 / 清理 / stderr 归集）。
   - 出向调用冷启动实测 ≈0.81–1.01 s（可接受，CI 会慢）。
   - `escalated` 生效后未装 peers 的机器 `seal` 不可用（刻意）。
-  - `.mcp.json` 成为 k3dge 输入（public 面，见 `docs/tasks/2026-09-02-M7-feat-peer_outbound_mcp_client.md`）。
+  - `.mcp.json` 成为 k3dge 输入（public 面，见 `docs/tasks/archive/M7/2026-09-02-M7-feat-peer_outbound_mcp_client.done.md`）。
 - **Reopen when**：① 出向通道跑通一轮 audit/quality（届时转 `Accepted`）；② 需要跨机 / 多用户传输；③ 主流 harness 开始扫 `.agent/`；④ `check` 被要求按文档 `Status` 区分严格度（已登 task）。
