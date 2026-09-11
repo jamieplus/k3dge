@@ -71,6 +71,13 @@ RULE_ASSETS = (
     "01-docs-structure.md",
     "02-simplification.md",
     "03-self-contained.md",
+    "04-milestone.md",
+    "05-branches.md",
+    "06-memo.md",
+    "07-audit.md",
+    "08-design-discipline.md",
+    "09-absorption.md",
+    "10-structure-over-prose.md",
 )
 
 def _slug(raw: str) -> str:
