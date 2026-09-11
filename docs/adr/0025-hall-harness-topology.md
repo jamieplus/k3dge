@@ -24,6 +24,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
       ⑯ D-1..D-3 独立文审回填 2026-09-10，经 Core Maintainer 本轮授权，依 `docs/adr/AUTHORING.md`：① §2.2/§2.3 旧生命周期措辞抹平到 §2.7（复核翻 `fixnote→fixed`、Hall 拔；消同篇自相抵）；② Note 旧号改事件表述（消 `pointer_dangling`）；③ 补独立文审证据——本轮就地修订经 k3dit Doc Audit 透镜独立复核，报告 `docs/reviews/2026-09-10-doc-audit-docs.md`（首轮待修 7，修后复审至 0）；过闸口径 = real lens（独立 agent 执行，非自审）。
       ⑰ 复核加硬（Proposed 段）2026-09-10，经 Core Maintainer 授权，依 `docs/adr/AUTHORING.md`：① 钉加可选尾段 `evidence=<可复跑命令>`，结案前 Hall 逐条 retest；② 复核输入补 `facts/verify.txt`/`tests.json`；③ `fixed` 理由须落到具体符号/调用点/测试名，纯复述 diff 判 FORMAT；④ 复核与修/判用**不同模型**（第二双眼睛）；⑤ verify/evidence 红改「`fixed` 回退 `pending` + 打回」，超 MAX_BOUNCE 才升级。过闸口径 = manual fallback（Core Maintainer 会话授权，agent 代改字）。
       ⑱ §2.7 处置/验证分写 + 盲对比（Proposed 段，覆盖同日"处置＝复核署名"试作）2026-09-10，经 Core Maintainer 授权：修席 `fixnote` note＝报告**处置**（对复核盲：物化 `_blind_fixnotes` 抹 note、`findings.json` 的 `how` 置空）；复核独立写 `fixed` note＝报告**验证**；Hall 并置两侧 `_text_overlap` 粗判（零交集仅公示不阻断）。过闸口径 = manual fallback（Core Maintainer 会话授权）。
+      ⑲ §2.2 职责卡单一源（Proposed 段）2026-09-10，经 Core Maintainer 授权：窗职责/焦点/协议/样例＝入库 `src/k3dit/windows/<窗>.md`；Hall 写进窗 `README.md`+`facts/instruction.md`，`seat_prompt` 只指路（"先读职责卡"）不复述，消 prompt/instruction 双源（曾致 C1 提示与 harvest 不一致）。过闸口径 = manual fallback。
 # Note: default `-`. Exactly one `Note:` field per ADR. Record each authorized operation
 # as a numbered segment (① ② ③ …): who/when authorized and how it actually passed the
 # gate (real lens vs manual fallback). Append segments; do not erase old traces.
@@ -55,6 +56,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 - 合并＝把 audit/quality 的内容**精细编排为一个模块**（同屋檐、多窗多席），不是两套东西塞进一个目录。
 - 基本责任单元是**窗口**：签名钥、scope、方法论全部落窗口级。
 - 方法论正文可同源（如 audit-method.md）；独立的是判断权，不是文本。
+- **职责卡单一源**：每窗职责/焦点/协议(落/翻钉)/好坏事例/边界＝入库文件 `src/k3dit/windows/<窗>.md`；Hall 物化时写进窗 `README.md` 并落 `facts/instruction.md`，席 prompt 只**指向它**（"先读职责卡"）不复述——消 prompt/instruction 双源漂移。
 - k3dit / k3lity 作为历史来源消失，能力资产按窗口重分，旧名不再作为模块内划分依据。
 - **分离锚点**（独立性的全部载体，缺一即角色扮演）：① W1 目录墙；② 各判读窗签名钥互不相同；③ W5 章在人手。
 - 独立性不依赖独立工件或独立发布轨（一个模块同一构建可签多产物），但三载体必须真实存在且可测。
