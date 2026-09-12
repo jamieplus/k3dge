@@ -33,4 +33,4 @@ date: 2026-09-06
 ## Related
 
 - `docs/adr/0025-hall-harness-topology.md`（§2.2 合并语义、§2.4 并的边界；本 task 是 G 链起点，后续 G2–G8 见各 task）
-- `docs/memo/2026-09-05-hall-pattern-discussion.md`（推演账与废案表）
+- `docs/memo/archive/2026-09-05-hall-pattern-discussion.md`（推演账与废案表）

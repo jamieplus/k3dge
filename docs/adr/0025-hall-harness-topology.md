@@ -49,7 +49,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 - 治理类比：**场地**（Hall＝大厅/政务中心）只组织周转、无审批权；**坐馆单位**（各窗口）持有权威。审计机构的内部监督天然自治，不因外部组织存在而成立。
 - 信任前提：同机同信任域（`ADR-0006` S-13）、防伪不成立、Peer Contract §0 双盲与 §1.4 机器不自签仍需主体分离；被审物主权不迁（`ADR-0025` §2.1）。
 - 合并的争议点：审计方若同时持有消费仓账本、盖封板章，审计即降格为自我声明——合并可行与否取决于"墙"能否从约定变成机制。
-- 本 ADR 冻结拓扑、窗口划分与墙；每窗方法论细节与流转参数（队列优先级、回归面、度量口径）另行讨论（推演账见 `docs/memo/2026-09-05-hall-pattern-discussion.md`）。
+- 本 ADR 冻结拓扑、窗口划分与墙；每窗方法论细节与流转参数（队列优先级、回归面、度量口径）另行讨论（推演账见 `docs/memo/archive/2026-09-05-hall-pattern-discussion.md`）。
 
 ## 2. 决策 (Decision)
 
@@ -304,7 +304,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 
 ## 4. 相关
 
-- `docs/memo/2026-09-05-hall-pattern-discussion.md`（推演账与废案表）
+- `docs/memo/archive/2026-09-05-hall-pattern-discussion.md`（推演账与废案表）
 - `docs/memo/2026-09-05-industry-benchmark-vs-4-harness.md`（四缺项归属 §3.1–§3.2；观测 G8）
 - `docs/memo/2026-09-05-graph-lens-for-audit-and-qa.md`（§6 窗路由表、§7 理论编排）
 - §2.7（判读席写面/窗工件合成）折叠自本 ADR 早期拟稿（未单列）；其触发的 `peer_contract §8` v2 钉语法随实现步落（本 ADR 定稿不提前改活契约）。

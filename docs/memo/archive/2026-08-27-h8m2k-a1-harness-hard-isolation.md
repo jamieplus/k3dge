@@ -1,5 +1,7 @@
 # Memo：Harness 环境级硬隔离 vs 认知级软隔离（h8m2k-a1）
 
+> **Legacy note（归档 2026-09-12）**: 权威正文已落 `ADR-0025`；本档仅存推演/选项/废案，判定以 ADR-0025 为准。
+
 - **Date**: 2026-08-27
 - **Source**: `h8m2k-a1` 5-Pass 隔离机制论证 + `k3dge/k3dit` 现行落地
 - **Status**: memo（`k3dge` 已 `M7` `Gate SUCCESS`，`k3dit` 5-Pass 已 `k3dit_run_audit 1..5`，无需立即转 `tasks`）
@@ -7,7 +9,7 @@
 > **勘误（2026-09-03，逐条可复跑）** —— 本 memo 的核心判断（环境级硬隔离 > 认知级软隔离）仍然成立，下面两句事实已过期：
 >
 > 1. 「`k3dit` 5-Pass 已 `k3dit_run_audit 1..5`」当时是**宿主 agent 逐轮自取指令**，不是本 memo 主张的硬隔离：那时 k3dge 侧连 MCP 客户端都没有。今天的对外入口已换成动作级 `k3dit_run_audit_flow`（`../k3dit/src/k3dit/mcp.py:155`），`pass_number` 退回内部原语。
-> 2. 支柱表里的「Clean Session 仅注入 `diff + 单轮 focus`」与本仓新规则 `ADR-0006` §2.3.8（调用方不得知道轮次）**正面冲突**。二者只能留一：要么 harness 遍历 peer 返回项（不发明轮次），要么 peer 自己派席。冲突的三条调和路（α/β/γ）与实测需求已记在 `docs/memo/2026-09-02-peer-wiring-and-seat-options.md` §2.1，未在此重复。
+> 2. 支柱表里的「Clean Session 仅注入 `diff + 单轮 focus`」与本仓新规则 `ADR-0006` §2.3.8（调用方不得知道轮次）**正面冲突**。二者只能留一：要么 harness 遍历 peer 返回项（不发明轮次），要么 peer 自己派席。冲突的三条调和路（α/β/γ）与实测需求已记在 `docs/memo/archive/2026-09-02-peer-wiring-and-seat-options.md` §2.1，未在此重复。
 >
 > 另：本 memo 的 **Capability Gating**（auditor 在能力层被剥夺写权限）目前**仍无实现**——现存的只是事后核查设想（git 快照越界即废）。这一格仍是缺口，别把「事后核」当「事前禁」。
 

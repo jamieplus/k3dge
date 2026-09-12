@@ -46,4 +46,4 @@ date: 2026-09-03
 ## Related
 
 - 事故：`docs/incidents/INC-20260902-CON-exit-and-trail-blindspot.md` §3 后三条未勾项
-- 席位侧的互补方案（制度化验收复核，不进闸）：`docs/memo/2026-09-02-peer-wiring-and-seat-options.md` §2.1
+- 席位侧的互补方案（制度化验收复核，不进闸）：`docs/memo/archive/2026-09-02-peer-wiring-and-seat-options.md` §2.1

@@ -289,22 +289,6 @@
       "tokens": "Memo: Prompt as Neural Net — 稀疏门控解释框架"
     },
     {
-      "path": "docs/memo/2026-08-27-h8m2k-a1-harness-hard-isolation.md",
-      "type": "memo",
-      "id": "2026-08-27-h8m2k-a1-harness-hard-isolation",
-      "title": "Memo：Harness 环境级硬隔离 vs 认知级软隔离（h8m2k-a1）",
-      "status": "memo（`k3dge` 已 `M7` `Gate SUCCESS`，`k3dit` 5-Pass 已 `k3dit_run_audit 1..5`，无需立即转 `tasks`）",
-      "tokens": "Memo：Harness 环境级硬隔离 vs 认知级软隔离（h8m2k-a1）"
-    },
-    {
-      "path": "docs/memo/2026-09-02-peer-wiring-and-seat-options.md",
-      "type": "memo",
-      "id": "2026-09-02-peer-wiring-and-seat-options",
-      "title": "Memo: peer 接线与审计席位的选项账（研究用，不作决策）",
-      "status": "",
-      "tokens": "Memo: peer 接线与审计席位的选项账（研究用，不作决策）"
-    },
-    {
       "path": "docs/memo/2026-09-05-doc-code-misalignment-list.md",
       "type": "memo",
       "id": "2026-09-05-doc-code-misalignment-list",
@@ -319,14 +303,6 @@
       "title": "Memo: 图论视角在审计/项目优化上的应用（为 audit vs QA 职责讨论铺底）",
       "status": "",
       "tokens": "Memo: 图论视角在审计/项目优化上的应用（为 audit vs QA 职责讨论铺底）"
-    },
-    {
-      "path": "docs/memo/2026-09-05-hall-pattern-discussion.md",
-      "type": "memo",
-      "id": "2026-09-05-hall-pattern-discussion",
-      "title": "Memo: 大厅模式推演账（2026-09-05，为 ADR-0025 与角色分工讨论作废案账）",
-      "status": "",
-      "tokens": "Memo: 大厅模式推演账（2026-09-05，为 ADR-0025 与角色分工讨论作废案账）"
     },
     {
       "path": "docs/memo/2026-09-05-industry-benchmark-vs-4-harness.md",

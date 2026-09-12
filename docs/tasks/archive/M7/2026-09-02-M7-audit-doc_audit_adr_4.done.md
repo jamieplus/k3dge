@@ -28,7 +28,7 @@ date: 2026-09-02
 - `docs/tasks/2026-09-02-M7-*.md` —— 本轮共 11 份（2 份已 done）
 - 代码面（本仓）：`engine/pipeline_runner.py`（出向客户端）、`engine/milestone.py` + `cli/status.py`（结构件名单单一事实源）、`cli/main.py`（`mcp probe` + `cmd_status` NameError）、`pyproject.toml`（`mcp>=1.0,<3`）
 - memo 层清理（2026-09-03）：`docs/memo/archive/2026-08-21-code-quality-discussion.md`、`docs/memo/archive/2026-08-24-docs-self-reflective-gate-vs-audit.md` 两份**新归档且首次带 `Superseded-by`**（本仓合规归档第一例）；就地勘误 `2026-08-27-h8m2k-…`（两句过期 + Capability Gating 缺口）、`2026-08-21-deferred-standards.md`（4 项已落地补落点）；`2026-09-02-plugins-main-absorption-eval.md` 4 行状态 🎯→✅ 并附文件:行 + 更正记录；`2026-09-02-peer-wiring-…` §1 折成指针表（消双源）；`docs/memo/archive/2026-08-24-audit-harness-independence.md:99` 一条裸引改全路径
-- `docs/memo/2026-09-02-peer-wiring-and-seat-options.md` —— 选项账（已定 / 待研究 / 废案 / 现状快照）。核点：正文是否把对话过程冒充实测；§1 十条「已定」与 ADR·task 是否逐条对得上；§3 废案理由是否可核；§2 是否残留已被 §1 判定过的伪选项
+- `docs/memo/archive/2026-09-02-peer-wiring-and-seat-options.md` —— 选项账（已定 / 待研究 / 废案 / 现状快照）。核点：正文是否把对话过程冒充实测；§1 十条「已定」与 ADR·task 是否逐条对得上；§3 废案理由是否可核；§2 是否残留已被 §1 判定过的伪选项
 - 跨仓留痕（不在本仓闸内）：`../k3dit`、`../k3lity`、`../k3che` 各 1 份本轮 task + `../k3dit/docs/tasks/2026-09-02-feat-audit_flow_tool.md`
 
 核对要点（供透镜参考，非结论）：

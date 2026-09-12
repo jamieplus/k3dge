@@ -46,4 +46,4 @@ date: 2026-09-04
 ## Related
 
 - 决策：`docs/adr/0026-audit-evidence-exchange-topology.md`（**Proposed——转正前本账禁止开工**）
-- 主权与写回背景：`docs/tasks/2026-09-04-M7-feat-audit_job_protocol.md`（k3dit）、`docs/memo/2026-09-02-peer-wiring-and-seat-options.md` 废案账
+- 主权与写回背景：`docs/tasks/2026-09-04-M7-feat-audit_job_protocol.md`（k3dit）、`docs/memo/archive/2026-09-02-peer-wiring-and-seat-options.md` 废案账

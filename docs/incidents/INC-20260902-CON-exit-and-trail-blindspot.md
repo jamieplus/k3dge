@@ -26,7 +26,7 @@ action_task_ref: docs/tasks/2026-09-03-M7-feat-gate_exit_and_trail_checks.md
 
 - **现存破损 D｜结构件被当内容条目**：`milestone.list_tasks` 与 `cli/status.py` 各持一份排除名单且都漏 `AUTHORING.md`（同文件 `:304` 另一份却含它）⇒ `k3dge task list --json` 返回幽灵 task、`status` 报 `Unfinished tasks (1)`；milestone"全 done"口径被污染。同源问题在 k3che：`../k3che/src/k3che/index.py:13` 排除集只有 `readme.md` ⇒ 实测本仓 122 篇语料含 ≥6 篇 `AUTHORING.md`。
 
-- **附带自查证据｜`task done` 不校验验收**：本轮破损 A 修完后我立即 `task done`，而该 task 验收第二条（机读出口同构，即破损 B）**当时未实现**，是事后复核验收条目才发现。活标本已记 `docs/memo/2026-09-02-peer-wiring-and-seat-options.md` §2.1。
+- **附带自查证据｜`task done` 不校验验收**：本轮破损 A 修完后我立即 `task done`，而该 task 验收第二条（机读出口同构，即破损 B）**当时未实现**，是事后复核验收条目才发现。活标本已记 `docs/memo/archive/2026-09-02-peer-wiring-and-seat-options.md` §2.1。
 
 ## 2. 根因剖析 (5 Whys)
 
@@ -60,5 +60,5 @@ action_task_ref: docs/tasks/2026-09-03-M7-feat-gate_exit_and_trail_checks.md
 
 - **Task（修复动作）**：`docs/tasks/2026-09-02-M7-fix-status_nameerror_next.done.md`（含回填）、`docs/tasks/2026-09-02-M7-fix-task_list_ghost_authoring.done.md`、`docs/tasks/2026-09-02-M7-fix-k3che_indexes_authoring_files.done.md`、待办 `docs/tasks/2026-09-03-M7-feat-gate_exit_and_trail_checks.md`
 - **决策**：`docs/adr/0006-mcp-foreign-harness-injection.md` §2.3.2（`check` 纯静态）、§2.4（降级不可静默）；`ADR-0008`（`[NEXT]` 单源）；`ADR-0012`（证据链）
-- **Memo**：`docs/memo/2026-09-02-peer-wiring-and-seat-options.md` §2.1（过度标记活标本 + 席位三层拆解）
+- **Memo**：`docs/memo/archive/2026-09-02-peer-wiring-and-seat-options.md` §2.1（过度标记活标本 + 席位三层拆解）
 - **跨仓同源**：`../k3che/docs/tasks/2026-09-02-fix-authoring_in_corpus.md`、`../k3dit/docs/tasks/2026-09-02-fix-mcp2_server_dead.md`
