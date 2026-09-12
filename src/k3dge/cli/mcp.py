@@ -571,7 +571,7 @@ def k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippe
 
     Unified audit entry — NOT a separate doc harness. Code scope routes to the 5-Pass
     lens; document scope routes to the Doc Audit section of the same protocol. Same peer
-    (k3dit), same 12-col report, same on_pre_seal verify (ADR-0020).
+    (k3dit), same 12-col report, same on_pre_seal verify (ADR-0005).
     """
     proto, fell_back, reason = _audit_protocol_with_fallback()
     # Highlighted fallback warning when external harness (k3dit) unavailable

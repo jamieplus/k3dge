@@ -71,7 +71,7 @@ Note: ① 就地修订（钉=写源/单份 12 列报告、封板资格归 `audit
 - 单一事实源：`engine/nextstep.STATE_OPTIONS` + `engine/audit_trigger.py`，与 §12 同一张表。
 
 ### 2.1.6 一轮 = 一份报告 + 位置钉子
-- 报告 schema 见 ADR-0017；单报告模型见 ADR-0020；钉的写源/收钉语义见 ADR-0025 §2.7。
+- 报告 schema 见 ADR-0017；单报告模型见 ADR-0005；钉的写源/收钉语义见 ADR-0025 §2.7。
 - **闭环界定**：报告 `待修=0` 即 `audit_trigger.audit_closed`；改后由 `verify` 核该报告。
 - **`[NEXT] pending_findings`**：
   - `scan_pending_findings` 扫 `src/`+`docs/`（跳 archive/reviews/generated）的 `k3dit:pending` 钉（语法见 `peer_contract §8`）。

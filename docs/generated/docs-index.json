@@ -113,14 +113,6 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
-      "path": "docs/adr/0020-harness-responsibility-split.md",
-      "type": "adr",
-      "id": "ADR-0020",
-      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Accepted",
-      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
-    },
-    {
       "path": "docs/adr/0021-doc-audit-post-check-non-blocking.md",
       "type": "adr",
       "id": "ADR-0021",

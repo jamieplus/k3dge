@@ -95,7 +95,7 @@ k3dge mcp probe --json     # 同上的机读形态；全活 exit 0，有死 exit
 | Tool | `k3dge_doc_grep` | `doc_catalog.grep_docs` | 扫托管文档正文，只回 path（可选 line），不回 snippet |
 | Tool | `k3dge_milestone_control` | `milestone.(status|align|seal)` | `status` 查任务、`align` Full Matrix 回归、`seal` 三闸机原子归档 |
 | Tool | `k3dge_submit_audit_report` | `milestone.persist_external_audit_report` | 外来审计报告机械落盘为在档报告 |
-| Prompt | `k3dge_5pass_audit_prompt` | 优先 `../k3dit/docs/guides/audit-method.md`，否则 `docs/protocols/audit_default.md` | 只指路；同一审计入口，按 `target_scope` 路由代码 5-Pass / 文档 Doc Audit（ADR-0020）；不在 k3dge 内维护透镜 |
+| Prompt | `k3dge_5pass_audit_prompt` | 优先 `../k3dit/docs/guides/audit-method.md`，否则 `docs/protocols/audit_default.md` | 只指路；同一审计入口，按 `target_scope` 路由代码 5-Pass / 文档 Doc Audit（ADR-0005）；不在 k3dge 内维护透镜 |
 | Tool | `k3dge_adr_index` | `engine.doc_catalog.analyze_adr_coverage` | ADR 集合自洽事实（重叠/指针 findings，非判断）；文档审计透镜原料 |
 
 ## 入向现状：server 已复活（2026-09-05，mcp 2.x 严格资源校验已修）

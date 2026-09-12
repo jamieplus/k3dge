@@ -12,6 +12,7 @@ Note: ① 就地修订（补 VCS 源形态）2026-09-05，经 Core Maintainer �
       ④ 就地修订（`k3dge audit` 口径：透镜不进 k3dge ≠ 审计线消费侧 CLI；原句作废）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ⑤ 去 changelog 化（删「（2026-09-05 就地补记）」与「原句作废」元叙述）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ⑥ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
+      ⑦ **合并原 ADR「Harness Responsibility Split」入本条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：职责切分与本地自用同属一层；被并者 0020 删除，全仓指针改指本条（含模板镜像/协议/rules）。原「三 harness」来源消失，冲突处以 ADR-0025 为准。过闸口径 = manual fallback。
 ---
 
 # ADR-0005: 本地自用、职责切分、审计独立 harness
@@ -65,6 +66,14 @@ seal 只拦该标记，闸条件见 ADR-0004 §2.1.3。
 协议兜底与传输细节见 ADR-0006 §2.2/§2.3、ADR-0019 §2.3；报告 schema 见 ADR-0017。
 k3dge 只留 `docs/reviews/` 槽位与 seal 证据；MCP `k3dge_5pass_audit_prompt` 只指路，不演进规程。
 
+### 2.7 harness 职责边界（原独立 ADR，合并入本条；「三 harness」历史让位于 ADR-0025 合并审计模块）
+- **边界裁决（仍有效）**：`k3dge`=形式硬闸（哈希/章节/结构枚举；提交时；硬）；`k3dit`=文档文本质量 + ADR 集合自洽（冲突/覆盖）+ 代码是否守已商定 ADR（文档变动时；结构硬、文本可勤可硬）；~~`k3lity`~~=商定/实现好不好（复杂度/重复/设计过重/ADR 值不值；里程碑时；必须软）——quality 已并入审计模块（ADR-0025）。
+- **代码审计与文档审计同形同路**：一个 peer（k3dit）、一份 12 列报告、一个 `on_pre_seal` verify；`k3dge` 只出一个指路 prompt（按 `target_scope` 路由 5-Pass / Doc Audit），无独立 doc-audit prompt/transport。
+- **doc review ≠ idea scoring**：k3dge 只验「报告存在」，不判优劣；「定得对不对 / 有无更简做法」归 soft review。
+- **k3dge 文档硬闸** = 各 `docs/<type>/.schema.json` 结构闸（结构 only，never merit）；ADR 冲突/覆盖的**事实**由 `k3dge_adr_index` 供，**判断**归 k3dit。
+- 原「three sibling harnesses」来源消失；冲突处以 ADR-0025 为准。
+
 ## 3. 产生后果 (Consequences)
 - **正**：本仓可直接 `./k3dge-init.sh`；align/check 测集不再分叉；封板无法用任意 md 冒充 align 产物；审计与一致性门禁解耦。
 - **负**：下游未设 `K3DGE_SOURCE` 时 editable 装的是下游自己；拆第五域的诉求被否决直到里程碑副作用再膨胀。
+- **职责边界**：`k3dge` 保持确定性与结构硬闸；语义审阅在 `k3dit`（文本质量、ADR 冲突判断）——硬闸是地板，不是语义裁判。

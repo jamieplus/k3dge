@@ -35,9 +35,9 @@ L2 入场券须逐条确认（agent 进车间前绑定到任务）：
 
 ## Doc Audit（文档审计，per-type，文档变动时）
 
-> **与 5-Pass 同源**：本节是同一份 k3dit 审计协议的一个 **scope**——代码走 5-Pass，文档走本节。二者由同一 peer（k3dit）执行、同一 12 列报告、同一 `on_pre_seal` verify，不是第五域、不另起 harness（ADR-0020）。`k3dge` 只**指路**（同一个审计 prompt，按 `target_scope` 路由到本节）并**提供事实**（`k3dge_adr_index`），不执行、不判。
+> **与 5-Pass 同源**：本节是同一份 k3dit 审计协议的一个 **scope**——代码走 5-Pass，文档走本节。二者由同一 peer（k3dit）执行、同一 12 列报告、同一 `on_pre_seal` verify，不是第五域、不另起 harness（ADR-0005）。`k3dge` 只**指路**（同一个审计 prompt，按 `target_scope` 路由到本节）并**提供事实**（`k3dge_adr_index`），不执行、不判。
 
-**触发**：文档改动时（非里程碑）。**T-01**：`k3dge check` 是静态硬闸、不跑透镜；doc-audit 在 **check 之后**经 `k3dge doc-audit` 触发（非阻断），走同一条 `k3dit.actions.audit` 链、`target_scope` 为文档时套用本节，产 12 列报告 + 建一个带 `Milestone` 的 `doc-audit` task（本轮不改，封板轮也得闭环，ADR-0021）。**只有 ADR 冲突/覆盖这一项留在里程碑审计**（`k3dge_adr_index` 事实 + k3dit 判，ADR-0020），不在每次 commit 的 doc-audit 里做。
+**触发**：文档改动时（非里程碑）。**T-01**：`k3dge check` 是静态硬闸、不跑透镜；doc-audit 在 **check 之后**经 `k3dge doc-audit` 触发（非阻断），走同一条 `k3dit.actions.audit` 链、`target_scope` 为文档时套用本节，产 12 列报告 + 建一个带 `Milestone` 的 `doc-audit` task（本轮不改，封板轮也得闭环，ADR-0021）。**只有 ADR 冲突/覆盖这一项留在里程碑审计**（`k3dge_adr_index` 事实 + k3dit 判，ADR-0005），不在每次 commit 的 doc-audit 里做。
 
 **per-type 透镜**：
 - **ADR — 集合自洽（冲突 / 覆盖 / 正交）**：两篇 *未 superseded* 的 ADR 不应无声共享 scope / decision-topic（冗余）；**正交性**——Decision 不得复述其它 ADR 的规范正文（复述＝第二源），跨篇事实应以 `见 ADR-XXXX §Y` 指针引用、单一 owner；指针须完整——`Supersedes`/`Related` 不悬空、被取代的 ADR 不再被当现行引用。事实来自 `k3dge_adr_index`（AdrIndex + O(n) 重叠/指针 findings，**非判断**）；冲突/冗余/正交由 k3dit 判。
