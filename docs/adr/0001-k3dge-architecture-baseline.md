@@ -7,6 +7,7 @@ Amended-by: -
 Date: 2026-08-19
 Deciders: Core Maintainer
 Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit` 无输出，no live lens）。
+      ② **合并原 ADR「TEMPLATE_DRIFT 锁在 engine」入本条 §2 第 7 条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：engine/templates 边界属架构基线；被并者 0014 删除，全仓指针改指本条。过闸口径 = manual fallback。
 ---
 
 # ADR-0001: k3dge 架构设计与工程治理基线
@@ -53,6 +54,12 @@ Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一
    - **形状变化留痕**：增 / 删 / 改名 / 改参公开符号属形状变化。
      - 须伴 `CHANGELOG.md ## [Unreleased]` 一行或 `spec` §1 边界句，提及该域与符号；仅刷新指纹不算闭环。
      - 首版为 `WARN` 不阻断，避免合法重构被罚。
+7. **TEMPLATE_DRIFT 登记表属 engine，不 import templates**（原独立 ADR，合并入本条）：
+   - `PAIRS` 在 `src/k3dge/engine/pairs.py`；`evaluate` 只从本域 import；**禁止** `engine → k3dge.templates`。
+   - 比对的是磁盘上的 `templates/assets` 文件（非 templates 包运行时 API）；仅自举仓生效，下游（k3dit 等）跳过。
+   - `templates` 仍是脚手架孤岛：`scaffold` 不读 `engine.pairs`；`test_template_sync` 可 import `engine.pairs`（测试不是域运行时依赖）。
+   - 不拆第五域；MCP check 与 `milestone align` 都走 `evaluate`，同一把锁。
+   - 重开：templates 运行时需读 `PAIRS` 时，把表抽到两边都能 import 的无依赖模块（仍禁止 engine import templates）。
 
 本 ADR 只定实现；目的语言（减少漂移、幻觉、修局部坏整体等，不必穷举）见 ADR-0009。
 

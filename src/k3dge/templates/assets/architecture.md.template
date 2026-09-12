@@ -47,7 +47,7 @@ graph TD
 * `engine` 为门禁判定与生命周期治理核心，不依赖 `cli/sync/templates`。
 * `sync` 依赖 `engine.contract`。
 * `cli` 分两路：`main` 本仓；`mcp` 外部 harness 注入（ADR-0006）。
-* `templates` 仅 `scaffolding`；`cli→templates` 仅 `init` 装配（ADR-0014）。
+* `templates` 仅 `scaffolding`；`cli→templates` 仅 `init` 装配（ADR-0001）。
 
 ## 3. 数据流（提交门禁）
 

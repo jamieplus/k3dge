@@ -43,7 +43,7 @@
 | `sync` | `src/k3dge/sync` | `docs/specs/sync/spec.md` | `tests/unit/sync` | engine | spec 接口块与契约哈希回写；`docs/generated/` 机器文档 |
 | `templates` | `src/k3dge/templates` | `docs/specs/templates/spec.md` | `tests/unit/templates` | — | `k3dge-init.sh` 脚手架生成器 |
 
-依赖方向：`cli → engine / sync / templates`、`sync → engine`、`engine ↛ templates`（`TEMPLATE_DRIFT` 字节锁，ADR-0014）。非 `package_root` 且非 `docs/specs/` 的文件不计入门禁范围。空 `manifest.domains` 报 `NO_DOMAINS`（下游空壳不得假绿）。
+依赖方向：`cli → engine / sync / templates`、`sync → engine`、`engine ↛ templates`（`TEMPLATE_DRIFT` 字节锁，ADR-0001）。非 `package_root` 且非 `docs/specs/` 的文件不计入门禁范围。空 `manifest.domains` 报 `NO_DOMAINS`（下游空壳不得假绿）。
 
 符号级寻址：`k3dge where <symbol>`（`file:line`；索引在 `docs/generated/symbol-index.json`，`k3dge index` 重建）。
 
@@ -57,7 +57,7 @@
 | **GateReport** | `passed ⇔ violations 为空`；含 `changed_files / modified_domains / violations`，`--json` 带符号级 diff | ADR-0001；`specs/engine §3` |
 | **L0 / L1 / L2** | 结构闸 / 契约哈希闸（含符号 diff）/ 行为闸（矩阵↔测试） | ADR-0001 |
 | **CONTRACT_DRIFT** | 公开签名哈希失配的违规码 | `specs/engine §4` |
-| **TEMPLATE_DRIFT** | 自举仓脚手架字节锁：`engine/pairs.PAIRS` 比对 `templates/assets`，引擎不 import `k3dge.templates` | ADR-0014 |
+| **TEMPLATE_DRIFT** | 自举仓脚手架字节锁：`engine/pairs.PAIRS` 比对 `templates/assets`，引擎不 import `k3dge.templates` | ADR-0001 |
 | **merge-base 基准** | 校验基准 = `merge-base(main, HEAD)`，code 可先落地、spec 分支内收敛 | ADR-0001 |
 | **Verification Matrix** | spec §4 的"场景 → 测试文件"表；`align` 跑 Full Matrix | ADR-0001 / ADR-0004 |
 | **三件套（版本）** | `pyproject.toml` / `.agent/manifest.json` / `src/k3dge/__init__.py` 版本镜像；不一致 = `VERSION_MISMATCH` | ADR-0004 |
@@ -128,7 +128,7 @@
 | ID | 主题（文件名） | 一句话 |
 | --- | --- | --- |
 | ADR-0001 | k3dge 架构设计与工程治理基线 | 四域布局 + L0/L1/L2 分层门禁 + 双向绑定 + 符号级 diff 留痕 |
-| ADR-0014 | template-drift-in-engine | 自举脚手架字节锁，engine 机检不 import templates |
+| ADR-0001 | template-drift-in-engine | 自举脚手架字节锁，engine 机检不 import templates |
 
 ### 文档体系
 | ID | 主题（文件名） | 一句话 |

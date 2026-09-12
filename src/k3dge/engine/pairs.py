@@ -1,6 +1,6 @@
 """Scaffold ↔ repo file pairs for the self-host TEMPLATE_DRIFT gate.
 
-Engine owns this registry so it does not import k3dge.templates (ADR-0014).
+Engine owns this registry so it does not import k3dge.templates (ADR-0001).
 Tests and any templates-side consumer import from here.
 
 Not in PAIRS (intentional, do not "complete" the list):

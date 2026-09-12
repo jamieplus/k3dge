@@ -48,7 +48,7 @@ graph TD
 * `engine` 为门禁判定与生命周期治理核心，不依赖 `cli/sync/templates`。
 * `sync` 依赖 `engine.contract`。
 * `cli` 分两路：`main` 本仓；`mcp` 外部 harness 注入（ADR-0006）。
-* `templates` 仅 `scaffolding`；`cli→templates` 仅 `init` 装配（ADR-0014）。
+* `templates` 仅 `scaffolding`；`cli→templates` 仅 `init` 装配（ADR-0001）。
 
 ## 3. 数据流（提交门禁）
 
@@ -67,7 +67,7 @@ flowchart LR
 
 * `GateReport.passed ⇔ violations.is_empty` —— 门禁语义基线（ADR-0001）
 * `Contract Hash` 锚定公开签名；改 `src/<domain>/` 公开接口须 `k3dge sync` 回写哈希（双向绑定）—— ADR-0001
-* `TEMPLATE_DRIFT` 仅自举、不 import `templates/` —— ADR-0014（`pairs.py:1`）
+* `TEMPLATE_DRIFT` 仅自举、不 import `templates/` —— ADR-0001（`pairs.py:1`）
 * spec 是契约、ADR 是决策事实源：操作层以指针引用 ADR 编号，不复写其正文 —— ADR-0001 / docs/adr/README.md
 * 文档类型合同：`docs/<type>/AUTHORING.md`（软）+ `docs/<type>/.schema.json`（硬闸）；寻址公式在 `AGENTS.md`；薄索引 `docs/generated/docs-index.json` —— ADR-0018 / ADR-0019
 * 协议仅 audit 两层 fallback，配置在 `.agent/pipeline.toml`，由 `PIPELINE_PROTOCOL_NOT_FOUND` 校验 —— ADR-0019

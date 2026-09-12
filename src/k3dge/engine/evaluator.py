@@ -415,7 +415,7 @@ class ConsistencyEngine:
             pass
 
     def _check_template_drift(self, manifest: Manifest) -> List[Violation]:
-        """脚手架镜像漂移：assets ↔ 本仓文件一致（仅 self_hosting=true，ADR-0014）。"""
+        """脚手架镜像漂移：assets ↔ 本仓文件一致（仅 self_hosting=true，ADR-0001）。"""
         out: List[Violation] = []
         try:
             is_self_host = bool(getattr(manifest, "self_hosting", False))

@@ -73,14 +73,6 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
-      "path": "docs/adr/0014-template-drift-in-engine.md",
-      "type": "adr",
-      "id": "ADR-0014",
-      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Accepted",
-      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
-    },
-    {
       "path": "docs/adr/0015-downstream-first-domain-and-protocol-pack.md",
       "type": "adr",
       "id": "ADR-0015",
