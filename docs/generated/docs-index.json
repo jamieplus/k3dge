@@ -329,6 +329,14 @@
       "tokens": "Memo: WikiSkill 论文吸收评估（Google Research, arXiv:2608.27454）"
     },
     {
+      "path": "docs/memo/2026-09-12-rust-k3dge-fit.md",
+      "type": "memo",
+      "id": "2026-09-12-rust-k3dge-fit",
+      "title": "Memo: Rust × vibe coding 契合性——Rust k3dge 可行性",
+      "status": "",
+      "tokens": "Memo: Rust × vibe coding 契合性——Rust k3dge 可行性"
+    },
+    {
       "path": "docs/protocols/audit_default.md",
       "type": "protocols",
       "id": "audit_default",
