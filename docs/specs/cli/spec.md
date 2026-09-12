@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/cli`
-- **Contract Hash**: `sha256:0beaa1c1b4851509995509616648c5b85d6dea1b5d936359089706f3218b2368`
-- **Last Updated**: 2026-09-08
+- **Contract Hash**: `sha256:76ecb0b3efe1f4911d29cfd801700eaf6dd45677f8fd5c010a187214914a5240`
+- **Last Updated**: 2026-09-11
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -22,6 +22,12 @@
 ## 2. Public Interfaces & Type Contracts
 <!-- k3dge:interfaces-start -->
 ```python
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+from typing import Sequence
+from k3dge.engine.evaluator import ConsistencyEngine
+from k3dge.engine.models import GateReport
 cmd_doc_audit(args: argparse.Namespace) -> int
 cmd_check(args: argparse.Namespace) -> int
 cmd_sync(args: argparse.Namespace) -> int
@@ -44,6 +50,14 @@ cmd_incident(args: argparse.Namespace) -> int
 cmd_status(args: argparse.Namespace) -> int
 build_parser() -> argparse.ArgumentParser
 main(argv: Optional[Sequence[str]]=None) -> int
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+from k3dge.engine import contract
+from k3dge.engine import milestone
+from k3dge.engine.evaluator import ConsistencyEngine
+from k3dge.engine.manifest import Manifest
+from k3dge.engine.models import GateReport
 get_manifest_resource() -> str
 get_manifest_resource_for(ws: Path) -> str
 get_domain_spec_resource(domain: str) -> str
@@ -63,6 +77,14 @@ k3dge_milestone_control(action: str, milestone_id: str, workspace_path: Optional
 k3dge_submit_audit_report(milestone_id: str, content: str, workspace_path: Optional[str]=None) -> str
 k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str) -> str
 k3dge_adr_index(workspace_path: Optional[str]=None) -> str
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Dict
+from k3dge.engine.evaluator import ConsistencyEngine
+from k3dge.engine.manifest import Manifest
+from k3dge.engine.manifest import ManifestError
+from k3dge.engine.milestone import parse_frontmatter
 cache_observability(workspace: Path) -> Optional[Dict[str, Any]]
 lifecycle_next(workspace: Path) -> Any
 workspace_status(workspace: Path) -> Dict[str, Any]

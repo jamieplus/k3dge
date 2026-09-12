@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/templates`
-- **Contract Hash**: `sha256:a4ab9ea5a48acd5349a3344361560fd60cd1001f4020489108fd737b895a0b3a`
-- **Last Updated**: 2026-08-27
+- **Contract Hash**: `sha256:584f6c364304dbea8d562d169a01acea21cce5031a4b562d906ef545e10bd760`
+- **Last Updated**: 2026-09-11
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -18,6 +18,41 @@
 ## 2. Public Interfaces & Type Contracts
 <!-- k3dge:interfaces-start -->
 ```python
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+args = sys.argv[1:] if len(sys.argv) > 1 else ['check']
+venv_k3dge = ROOT / '.venv' / ('Scripts/k3dge.exe' if os.name == 'nt' else 'bin/k3dge')
+k3dge = shutil.which('k3dge')
+from __future__ import annotations
+from importlib import resources
+from pathlib import Path
+from typing import Optional
+from typing import Sequence
+AGENTS_TEMPLATE = _asset('agents.md')
+SPEC_TEMPLATE = _asset('spec.md.template')
+GATE_SH_TEMPLATE = _asset('gate.sh')
+GATE_PY_TEMPLATE = _asset('gate.py')
+GATE_PS1_TEMPLATE = _asset('gate.ps1')
+K3DGE_INIT_SH_TEMPLATE = _asset('init.sh')
+K3DGE_INIT_WRAPPER = _asset('k3dge-init-wrapper.sh')
+K3DGE_INIT_PS1_WRAPPER = _asset('k3dge-init-wrapper.ps1')
+INIT_PS1_TEMPLATE = _asset('init.ps1')
+DOCS_TOML_TEMPLATE = _asset('docs.toml.template')
+PIPELINE_TOML_TEMPLATE = _asset('pipeline.toml.template')
+GENERATE_DOCS_SH_TEMPLATE = _asset('generate-docs.sh')
+GENERATE_DOCS_PS1_TEMPLATE = _asset('generate-docs.ps1')
+PRE_COMMIT_TEMPLATE = _asset('pre-commit.yaml.template')
+ARCHITECTURE_TEMPLATE = _asset('architecture.md.template')
+REVIEWS_README_TEMPLATE = _asset('reviews-readme.md')
+MCP_BRIDGE_TEMPLATE = _asset('mcp-bridge.md.template')
+GITIGNORE_TEMPLATE = _asset('gitignore.template')
+ADR_README_TEMPLATE = _asset('adr-readme.md.template')
+DOWNSTREAM_GUIDE_TEMPLATE = _asset('downstream.md')
+PROTOCOL_TEMPLATE = _asset('protocols/audit_default.md')
+VERIFY_PROTOCOL_TEMPLATE = _asset('protocols/verify_default.md')
+TASKS_README_TEMPLATE = _asset('tasks-readme.md')
+BRANCHES_README_TEMPLATE = _asset('branches-readme.md')
+MEMO_README_TEMPLATE = _asset('memo-readme.md')
+RULE_ASSETS = ('00-core-discipline.md', '01-docs-structure.md', '02-simplification.md', '03-self-contained.md', '04-milestone.md', '05-branches.md', '06-memo.md', '07-audit.md', '08-design-discipline.md', '09-absorption.md', '10-structure-over-prose.md')
 ensure_mcp_config(target: Path) -> bool
 scaffold(target: Path, name: str | None=None) -> None
 main(argv: Optional[Sequence[str]]=None) -> int

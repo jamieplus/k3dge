@@ -6,6 +6,12 @@
 
 ```python
 # main.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+from typing import Sequence
+from k3dge.engine.evaluator import ConsistencyEngine
+from k3dge.engine.models import GateReport
 cmd_doc_audit(args: argparse.Namespace) -> int
     # doc: Non-blocking post-check doc authoring audit: report (k3dit) + milestone task.
 cmd_check(args: argparse.Namespace) -> int
@@ -35,6 +41,14 @@ cmd_status(args: argparse.Namespace) -> int
 build_parser() -> argparse.ArgumentParser
 main(argv: Optional[Sequence[str]]=None) -> int
 # mcp.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+from k3dge.engine import contract
+from k3dge.engine import milestone
+from k3dge.engine.evaluator import ConsistencyEngine
+from k3dge.engine.manifest import Manifest
+from k3dge.engine.models import GateReport
 get_manifest_resource() -> str
     # doc: Read .agent/manifest.json ground truth。workspace 取 server CWD（mcp 2.x：无模板 URI 不得带参数）。
 get_manifest_resource_for(ws: Path) -> str
@@ -74,6 +88,14 @@ k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: s
 k3dge_adr_index(workspace_path: Optional[str]=None) -> str
     # doc: Fact tool: ADR set self-consistency (coverage/conflict facts). Non-judgmental; k3dit decides.
 # status.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Dict
+from k3dge.engine.evaluator import ConsistencyEngine
+from k3dge.engine.manifest import Manifest
+from k3dge.engine.manifest import ManifestError
+from k3dge.engine.milestone import parse_frontmatter
 cache_observability(workspace: Path) -> Optional[Dict[str, Any]]
     # doc: service 角色遥测，**只供展示**（peer contract §0：永不进判定链）。
 lifecycle_next(workspace: Path) -> Any
@@ -86,8 +108,16 @@ workspace_status(workspace: Path) -> Dict[str, Any]
 
 ```python
 # _ts.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
 extract_ts_interface(path: Path) -> str
 # audit_checklist.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+CHECK_LIST_PATH = '.agent/audit_checklist.json'
 build_checklist(workspace: Path, milestone_id: Optional[str]=None) -> dict
     # doc: Recompute the audit-condition snapshot and persist it (keeps counters if the
 read_checklist(workspace: Path) -> Optional[dict]
@@ -98,6 +128,12 @@ get_verify_attempts(workspace: Path) -> int
 bump_verify_attempt(workspace: Path) -> int
 reset_verify_attempts(workspace: Path) -> None
 # audit_flow.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Dict
+from typing import Optional
+from k3dge.engine.pipeline_runner import run_action
+STATE_REL = '.agent/audit_jobs.json'
 submit_audit(workspace: Path, milestone_id: str, targets: Optional[list]=None, io=None, role: str='audit') -> dict
     # doc: produce 阶段：锁审计线 → 交件 → 落 `awaiting_audit`。协议调用必须短。
 collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str]=None, io=None) -> dict
@@ -117,11 +153,24 @@ materialize(workspace: Path, job_key: str='', rev: str='', dest: str='') -> dict
 prune_finished(workspace: Path) -> dict
     # doc: ⑤ seal 收口钩子：清已结案 job 的 worktree 与审计线（幂等，容错）。
 # audit_trigger.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Tuple
+from k3dge.engine.milestone import get_current_milestone
+from k3dge.engine.milestone import scan_milestone_tasks
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
     # doc: Return (suggested, reasons). Only fires on a quantitative event.
 audit_closed(workspace: Path, milestone_id: str) -> bool
     # doc: True iff the single audit report exists with 待修==0.
 # contract.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Tuple
+INTERFACE_START = '<!\x2d\x2d k3dge:interfaces\x2dstart \x2d\x2d>'
+INTERFACE_END = '<!\x2d\x2d k3dge:interfaces\x2dend \x2d\x2d>'
 class ContractExtractor
 # doc: Abstract contract extractor — register per-language implementations.
     can_handle(self, path: Path) -> bool
@@ -145,12 +194,30 @@ verify_contract(src_dir: Path, spec_content: str, manifest=None, workspace_root:
 symbol_diff(spec_content: str, src_dir: Path, manifest=None, workspace_root: Path | None=None) -> dict
     # doc: L1 report layer: symbol-level diff between spec-stored interface and live code.
 # diff.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+BASE_CANDIDATES = ('origin/main', 'origin/master', 'main', 'master')
 class GitError(RuntimeError)
 resolve_base(workspace: Path) -> str
     # doc: Return the base ref for branch-level diffing, falling back to HEAD.
 get_changed_files(workspace: Path) -> List[str]
     # doc: Return all files changed relative to merge-base, including uncommitted work.
 # doc_catalog.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Dict
+from typing import Iterable
+from typing import List
+from typing import Optional
+from typing import Tuple
+from k3dge.engine.models import Violation
+SCHEMA_FILE = '.schema.json'
+INDEX_REL = 'docs/generated/docs-index.json'
+AUTHORING_FILE = 'AUTHORING.md'
+AUX_NAMES = frozenset({'README.md', '_template.md', 'AUTHORING.md', 'summary.md', 'SUMMARY.md', 'LEFTOVERS.md', 'leftovers.md'})
+SKIP_TYPES = frozenset({'generated'})
 parse_doc_schema(text: str) -> Optional[dict]
     # doc: Parse a ``.schema.json`` body. Empty → None; invalid JSON → ``_invalid``.
 iter_doc_types(workspace: Path) -> List[str]
@@ -160,6 +227,8 @@ build_docs_index(workspace: Path, *, include_archive: bool=False) -> dict
 write_docs_index(workspace: Path) -> Path
 list_docs(workspace: Path, *, typ: Optional[str]=None, ident: Optional[str]=None, q: Optional[str]=None, include_archive: bool=False) -> List[dict]
 where_doc(workspace: Path, ident: str) -> List[dict]
+GREP_MAX_FILES = 20
+GREP_MAX_LINES_PER_FILE = 8
 grep_docs(workspace: Path, query: str, *, typ: Optional[str]=None, line: bool=False, include_archive: bool=False, max_files: int=GREP_MAX_FILES, ignore_case: bool=True) -> List[dict]
     # doc: Scan managed doc bodies; return ``path`` or ``path``+``line`` only.
 check_section_order(text: str) -> Optional[Tuple[str, str]]
@@ -171,9 +240,30 @@ validate_docs_index(workspace: Path) -> List[Violation]
 analyze_adr_coverage(workspace: Path) -> dict
     # doc: ADR set self-consistency facts (non-judgmental). k3dit decides conflict.
 # evaluator.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Set
+from k3dge.engine import contract
+from k3dge.engine import diff
+from k3dge.engine import spec_schema
+from k3dge.engine.diff import GitError
+from k3dge.engine.manifest import Manifest
+from k3dge.engine.manifest import ManifestError
+from k3dge.engine.models import GateReport
+from k3dge.engine.models import Violation
+from k3dge.engine.pairs import PAIRS
 class ConsistencyEngine
     evaluate(self, run_tests: bool=False, force_full: bool=False, staged: bool=False) -> GateReport
 # manifest.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+MANIFEST_PATH = '.agent/manifest.json'
 class ManifestError(ValueError)
 class Manifest
     depends_on(self, domain: str) -> List[str]
@@ -187,6 +277,19 @@ class Manifest
     is_ignored(self, path: str) -> bool
     under_package_root(self, path: str) -> bool
 # markers.py
+from __future__ import annotations
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable
+from typing import List
+from typing import Sequence
+from typing import Tuple
+KINDS = ('pending', 'leftover', 'disputed', 'fixnote', 'fixed')
+OPEN_KINDS = frozenset({'pending', 'disputed', 'fixnote'})
+SCOPES = ('line', 'file', 'repo')
+SIDECAR = 'AUDIT.md'
+MARKER_RE = re.compile('(?:#|//|<!--)[ \\t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \\t]+(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \\t]*@(?P<scope>line|file|repo))?' + _ATTRS + '[ \\t]*(?P<note>[^\\n]*?)[ \\t]*(?:-->)?[ \\t]*$', re.M)
+MARKER_RE_MD = re.compile('<!--[ \\t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \\t]+(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \\t]*@(?P<scope>line|file|repo))?' + _ATTRS + '(?P<note>[^\\n]*?)[ \\t]*-->[ \\t]*$', re.M)
 class Marker
     file: str
     line: int
@@ -210,6 +313,18 @@ open_samples(markers: Sequence[Marker]) -> List[str]
 closure_ok(markers: Sequence[Marker]) -> Tuple[bool, dict]
     # doc: 结项判据（规则 5 入内）：fixnote/disputed 不许活过结项；pending 清零才可关单。
 # milestone.py
+from __future__ import annotations
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Tuple
+from k3dge.engine.evaluator import ConsistencyEngine
+STATUS_RE = re.compile('-\\s+\\*\\*Status\\*\\*:\\s*([\\w-]+)', re.IGNORECASE)
+MILESTONE_RE = re.compile('-\\s+\\*\\*Milestone\\*\\*:\\s*([^\\n\\r]+)', re.IGNORECASE)
+PRIORITY_RE = re.compile('-\\s+\\*\\*Priority\\*\\*:\\s*(\\S+)', re.IGNORECASE)
+TITLE_RE = re.compile('^#\\s+(.+)$', re.MULTILINE)
+GUIDE_STUB_RE = re.compile('<!--\\s*k3dge:guide-stub\\s*-->', re.IGNORECASE)
 parse_frontmatter(content: str) -> dict[str, str]
     # doc: Strict frontmatter parser: only `---` block at start, YAML-like `key: value`.
 get_current_milestone(workspace: Path) -> str
@@ -251,6 +366,10 @@ run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt
 run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
     # doc: Seal = archive + version + pointer. Requires a *closed* audit first.
 # models.py
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Optional
+from typing import Tuple
 class Violation
     rule_id: str
     message: str
@@ -265,6 +384,10 @@ class GateReport
     violations: Tuple[Violation, ...] = ()
     render(self) -> str
 # nextstep.py
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Optional
+STATE_OPTIONS: dict = {'normal': {'note': '常规提交门禁通过'}, 'pending_findings': {'ask': '有 findings 钉在代码/文档里；继续处理这些 pending？', 'if_y': '修完删 `k3dit:pending <ID>` 标记；有意留改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）', 'if_n': 'stop'}, 'ratchet_open': {'note': '有在办棘轮工单（ADR-0024）：进程不等人，但账必须可见', 'if_y': 'k3dge audit status <job> 查对端；席位侧一圈见契约 §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）'}, 'doc_audit': {'note': 'docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断——`k3dge doc-audit` 出报告(k3dit)+建里程碑 task（本轮不改，封板轮也得闭环）'}, 'audit_suggested': {'ask': '要审吗？(y/N，无倒计时)', 'if_y': 'k3dge milestone audit <id>（必审，待修=0 才谈封板）', 'if_n': 'stop（继续干活）'}, 'seal_ready': {'ask': '审计已闭环（待修=0），封板？(y/N，无倒计时)', 'if_y': 'k3dge milestone seal <id>（align→归档+版本+指针）', 'if_n': 'stop（里程碑继续挂着，不封）'}, 'audit_needed': {'note': '未审计不可封板（封=归档+版本+指针，非界限）：先 k3dge milestone audit <id>'}, 'audit_open': {'ask': 'agent 修？(倒计时默认修)', 'if_y': '修完重跑 k3dge milestone audit <id>（重审）', 'if_n': 'stop / 转人工干预'}, 'escalated': {'note': 'verify 连续 >3 次未闭环，转人工干预：k3dge milestone audit-submit <id> 或人工复核'}, 'sealed': {'note': '已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑'}, 'deferred': {'note': '已放弃封板（当普通提交结束）'}, 'new_domain': {'ask': '新建 src/ 域未在 manifest 注册？', 'if_y': '补 manifest + spec + tests，再 k3dge sync 回写契约', 'if_n': 'stop'}}
 class NextStep
     state: str
     milestone: str
@@ -280,7 +403,19 @@ class NextStep
     render_mcp(self) -> dict
 next_for_rejection(milestone: str, message: str) -> NextStep
     # doc: Failure -> action. Pick the corrective command from the rejection reason.
+# pairs.py
+from __future__ import annotations
+PAIRS: list[tuple[str, str]] = [('gate.py', 'scripts/gate.py'), ('gate.sh', 'scripts/gate.sh'), ('gate.ps1', 'scripts/gate.ps1'), ('init.sh', 'scripts/init.sh'), ('init.ps1', 'scripts/init.ps1'), ('k3dge-init-wrapper.sh', 'k3dge-init.sh'), ('k3dge-init-wrapper.ps1', 'k3dge-init.ps1'), ('generate-docs.sh', 'scripts/generate-docs.sh'), ('generate-docs.ps1', 'scripts/generate-docs.ps1'), ('agents.md', 'AGENTS.md'), ('agent-readme.md', '.agent/README.md'), ('rules/00-core-discipline.md', '.agent/rules/00-core-discipline.md'), ('rules/01-docs-structure.md', '.agent/rules/01-docs-structure.md'), ('rules/02-simplification.md', '.agent/rules/02-simplification.md'), ('rules/03-self-contained.md', '.agent/rules/03-self-contained.md'), ('rules/04-milestone.md', '.agent/rules/04-milestone.md'), ('rules/05-branches.md', '.agent/rules/05-branches.md'), ('rules/06-memo.md', '.agent/rules/06-memo.md'), ('rules/07-audit.md', '.agent/rules/07-audit.md'), ('rules/08-design-discipline.md', '.agent/rules/08-design-discipline.md'), ('rules/09-absorption.md', '.agent/rules/09-absorption.md'), ('rules/10-structure-over-prose.md', '.agent/rules/10-structure-over-prose.md'), ('docs.toml.template', '.agent/docs.toml'), ('pipeline.toml.template', '.agent/pipeline.toml'), ('spec.md.template', 'docs/specs/_template/spec.md'), ('tasks-readme.md', 'docs/tasks/README.md'), ('reviews-readme.md', 'docs/reviews/README.md'), ('tasks/_template.md', 'docs/tasks/_template.md'), ('memo/_template.md', 'docs/memo/_template.md'), ('branches/_template.md', 'docs/branches/_template.md'), ('adr/_template.md', 'docs/adr/_template.md'), ('adr/AUTHORING.md', 'docs/adr/AUTHORING.md'), ('adr/.schema.json', 'docs/adr/.schema.json'), ('tasks/AUTHORING.md', 'docs/tasks/AUTHORING.md'), ('memo/AUTHORING.md', 'docs/memo/AUTHORING.md'), ('branches/AUTHORING.md', 'docs/branches/AUTHORING.md'), ('incidents/AUTHORING.md', 'docs/incidents/AUTHORING.md'), ('tasks/.schema.json', 'docs/tasks/.schema.json'), ('memo/.schema.json', 'docs/memo/.schema.json'), ('branches/.schema.json', 'docs/branches/.schema.json'), ('incidents/.schema.json', 'docs/incidents/.schema.json'), ('pre-commit.yaml.template', '.pre-commit-config.yaml'), ('branches-readme.md', 'docs/branches/README.md'), ('memo-readme.md', 'docs/memo/README.md'), ('downstream.md', 'docs/guides/downstream.md'), ('protocols/audit_default.md', 'docs/protocols/audit_default.md'), ('protocols/verify_default.md', 'docs/protocols/verify_default.md')]
 # pipeline_runner.py
+from __future__ import annotations
+from dataclasses import dataclass
+from dataclasses import field
+from pathlib import Path
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 class TransportResult
     ok: bool
     provider: Optional[str]
@@ -307,12 +442,26 @@ probe_servers(workspace: Path, timeout: int=20) -> List[Tuple[str, bool, str, Li
 run_action(workspace: Path, action_ref: str, *, io=None, timeout_default: int=60, arguments: Optional[dict]=None) -> TransportResult
     # doc: Execute a peer action by walking its transports. Returns first success.
 # pipeline_schema.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Tuple
+PipelineViolation = Tuple[str, str]
 validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
     # doc: Validate `.agent/pipeline.toml`. Returns [] when valid or file absent.
 # protocol.py
+from __future__ import annotations
+from pathlib import Path
 write_incident(workspace: Path, target: str | None, task_type: str | None, task_id: str, detail: str) -> Path
     # doc: Escalate a persistent protocol deviation to a human-visible incident note.
 # search.py
+from __future__ import annotations
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict
+from typing import List
+from typing import Optional
+INDEX_REL = 'docs/generated/symbol-index.json'
 class Location
     file: str
     line: Optional[int] = None
@@ -327,9 +476,19 @@ where(workspace: Path, symbol: str) -> List[Location]
 search(workspace: Path, query: str, *, snippet: bool=True, context: int=2, max_snippet: int=240) -> List[Location]
     # doc: Controlled search. Returns path:line[: snippet]. Snippet window is clamped to
 # spec_schema.py
+from __future__ import annotations
+from typing import List
+from typing import Optional
+from typing import Tuple
+REQUIRED_SECTIONS: List[Tuple[str, 're.Pattern[str]']] = [('Domain Boundary & Responsibilities', re.compile('^#{2,3}\\s+.*Domain Boundary', re.MULTILINE)), ('Public Interfaces & Type Contracts', re.compile('^#{2,3}\\s+.*Public Interfaces', re.MULTILINE)), ('Verification Matrix', re.compile('^#{2,3}\\s+.*Verification Matrix', re.MULTILINE))]
+CONTRACT_HASH_RE = re.compile('\\*\\*Contract Hash\\*\\*:\\s*`?sha256:([0-9a-f]{64})`?', re.IGNORECASE)
 validate_structure(content: str) -> List[str]
 extract_contract_hash(content: str) -> Optional[str]
 # version.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Tuple
+from k3dge.engine.models import Violation
 parse_version(v: str) -> Tuple[int, int, int]
 format_version(major: int, minor: int, patch: int) -> str
 get_pyproject_version(workspace: Path) -> str | None
@@ -346,6 +505,12 @@ append_changelog(workspace: Path, new_version: str, notes: str | None=None, chan
 consume_unreleased(workspace: Path) -> str
     # doc: Extract ## [Unreleased] body and atomically clear it for next cycle.
 # worktree.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+from k3dge.engine.markers import Marker
+from k3dge.engine.markers import extract
+from k3dge.engine.markers import parse_text
 branch_name(job: str) -> str
 worktree_path(workspace: Path, job: str) -> Path
 ensure(workspace: Path, job: str, base: Optional[str]=None) -> Path
@@ -357,7 +522,7 @@ advance(workspace: Path, job: str) -> Optional[str]
 strip_pins(workspace: Path, job: str) -> dict
     # doc: 收官去钉：删审计线 worktree 里独占一行的钉；行尾钉不动（只上报）。
 merge_back(workspace: Path, job: str, accept_dirty: tuple=()) -> dict
-    # doc: closure 回写主干（P1：默认自动；脏树/冲突 ⇒ 停并升级人工，§1.4）。
+    # doc: closure 回写主干（P1：默认自动；脏树/冲突/落点闸红 ⇒ 停并升级人工，§1.4）。
 prune(workspace: Path, job: str) -> dict
     # doc: ⑤ 收口：删现场；审计线**仅在已并入主干时**删（闸过删线，ADR-0024 重设计）。
 remove(workspace: Path, job: str) -> None
@@ -371,6 +536,20 @@ materialize(workspace: Path, rev: str, dest: Path) -> Path
 
 ```python
 # generator.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Sequence
+from typing import Tuple
+from k3dge.engine import contract
+from k3dge.engine import spec_schema
+from k3dge.engine.manifest import Manifest
+HASH_LINE_RE = re.compile('(\\*\\*Contract Hash\\*\\*:).*$', re.MULTILINE)
+DATE_LINE_RE = re.compile('(\\*\\*Last Updated\\*\\*:).*$', re.MULTILINE)
+PUBLIC_INTERFACES_RE = re.compile('^#{2,3}\\s+.*Public Interfaces', re.MULTILINE)
+LAYOUT_START = '<!-- k3dge:layout-start -->'
+LAYOUT_END = '<!-- k3dge:layout-end -->'
 sync_domain(workspace: Path, manifest: Manifest, domain: str, iface: str | None=None) -> Optional[Path]
 render_readme_layout(workspace: Path, manifest: Manifest) -> Optional[Path]
     # doc: Regenerate the README layout block from the manifest (no-op if README lacks markers).
@@ -382,7 +561,43 @@ sync_all(workspace: Path, domains: Optional[Sequence[str]]=None) -> Tuple[List[s
 ## templates — `src/k3dge/templates`
 
 ```python
+# gate.py
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+args = sys.argv[1:] if len(sys.argv) > 1 else ['check']
+venv_k3dge = ROOT / '.venv' / ('Scripts/k3dge.exe' if os.name == 'nt' else 'bin/k3dge')
+k3dge = shutil.which('k3dge')
 # scaffold.py
+from __future__ import annotations
+from importlib import resources
+from pathlib import Path
+from typing import Optional
+from typing import Sequence
+AGENTS_TEMPLATE = _asset('agents.md')
+SPEC_TEMPLATE = _asset('spec.md.template')
+GATE_SH_TEMPLATE = _asset('gate.sh')
+GATE_PY_TEMPLATE = _asset('gate.py')
+GATE_PS1_TEMPLATE = _asset('gate.ps1')
+K3DGE_INIT_SH_TEMPLATE = _asset('init.sh')
+K3DGE_INIT_WRAPPER = _asset('k3dge-init-wrapper.sh')
+K3DGE_INIT_PS1_WRAPPER = _asset('k3dge-init-wrapper.ps1')
+INIT_PS1_TEMPLATE = _asset('init.ps1')
+DOCS_TOML_TEMPLATE = _asset('docs.toml.template')
+PIPELINE_TOML_TEMPLATE = _asset('pipeline.toml.template')
+GENERATE_DOCS_SH_TEMPLATE = _asset('generate-docs.sh')
+GENERATE_DOCS_PS1_TEMPLATE = _asset('generate-docs.ps1')
+PRE_COMMIT_TEMPLATE = _asset('pre-commit.yaml.template')
+ARCHITECTURE_TEMPLATE = _asset('architecture.md.template')
+REVIEWS_README_TEMPLATE = _asset('reviews-readme.md')
+MCP_BRIDGE_TEMPLATE = _asset('mcp-bridge.md.template')
+GITIGNORE_TEMPLATE = _asset('gitignore.template')
+ADR_README_TEMPLATE = _asset('adr-readme.md.template')
+DOWNSTREAM_GUIDE_TEMPLATE = _asset('downstream.md')
+PROTOCOL_TEMPLATE = _asset('protocols/audit_default.md')
+VERIFY_PROTOCOL_TEMPLATE = _asset('protocols/verify_default.md')
+TASKS_README_TEMPLATE = _asset('tasks-readme.md')
+BRANCHES_README_TEMPLATE = _asset('branches-readme.md')
+MEMO_README_TEMPLATE = _asset('memo-readme.md')
+RULE_ASSETS = ('00-core-discipline.md', '01-docs-structure.md', '02-simplification.md', '03-self-contained.md', '04-milestone.md', '05-branches.md', '06-memo.md', '07-audit.md', '08-design-discipline.md', '09-absorption.md', '10-structure-over-prose.md')
 ensure_mcp_config(target: Path) -> bool
     # doc: Idempotently merge k3dge (and pipeline-enabled peers) into .mcp.json.
 scaffold(target: Path, name: str | None=None) -> None

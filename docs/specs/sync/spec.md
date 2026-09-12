@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/sync`
-- **Contract Hash**: `sha256:594d35489e70db9e99394859007ae76bf3007ebdab23ca2a4ffa21a7d7f39673`
-- **Last Updated**: 2026-08-25
+- **Contract Hash**: `sha256:a127638f48fe919d833e65fc64d7a9cdd17bb95c66081e2326afd0612d5ff2bc`
+- **Last Updated**: 2026-09-11
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -19,6 +19,20 @@
 ## 2. Public Interfaces & Type Contracts
 <!-- k3dge:interfaces-start -->
 ```python
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Sequence
+from typing import Tuple
+from k3dge.engine import contract
+from k3dge.engine import spec_schema
+from k3dge.engine.manifest import Manifest
+HASH_LINE_RE = re.compile('(\\*\\*Contract Hash\\*\\*:).*$', re.MULTILINE)
+DATE_LINE_RE = re.compile('(\\*\\*Last Updated\\*\\*:).*$', re.MULTILINE)
+PUBLIC_INTERFACES_RE = re.compile('^#{2,3}\\s+.*Public Interfaces', re.MULTILINE)
+LAYOUT_START = '<!-- k3dge:layout-start -->'
+LAYOUT_END = '<!-- k3dge:layout-end -->'
 sync_domain(workspace: Path, manifest: Manifest, domain: str, iface: str | None=None) -> Optional[Path]
 render_readme_layout(workspace: Path, manifest: Manifest) -> Optional[Path]
 render_manual_docs(workspace: Path, manifest: Manifest, doc_cache: dict[str, str] | None=None) -> List[Path]
