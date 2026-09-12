@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-09-12
+
 ### Changed
 - k3dge 侧文档/配置对齐合并审计模块（单份 12 列报告、无独立 quality fallback）
 
@@ -29,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 核 milestone 棘轮对 collect=open(待修>0) 是否误判 closed
 - 审计 scope=src 时模板 pairs 不可同步致 verify TEMPLATE_DRIFT 假红
 - 判读席禁止重提已 leftover
+
 ## [0.1.9] - 2026-09-05
 
 ### Added

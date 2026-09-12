@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "k3dge"
-version = "0.1.9"
+version = "0.1.10"
 description = "Spec-gate harness: deterministic contract drift detection for vibecoding agents"
 requires-python = ">=3.10"
 license = { text = "MIT" }
