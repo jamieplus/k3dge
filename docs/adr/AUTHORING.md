@@ -9,6 +9,15 @@ Copy `_template.md`. Soft rules (k3dit may judge text quality; k3dge does not):
 
 Do not judge whether the decision is a *good* idea (k3lity, soft). k3dit may flag two Accepted Decision sections that directly negate each other.
 
+## 先并入，后新建 (merge-before-new)
+
+**新建前先找同类 ADR——一类问题一条。** 很多决策描述的是**同一类问题**；散在多篇里就退化成一族散文，谁也读不全。
+
+- 能扩写现有 ADR（就地增补 / `Amended by`）的，**不新开**。
+- 只有确属**新决策类**（现有 ADR 都不覆盖）才 copy `_template.md`。
+- 判断"同类"看**不变量与所有权**，不看措辞；同一条不变量被两篇各写一半＝应并。
+- 合并不降清晰：宿主 ADR 用子节收编，被并者**物理删除**（git 留档），全仓指针重指。
+
 ## 人读优先 (readability)
 
 软规则，k3dit 文审按此判（结构另有 `.schema.json` 硬闸）：
@@ -45,7 +54,7 @@ Do not judge whether the decision is a *good* idea (k3lity, soft). k3dit may fla
 
 | 操作 | 默认路径（无条件可用） | 需显式人工授权的例外 | 机验码 |
 | --- | --- | --- | --- |
-| 新建 | copy `_template.md`，`Status: Proposed` → 由人/k3dit 判 `Accepted` | — | `ADR_SECTIONS_MISSING`, `ADR_NUMBER_COLLISION`, `ADR_FRONTMATTER_MISSING` |
+| 新建 | **先查同类 ADR 并入**（见「先并入，后新建」）；确无同类才 copy `_template.md`，`Status: Proposed` → 由人/k3dit 判 `Accepted` | — | `ADR_SECTIONS_MISSING`, `ADR_NUMBER_COLLISION`, `ADR_FRONTMATTER_MISSING` |
 | 改正文（已 `Accepted`） | 新开一条：`Supersedes: ADR-NNNN` + 旧文 `Status: Superseded by ADR-NNNN`；非冲突增补用 `Amended by ADR-NNNN` | **就地修订（in-place revision）**：流程尚未跑通时其 `Accepted` 本就是过早的，允许直接替换决策正文，免得一次性 supersession 把 ADR 集撑成废料堆 | 同上 + `ADR_SECTION_ORDER` |
 | 删除 / 改名 / 复用编号 | 一律不允许；**Numbers are never reused** | **物理删除**（含改名腾号） | `ADR_FILENAME_MISMATCH` |
 

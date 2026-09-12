@@ -34,7 +34,7 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 | --- | --- |
 | Public signature | `k3dge sync` |
 | New `src/` domain | `manifest` + `spec` + tests |
-| Persistent design | copy `docs/adr/_template.md`; read `docs/adr/AUTHORING.md` |
+| Persistent design | **先并同类 ADR**（AUTHORING「先并入，后新建」）；确无同类才 copy `docs/adr/_template.md`；read `docs/adr/AUTHORING.md` |
 | Task done | `Status: done` + `.done.md` |
 | In-flight ratchet job (`[NEXT] ratchet_open`) | 席位流程见契约 §1.4；`k3dge milestone audit <id>` 幂等步进（建单→探单→collect→写回重试），进程不等人 |
 | Milestone all `done` | `k3dge milestone align`(Full Matrix, 无人问) → `[NEXT] audit_suggested`（**不是建议封板**）→ 问「要审吗？(y/N 无倒计时)」→ 是→ `k3dge milestone audit <id>`：合并审计模块（ADR-0025）**一份 12 列报告**，待修>0 问「agent 修？(倒计时默认修)」→ 重审（同一报告 verify）→ 待修=0 → `[NEXT] seal_ready` → `k3dge milestone seal` 才问「封板？」 |
