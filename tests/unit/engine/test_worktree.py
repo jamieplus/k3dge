@@ -205,3 +205,19 @@ def test_merge_back_after_detached_present(tmp_path):
     r = W.merge_back(ws, "J9")
     assert r["ok"] and r["mode"] == "rebase", r
     assert (ws / "extra.py").exists() and (ws / "main.py").exists()
+
+
+def test_merge_back_landing_gate_blocks_and_resets(tmp_path, monkeypatch):
+    """落点机械闸红 ⇒ 不并、主干回滚到旧头（先验后并，主干不被污染）。"""
+    ws = _repo(tmp_path)
+    W.ensure(ws, "J1")
+    _commit_on_branch(ws, "extra.py", "e = 1\n")
+    before = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True,
+                            text=True).stdout.strip()
+    monkeypatch.setattr(W, "_run_landing_gate",
+                        lambda w: {"ok": False, "step": "tests", "message": "1 failed"})
+    r = W.merge_back(ws, "J1")
+    assert not r["ok"] and r["mode"] == "gate" and "落点" in r["message"]
+    after = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True,
+                           text=True).stdout.strip()
+    assert after == before and not (ws / "extra.py").exists()

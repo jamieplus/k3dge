@@ -158,13 +158,45 @@ def strip_pins(workspace: Path, job: str) -> dict:
     return {"stripped_files": files, "stripped_lines": lines, "suspicious": suspicious, "kept": kept}
 
 
+def _run_landing_gate(workspace: Path) -> dict:
+    """消费侧落点机械闸（ADR-0025 Note ㉖）：主干工作树上跑 check + doc-gate + pytest。
+
+    红 ⇒ 调用方回滚主干、挡下合并（先验后并，主干不被坏改动污染）。复用 `scripts/`（与
+    pre-commit 同源）+ `pytest`（与 CI 同源）；缺哪件跳哪件（夹具/非标仓不误伤），全缺=skipped。
+    """
+    import sys
+
+    steps: list = []
+    gate = workspace / "scripts" / "gate.py"
+    doc = workspace / "scripts" / "pre-commit"
+    if gate.is_file():
+        steps.append(("check", [sys.executable, str(gate), "check"]))
+    if doc.is_file():
+        steps.append(("doc-gate", [sys.executable, str(doc), "--scan"]))
+    if (workspace / "tests").is_dir():
+        steps.append(("tests", [sys.executable, "-m", "pytest", "-q"]))
+    if not steps:
+        return {"ok": True, "skipped": True}
+    for name, cmd in steps:
+        try:
+            r = subprocess.run(cmd, cwd=str(workspace), capture_output=True, text=True)
+        except OSError as exc:
+            return {"ok": False, "step": name, "message": f"执行失败：{exc}"}
+        if r.returncode != 0:
+            tail = [ln for ln in (r.stdout + "\n" + r.stderr).strip().splitlines() if ln.strip()][-8:]
+            return {"ok": False, "step": name, "message": "；".join(tail)[-300:]}
+    return {"ok": True}
+
+
 def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
-    """closure 回写主干（P1：默认自动；脏树/冲突 ⇒ 停并升级人工，§1.4）。
+    """closure 回写主干（P1：默认自动；脏树/冲突/落点闸红 ⇒ 停并升级人工，§1.4）。
 
     路径：先去钉（钉永不进主干，去钉产物提版）→ ff 直达；ff 不成则把线
     (base..br] `rebase --onto` 重演到主干头（线提交全是机械件，重演即普通 git）
     再 ff；冲突 ⇒ abort 复原＋升级人工。真 merge 不再使用（审计线模型）。
 
+    **落点机械闸**：ff 主干的**同一瞬间**跑 `run_landing_gate`；红则 `reset --hard`
+    回滚主干（先验后并）——审计成果仍在线上，交人工/重审。
     accept_dirty：编排进程自己写的件（工单 task/报告落盘/state 文件）——
     守卫防的是"人的未提交工作被卷进去"，不该拦自己刚写的字。
     """
@@ -187,7 +219,13 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
         advance(workspace, job)  # 去钉产物提版；干净即 no-op
     except RuntimeError as exc:
         return {"ok": False, "mode": "error", "message": f"去钉提版失败：{exc}"}
+    pre = _git(workspace, "rev-parse", "HEAD").stdout.strip()
     if _git(workspace, "merge", "--ff-only", br).returncode == 0:
+        gate = _run_landing_gate(workspace)
+        if not gate.get("ok"):
+            _git(workspace, "reset", "--hard", pre)
+            return {"ok": False, "mode": "gate",
+                    "message": f"落点机械闸红（{gate.get('step')}）：{gate.get('message', '')[:200]}"}
         return {"ok": True, "mode": "ff", "stripped": strip}
     main_head = _git(workspace, "rev-parse", "HEAD").stdout.strip()
     base = _git(workspace, "merge-base", "HEAD", br).stdout.strip()
@@ -205,7 +243,13 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
         _git(wt, "rebase", "--abort")  # 复原现场（进程件；线原位保留供人工）
         return {"ok": False, "mode": "conflict",
                 "message": f"rebase 冲突（{(rb.stderr or rb.stdout).strip()[:120]}）→ 人工处理后重试（§1.4）"}
+    pre2 = _git(workspace, "rev-parse", "HEAD").stdout.strip()
     if _git(workspace, "merge", "--ff-only", br).returncode == 0:
+        gate = _run_landing_gate(workspace)
+        if not gate.get("ok"):
+            _git(workspace, "reset", "--hard", pre2)
+            return {"ok": False, "mode": "gate",
+                    "message": f"落点机械闸红（{gate.get('step')}）：{gate.get('message', '')[:200]}"}
         return {"ok": True, "mode": "rebase"}
     return {"ok": False, "mode": "error", "message": "重演后仍无法 ff（异常态，交人工）"}
 
