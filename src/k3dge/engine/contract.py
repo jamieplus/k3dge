@@ -186,6 +186,7 @@ def extract_python_interface(source: str, include_doc: bool = False) -> str:
     (used by machine docs); hash computation always uses `include_doc=False`
     so comment/docstring churn never triggers contract drift.
     """
+# k3dit:pending code-5 sev=中 prio=P1 type=正确性 extract_python_interface:189 只遍历顶层函数/类：模块级公开常量永不进契约哈希（`STATE_OPTIONS` 这类事实源改值无感），`__all__` 只当过滤器、其内容自身不进哈希，顶层 re-export（from x import f 列进 __all__）也不进 → 「公开符号变更→sync」对这三类静默漏放，L1 只证函数/类签名。evidence=PYTHONPATH=$PWD/src/src python3 -c "from k3dge.engine.contract import compute_hash as H, extract_python_interface as E;print(H(E('STATE = 1' + chr(10) + 'def f(): ...'))==H(E('STATE = 2' + chr(10) + 'def f(): ...')))" 输出 True
     tree = ast.parse(source)
     allow = _get_all_names(tree)
     lines: List[str] = []
@@ -345,6 +346,7 @@ def symbol_diff(
     spec_block = _extract_interface_block(spec_content)
     code_iface = collect_domain_interface(src_dir, manifest, workspace_root)
     spec_syms = _parse_symbols(normalize(spec_block))
+# k3dit:pending code-14 sev=低 prio=P2 type=正确性 contract.symbol_diff:348 先 normalize()（逐行 collapse 掉前导空白）再 _parse_symbols（靠行首缩进判类成员归属）→ 类方法/属性被当顶层符号、键名混入 "def " 前缀与基类表（'Foo(Base)'）——CONTRACT_DRIFT 的 symbol_diff 详情与 _shape_change_documented 的 CHANGELOG 命中名错乱（不碰哈希/闸值，只污染报告层与 WARN 判定）。evidence=PYTHONPATH=$PWD/src/src python3 -c "from k3dge.engine.contract import _parse_symbols, normalize; print(_parse_symbols(normalize('class Foo(Base)'+chr(10)+'    def bar(self, x: int) -> None')))"
     code_syms = _parse_symbols(normalize(code_iface))
     added = sorted(set(code_syms) - set(spec_syms))
     removed = sorted(set(spec_syms) - set(code_syms))

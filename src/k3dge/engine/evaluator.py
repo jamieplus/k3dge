@@ -642,6 +642,7 @@ class ConsistencyEngine:
         src_dir = self.workspace_root / src_rel
         if not src_dir.exists():
             return out
+# k3dit:pending code-6 sev=中 prio=P2 type=隐蔽 _check_domain_imports:645 正则把包前缀硬编码为 "k3dge."：下游仓（不同包名，如 k3dit/k3che）任何跨域导入都不匹配 → ADR-0001 决策6 的反向导入禁令对下游静默空转、check 常绿（downstream-first 是 ADR-0015 主用途），且只认一级 `k3dge.<domain>`，`from k3dge.engine.sub import` 之类也只取 engine。前缀应取自 manifest（package_root/域 src 公共段推导）。evidence=python3 -c "import re;print(bool(re.match(r'^\s*(?:from\s+k3dge\.([a-z_]+)|import\s+k3dge\.([a-z_]+))','from k3dit.engine import x')))" 出 False
         import_re = re.compile(r"^\s*(?:from\s+k3dge\.([a-z_]+)|import\s+k3dge\.([a-z_]+))")
         allowed = set(manifest.depends_on(domain))
         for py in sorted(src_dir.rglob("*.py")):

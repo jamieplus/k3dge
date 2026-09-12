@@ -307,5 +307,6 @@ def materialize(workspace: Path, rev: str, dest: Path) -> Path:
     if p.returncode != 0:
         raise RuntimeError(f"物化失败: {p.stderr.decode('utf-8', 'replace').strip()[:160]}")
     with tarfile.open(fileobj=io.BytesIO(p.stdout)) as tf:
+# k3dit:pending code-10 sev=中 prio=P2 type=缺陷 materialize:263 用 tarfile.extractall(filter=)——该参数 3.12 首发、仅回移到 3.11.4/3.10.12+，而本仓最低支持含 3.10（init.sh:29 声明 >=3.10；pipeline_runner/milestone 的 tomli 兜底即 3.10 路径）→ 低补丁版本 python 上 TypeError，Hall 物化基线动词直接崩。evidence=python3.10 -c "import io,tarfile;tarfile.open(fileobj=io.BytesIO()).extractall('.',filter='data')" 出 TypeError
         tf.extractall(dest, filter="data")
     return dest

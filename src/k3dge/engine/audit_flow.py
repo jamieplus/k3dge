@@ -67,6 +67,7 @@ def _count_status(report_md: str) -> Dict[str, int]:
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         if len(cells) >= 8 and cells[0] not in ("ID", "---") and not set(cells[0]) <= set("-: "):
+# k3dit:pending code-13 sev=中 prio=P2 type=冲突 audit_flow._count_status:70 固定 cells[7] 取状态、只查 len>=8；milestone._parse_audit_stats:1113 按表头定位「状态」且跳过 len!=表头 的行——同一 12 列报告含 8-11 格数据行时两口径待修数分歧（C=1 P=0），collect_audit:250 据 C 定 open/closed、audit_trigger.audit_closed:108 据 P 定封板资格，截断行可让封板闸误判闭环。evidence=PYTHONPATH=$PWD/src/src python3 -c "from k3dge.engine.audit_flow import _count_status as C; from k3dge.engine.milestone import _parse_audit_stats as P; r=chr(10).join(['| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |','|---|---|---|---|---|---|---|---|---|---|---|---|','| A-1 | 2026-09-11 | 高 | P1 | 安全 | x | p | 待修 |']); print(C(r)['待修'], P(r)['待修'])"
             status = cells[7]
             if status in counts:
                 counts[status] += 1

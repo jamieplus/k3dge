@@ -104,6 +104,7 @@ def parse_text(rel: str, text: str) -> Tuple[List[Marker], List[str]]:
     problems: List[str] = []
     rx = MARKER_RE_MD if rel.endswith((".md", ".html")) else MARKER_RE
     for m in rx.finditer(text):
+# k3dit:pending code-11 sev=中 prio=P2 type=缺陷 parse_text:107 行号按 count("\n") 定位，而消费方按 text.splitlines() 索引（worktree.strip_pins:146 `src[m.line-1]`）：splitlines 还把 \x0c/\x85/\u2028 当行界（py 源码页分隔 \x0c 常见），两套行号在含此类字节的文件里错位——收官去钉把真独占行钉误判 suspicious 不删，行号前偏时还会删错无辜行。evidence=python3 -c "t='a\x0cb' + chr(10) + 'c' + chr(10);print(t.count(chr(10)), len(t.splitlines()))" 出 1 2
         line_no = text.count("\n", 0, m.start()) + 1
         kind = m.group("kind")
         note = m.group("note") or ""

@@ -1075,6 +1075,7 @@ def persist_external_audit_report(
     if kind == "quality" and not _QUALITY_MARKER_RE.search(content):
         content = f"<!-- k3dge:kind: quality -->\n{content}"
     suffix = "quality" if kind == "quality" else "audit"
+# k3dit:pending code-1 sev=中 prio=P1 type=安全 persist_external_audit_report:1078 的 milestone_id 未过 _validate_milestone_id（对比 _safe_archive_dir:375、run_milestone_alignment:711 均校）就拼进落盘文件名：MCP k3dge_submit_audit_report 直连该参，路径段/`..` 可注入落点写文件到 docs/reviews 外（成败依 OS 对 `..` 段的解析策略——未校验本身即缺陷）；同型 audit_flow.collect_audit:218。evidence=PYTHONPATH=$PWD/src/src python3 -c "import pathlib;from k3dge.engine.milestone import persist_external_audit_report as p;p(pathlib.Path('.'),'x/../../../evil','b');import os;print(sorted(os.listdir('..')))"
     path = reviews / f"{today}-{milestone_id}-{scope}-{suffix}.md"
     path.write_text(content.strip() + "\n", encoding="utf-8")
     return path

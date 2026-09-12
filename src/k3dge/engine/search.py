@@ -174,6 +174,7 @@ def search(
     """Controlled search. Returns path:line[: snippet]. Snippet window is clamped to
     _MAX_CONTEXT lines so a query never floods the context window."""
     raw = _run_ripgrep(workspace, query)
+# k3dit:pending code-7 sev=低 prio=P2 type=冲突 search:177 双后端语义不等价：rg 把 query 当正则且尊重 .gitignore，_python_search:158 是纯子串且只跳 .git/docs/generated（.venv/node_modules 整扫）→ 同查询命中集随 rg 装否而变：无 rg 时正则式 query 静默漏报（help 却宣称 "query: search term / regex"），.venv 噪音又涌入"controlled search"。
     if raw is None:
         raw = _python_search(workspace, query)
     locs: List[Location] = []
