@@ -137,14 +137,6 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
-      "path": "docs/adr/0024-audit-evidence-exchange-topology.md",
-      "type": "adr",
-      "id": "ADR-0024",
-      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Proposed",
-      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
-    },
-    {
       "path": "docs/adr/0025-hall-harness-topology.md",
       "type": "adr",
       "id": "ADR-0025",
@@ -444,9 +436,9 @@
       "path": "docs/reviews/2026-09-10-doc-audit-docs.md",
       "type": "reviews",
       "id": "2026-09-10-doc-audit-docs",
-      "title": "审计：文档审计（ADR-0024/0025 + AGENTS/rules/pipeline/protocols/tasks + k3dit spec）",
+      "title": "审计：文档审计（ADR-0025/0025 + AGENTS/rules/pipeline/protocols/tasks + k3dit spec）",
       "status": "",
-      "tokens": "审计：文档审计（ADR-0024/0025 + AGENTS/rules/pipeline/protocols/tasks + k3dit spec）"
+      "tokens": "审计：文档审计（ADR-0025/0025 + AGENTS/rules/pipeline/protocols/tasks + k3dit spec）"
     },
     {
       "path": "docs/reviews/2026-09-12-M8-closure.md",

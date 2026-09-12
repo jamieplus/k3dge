@@ -20,7 +20,7 @@
 # 质量不在角色表：它是合并审计模块内的窗口（ADR-0025），无独立 peer。
 [roles.audit]
 bind = "k3dit"
-mode = "ratchet"   # 审计腿=棘轮工单步进（ADR-0024）；缺省 "scaffold" 为旧一次性形
+mode = "ratchet"   # 审计腿=棘轮工单步进（ADR-0025）；缺省 "scaffold" 为旧一次性形
 
 [roles.cache]
 bind = "k3che"

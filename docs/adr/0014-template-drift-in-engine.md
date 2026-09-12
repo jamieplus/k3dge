@@ -6,7 +6,7 @@ Supersedes: -
 Amended-by: -
 Date: 2026-08-25
 Deciders: Core Maintainer
-Note: ① 就地修订（`k3dge audit` 口径：原"不加 k3dge audit / 已删子命令"句作废，改指 ADR-0024 §2.2 审计线 CLI）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit` 无输出，no live lens）。
+Note: ① 就地修订（`k3dge audit` 口径：原"不加 k3dge audit / 已删子命令"句作废，改指 ADR-0025 §2.9.2 审计线 CLI）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit` 无输出，no live lens）。
       ② 去 changelog 化（删「原句作废」元叙述）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ③ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
 ---
@@ -32,7 +32,7 @@ Note: ① 就地修订（`k3dge audit` 口径：原"不加 k3dge audit / 已删�
 4. **不拆第五域**，不把 TEMPLATE_DRIFT 挪到仅 `cli.cmd_check`。
    - MCP check 与 `milestone align` 都走 `evaluate`，必须同一把锁。
 5. **不加审计透镜**（ADR-0005 维持）。
-   - `k3dge audit` 是审计线消费侧 CLI，不是透镜，不改变本条的 engine 锁；见 ADR-0024 §2.2。
+   - `k3dge audit` 是审计线消费侧 CLI，不是透镜，不改变本条的 engine 锁；见 ADR-0025 §2.9.2。
 
 ## 3. 产生后果 (Consequences)
 

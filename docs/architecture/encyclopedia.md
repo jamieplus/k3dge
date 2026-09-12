@@ -71,7 +71,7 @@
 | **审计闭环（封板界限）** | audit 单份 **12 列报告**到 `待修=0`；未审计调 seal → `audit_needed` | ADR-0017；[`overview.md`](overview.md) §6 |
 | **钉语法 markers** | `k3dit:<kind> <ID>[@scope] <一句话≤80字>`；kind ∈ `pending/leftover/disputed/fixnote`；scope ∈ `line/file/repo`；开放=前三态，结项须清零 | [`docs/protocols/peer_contract.md`](../protocols/peer_contract.md) §8；`engine/markers.py` |
 | **pending_findings** | `k3dit:pending` 钉计数（check/status 报 `pending=N`，最高优先）；处置以 12 列+tasks 为准，理由写报告不入正文 | AGENTS.md §12；`peer_contract §8` |
-| **审计线 Audit Line** | gate 类唯一输入形式：一单一线（`k3dit/<单>` 分支 + worktree checkout），锁点 L 即 `baseline`；袋/独立库/打包器全部退役 | ADR-0024；`peer_contract §3` |
+| **审计线 Audit Line** | gate 类唯一输入形式：一单一线（`k3dit/<单>` 分支 + worktree checkout），锁点 L 即 `baseline`；袋/独立库/打包器全部退役 | ADR-0025；`peer_contract §3` |
 | **棘轮 Ratchet** | 一工单 = 一快照，单内审↔修可多程；submit/collect 两态；`claim` 即续租；快照推进一律 `git update-ref` CAS | `peer_contract §1.4` |
 | **席位 seat** | 审计机构经 seat 连接组件上岗；`sign-report` 署名才算结案 | `peer_contract §1.4` / §2 |
 | **doc-audit** | `check` 后、**非阻断**的文档作者合规审计：k3dit 报告 + 建带 Milestone 的 task | ADR-0021 |
@@ -137,7 +137,7 @@
 | ADR-0018 | doc-readme-anchor-governance | 每种文档类型 README 锚点 + AUTHORING 寻址治理 |
 | ADR-0019 | protocol-load-proof-abandoned | 协议加载证明废弃；`PIPELINE_PROTOCOL_NOT_FOUND` 静态守卫 |
 | ADR-0023 | low-authority-archive-tier | 低权威归档层（挪走不删） |
-| ADR-0024 | audit-evidence-exchange-topology | 送检包拓扑：git-tree oid 身份 + 单文件位置 + 棘轮交换 |
+| ADR-0025 | audit-evidence-exchange-topology | 送检包拓扑：git-tree oid 身份 + 单文件位置 + 棘轮交换 |
 
 ### 生命周期
 | ID | 主题（文件名） | 一句话 |

@@ -1,9 +1,9 @@
 """审计线（k3dge 进程件，施工账⑦）：一单一条线——真实分支＋可编辑签出＋present 自动供给。
 
-审计线模型（ADR-0024 重设计）：分支 `k3dit/<job>` 从锁点 L 拉起、住**消费仓 .git**，
+审计线模型（ADR-0025 重设计）：分支 `k3dit/<job>` 从锁点 L 拉起、住**消费仓 .git**，
 worktree `.k3dge/wt/<job>` 即送检现场（对象格式/树布局同主干，merge 即普通 git）。
 Hall 凭 wt 目录拷窗、收回改动经 advance 提版；判读窗永不操作消费仓 .git。
-present 由进程从 worktree 抽取（markers.extract），席位口供退居交叉核对（§ADR-0024 §2.4）。
+present 由进程从 worktree 抽取（markers.extract），席位口供退居交叉核对（§ADR-0025 §2.9.4）。
 """
 from __future__ import annotations
 
@@ -258,7 +258,7 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
 
 
 def prune(workspace: Path, job: str) -> dict:
-    """⑤ 收口：删现场；审计线**仅在已并入主干时**删（闸过删线，ADR-0024 重设计）。
+    """⑤ 收口：删现场；审计线**仅在已并入主干时**删（闸过删线，ADR-0025 重设计）。
 
     未并入（在办/冲突未人工闭环）⇒ 线保留原位，崩溃恢复与幂等重试都靠它。
     """

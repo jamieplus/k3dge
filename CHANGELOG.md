@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ratchet v3 施工十单封账凭条
 - 真跑前置：席位工单棘轮化 + ratchet_open 路由
 - 席位工单棘轮化（G1）＋ `[NEXT] ratchet_open` 路由：编排认识在办工单（G2）
-- ratchet v3 施工账十单全绿（ADR-0024 落地）：bundle 单文件交换原子＋身份/位置分家（②④）；分支工作现场 ensure/advance CAS/merge_back P1＋seal prune 钩子（③⑤⑦）；k3dit 句柄透传零代码落盘、角色门（fixed 仅审计席）、audit-report 机械渲染＋署名结案两步（①⑧⑨）；`k3dge audit` 四动词与 `bundle create`（⑩）；peer_contract v0.6 与 memo 化石条目（⑥）
+- ratchet v3 施工账十单全绿（ADR-0025 落地）：bundle 单文件交换原子＋身份/位置分家（②④）；分支工作现场 ensure/advance CAS/merge_back P1＋seal prune 钩子（③⑤⑦）；k3dit 句柄透传零代码落盘、角色门（fixed 仅审计席）、audit-report 机械渲染＋署名结案两步（①⑧⑨）；`k3dge audit` 四动词与 `bundle create`（⑩）；peer_contract v0.6 与 memo 化石条目（⑥）
 - task create duplicate check via cache role
 
 - k3dge 出向 MCP 客户端与 endpoint 唯一事实源

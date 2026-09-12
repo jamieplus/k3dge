@@ -1389,7 +1389,7 @@ def run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]:
 
 
 def _audit_mode(workspace: Path, role: str = "audit") -> str:
-    """审计腿形状：`[roles.audit] mode="ratchet"`＝工单模式（ADR-0024）；缺省 scaffold（旧形）。"""
+    """审计腿形状：`[roles.audit] mode="ratchet"`＝工单模式（ADR-0025）；缺省 scaffold（旧形）。"""
     try:
         try:
             import tomllib
@@ -1475,7 +1475,7 @@ def run_audit_flow(
 
     ratchet = _audit_mode(workspace) == "ratchet"
     if ratchet:
-        # 审计腿＝工单步进（ADR-0024）：一次调用推一步，绝不在闸里等席；步没 closed 就交回 [NEXT]。
+        # 审计腿＝工单步进（ADR-0025）：一次调用推一步，绝不在闸里等席；步没 closed 就交回 [NEXT]。
         step_status, step_msg = _ratchet_audit_step(workspace, milestone_id, io=prompt.out_stream)
         if step_status != "closed":
             if step_status == "progress":

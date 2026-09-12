@@ -72,7 +72,7 @@ MCP 有两个方向，**互不借道、互不背书**：
 1. **每个 harness 各发一个 MCP server**：工具名带自己前缀，签名不出现调用方私有概念。
    - peers 被第三方 harness 直连是正常态，不得为 k3dge 增设专用参数。
 2. **`check` 是纯静态硬闸**：只验盘上文件与结构（schema / 符号引用 / 协议文件存在），永不调用 agent、透镜或 peer 进程——不连 MCP、不跑 peer CLI（T-01）。
-   - 作域只限 `check`；出向调用只在 `milestone audit` / `seal` / `doc-audit` / `audit`（ADR-0024 §2.2）。
+   - 作域只限 `check`；出向调用只在 `milestone audit` / `seal` / `doc-audit` / `audit`（ADR-0025 §2.9.2）。
 3. **endpoint 单一事实源＝`.mcp.json`**（`command` / `args` / `env` / `cwd` 即全部连接配方）。
    - `pipeline.toml` 只声明流程（stage / tool / fallback 链 / 超时），不得重复写 endpoint。
 4. **`pipeline.toml` 是第三根门禁支柱**：旧键 `[harnesses]` / `[hooks]` 必须 `PIPELINE_SCHEMA_INVALID`，不得当空 `peers` 放行。

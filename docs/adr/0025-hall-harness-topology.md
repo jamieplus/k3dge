@@ -12,8 +12,8 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
       ④ 2026-09-09 再修 §2.7 拓扑（Proposed 段，实现前对齐）：done 信号从"窗 root 内 `artifact.json` 由包装器写"改定为"**Hall 私有心跳 `done_path`（`{K3DIT_HALL_ROOT}/.run/{job}/{window}.done`，在 CLI 目录树外，防内层 edit=allow 伪造）**"；"包装器合成 items 写 artifact.json"划掉，改定**包装器只 touch 心跳、`step_judges` harvest 树并 `_apply_live` 只吃收成、忽略席产 JSON**；修/核窗本批不动；补"分批边界"（k3dit 侧 v2 先行、§8/markers/strip 留契约镜像批）。授权人：Core Maintainer。
       ⑤ 2026-09-10 §2.7 补修/核规程（Proposed 段）：修/核腿**废 `accepted` 二值**、改钉/树驱动——修席删 `pending` 标=改（§8 结案凭据）/翻 `leftover`/`disputed`；Hall 对 Hall 私域 `.orig` 原快照 `diff(窗src,.orig)` 逐条推 state（删标且 diff≠∅=`fixed`；删标但 diff=∅=FORMAT；未碰=`pending` 留 open 由复核打回）；复核按合线 advance diff retest；done=心跳；原快照 `{K3DIT_HALL_ROOT}/.run/{job}/{window}.orig`。授权人：Core Maintainer。
       ⑥ 2026-09-10 再修（Proposed 段）：W4 以 §2.7 心跳/原快照为准（Hall 调度状态可重放，运行现场在私域 `.run/`）；`sign-report` 署名口径＝人或席位（baseline 形式比对归 Hall 机械进程）；引用的早期拟稿 ADR 号改指自身。授权人：Core Maintainer。
-      ⑦ 2026-09-10 正交去重（Proposed 段）：W3 降级格式改指 ADR-0006 §2.4；章笔分离去掉对 ADR-0024 P3 的循环引，本 ADR 为署名/收钉单源。授权人：Core Maintainer。
-      ⑧ 2026-09-10 正交收尾（Proposed 段）：§2.7 补齐报告文件落盘主语（k3dge 进程落盘，Hall 只 join），与 ADR-0024 §2.1 对齐。授权人：Core Maintainer。
+      ⑦ 2026-09-10 正交去重（Proposed 段）：W3 降级格式改指 ADR-0006 §2.4；章笔分离去掉对 ADR-0025 P3 的循环引，本 ADR 为署名/收钉单源。授权人：Core Maintainer。
+      ⑧ 2026-09-10 正交收尾（Proposed 段）：§2.7 补齐报告文件落盘主语（k3dge 进程落盘，Hall 只 join），与 ADR-0025 §2.9.1 对齐。授权人：Core Maintainer。
       ⑨ 2026-09-10 经 Core Maintainer 本轮显式授权，改名/平移编号（重排前该文件占另一号 → 本号 ADR-0025，填空缺；全仓引用同步）。依 `docs/adr/AUTHORING.md`。
       ⑩ 去 changelog 化（删「就地精化 / 划掉旧稿 / 反转旧 prompt / 双源划掉」等元叙述与「补定 date」）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
        ⑪ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长机制拆块；不变量与章节号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
@@ -32,6 +32,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
       ㉔ 统计口径 + 统计账（Proposed 段）2026-09-10，经 Core Maintainer 授权：k3dit 记 **append-only 统计账** `ledger/stats.jsonl`（每单终态一条：counts/findings/windows/tries/models/bounces/verify_fail/耗时/rounds）；口径（可数、不判定）＝误诊率 disputed/total、有意留率 leftover/total、打回率 bounces/rounds、座位重试率 Σtries/窗运行数、逃逸代理「重提率」见 `metrics.recurrence()`；`k3dit stats --by {milestone,job,date,type,severity,priority,state,window,model}` **任意维度聚合**（账是唯一源，报告/观测行是投影）。
       ㉕ 模型维度（Proposed 段）2026-09-10，经 Core Maintainer 授权：事件记**失败档链** `tried=["<model>: <why>", …]`；判读发现打**产出模型** `finding.model`、修/核记 `last_model`；`stats.jsonl` 的 findings 带 `model`；`k3dit stats --by model`＝发现级聚合；`--models` 出按模型度量（发现数/误诊率/有意留率/窗运行数/重试/耗时/失败档），供模型选型。只出事实、不判定。
       ㉖ verify 解耦（Proposed 段，覆盖 ⑭ 的"结案前 verify 硬门"与 ⑰ 的"verify 红回退打回"）2026-09-11，经 Core Maintainer 授权，依 `docs/adr/AUTHORING.md`：真跑坐实 Hall 侧 mechanical verify **越位**——审计线 worktree 缺 `.venv`/收据 ⇒ 环境假红；all-or-nothing 回退连坐已复核的 `fixed`；打回让席重做做过的事。改定：**审计侧不执行任何被审仓代码**——删结案前 `_verify_line`（仓级 verify + 逐条 evidence 执行）与 `_verify_failed` 打回；`fixed`＝**修主张(fixnote∧真码差) ∧ 复核正向背书 ∧ Hall 拔** 三合，语义＝**复核背书**（非"机械验证通过"）。机械闸归**消费侧落点**：k3dge 既有 pre-commit `check` + CI `k3dge check --with-tests`/`pytest`（环境正确、时机在落地）。`audit_closed`（审计完备）与机械绿（代码能跑）分家，`seal` 两者都要。钉尾 `evidence=<命令>` 退为**证据主张**（进报告、审计侧不执行，由消费侧 CI/落地统一跑）；`k3dit_audit_submit` 不再带 `verify`。过闸口径 = manual fallback（Core Maintainer 会话授权，agent 代改字）。
+      ㉗ **合并原 ADR「审计证据交换拓扑」入本条 §2.9**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：审计线与 Hall 同属“审计模块拓扑”一决策；被并者 0024 删除，全仓指针改指本条（原 §2.1–§2.5 → §2.9.1–§2.9.5）。过闸口径 = manual fallback。
 # Note: default `-`. Exactly one `Note:` field per ADR. Record each authorized operation
 # as a numbered segment (① ② ③ …): who/when authorized and how it actually passed the
 # gate (real lens vs manual fallback). Append segments; do not erase old traces.
@@ -44,7 +45,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 
 - 三 harness（`ADR-0005`：k3dge / k3dit / k3lity）的审计与质量接口同构（submit / collect / bundle / 12 列报告 / ratchet），一分多带来形式冗余与双份维护面。
 - 治理类比：**场地**（Hall＝大厅/政务中心）只组织周转、无审批权；**坐馆单位**（各窗口）持有权威。审计机构的内部监督天然自治，不因外部组织存在而成立。
-- 信任前提：同机同信任域（`ADR-0006` S-13）、防伪不成立、Peer Contract §0 双盲与 §1.4 机器不自签仍需主体分离；被审物主权不迁（`ADR-0024` §2.1）。
+- 信任前提：同机同信任域（`ADR-0006` S-13）、防伪不成立、Peer Contract §0 双盲与 §1.4 机器不自签仍需主体分离；被审物主权不迁（`ADR-0025` §2.1）。
 - 合并的争议点：审计方若同时持有消费仓账本、盖封板章，审计即降格为自我声明——合并可行与否取决于"墙"能否从约定变成机制。
 - 本 ADR 冻结拓扑、窗口划分与墙；每窗方法论细节与流转参数（队列优先级、回归面、度量口径）另行讨论（推演账见 `docs/memo/2026-09-05-hall-pattern-discussion.md`）。
 
@@ -88,12 +89,12 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 - **W1 ctx 隔离**：跨窗口泄露＝Hall 失职。
   - 窗口 root 专属目录、权限 deny-by-default（根外与邻窗拒绝、无审批路径）。
   - Hall spawn 时校验 root + 权限配置。
-  - **env 面**：送检物是 git 树，本身不含 env/secret 状态；"env 清洗"只针对 **Hall 交给席位进程的宿主环境**——不继承全量宿主 env，仅白名单 + 本窗 `env` 文件（`HALL_*`、钥路径）。不是对审计线内容脱敏（线是全树 checkout，ADR-0024 §2.2 已承认）。
+  - **env 面**：送检物是 git 树，本身不含 env/secret 状态；"env 清洗"只针对 **Hall 交给席位进程的宿主环境**——不继承全量宿主 env，仅白名单 + 本窗 `env` 文件（`HALL_*`、钥路径）。不是对审计线内容脱敏（线是全树 checkout，ADR-0025 §2.9.2 已承认）。
   - 测试：窗内 Read / Grep 根外与邻窗 → 断言拒绝；席进程 env 不含账本/无关密钥。
 - **W2 轮间清场**：每轮结束销毁 / 轮换目录，防残留。
 - **W3 降级可见**：任一窗口不可达 → `WARN[DOWNGRADE]` 上抛消费仓（四落点见 ADR-0006 §2.4）；禁止 Hall 内自愈掩盖。
 - **W4 账本主权**：Hall 保管账本原件（findings/rounds/计数，程序可复算）。
-  - 被审仓快照原件与归档主权在消费仓侧；归档经消费仓侧 shim 镜像（ADR-0024 主权四章不破）。保管诚实是程序不是判断。
+  - 被审仓快照原件与归档主权在消费仓侧；归档经消费仓侧 shim 镜像（ADR-0025 主权四章不破）。保管诚实是程序不是判断。
   - 调度状态由账本重放重建；运行现场（心跳/原快照）在 Hall 私域 `.run/`（§2.7）。
   - Hall 崩溃重启后必须回到同一调度位置；kill -9 演练是 G2 验收项。
 - **W5 闭包计数**：计数器任何席位不可读/不可写；接受权＝人（章在人手，非任何席位角色）。
@@ -121,7 +122,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 - **统计席位（程序控制+收尾度量+回归测试）归进程侧**：Hall 确定性程序控制 + 观测，不占判读窗、无签名钥。
   - 送检快照之外的数据走读裁剪；观测只出事实、不判定（先例：k3che 观测行、k3dge status）。
 - **行业对标三列对账**：拟引入的外部标准要素先查对应 k3dge 既有机制，落「保留 / 优化 / 新增」三列；已有设计只能被优化、不可丢失。
-  - 三条不可丢基准：一单一条审计线＋主权四章（ADR-0024）；12 列报告 + provenance/baseline；双盲 + 机器不自签 + 审计钉棘轮。
+  - 三条不可丢基准：一单一条审计线＋主权四章（ADR-0025）；12 列报告 + provenance/baseline；双盲 + 机器不自签 + 审计钉棘轮。
 - **补缺增量**（三方均缺）：修席队列优先级（严重度×优先级）、回归面选择（blast radius）。
   - 度量回灌（误诊率/泄漏率/窗口漂移，观测不判定）、反例/边界击穿；全挂"Hall 确定性程序控制 + 代码审计窗方法"名下。
 - 单席角色扮演被禁：任何角色必须有独立窗口与独立授权。
@@ -130,7 +131,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 
 - 不定流转参数（修复队列优先级启发式、回归面规则、度量口径），仍下一步讨论；本 ADR 冻结拓扑、窗口划分与墙。
 - 例外：判读席写面与窗工件合成已定于 §2.7。
-- 不跨信任域部署；不引入被审方防伪机制（ADR-0024 §2.5 保持）。
+- 不跨信任域部署；不引入被审方防伪机制（ADR-0025 §2.9.5 保持）。
 
 ### 2.6 转 Accepted 门槛
 
@@ -212,7 +213,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 - §2 collect 信封四字段（`provenance.seat`＝Hall 汇总窗名；baseline＝线头）。
 - 窗 ed25519 仍＝Hall 对"本窗收成"的章，不迁 git author；`advance` 仍 `k3dge-process` 机械 commit。
 - 结项 12 列仍 §1.4 `audit-report` join（baseline 比对由 Hall 机械执行）→ `sign-report` 人或席位署名、机器不自签。
-- 报告文件落盘归 k3dge 进程（`docs/reviews/`，ADR-0024 §2.1）；Hall 只 join/验签，不写消费仓。
+- 报告文件落盘归 k3dge 进程（`docs/reviews/`，ADR-0025 §2.9.1）；Hall 只 join/验签，不写消费仓。
 - **窗收成 scope 面**：Hall 只收窗内 `@line` 钉（`@file` 头部块同语法可收）；`@repo`/`AUDIT.md` 侧车条目不进 Hall 流程——多文件发现由 k3dge 侧 `markers` 与报告承载，窗 scope 语义与执行面此不等价（另立任务前不预焊）。
 - §4 findings 产出方＝合并审计模块内各窗（quality 已并入，无独立腿）；ADR-0012 不引用于此。
 
@@ -232,6 +233,58 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 | 复核窗（独立钥） | Retest：看 `present.md`（修席 `.orig→现` diff）+ conformance/LTL | — | — | findings 账本 + present diff |
 
 价值窗独立于代码窗：前者审"设计值不值"（含工具预计算事实）、后者审"这段贵不贵/对不对"（diff 内），对照面不同、不共钥。
+
+### 2.9 审计线与证据交换拓扑（原独立 ADR，合并入本条）
+
+> 线是审计的物，Hall 在上面调度；原「审计证据交换拓扑」与本条同属"审计模块拓扑"一决策，故作一。以下 §2.9.1–§2.9.5 即原条 §2.1–§2.5。
+
+#### 2.9.1 主权四章（各归其一，无重叠）
+
+| 物 | 主权 | 依据 |
+| --- | --- | --- |
+| 证据本体（分支 `k3dit/<单>` + worktree）与 GC | **k3dge**（消费仓）：线自锁点 L 拉起；闸过合主干后删现场删线（仅已并入时）；废单删分支——主干从未脏 | 被审物不迁主权；线是消费侧的物 |
+| 工单（findings / 裁决史 / 状态机 / 报告） | **审计模块**：账本只存机构判断物 + 引用（baseline / branch / scope），不存一字节客户代码 | 数据最小化 |
+| 阅件 | **席位**：submit 得 `{baseline, branch, wt_dir, scope}`；Hall 按 scope 拷窗，轮毕即清；席位/机构永不直接操作消费仓 `.git` | 处理≠归档 |
+| 审计意见（findings/裁决） | **判读窗/复核窗**各自署名（窗钥签本窗收成）；窗产出即意见，Hall 不代笔 | §2.2/§2.7 |
+| 报告 join | **Hall 进程**把各窗署名收成机械合并成 12 列（账本⋈delta，不判断、不重打字） | §2.7 |
+| 报告落盘 | **k3dge 进程**机械放置 `docs/reviews/`（可复算、不产判断）；Hall 只 join/验签 | ADR-0006 §2.3.6 |
+
+**裁决签名规则（P3）**：翻转与署名机制以 §2.2/§2.3/§2.7 为准（章笔分离；修席只改物，人或席位署名）。
+
+#### 2.9.2 交换物：审计线（一单一条）
+
+- **形状**：线＝分支 `k3dit/<单>`（自锁点 L 拉起，住消费仓 `.git`）＋ worktree 现场（`.k3dge/wt/<单>`）。
+  - 送检＝锁线（`ensure`＋`advance`，脏改动进程代提交）；交件＝字符串句柄（baseline=L/branch/wt_dir/scope）；取件＝机构内部读现场。
+  - 独立库、打包器、袋、sha256 特殊对象格式全部退役。
+- **钉即交换介质**：判读/修/核在树上的钉上交换（语法与写源见 `peer_contract §8`、§2.7）；JSON 只当签名信封，12 列从账本渲染。
+- **隔离三层**：审计线 vs 主干（ref＋本地 exclude＋闸过删线）；窗 vs 窗（Hall 按 scope 拷窗＋CLI root/deny）；席位 vs 消费仓 `.git`（改动经 Hall 收回、进程 advance 提版）。
+- **身份**＝最新线头 commit oid（主干血统、可复算、可 `git log`）。
+  - submit 锁 L 只是首钉；Hall 每提版（advance）即重钉——报告按最新基线签。
+  - 判读在旧 L 下的工作由复核窗覆盖；案内版本史＝线本身＋账本判读记录。
+- **代价（承认）**：无包级脱敏——审计线是全树 checkout，secret 随现场直穿机构全程；送检范围退为 Hall 物化参数。同信任域可接受（§1）；跨信任域 ⇒ Reopen ①。
+
+#### 2.9.3 写回拓扑：线上最终版合入主干
+
+- 主干只在 closure 时接收合并；合并默认自动执行，冲突即停并升级人工（P1）——机器搬运，人只在物理分歧处出现。
+- 路径：先去钉（钉永不进主干：独占钉行删，行尾钉上报；去钉产物提版）→ ff 直达。
+  - ff 不成 ⇒ 线 `(base..L′]` `rebase --onto` 重演到主干头再 ff（真 merge 已废：线提交全是机械件）。
+  - 冲突 ⇒ abort 复原＋升级人工（§1.4）。
+- 账本载"判"、分支载"物"：裁决权威在工单簿，分支不复制真相。
+- 轮次分支 ref 住消费仓 `.git`（P2）。
+- 废单＝删分支（主干从未脏）；崩溃恢复＝分支原位续走；过程留痕＝`git log k3dit/<job>`；闭环后删现场删线（仅已并入时）。
+
+#### 2.9.4 复用与校验
+
+- 跨仓/跨单复用按 **oid × lens_version 匹配工单簿结论**——不需持有客户内容，与最小化自洽。
+- 完整性链条：锁点 L 即基线（主干血统、可复算）＋ report `provenance.baseline` 与 L 的形式比对。
+- k3dit 无内容，故不做内容验货。
+
+#### 2.9.5 非目标 (Non-goals)
+
+- 不建 k3che 证据/CAS 角色（回归 token 经济）。
+- 不做"镜像/备份"入协议（机构运维手段）。
+- 不引入被审方防伪机制（信任域内，§1）。
+- 不实现远程部署（服务发现/推拉鉴权等）。远近同形只是包时代的愿景，线时代远程即另题——到实施时另立 ADR，不在本条内预焊。
 
 ## 3. 产生后果 (Consequences)
 

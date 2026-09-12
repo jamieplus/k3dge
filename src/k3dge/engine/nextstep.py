@@ -36,7 +36,7 @@ STATE_OPTIONS: dict = {
         "if_n": "stop",
     },
     "ratchet_open": {
-        "note": "有在办棘轮工单（ADR-0024）：进程不等人，但账必须可见",
+        "note": "有在办棘轮工单（ADR-0025）：进程不等人，但账必须可见",
         "if_y": "k3dge audit status <job> 查对端；席位侧一圈见契约 §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）",
     },
     "doc_audit": {

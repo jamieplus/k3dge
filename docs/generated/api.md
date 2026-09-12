@@ -389,7 +389,7 @@ class GateReport
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
-STATE_OPTIONS: dict = {'normal': {'note': '常规提交门禁通过'}, 'pending_findings': {'ask': '有 findings 钉在代码/文档里；继续处理这些 pending？', 'if_y': '修完删 `k3dit:pending <ID>` 标记；有意留改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）', 'if_n': 'stop'}, 'ratchet_open': {'note': '有在办棘轮工单（ADR-0024）：进程不等人，但账必须可见', 'if_y': 'k3dge audit status <job> 查对端；席位侧一圈见契约 §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）'}, 'doc_audit': {'note': 'docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断——`k3dge doc-audit` 出报告(k3dit)+建里程碑 task（本轮不改，封板轮也得闭环）'}, 'audit_suggested': {'ask': '要审吗？(y/N，无倒计时)', 'if_y': 'k3dge milestone audit <id>（必审，待修=0 才谈封板）', 'if_n': 'stop（继续干活）'}, 'seal_ready': {'ask': '审计已闭环（待修=0），封板？(y/N，无倒计时)', 'if_y': 'k3dge milestone seal <id>（align→归档+版本+指针）', 'if_n': 'stop（里程碑继续挂着，不封）'}, 'audit_needed': {'note': '未审计不可封板（封=归档+版本+指针，非界限）：先 k3dge milestone audit <id>'}, 'audit_open': {'ask': 'agent 修？(倒计时默认修)', 'if_y': '修完重跑 k3dge milestone audit <id>（重审）', 'if_n': 'stop / 转人工干预'}, 'escalated': {'note': 'verify 连续 >3 次未闭环，转人工干预：k3dge milestone audit-submit <id> 或人工复核'}, 'sealed': {'note': '已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑'}, 'deferred': {'note': '已放弃封板（当普通提交结束）'}, 'new_domain': {'ask': '新建 src/ 域未在 manifest 注册？', 'if_y': '补 manifest + spec + tests，再 k3dge sync 回写契约', 'if_n': 'stop'}}
+STATE_OPTIONS: dict = {'normal': {'note': '常规提交门禁通过'}, 'pending_findings': {'ask': '有 findings 钉在代码/文档里；继续处理这些 pending？', 'if_y': '修完删 `k3dit:pending <ID>` 标记；有意留改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）', 'if_n': 'stop'}, 'ratchet_open': {'note': '有在办棘轮工单（ADR-0025）：进程不等人，但账必须可见', 'if_y': 'k3dge audit status <job> 查对端；席位侧一圈见契约 §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）'}, 'doc_audit': {'note': 'docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断——`k3dge doc-audit` 出报告(k3dit)+建里程碑 task（本轮不改，封板轮也得闭环）'}, 'audit_suggested': {'ask': '要审吗？(y/N，无倒计时)', 'if_y': 'k3dge milestone audit <id>（必审，待修=0 才谈封板）', 'if_n': 'stop（继续干活）'}, 'seal_ready': {'ask': '审计已闭环（待修=0），封板？(y/N，无倒计时)', 'if_y': 'k3dge milestone seal <id>（align→归档+版本+指针）', 'if_n': 'stop（里程碑继续挂着，不封）'}, 'audit_needed': {'note': '未审计不可封板（封=归档+版本+指针，非界限）：先 k3dge milestone audit <id>'}, 'audit_open': {'ask': 'agent 修？(倒计时默认修)', 'if_y': '修完重跑 k3dge milestone audit <id>（重审）', 'if_n': 'stop / 转人工干预'}, 'escalated': {'note': 'verify 连续 >3 次未闭环，转人工干预：k3dge milestone audit-submit <id> 或人工复核'}, 'sealed': {'note': '已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑'}, 'deferred': {'note': '已放弃封板（当普通提交结束）'}, 'new_domain': {'ask': '新建 src/ 域未在 manifest 注册？', 'if_y': '补 manifest + spec + tests，再 k3dge sync 回写契约', 'if_n': 'stop'}}
 class NextStep
     state: str
     milestone: str
@@ -542,7 +542,7 @@ strip_pins(workspace: Path, job: str) -> dict
 merge_back(workspace: Path, job: str, accept_dirty: tuple=()) -> dict
     # doc: closure 回写主干（P1：默认自动；脏树/冲突/落点闸红 ⇒ 停并升级人工，§1.4）。
 prune(workspace: Path, job: str) -> dict
-    # doc: ⑤ 收口：删现场；审计线**仅在已并入主干时**删（闸过删线，ADR-0024 重设计）。
+    # doc: ⑤ 收口：删现场；审计线**仅在已并入主干时**删（闸过删线，ADR-0025 重设计）。
 remove(workspace: Path, job: str) -> None
 pin_baseline(workspace: Path, name: str, oid: str) -> bool
     # doc: 留存被引用的审计基线（报告引用的 commit 经 rebase 后可能悬空，gc 即不可复验）。

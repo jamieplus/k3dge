@@ -62,7 +62,7 @@ seal 只拦该标记，闸条件见 ADR-0004 §2.1.3。
 ### 2.6 审计独立 harness
 **透镜规程不进 `src/k3dge`**：不做审计判断、不发透镜。
 `k3dge audit` 子命令指**审计线在消费侧的线管理**（submit/status/show/advance/materialize/close），不是透镜。
-细则见 ADR-0024 §2.2。
+细则见 ADR-0025 §2.9.2。
 协议兜底与传输细节见 ADR-0006 §2.2/§2.3、ADR-0019 §2.3；报告 schema 见 ADR-0017。
 k3dge 只留 `docs/reviews/` 槽位与 seal 证据；MCP `k3dge_5pass_audit_prompt` 只指路，不演进规程。
 

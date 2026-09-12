@@ -1280,7 +1280,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_mk.add_argument("--check", action="store_true", help="有语法/锚点违规时退出码 1（供 CI）")
     p_mk.set_defaults(func=cmd_markers)
 
-    p_aud = sub.add_parser("audit", help="审计线棘轮：submit/status/show/advance/materialize/close（ADR-0024；工作区=CWD）")
+    p_aud = sub.add_parser("audit", help="审计线棘轮：submit/status/show/advance/materialize/close（ADR-0025；工作区=CWD）")
     p_aud.add_argument("audit_action", choices=["submit", "status", "show", "advance", "materialize", "close"])
     p_aud.add_argument("job_or_milestone", nargs="?", default="", help="status/show/materialize:job_id 或里程碑；advance:线名；close:milestone")
     p_aud.add_argument("--milestone", default="", help="submit：挂里程碑 id")

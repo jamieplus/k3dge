@@ -79,7 +79,7 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
                  role: str = "audit") -> dict:
     """produce 阶段：锁审计线 → 交件 → 落 `awaiting_audit`。协议调用必须短。
 
-    一单一条线（ADR-0024 重设计）：`k3dit/<单>` 分支从 HEAD 拉起，锁点 L=线头 commit；
+    一单一条线（ADR-0025 重设计）：`k3dit/<单>` 分支从 HEAD 拉起，锁点 L=线头 commit；
     已 checkout 的 worktree 目录即送检物。`targets` 是范围说明（Hall 物化参数），不是内容边界。
     """
     if not targets:
@@ -94,7 +94,7 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
     id_err = _validate_milestone_id(job)
     if id_err:
         return {"state": "failed", "detail": id_err}
-    try:  # ③ 锁线：挂 worktree，脏改动进程代提交（线=现场=送检，ADR-0024 §2.3）
+    try:  # ③ 锁线：挂 worktree，脏改动进程代提交（线=现场=送检，ADR-0025 §2.9.3）
         _wt.ensure(workspace, job)
         baseline = _wt.advance(workspace, job)
     except Exception as exc:  # 非 git 仓 ⇒ 无法锁线，审计不可进行（如实报，不静默）
@@ -111,7 +111,7 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
             "scope": ",".join(targets),
             "milestone_id": milestone_id,
             # ① 交件句柄（字符串；线归 k3dge，机构凭 wt_dir 读、Hall 收回改动经 advance，
-            #    席位/机构永不直接操作消费仓 .git——ADR-0024 §2.2）
+            #    席位/机构永不直接操作消费仓 .git——ADR-0025 §2.9.2）
             "branch": branch,
             "wt_dir": str(_wt.worktree_path(workspace, job).resolve()),
             # 机械闸不在审计侧（ADR-0025 Note ㉖）：`fixed`＝复核背书；代码能跑/过闸归消费侧
@@ -433,7 +433,7 @@ def materialize(workspace: Path, job_key: str = "", rev: str = "", dest: str = "
 def prune_finished(workspace: Path) -> dict:
     """⑤ seal 收口钩子：清已结案 job 的 worktree 与审计线（幂等，容错）。
 
-    收口＝闸过合主干后删线删现场（ADR-0024 重设计）；主干已含线内容，史在 main。
+    收口＝闸过合主干后删线删现场（ADR-0025 重设计）；主干已含线内容，史在 main。
     """
     from k3dge.engine import worktree as _wt
 

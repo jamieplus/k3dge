@@ -9,7 +9,7 @@
 - **In Scope**:
   - 本仓原生入口：`k3dge check` / `sync` / `milestone` / `version` / `task` / `doc list|where|grep|sync`（shell、pre-commit、CI）。
   - 对外 harness 注入：`k3dge.cli.mcp` 把同一套 engine 事实以 MCP stdio 交给 DSH / Codex / Claude Code / OpenCode 等，禁止那些工具私有重实现门禁（ADR-0006）。
-  - 不负责判定（engine）与透镜审计；`k3dge audit` 是审计线消费侧管理（submit/status/show/advance/materialize/close，ADR-0024 §2.2），不是透镜。
+  - 不负责判定（engine）与透镜审计；`k3dge audit` 是审计线消费侧管理（submit/status/show/advance/materialize/close，ADR-0025 §2.9.2），不是透镜。
   - `check` 支持 `--json` 机器可读输出，以及 `--with-tests`（selective L2）与 `--force-full`（全域 L0/L1）。
   - 协议治理：`docs/protocols/*.md`（`audit_default.md` / `verify_default.md`，审计 + 复审两层）为 `k3dge scaffold` 脚手架模板，由 `.agent/pipeline.toml` 的 manual-step `protocol` 引用配置（`k3dge check` 经 `PIPELINE_PROTOCOL_NOT_FOUND` 校验）；其余类型规则在各 `docs/<type>/AUTHORING.md`（CLI 不再暴露 `protocol` 子命令）；`incident` 子命令生成 L2 事故记录。
   - 从当前目录向上定位 workspace 根（含 `.git` 或 `.agent`）。
