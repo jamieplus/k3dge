@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:eb92a51057d7d9affdb510b66009c6e78e6f91a746c6f01d74ff5138dd77ff2b`
+- **Contract Hash**: `sha256:2fe433991ac4bb61816c75e9185bb13ff5679ee341b32b4e07151d4845f26c81`
 - **Last Updated**: 2026-09-12
 
 ## 1. Domain Boundary & Responsibilities
@@ -152,7 +152,7 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 REL = '.agent/gates.toml'
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}}}
 load(workspace: Path) -> Dict[str, Any]
 get(workspace: Path, section: str, key: str) -> Any
 preconditions(workspace: Path, kind: str) -> list

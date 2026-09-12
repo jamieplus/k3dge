@@ -1612,23 +1612,43 @@ def run_seal_flow(
         msg = f"Milestone {milestone_id}: seal deferred — 不封，里程碑继续挂着。"
         return "deferred", msg + "\n" + nextstep.NextStep.from_state("deferred", milestone_id).render_cli()
 
-    # align (Full Matrix) if not yet run this cycle, then archive.
-    ok, amsg, _ = run_milestone_alignment(workspace, milestone_id)
-    if not ok:
-        return "rejected", amsg + "\n" + nextstep.next_for_rejection(milestone_id, amsg).render_cli()
-    _strip_align_stub(workspace, milestone_id)
+    # 动作：读「硬闸契约」`[checks.seal].actions`（ADR-0001 §2 第 8 条）——执行器按声明跑；
+    # 未实现的 id 视为配置错（拒绝，不让声明空转）。
+    def _full_matrix():
+        ok, amsg, _ = run_milestone_alignment(workspace, milestone_id)
+        if not ok:
+            return False, amsg
+        _strip_align_stub(workspace, milestone_id)
+        return True, ""
 
-    ok, msg = seal_milestone(workspace, milestone_id)
-    if not ok:
-        return "rejected", msg + "\n" + nextstep.next_for_rejection(milestone_id, msg).render_cli()
-    closure = _write_closure_note(workspace, milestone_id)
-    msg += f"\n  收摊清单: {closure.relative_to(workspace)}"
-    try:  # ⑤ end-flow 清理钩子：派生件（worktree/已并入的审计线）收口即删；史在主干
-        from k3dge.engine.audit_flow import prune_finished
+    def _archive():
+        return seal_milestone(workspace, milestone_id)
 
-        pr = prune_finished(workspace)
-        if pr.get("pruned"):
-            msg += f"\n  审计派生件清理: {pr['pruned']} 组"
-    except Exception:
-        pass
+    def _closure_note():
+        p = _write_closure_note(workspace, milestone_id)
+        return True, f"\n  收摊清单: {p.relative_to(workspace)}"
+
+    def _prune():
+        try:  # end-flow 清理钩子：派生件（worktree/已并入的审计线）收口即删；史在主干
+            from k3dge.engine.audit_flow import prune_finished
+
+            pr = prune_finished(workspace)
+            if pr.get("pruned"):
+                return True, f"\n  审计派生件清理: {pr['pruned']} 组"
+        except Exception:
+            pass
+        return True, ""
+
+    registry = {"full_matrix": _full_matrix, "archive": _archive,
+                "closure_note": _closure_note, "prune": _prune}
+    msg = ""
+    for aid in gates.actions(workspace, "seal"):
+        fn = registry.get(aid)
+        if fn is None:
+            msg = f"[SEAL REJECTED] gate contract references unknown action id: '{aid}'"
+            return "rejected", msg + "\n" + nextstep.next_for_rejection(milestone_id, msg).render_cli()
+        ok, out = fn()
+        if not ok:
+            return "rejected", out + "\n" + nextstep.next_for_rejection(milestone_id, out).render_cli()
+        msg += out
     return "sealed", msg + "\n" + nextstep.NextStep.from_state("sealed", milestone_id).render_cli()

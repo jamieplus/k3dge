@@ -22,7 +22,8 @@ DEFAULTS: Dict[str, Any] = {
     # 编排单元：preconditions（闸 id，全绿才继续）+ actions（动作 id）。见 ADR-0001 §2 第 8 条。
     "checks": {
         "seal": {"preconditions": ["tasks_all_done", "align_pass", "guides_filled",
-                                   "adrs_all_accepted", "adr_landed"]},
+                                   "adrs_all_accepted", "adr_landed"],
+                 "actions": ["full_matrix", "archive", "closure_note", "prune"]},
     },
 }
 

@@ -10,3 +10,4 @@ volume_max = 8
 # seal 消费这组闸；执行器读契约跑（ADR-0001 §2 第 8 条）。
 [checks.seal]
 preconditions = ["tasks_all_done", "align_pass", "guides_filled", "adrs_all_accepted", "adr_landed"]
+actions = ["full_matrix", "archive", "closure_note", "prune"]
