@@ -1,5 +1,7 @@
 # Memo: DeepTutor 吸收评估（2026-09-06）
 
+> **Legacy note（归档 2026-09-12）**: §1 边表抽取器**已落**（k3dit `tools/import_graph.py` 的 `import_graph`/`cycles`）；§2 检索失败分类落 k3che `feat-retrieval_failure_taxonomy`，复核窗/模板引用落 k3dit `docs-protocol_absorption_backfill`。
+
 - **类型**: 可落地（两条，洁净室；其余排除）
 - **念头**: 扫 `workspace/DeepTutor`（HKU lifelong tutoring，Apache-2.0），找能被审计模块/k3che 吸收的模式。只搬模式/判据，零粘代码；1 行署名。
 - **触发场景**: 2026-09-06 会话，维护者问"DeepTutor 里有值得吸收的设计吗"

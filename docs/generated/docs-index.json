@@ -289,44 +289,12 @@
       "tokens": "Memo: Prompt as Neural Net — 稀疏门控解释框架"
     },
     {
-      "path": "docs/memo/2026-09-05-doc-code-misalignment-list.md",
-      "type": "memo",
-      "id": "2026-09-05-doc-code-misalignment-list",
-      "title": "Memo: 文档↔代码未对齐清单（2026-09-05 对账，待核实回填）",
-      "status": "",
-      "tokens": "Memo: 文档↔代码未对齐清单（2026-09-05 对账，待核实回填）"
-    },
-    {
       "path": "docs/memo/2026-09-05-graph-lens-for-audit-and-qa.md",
       "type": "memo",
       "id": "2026-09-05-graph-lens-for-audit-and-qa",
       "title": "Memo: 图论视角在审计/项目优化上的应用（为 audit vs QA 职责讨论铺底）",
       "status": "",
       "tokens": "Memo: 图论视角在审计/项目优化上的应用（为 audit vs QA 职责讨论铺底）"
-    },
-    {
-      "path": "docs/memo/2026-09-05-industry-benchmark-vs-4-harness.md",
-      "type": "memo",
-      "id": "2026-09-05-industry-benchmark-vs-4-harness",
-      "title": "Memo: 四 harness vs 行业标准完整对标（缺项清单 + 归属建议）",
-      "status": "",
-      "tokens": "Memo: 四 harness vs 行业标准完整对标（缺项清单 + 归属建议）"
-    },
-    {
-      "path": "docs/memo/2026-09-06-deeptutor-absorption-eval.md",
-      "type": "memo",
-      "id": "2026-09-06-deeptutor-absorption-eval",
-      "title": "Memo: DeepTutor 吸收评估（2026-09-06）",
-      "status": "",
-      "tokens": "Memo: DeepTutor 吸收评估（2026-09-06）"
-    },
-    {
-      "path": "docs/memo/2026-09-06-wikiskill-absorption-eval.md",
-      "type": "memo",
-      "id": "2026-09-06-wikiskill-absorption-eval",
-      "title": "Memo: WikiSkill 论文吸收评估（Google Research, arXiv:2608.27454）",
-      "status": "",
-      "tokens": "Memo: WikiSkill 论文吸收评估（Google Research, arXiv:2608.27454）"
     },
     {
       "path": "docs/memo/2026-09-12-rust-k3dge-fit.md",
@@ -516,9 +484,9 @@
       "path": "docs/tasks/2026-09-12-M9-docs-adr_isolation_evidence.md",
       "type": "tasks",
       "id": "2026-09-12-M9-docs-adr_isolation_evidence",
-      "title": "WikiSkill ablation 实证入 ADR-0025 W1 依据（执行席隔离）",
+      "title": "WikiSkill 残项入 ADR 层：W1 隔离实证 + PURPOSE 回指惯例",
       "status": "idea",
-      "tokens": "WikiSkill ablation 实证入 ADR-0025 W1 依据（执行席隔离）"
+      "tokens": "WikiSkill 残项入 ADR 层：W1 隔离实证 + PURPOSE 回指惯例"
     },
     {
       "path": "docs/tasks/2026-09-12-M9-docs-spec_boundary_fill.md",

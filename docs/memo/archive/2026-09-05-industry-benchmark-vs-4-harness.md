@@ -1,5 +1,7 @@
 # Memo: 四 harness vs 行业标准完整对标（缺项清单 + 归属建议）
 
+> **Legacy note（归档 2026-09-12）**: 权威已落 `ADR-0025` §2/§2.4（窗重划）＋ 4 票：k3ge `feat-process_audit`/`feat-escape_metric`、k3dit `feat-test_layer_coverage`、k3che `feat-rca_record`。注：文中 `k3lity` 为历史名，能力已并入审计模块（ADR-0025）。
+
 - **类型**: 暂无法落地（下一步讨论：六判读窗重划 + 缺项落地顺序）
 - **念头**: 用 k3dge+k3dit+k3lity+k3che **整体**对标行业标准，暴露"现有功能之外该补什么"，为六判读窗重划与落地顺序提供依据。**行业参照 → 缺失 → 归属**，顺序不能反。
 - **Date**: 2026-09-05

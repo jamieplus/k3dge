@@ -1,5 +1,7 @@
 # Memo: WikiSkill 论文吸收评估（Google Research, arXiv:2608.27454）
 
+> **Legacy note（归档 2026-09-12）**: §1 提案接受史落 k3dit `feat-proposal_log`；§2 隔离实证落 k3ge `docs-adr_isolation_evidence`＋k3dit `docs-protocol_absorption_backfill`；§3 PURPOSE 回指落 k3ge `docs-adr_isolation_evidence`、index 形态落 k3che `docs-index_entry_form`。
+
 - **类型**: 可落地（3 条机制；思想借鉴，论文无代码可粘，不涉许可）
 - **念头**: WikiSkill 做 skill evolution：Raw（不可变执行轨迹）/ Wiki（累积结构化知识）/ Skill（可回滚程序知识）三层 + Inference→Maintainer→Proposer→Gating&Rollback 四组件循环。5 模型×5 benchmark 全胜，ablation 给了关键数字。
 - **触发场景**: 2026-09-06 会话，维护者贴论文问"有什么可以借鉴"

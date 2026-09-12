@@ -35,6 +35,6 @@ date: 2026-09-06
 ## Related
 
 - `docs/adr/0025-hall-harness-topology.md`（§2.2 四判读窗；复核窗对照物=声明模型）
-- `docs/memo/2026-09-05-industry-benchmark-vs-4-harness.md`（§3.2 四缺项归属：②③工具半归本 task）
-- `docs/memo/2026-09-06-deeptutor-absorption-eval.md`（条目 1 边表抽取器，随本 task 落地）
+- `docs/memo/archive/2026-09-05-industry-benchmark-vs-4-harness.md`（§3.2 四缺项归属：②③工具半归本 task）
+- `docs/memo/archive/2026-09-06-deeptutor-absorption-eval.md`（条目 1 边表抽取器，随本 task 落地）
 - `2026-09-06-M8-feat-hall_G1_merge.md`（前置：工具代码已搬入）

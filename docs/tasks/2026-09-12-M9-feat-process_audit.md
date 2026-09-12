@@ -14,10 +14,10 @@ date: 2026-09-12
 - **Date**: 2026-09-12
 
 ## Intent
-里程碑证据链的**时间序/完整性**成为一条闸：报告 `provenance.baseline`==线头、审计发生在 `fix_base` 之后、report 被 review 署名。
+里程碑证据链的**时间序/完整性**成为一条闸：报告 `provenance.baseline`==线头、审计发生在 `fix_base` 之后、report 被 review 署名；并查**已修缺陷是否有 RCA 回灌记录**（industry §2.3 过程审计侧，消费 k3che `record_rca`）。
 
 ## 上下文/切入点
-- 来源：memo `industry-benchmark-vs-4-harness` §2 缺项1。
+- 来源：memo `docs/memo/archive/2026-09-05-industry-benchmark-vs-4-harness.md` §2 缺项1。
 - 现状：`check` 只查契约哈希/spec 结构/证据存在，**不查时序**。
 - 落点：硬闸契约 gate（如 `[checks.seal]` 加 `evidence_chain_ordered`），执行器读契约跑。
 

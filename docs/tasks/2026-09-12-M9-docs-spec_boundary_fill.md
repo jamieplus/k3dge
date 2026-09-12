@@ -14,11 +14,11 @@ date: 2026-09-12
 - **Date**: 2026-09-12
 
 ## 意图
-补齐 spec §1 人读边界，使其与 `src/k3dge/{engine,cli}/` 现存文件一致（B2/B3）。
+补齐 spec §1 人读边界，使其与 `src/k3dge/{engine,cli}/` 现存文件一致（B2/B3）；并补 `docs/architecture/overview.md` engine 描述漏列 `milestone / version / TEMPLATE_DRIFT`（C5）。
 
 ## 来源/证据
-- memo `doc-code-misalignment-list` B2/B3（2026-09-05）。
-- 逐条对照 `src/k3dge/{engine,cli}/` 现存文件与对应 spec §1。
+- memo `docs/memo/archive/2026-09-05-doc-code-misalignment-list.md` B2/B3/C5（2026-09-05）。
+- 逐条对照 `src/k3dge/{engine,cli}/` 现存文件与对应 spec §1 / overview engine 行。
 
 ## 边界
 只改 §1 人读段（`check` 不解析自然语言）；**不动 §2 接口块/契约哈希**。

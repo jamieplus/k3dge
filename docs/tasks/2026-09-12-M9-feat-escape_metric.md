@@ -17,7 +17,7 @@ date: 2026-09-12
 把"逃逸"变成可数事实：后续里程碑发现的**上轮漏项**比率，进观测行（不阻断提交）。
 
 ## 上下文/切入点
-- 来源：memo `industry-benchmark-vs-4-harness` §2 缺项4。
+- 来源：memo `docs/memo/archive/2026-09-05-industry-benchmark-vs-4-harness.md` §2 缺项4。
 - 现状：k3dit `metrics`/`stats` 已出误诊率/有意留率/打回率；**无逃逸**（需外部真值回流，memo 曾标"暂不做"）。
 - 落点：`audit_trigger` 增逃逸率口径（阈值入契约）+ `observe` 观测行。
 
