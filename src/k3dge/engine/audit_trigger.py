@@ -19,14 +19,13 @@ import subprocess
 from pathlib import Path
 from typing import List, Tuple
 
+from k3dge.engine import gates
 from k3dge.engine.milestone import (
     _find_audit_report,
     get_current_milestone,
     scan_milestone_tasks,
 )
 
-_C2_THRESHOLD = 5
-_VOLUME_THRESHOLD = 8
 _CTRL_NODES = (
     ast.If, ast.For, ast.AsyncFor, ast.While, ast.Try, ast.With, ast.AsyncWith,
 )
@@ -77,15 +76,17 @@ def compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]:
     if n > 0 and not any(t.status in ("in-progress", "idea") for t in tasks):
         reasons.append(f"账齐：本里程碑 {n} 个任务全 done，建议过一遍透镜")
 
+    c2_max = int(gates.get(workspace, "audit_trigger", "c2_nesting_max"))
+    vol_max = int(gates.get(workspace, "audit_trigger", "volume_max"))
     files = _git_changed_files(workspace)
     srcs = [workspace / f for f in files if f.startswith("src/") and f.endswith(".py")]
     if srcs:
         depth = max((_max_control_depth(p) for p in srcs), default=0)
-        if depth >= _C2_THRESHOLD:
-            reasons.append(f"C2 嵌套：触及 src/ 控制流 AST 深度最大 {depth} ≥ {_C2_THRESHOLD}")
+        if depth >= c2_max:
+            reasons.append(f"C2 嵌套：触及 src/ 控制流 AST 深度最大 {depth} ≥ {c2_max}")
     vol = [f for f in files if f.startswith("src/") or f.startswith("docs/specs/")]
-    if len(vol) >= _VOLUME_THRESHOLD:
-        reasons.append(f"体积：变更 {len(vol)} 个 src/specs 文件 ≥ {_VOLUME_THRESHOLD}")
+    if len(vol) >= vol_max:
+        reasons.append(f"体积：变更 {len(vol)} 个 src/specs 文件 ≥ {vol_max}")
     # NOTE: overview.md staleness is intentionally NOT an audit trigger —
     # updating architecture is handled inside the milestone closure note, not a hook.
 

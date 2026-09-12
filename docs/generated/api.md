@@ -158,6 +158,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List
 from typing import Tuple
+from k3dge.engine import gates
 from k3dge.engine.milestone import get_current_milestone
 from k3dge.engine.milestone import scan_milestone_tasks
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
@@ -257,6 +258,17 @@ from k3dge.engine.models import Violation
 from k3dge.engine.pairs import PAIRS
 class ConsistencyEngine
     evaluate(self, run_tests: bool=False, force_full: bool=False, staged: bool=False) -> GateReport
+# gates.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Dict
+REL = '.agent/gates.toml'
+DEFAULTS: Dict[str, Dict[str, Any]] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}}
+load(workspace: Path) -> Dict[str, Dict[str, Any]]
+    # doc: 缺省 ∪ `.agent/gates.toml`（段内覆盖）；文件缺失/坏 ⇒ 缺省。
+get(workspace: Path, section: str, key: str) -> Any
+    # doc: 读某闸的某阈值（含缺省）。
 # manifest.py
 from __future__ import annotations
 from pathlib import Path

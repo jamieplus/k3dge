@@ -8,6 +8,7 @@ Date: 2026-08-19
 Deciders: Core Maintainer
 Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit` 无输出，no live lens）。
       ② **合并原 ADR「TEMPLATE_DRIFT 锁在 engine」入本条 §2 第 7 条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：engine/templates 边界属架构基线；被并者 0014 删除，全仓指针改指本条。过闸口径 = manual fallback。
+      ③ 就地增补 §2 第 8 条「硬闸契约（`.agent/gates.toml`）」（闸的声明式阈值/开关，执行器读契约，缺省在 `engine/gates.DEFAULTS`）2026-09-12，经 Core Maintainer 本轮显式授权（M9 治理配置化），依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback。
 ---
 
 # ADR-0001: k3dge 架构设计与工程治理基线
@@ -60,6 +61,9 @@ Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一
    - `templates` 仍是脚手架孤岛：`scaffold` 不读 `engine.pairs`；`test_template_sync` 可 import `engine.pairs`（测试不是域运行时依赖）。
    - 不拆第五域；MCP check 与 `milestone align` 都走 `evaluate`，同一把锁。
    - 重开：templates 运行时需读 `PAIRS` 时，把表抽到两边都能 import 的无依赖模块（仍禁止 engine import templates）。
+8. **硬闸契约（`.agent/gates.toml`）**：闸的**声明式阈值/开关**在此覆盖；缺省在 `engine/gates.DEFAULTS`（唯一源），执行器读契约；配置缺失/坏 ⇒ 回落缺省（**闸不因配置坏而失效**）。
+   - 契约只承载**数据**，不含逻辑/表达式（不长第二套判定语言）。
+   - 首批：`[audit_trigger] c2_nesting_max / volume_max`；后续 gate rule（含封版 ADR 闸）按同一契约声明。
 
 本 ADR 只定实现；目的语言（减少漂移、幻觉、修局部坏整体等，不必穷举）见 ADR-0009。
 

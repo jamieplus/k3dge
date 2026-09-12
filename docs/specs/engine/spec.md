@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:f76b52a6f7f64a3a084a03b25777e69cfad40d180004b4d45903894b625989af`
+- **Contract Hash**: `sha256:1fb1edf5b81cfa476d1f25c26958e8ecc09c4b563e8de3c5141c1bea61f70faa`
 - **Last Updated**: 2026-09-12
 
 ## 1. Domain Boundary & Responsibilities
@@ -61,6 +61,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List
 from typing import Tuple
+from k3dge.engine import gates
 from k3dge.engine.milestone import get_current_milestone
 from k3dge.engine.milestone import scan_milestone_tasks
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
@@ -140,6 +141,14 @@ from k3dge.engine.models import Violation
 from k3dge.engine.pairs import PAIRS
 class ConsistencyEngine
     evaluate(self, run_tests: bool=False, force_full: bool=False, staged: bool=False) -> GateReport
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Dict
+REL = '.agent/gates.toml'
+DEFAULTS: Dict[str, Dict[str, Any]] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}}
+load(workspace: Path) -> Dict[str, Dict[str, Any]]
+get(workspace: Path, section: str, key: str) -> Any
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
