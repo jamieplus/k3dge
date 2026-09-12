@@ -1477,8 +1477,9 @@ def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str =
         return "stalled", f"写回仍未闭（{r.get('mode')}）：{r.get('message', '')[:90]}——人工 rebase 后再跑本命令幂等重试。"
     inflight = [j for j in mine if j.get("state") not in ("collected", "failed")]
     if not inflight:
-        done = [j for j in mine if j.get("state") == "collected" and j.get("merge_ok", True) and j.get("report")]
-        if done:  # 本里程碑已有签署报告且写回闭 ⇒ 审计腿即成（新鲜度与旧链同形：报告在场为凭）
+        done = [j for j in mine if j.get("state") == "collected" and j.get("merge_ok", True)
+                and j.get("report") and (j.get("counts") or {}).get("待修", 0) == 0]
+        if done:  # 本里程碑已有签署报告且**待修=0**并写回闭 ⇒ 审计腿即成（报告在场不代表闭环）
             return "closed", f"本里程碑签署报告已闭环（{done[-1]['report']}；待修 {done[-1].get('counts', {}).get('待修', '?')}）。"
         r = audit_flow.submit_audit(workspace, milestone_id, io=io, role=role)
         if not r.get("ok"):

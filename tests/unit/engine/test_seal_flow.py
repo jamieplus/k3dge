@@ -444,6 +444,19 @@ class TestRatchetAuditStep(TestCase):
             st, msg = ms._ratchet_audit_step(ws, "M1")
         assert st == "closed" and "M1-audit.md" in msg
 
+    def test_collected_with_pending_does_not_fake_close(self):
+        """collected 报告若 待修>0（未尽项 / 报告已删）⇒ 不得假闭环；应重新建单。"""
+        import json as _json
+
+        ws = self._ws_r()
+        (ws / ".agent" / "audit_jobs.json").write_text(_json.dumps({"jobs": [
+            {"job_id": "J-9", "milestone_id": "M1", "state": "collected", "merge_ok": True,
+             "report": "docs/reviews/M1-audit.md", "counts": {"待修": 3}}]}), encoding="utf-8")
+        with mock.patch("k3dge.engine.audit_flow.submit_audit",
+                        return_value={"ok": True, "job_id": "J-10", "state": "awaiting_audit"}) as m:
+            st, msg = ms._ratchet_audit_step(ws, "M1")
+        assert st == "progress" and "J-10" in msg and m.called
+
     def test_full_flow_ratchet_then_quality(self):
         """审计腿工单闭环后只剩 quality 腿；两腿皆净 ⇒ audited。"""
         import json as _json
