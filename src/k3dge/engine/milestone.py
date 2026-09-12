@@ -1084,7 +1084,6 @@ def persist_external_audit_report(
     if kind == "quality" and not _QUALITY_MARKER_RE.search(content):
         content = f"<!-- k3dge:kind: quality -->\n{content}"
     suffix = "quality" if kind == "quality" else "audit"
-# k3dit:fixed code-1 persist :1065 落盘前校 id/scope,audit_flow :182 同源校验;仍可写到 docs/reviews 外=没修对
     path = reviews / f"{today}-{milestone_id}-{scope}-{suffix}.md"
     path.write_text(content.strip() + "\n", encoding="utf-8")
     return path

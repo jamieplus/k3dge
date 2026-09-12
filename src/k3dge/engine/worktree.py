@@ -331,6 +331,5 @@ def materialize(workspace: Path, rev: str, dest: Path) -> Path:
     if p.returncode != 0:
         raise RuntimeError(f"物化失败: {p.stderr.decode('utf-8', 'replace').strip()[:160]}")
     with tarfile.open(fileobj=io.BytesIO(p.stdout)) as tf:
-        # k3dit:fixed code-10 _safe_extractall :245 无 filter 版回落路径/链接收敛;关联 test_worktree.py;3.10 低补丁版崩=没修对
         _safe_extractall(tf, dest)
     return dest

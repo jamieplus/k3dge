@@ -143,7 +143,6 @@ sequenceDiagram
 
 ## 8. 决策与有意留索引
 
-<!-- k3dit:fixed doc-1 本行 :147 不再承诺映射表，改指主题+ADR-0023 §2.3（不维护映射），与 README（仅 Topics）一致；若正文再现旧号映射指向＝没修对 -->
 已定案决策：寻址用 `k3dge doc list --type adr`；主题见 [`docs/adr/README.md`](../adr/README.md)（历史编号不维护映射表，ADR-0023 §2.3）。
 
 有意留（活文档常驻表）：[`docs/reviews/LEFTOVERS.md`](../reviews/LEFTOVERS.md) 为唯一事实源。

@@ -119,7 +119,6 @@ def parse_text(rel: str, text: str) -> Tuple[List[Marker], List[str]]:
     problems: List[str] = []
     rx = MARKER_RE_MD if rel.endswith((".md", ".html")) else MARKER_RE
     for m in rx.finditer(text):
-        # k3dit:fixed code-11 parse_text :123 用 _line_index(:102 界与 splitlines 同套);关联 test_markers.py;行号再偏=没修对
         line_no = _line_index(text, m.start())
         kind = m.group("kind")
         note = m.group("note") or ""

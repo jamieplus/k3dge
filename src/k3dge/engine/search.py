@@ -181,7 +181,6 @@ def search(
     """Controlled search. Returns path:line[: snippet]. Snippet window is clamped to
     _MAX_CONTEXT lines so a query never floods the context window."""
     raw = _run_ripgrep(workspace, query)
-    # k3dit:fixed code-7 _python_search :149 当正则(非法退子串),:152 跳 .venv 等;gitignore 差异残留;正则 query 再漏报=没修对
     if raw is None:
         raw = _python_search(workspace, query)
     locs: List[Location] = []

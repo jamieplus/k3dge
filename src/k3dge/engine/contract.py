@@ -207,7 +207,6 @@ def extract_python_interface(source: str, include_doc: bool = False) -> str:
     (used by machine docs); hash computation always uses `include_doc=False`
     so comment/docstring churn never triggers contract drift.
     """
-    # k3dit:fixed code-5 extract_python_interface 收常量/__all__/re-export 入哈希(:227-254);STATE=1→2 哈希仍等=没修对
     tree = ast.parse(source)
     allow = _get_all_names(tree)
     lines: List[str] = []
@@ -410,7 +409,6 @@ def symbol_diff(
     """
     spec_block = _extract_interface_block(spec_content)
     code_iface = collect_domain_interface(src_dir, manifest, workspace_root)
-    # k3dit:fixed code-14 symbol_diff :414 不再 normalize,_parse_symbols :391 indent==0 定顶层归属;键再混 def 前缀=没修对
     spec_syms = _parse_symbols(spec_block)
     code_syms = _parse_symbols(code_iface)
     added = sorted(set(code_syms) - set(spec_syms))

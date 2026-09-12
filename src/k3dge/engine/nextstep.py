@@ -123,7 +123,6 @@ class NextStep:
             lines.append(f"  if y: {if_y}")
         if if_n:
             lines.append(f"  if n: {if_n}")
-        # k3dit:fixed code-12 render_cli :127 与 render_mcp :146 两态同带 note;test_nextstep 同构;[NEXT] 丢 note=没修对
         if self.note:
             lines.append(f"  note: {self.note}")
         return "\n".join(lines)
