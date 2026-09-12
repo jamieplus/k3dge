@@ -28,6 +28,12 @@ date: 2026-09-04
 2. **`.mcp.json` 解释器固化**：k3dit/k3che server 由 `"command":"python"` + `PYTHONPATH` 改为各仓 venv **绝对路径**（demo 已验证该形）。现状：`.mcp.json` 仍是 `"python"`。
 3. **scaffold 出生即红（`PIPELINE_PEER_UNWIRED`）**：新下游仓 pipeline 默认绑 k3dit/k3che，但 scaffold 的 `.mcp.json` 不声明 peers ⇒ 首跑 `check` 报红。修法二选一：scaffold 生成**无 role 绑定的空 pipeline**，或 init 在缺 `.mcp.json` 条目时自动注 stub。
 
+## 边界与拆分
+
+- 事实归属：§7 预筛口径属 `peer_contract §7` + `audit_flow`（纯形式校验）；`.mcp.json` 解释器属下游装配（`cli/mcp` + `scaffold`）；scaffold 出生红属 `scaffold` + `pipeline_schema`。
+- 边界检查：预筛只做形式短路、不解释对方内部（`ADR-0006`）；scaffold 不替下游决定绑谁。
+- 桩子先行：预筛先造"闭环报告 + 同基线"fixture，断短路与 `--force`；scaffold 先造空下游仓，断首跑不红。
+
 ## 验收
 
 - 每项完成后勾除并指向证据；3 项全清后本单 `done`。
