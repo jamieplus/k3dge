@@ -60,18 +60,17 @@ def _parse_envelope(res) -> Dict:
 
 
 def _count_status(report_md: str) -> Dict[str, int]:
-    """12 列表的 状态 列计数（形式可验；枚举仅三种）。"""
-    counts = {"待修": 0, "有意留": 0, "已修": 0}
-    for line in report_md.splitlines():
-        if not line.strip().startswith("|"):
-            continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) >= 8 and cells[0] not in ("ID", "---") and not set(cells[0]) <= set("-: "):
-# k3dit:pending code-13 sev=中 prio=P2 type=冲突 audit_flow._count_status:70 固定 cells[7] 取状态、只查 len>=8；milestone._parse_audit_stats:1113 按表头定位「状态」且跳过 len!=表头 的行——同一 12 列报告含 8-11 格数据行时两口径待修数分歧（C=1 P=0），collect_audit:250 据 C 定 open/closed、audit_trigger.audit_closed:108 据 P 定封板资格，截断行可让封板闸误判闭环。evidence=PYTHONPATH=$PWD/src/src python3 -c "from k3dge.engine.audit_flow import _count_status as C; from k3dge.engine.milestone import _parse_audit_stats as P; r=chr(10).join(['| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |','|---|---|---|---|---|---|---|---|---|---|---|---|','| A-1 | 2026-09-11 | 高 | P1 | 安全 | x | p | 待修 |']); print(C(r)['待修'], P(r)['待修'])"
-            status = cells[7]
-            if status in counts:
-                counts[status] += 1
-    return counts
+    """12 列表的 状态 列计数（形式可验；枚举仅三种）。
+
+    单一表格口径：委托 `milestone._parse_audit_stats`（按表头定位「状态」列、跳过
+    len != 表头 的截断行），与封板闸 `audit_trigger.audit_closed` 同源——不再固定
+    cells[7] 取状态（code-13：同一报告两口径待修数会分歧，截断行可误判闭环）。
+    """
+    # k3dit:fixnote code-13 删固定 cells[7]/len>=8 口径，改委托 milestone._parse_audit_stats（表头+跳截断行），与封板闸同源
+    from k3dge.engine.milestone import _parse_audit_stats
+
+    stats = _parse_audit_stats(report_md)
+    return {"待修": stats["待修"], "有意留": stats["有意留"], "已修": stats["已修"]}
 
 
 # ---------- 两态入口 ----------
@@ -176,6 +175,13 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
     if job is None:
         return {"state": "awaiting_audit", "detail": "no awaiting audit job; submit first"}
     role = job.get("role", "audit")
+    # milestone_id 拼进落盘文件名（下方 report_path），必须先过安全校验；空值回落 adhoc（submit 同口径）
+    from k3dge.engine.milestone import _validate_milestone_id
+
+    safe_ms = milestone_id or job.get("milestone_id") or "adhoc"
+    id_err = _validate_milestone_id(safe_ms)
+    if id_err:
+        return {"state": "failed", "error": "FORMAT", "detail": id_err}
 
     res = run_action(workspace, f"{role}.collect", io=io, arguments={"job_id": job["job_id"]})
     env = _parse_envelope(res)
@@ -216,7 +222,7 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
     reviews = workspace / "docs" / "reviews"
     reviews.mkdir(parents=True, exist_ok=True)
     today = datetime.date.today().isoformat()
-    report_path = reviews / f"{today}-{milestone_id}-{'quality' if role != 'audit' else 'audit'}.md"
+    report_path = reviews / f"{today}-{safe_ms}-{'quality' if role != 'audit' else 'audit'}.md"
     # 案卷防互踩闸（首夜事故根因）：目标已有**异类或异基线**报告 ⇒ 拒落，不静默覆盖
     if report_path.is_file():
         prev = report_path.read_text(encoding="utf-8", errors="ignore")

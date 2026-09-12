@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -140,11 +141,18 @@ def _run_ripgrep(workspace: Path, query: str) -> Optional[List[str]]:
 
 
 def _python_search(workspace: Path, query: str) -> List[str]:
+    """rg 缺席时的兜底，刻意对齐 rg 语义：query 当正则（非法正则回退子串）、
+    跳过 .git/.venv/venv/node_modules/__pycache__/docs/generated（code-7：原纯子串 +
+    整扫 .venv/node_modules 使命中集随 rg 装否而变）。"""
     out: List[str] = []
-    pat = query
+    try:
+        rx = re.compile(query)
+    except re.error:
+        rx = None
+    skip_dirs = {".git", ".venv", "venv", "node_modules", "__pycache__"}
     for path in workspace.rglob("*"):
         rel_parts = path.relative_to(workspace).parts
-        if not path.is_file() or ".git" in path.parts or rel_parts[:2] == ("docs", "generated"):
+        if not path.is_file() or set(rel_parts) & skip_dirs or rel_parts[:2] == ("docs", "generated"):
             continue
         try:
             if path.stat().st_size > 1_000_000:   # 体积闸：超大文件不整读（A-2）
@@ -155,11 +163,10 @@ def _python_search(workspace: Path, query: str) -> List[str]:
             text = path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        if pat in text:
-            rel = str(path.relative_to(workspace)).replace("\\", "/")
-            for i, line in enumerate(text.splitlines(), 1):
-                if pat in line:
-                    out.append(f"{rel}:{i}:{line}")
+        rel = str(path.relative_to(workspace)).replace("\\", "/")
+        for i, line in enumerate(text.splitlines(), 1):
+            if (rx.search(line) if rx is not None else query in line):
+                out.append(f"{rel}:{i}:{line}")
     return out
 
 
@@ -174,7 +181,7 @@ def search(
     """Controlled search. Returns path:line[: snippet]. Snippet window is clamped to
     _MAX_CONTEXT lines so a query never floods the context window."""
     raw = _run_ripgrep(workspace, query)
-# k3dit:pending code-7 sev=低 prio=P2 type=冲突 search:177 双后端语义不等价：rg 把 query 当正则且尊重 .gitignore，_python_search:158 是纯子串且只跳 .git/docs/generated（.venv/node_modules 整扫）→ 同查询命中集随 rg 装否而变：无 rg 时正则式 query 静默漏报（help 却宣称 "query: search term / regex"），.venv 噪音又涌入"controlled search"。
+    # k3dit:fixnote code-7 兜底 _python_search 改按正则（非法回退子串）并跳 .venv/venv/node_modules/__pycache__，与 rg 收敛
     if raw is None:
         raw = _python_search(workspace, query)
     locs: List[Location] = []

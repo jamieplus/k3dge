@@ -41,6 +41,26 @@ def _spec_violation_path(workspace: Path, manifest: Manifest, domain: str) -> Op
     return str(workspace / rel) if rel else None
 
 
+def _package_prefix(manifest: Manifest, domain: str) -> str:
+    """Top-level import package for a domain's src (e.g. `src/k3dge/engine` -> `k3dge`).
+
+    Derived from manifest (package_root + the domain's src), never hardcoded: downstream
+    repos use a different package name (k3dit/k3che), so a baked-in `k3dge.` made the
+    reverse-import ban silently no-op there (code-6).
+    """
+    src_rel = manifest.src_path(domain)
+    if not src_rel:
+        return ""
+    root = manifest.package_root.replace("\\", "/").rstrip("/")
+    rel = src_rel.replace("\\", "/")
+    if root and rel.startswith(root + "/"):
+        rel = rel[len(root) + 1 :]
+    elif rel == root:
+        return ""
+    parts = [p for p in rel.split("/") if p]
+    return parts[0] if parts else ""
+
+
 def _shape_change_documented(workspace: Path, domain: str, spec_content: str, sym_diff: dict) -> bool:
     """C gate (WARN only): a shape change (added/removed/changed symbols) must leave a human trace.
 
@@ -179,7 +199,7 @@ class ConsistencyEngine:
             return []
         return [p.strip() for p in out.stdout.splitlines() if p.strip()]
 
-# k3dit:pending value-1 sev=中 prio=P2 type=结构 evaluate:182 god-method 283行/CC61，一个方法混居≥9类门控：manifest加载+git diff/staged+docs根策略+spec/src域映射+测试批跑/depends_on+版本一致+CHANGELOG done告警+模板漂移(self-host)+pipeline硬门+docs校验，各段自包 try/except 塞 Violation；远超 M7-quality Q-3 已接受带(CC11-19 argparse 派，不覆盖本函数)，应下沉为独立门控子检查（_check_domain 已有抽取先例可循）
+# k3dit:leftover value-1 283行/9门控重构无窗内测试保行为；M7-Q3同域已接受技术债，交独立refactor task
     def evaluate(self, run_tests: bool = False, force_full: bool = False, staged: bool = False) -> GateReport:
         try:
             manifest = Manifest.load(self.workspace_root)
@@ -643,8 +663,13 @@ class ConsistencyEngine:
         src_dir = self.workspace_root / src_rel
         if not src_dir.exists():
             return out
-# k3dit:pending code-6 sev=中 prio=P2 type=隐蔽 _check_domain_imports:645 正则把包前缀硬编码为 "k3dge."：下游仓（不同包名，如 k3dit/k3che）任何跨域导入都不匹配 → ADR-0001 决策6 的反向导入禁令对下游静默空转、check 常绿（downstream-first 是 ADR-0015 主用途），且只认一级 `k3dge.<domain>`，`from k3dge.engine.sub import` 之类也只取 engine。前缀应取自 manifest（package_root/域 src 公共段推导）。evidence=python3 -c "import re;print(bool(re.match(r'^\s*(?:from\s+k3dge\.([a-z_]+)|import\s+k3dge\.([a-z_]+))','from k3dit.engine import x')))" 出 False
-        import_re = re.compile(r"^\s*(?:from\s+k3dge\.([a-z_]+)|import\s+k3dge\.([a-z_]+))")
+        # k3dit:fixnote code-6 包前缀不再硬编码 k3dge.，改由 manifest 推导（package_root+域src首段）；下游跨域导入现能匹配，禁令不再空转
+        pkg = _package_prefix(manifest, domain)
+        if not pkg:
+            return out
+        import_re = re.compile(
+            rf"^\s*(?:from\s+{re.escape(pkg)}\.([a-z_]+)|import\s+{re.escape(pkg)}\.([a-z_]+))"
+        )
         allowed = set(manifest.depends_on(domain))
         for py in sorted(src_dir.rglob("*.py")):
             if py.name == "__init__.py":

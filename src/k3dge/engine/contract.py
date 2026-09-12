@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import re
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -17,6 +18,22 @@ class _ExtractError(RuntimeError):
 
 def _ann(node: Optional[ast.AST]) -> str:
     return ast.unparse(node) if node is not None else ""
+
+
+def _fmt_value(node: Optional[ast.AST]) -> str:
+    """Rendered constant value with interface delimiters escaped.
+
+    A module constant can hold the literal `INTERFACE_START`/`INTERFACE_END` text
+    (contract.py itself does); verbatim it would truncate the spec interface block on
+    the next `sync`/`symbol_diff`. Escaping is deterministic, so the hash stays stable.
+    """
+    if node is None:
+        return ""
+    text = _ann(node)
+    for marker in (INTERFACE_START, INTERFACE_END):
+        if marker in text:
+            text = text.replace(marker, marker.replace("-", "\\x2d"))
+    return text
 
 
 def _fmt_arg(arg: ast.arg) -> str:
@@ -111,12 +128,12 @@ def _fmt_class(node: ast.ClassDef, indent: str = "", include_doc: bool = False) 
         elif isinstance(child, ast.AnnAssign) and isinstance(child.target, ast.Name) and not child.target.id.startswith("_"):
             ann = _ann(child.annotation)
             suffix = f": {ann}" if ann else ""
-            val = f" = {_ann(child.value)}" if child.value is not None else ""
+            val = f" = {_fmt_value(child.value)}" if child.value is not None else ""
             members.append(f"    {child.target.id}{suffix}{val}")
         elif isinstance(child, ast.Assign):
             for t in child.targets:
                 if isinstance(t, ast.Name) and not t.id.startswith("_"):
-                    members.append(f"    {t.id} = {_ann(child.value)}")
+                    members.append(f"    {t.id} = {_fmt_value(child.value)}")
     body = lines + members
     if not body:
         return header
@@ -179,6 +196,10 @@ def _get_all_names(tree: ast.Module) -> Optional[set[str]]:
     return None
 
 
+def _is_public(name: str) -> bool:
+    return bool(name) and not name.startswith("_")
+
+
 def extract_python_interface(source: str, include_doc: bool = False) -> str:
     """Extract normalized public interface signatures from Python source.
 
@@ -186,27 +207,51 @@ def extract_python_interface(source: str, include_doc: bool = False) -> str:
     (used by machine docs); hash computation always uses `include_doc=False`
     so comment/docstring churn never triggers contract drift.
     """
-# k3dit:pending code-5 sev=中 prio=P1 type=正确性 extract_python_interface:189 只遍历顶层函数/类：模块级公开常量永不进契约哈希（`STATE_OPTIONS` 这类事实源改值无感），`__all__` 只当过滤器、其内容自身不进哈希，顶层 re-export（from x import f 列进 __all__）也不进 → 「公开符号变更→sync」对这三类静默漏放，L1 只证函数/类签名。evidence=PYTHONPATH=$PWD/src/src python3 -c "from k3dge.engine.contract import compute_hash as H, extract_python_interface as E;print(H(E('STATE = 1' + chr(10) + 'def f(): ...'))==H(E('STATE = 2' + chr(10) + 'def f(): ...')))" 输出 True
+    # k3dit:fixnote code-5 补收公开模块级常量、__all__ 内容、顶层 re-export 入 L1 契约哈希；三类此前改值 sync 无感，现纳入
     tree = ast.parse(source)
     allow = _get_all_names(tree)
     lines: List[str] = []
+
+    def _wanted(name: str) -> bool:
+        if allow is not None:
+            return name in allow
+        return _is_public(name)
+
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            name = node.name
-            if allow is not None:
-                if name not in allow:
-                    continue
-            elif name.startswith("_"):
-                continue
-            lines.append(_fmt_func(node, include_doc=include_doc))
+            if _wanted(node.name):
+                lines.append(_fmt_func(node, include_doc=include_doc))
         elif isinstance(node, ast.ClassDef):
-            name = node.name
-            if allow is not None:
-                if name not in allow:
+            if _wanted(node.name):
+                lines.append(_fmt_class(node, include_doc=include_doc))
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+            value = node.value
+            ann_suffix = ""
+            if isinstance(node, ast.AnnAssign) and node.annotation is not None:
+                ann_suffix = f": {_ann(node.annotation)}"
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for t in targets:
+                if not isinstance(t, ast.Name):
                     continue
-            elif name.startswith("_"):
-                continue
-            lines.append(_fmt_class(node, include_doc=include_doc))
+                if t.id == "__all__":
+                    if allow is not None:
+                        lines.append(f"__all__ = {sorted(allow)}")
+                    continue
+                if not _is_public(t.id):
+                    continue
+                if not _wanted(t.id):
+                    continue
+                val = f" = {_fmt_value(value)}" if value is not None else ""
+                lines.append(f"{t.id}{ann_suffix}{val}")
+        elif isinstance(node, ast.ImportFrom):
+            module = ("." * node.level) + (node.module or "")
+            for alias in node.names:
+                if alias.name == "*":
+                    continue
+                name = alias.asname or alias.name
+                if not _is_public(name) or not _wanted(name):
+                    continue
+                lines.append(f"from {module} import {name}")
     return "\n".join(lines)
 
 
@@ -304,30 +349,50 @@ def _extract_interface_block(spec_content: str) -> str:
 
 
 def _symbol_name(line: str) -> Optional[str]:
+    """Symbol key for a generated-interface line: class / function / constant / re-export."""
     s = line.strip()
-    if s.startswith("class "):
-        head = s[len("class ") :]
-    elif "(" in s:
-        head = s[: s.index("(")]
-    else:
+    if not s:
         return None
-    return head.strip() or None
+    if s.startswith("class "):
+        # drop bases and trailing ':' so the key is the class name (bases stay in the value)
+        return re.split(r"[(:]", s[len("class ") :], 1)[0].strip() or None
+    if s.startswith("from ") and " import " in s:
+        tail = s.split(" import ", 1)[1]
+        return tail.split(",")[0].split(" as ")[-1].strip().split(".")[0] or None
+    if s.startswith("import "):
+        tail = s[len("import ") :]
+        return tail.split(",")[0].split(" as ")[-1].strip().split(".")[0] or None
+    m = re.match(r"([A-Za-z_]\w*)\s*[:=]", s)
+    if m:  # module constant / annotated constant (key = name, value = full line)
+        return m.group(1)
+    if "(" in s:
+        head = s[: s.index("(")].strip()
+        if re.fullmatch(r"[A-Za-z_]\w*", head):
+            return head
+    return None
 
 
-def _parse_symbols(normalized: str) -> "dict[str, str]":
-    """Map each top-level public symbol -> normalized signature (class includes members)."""
+def _parse_symbols(interface: str) -> "dict[str, str]":
+    """Map each top-level public symbol -> normalized signature (class includes members).
+
+    Takes the **raw** (indented) interface. Leading indentation is what marks a symbol
+    as a class member, so it must not be collapsed beforehand (code-14): normalizing
+    first made every method/property a bogus top-level symbol and mixed `def ` / base
+    lists into the keys. Only intra-line whitespace is collapsed, for stable compares.
+    """
     syms: dict[str, str] = {}
     current: Optional[str] = None
-    for raw in normalized.split("\n"):
-        if not raw.strip():
+    for raw in interface.split("\n"):
+        collapsed = " ".join(raw.split())
+        if not collapsed:
             continue
         indent = len(raw) - len(raw.lstrip())
-        name = _symbol_name(raw)
+        name = _symbol_name(collapsed)
         if indent == 0 and name:
             current = name
-            syms[name] = raw.strip()
+            syms[name] = collapsed
         elif current is not None:
-            syms[current] += "\n" + raw.strip()
+            syms[current] += "\n" + collapsed
     return syms
 
 
@@ -345,9 +410,9 @@ def symbol_diff(
     """
     spec_block = _extract_interface_block(spec_content)
     code_iface = collect_domain_interface(src_dir, manifest, workspace_root)
-    spec_syms = _parse_symbols(normalize(spec_block))
-# k3dit:pending code-14 sev=低 prio=P2 type=正确性 contract.symbol_diff:348 先 normalize()（逐行 collapse 掉前导空白）再 _parse_symbols（靠行首缩进判类成员归属）→ 类方法/属性被当顶层符号、键名混入 "def " 前缀与基类表（'Foo(Base)'）——CONTRACT_DRIFT 的 symbol_diff 详情与 _shape_change_documented 的 CHANGELOG 命中名错乱（不碰哈希/闸值，只污染报告层与 WARN 判定）。evidence=PYTHONPATH=$PWD/src/src python3 -c "from k3dge.engine.contract import _parse_symbols, normalize; print(_parse_symbols(normalize('class Foo(Base)'+chr(10)+'    def bar(self, x: int) -> None')))"
-    code_syms = _parse_symbols(normalize(code_iface))
+    # k3dit:fixnote code-14 去掉先 normalize() 再 _parse_symbols：改用原始带缩进接口，只 collapse 行内空白；类成员重归类、键名不再混入基类表
+    spec_syms = _parse_symbols(spec_block)
+    code_syms = _parse_symbols(code_iface)
     added = sorted(set(code_syms) - set(spec_syms))
     removed = sorted(set(spec_syms) - set(code_syms))
     changed = sorted(

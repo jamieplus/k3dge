@@ -123,8 +123,8 @@ class NextStep:
             lines.append(f"  if y: {if_y}")
         if if_n:
             lines.append(f"  if n: {if_n}")
-# k3dit:pending code-12 sev=低 prio=P2 type=冲突 render_cli:126 只在 ask/if_y/if_n 全空时透传 note，render_mcp:146 无条件带 note → ratchet_open / pending_findings（配 if_y/ask+note 态）人类 [NEXT] 行丢 note、MCP/JSON 出口有——三出口字典相等断言（INC-20260902 / test_status_next_is_isomorphic_across_exits）的覆盖面。evidence=PYTHONPATH=$PWD/src/src python3 -c "from k3dge.engine.nextstep import NextStep as N;n=N.from_state('ratchet_open','M9');print('棘轮' in str(n.render_mcp()), '棘轮' in n.render_cli())" 出 True False
-        if self.note and not (ask or if_y or if_n):
+        # k3dit:fixnote code-12 note 不再以 ask/if_y/if_n 全空为前提，与 render_mcp 同口径无条件透传；人类 [NEXT] 行不再丢 note
+        if self.note:
             lines.append(f"  note: {self.note}")
         return "\n".join(lines)
 

@@ -97,6 +97,21 @@ def head_block_end(lines: Sequence[str]) -> int:
     return i
 
 
+# str.splitlines() 的行界（除 \n 外还含 \x0b\x0c\x1c-\x1e\x85\u2028\u2029）——
+# parse_text 的行号必须用同一套，否则 worktree.strip_pins 按 splitlines 索引会错位（code-11）。
+_LINE_BREAK_RE = re.compile(r"\r\n|[\r\n\v\f\x1c-\x1e\x85\u2028\u2029]")
+
+
+def _line_index(text: str, pos: int) -> int:
+    """char offset -> 1-based line number，与 str.splitlines() 同口径。"""
+    import bisect
+
+    starts = [0]
+    for bm in _LINE_BREAK_RE.finditer(text):
+        starts.append(bm.end())
+    return bisect.bisect_right(starts, pos)
+
+
 def parse_text(rel: str, text: str) -> Tuple[List[Marker], List[str]]:
     lines = text.splitlines()
     hb = head_block_end(lines)
@@ -104,8 +119,8 @@ def parse_text(rel: str, text: str) -> Tuple[List[Marker], List[str]]:
     problems: List[str] = []
     rx = MARKER_RE_MD if rel.endswith((".md", ".html")) else MARKER_RE
     for m in rx.finditer(text):
-# k3dit:pending code-11 sev=中 prio=P2 type=缺陷 parse_text:107 行号按 count("\n") 定位，而消费方按 text.splitlines() 索引（worktree.strip_pins:146 `src[m.line-1]`）：splitlines 还把 \x0c/\x85/\u2028 当行界（py 源码页分隔 \x0c 常见），两套行号在含此类字节的文件里错位——收官去钉把真独占行钉误判 suspicious 不删，行号前偏时还会删错无辜行。evidence=python3 -c "t='a\x0cb' + chr(10) + 'c' + chr(10);print(t.count(chr(10)), len(t.splitlines()))" 出 1 2
-        line_no = text.count("\n", 0, m.start()) + 1
+        # k3dit:fixnote code-11 行号由 count("\\n") 改 _line_index，与 str.splitlines 同界，对齐 strip_pins
+        line_no = _line_index(text, m.start())
         kind = m.group("kind")
         note = m.group("note") or ""
         cap = _MAX_NOTE_PENDING if kind == "pending" else _MAX_NOTE

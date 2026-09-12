@@ -289,6 +289,30 @@ def pin_baseline(workspace: Path, name: str, oid: str) -> bool:
     return _git(workspace, "update-ref", f"refs/audit-baseline/{name}", oid).returncode == 0
 
 
+def _safe_extractall(tf, dest: Path) -> None:
+    """跨版本安全解包（code-10）。
+
+    `TarFile.extractall(filter=...)` 3.12 首发、仅回移到 3.11.4/3.10.12+，而本仓最低
+    支持 3.10（`init.sh` 声明 >=3.10）→ 低补丁版本直接 TypeError，Hall 物化动词崩。
+    优先用 data 过滤器；不支持则先手工挡绝对路径/`..`/链接外逃再解包，路径收敛不放弃。
+    """
+    try:
+        tf.extractall(dest, filter="data")
+        return
+    except TypeError:  # Python < 3.11.4 / < 3.10.12：filter= 尚不存在
+        pass
+    dest_resolved = Path(dest).resolve()
+    for member in tf.getmembers():
+        target = (dest_resolved / member.name).resolve()
+        if not target.is_relative_to(dest_resolved):
+            raise RuntimeError(f"拒绝越界解包: {member.name}")
+        if member.issym() or member.islnk():
+            link = (target.parent / member.linkname).resolve()
+            if not link.is_relative_to(dest_resolved):
+                raise RuntimeError(f"拒绝越界链接: {member.name} -> {member.linkname}")
+    tf.extractall(dest)
+
+
 def materialize(workspace: Path, rev: str, dest: Path) -> Path:
     """只读物化：把 rev 的树解到 dest（内容物，无 `.git`；不碰线/worktree/分支）。
 
@@ -307,6 +331,6 @@ def materialize(workspace: Path, rev: str, dest: Path) -> Path:
     if p.returncode != 0:
         raise RuntimeError(f"物化失败: {p.stderr.decode('utf-8', 'replace').strip()[:160]}")
     with tarfile.open(fileobj=io.BytesIO(p.stdout)) as tf:
-# k3dit:pending code-10 sev=中 prio=P2 type=缺陷 materialize:263 用 tarfile.extractall(filter=)——该参数 3.12 首发、仅回移到 3.11.4/3.10.12+，而本仓最低支持含 3.10（init.sh:29 声明 >=3.10；pipeline_runner/milestone 的 tomli 兜底即 3.10 路径）→ 低补丁版本 python 上 TypeError，Hall 物化基线动词直接崩。evidence=python3.10 -c "import io,tarfile;tarfile.open(fileobj=io.BytesIO()).extractall('.',filter='data')" 出 TypeError
-        tf.extractall(dest, filter="data")
+        # k3dit:fixnote code-10 extractall(filter=) 收进 _safe_extractall：支持版走 data，低补丁版手工挡 ../绝对/链接外逃
+        _safe_extractall(tf, dest)
     return dest

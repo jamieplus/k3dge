@@ -155,7 +155,7 @@ def _append_to_unreleased(workspace: Path, task_path: Path) -> bool:
         return False
 
 
-# k3dit:pending value-2 sev=中 prio=P2 type=冗余 12列审计报告「扫 reviews/*.md→跳 aux→utf-8 读→按表头定位列→按状态计数/翻状态」逻辑各写一遍且口径不一：本函数(CC50，含列索引/index/翻转/## 回填内联解析)、_parse_audit_stats:1084、_find_report:1011、audit_flow._count_status:70、audit_flow.collect_audit:165(CC31) 共≥5套；code-13 已抓到 _count_status 与 _parse_audit_stats 两口径分歧即为此重复的直接代价。应收敛为单一表格解析/遍历器，其余仅调用
+# k3dit:leftover value-2 code-13 已把 _count_status 委托 _parse_audit_stats 消分歧；余4扫描器职责各异，全并属refactor
 def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, milestone: str | None) -> None:
     """Best-effort auto-backfill for audit reviews when a task is marked done.
 
@@ -1062,6 +1062,14 @@ def persist_external_audit_report(
     12-col header, a canonical header is prepended so downstream parsing works; the
     latest submission for a (milestone, scope) overwrites any prior one.
     """
+    id_err = _validate_milestone_id(milestone_id)
+    if id_err:
+        raise ValueError(id_err)
+    if scope and not _SAFE_MILESTONE_ID_RE.fullmatch(scope):
+        raise ValueError(
+            f"Invalid scope '{scope}': use a letter/digit start, then letters, "
+            "digits, '.', '_' or '-' only (no path separators)."
+        )
     reviews = workspace / "docs" / "reviews"
     reviews.mkdir(parents=True, exist_ok=True)
     norm = (content or "").replace(" ", "")
@@ -1076,7 +1084,7 @@ def persist_external_audit_report(
     if kind == "quality" and not _QUALITY_MARKER_RE.search(content):
         content = f"<!-- k3dge:kind: quality -->\n{content}"
     suffix = "quality" if kind == "quality" else "audit"
-# k3dit:pending code-1 sev=中 prio=P1 type=安全 persist_external_audit_report:1078 的 milestone_id 未过 _validate_milestone_id（对比 _safe_archive_dir:375、run_milestone_alignment:711 均校）就拼进落盘文件名：MCP k3dge_submit_audit_report 直连该参，路径段/`..` 可注入落点写文件到 docs/reviews 外（成败依 OS 对 `..` 段的解析策略——未校验本身即缺陷）；同型 audit_flow.collect_audit:218。evidence=PYTHONPATH=$PWD/src/src python3 -c "import pathlib;from k3dge.engine.milestone import persist_external_audit_report as p;p(pathlib.Path('.'),'x/../../../evil','b');import os;print(sorted(os.listdir('..')))"
+# k3dit:fixnote code-1 milestone_id/scope 过 _validate_milestone_id，非法即 raise；落盘名两段不可越界，collect_audit 同校
     path = reviews / f"{today}-{milestone_id}-{scope}-{suffix}.md"
     path.write_text(content.strip() + "\n", encoding="utf-8")
     return path

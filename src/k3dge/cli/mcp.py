@@ -108,7 +108,7 @@ def k3dge_check(
     force_full: bool = False,
 ) -> str:
     """Run k3dge consistency gate directly via ConsistencyEngine."""
-# k3dit:pending code-2 sev=中 prio=P1 type=安全 MCP 注入面（本文件 ~10 工具）workspace_path 直通 _find_workspace（cli/main.py:28，resolve 不收敛）：外部 agent 可指任意目录——get_manifest_resource 读、create_task 写、milestone_control seal 归档搬移他仓，with_tests=True 更对任意路径跑 pytest（attacker 内容的 conftest.py 以服务进程权限执行）。ADR-0006 §2.2 S-13 把信任边界定为 OS 用户，但窗/仓物理隔离（ADR-0025 §2.7 防越窗写）正依赖收敛，此参数把隔离旁路掉——至少应缺省锁 CWD 并将越界显式化。
+# k3dit:leftover code-2 ADR-0006 S-13 信任域=OS用户；锁CWD会废跨仓 workspace_path（既有测试/流程），收敛属编排，改需ADR
     ws = _find_workspace(workspace_path=workspace_path)
     report: GateReport = ConsistencyEngine(ws).evaluate(run_tests=with_tests, force_full=force_full)
     payload = _to_json(report)
