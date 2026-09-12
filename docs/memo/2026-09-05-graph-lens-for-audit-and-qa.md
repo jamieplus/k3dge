@@ -144,6 +144,6 @@ audit vs QA 职责划分讨论时，建议开场先对齐一句工作定义草�
 ## 8. 相关
 
 - `docs/memo/2026-09-02-plugins-main-absorption-eval.md`（P3 度量循环行——图论应用与度量纪律在 k3lity 汇合）
-- k3dit `docs/guides/protocol.md`（Pass 2/4/5 + ADR-0003/0004 的并发红旗、code-judo）
+- k3dit `docs/guides/protocol.md`（Pass 2/4/5 + ADR-0018/0004 的并发红旗、code-judo）
 - `docs/protocols/peer_contract.md` §9（blocking 字段）、§6（12 列）
 - `docs/adr/0006-mcp-foreign-harness-injection.md`（调动作不调步骤——图事实的交付也必须走动作面，不许调用方自己拿边表算）

@@ -83,10 +83,10 @@
 | --- | --- | --- |
 | **Diátaxis 分类** | `guides`=教程 / `generated`=Reference 机器自动生成 / `architecture`=解释（本文+overview） | [`overview.md`](overview.md) 头部；`docs/generated/README.md` |
 | **`docs/<type>` 规约** | 每种类型锁 `README.md` + `AUTHORING.md`；结构硬闸 `docs/<type>/.schema.json`（有才闸，缺则下游安全） | ADR-0018/0019；`engine/doc_catalog.py` |
-| **doc catalog** | `list / where / grep`；`grep` 正文只回 `path(:line)`，不回 snippet | ADR-0019；`docs/generated/docs-index.json` |
+| **doc catalog** | `list / where / grep`；`grep` 正文只回 `path(:line)`，不回 snippet | ADR-0018；`docs/generated/docs-index.json` |
 | **LEFTOVERS.md** | 有意留（活文档常驻表）唯一事实源 | [`overview.md`](overview.md) §8 |
 | **Memo** | spark inbox：三种"暂不成事"的念头（模糊/暂不可落地/弱相关）；成熟后晋升 tasks 并移 archive | `docs/guides/user_guide.md`；`docs/memo/README.md` |
-| **Incident** | 持续偏离落 `docs/incidents/INC-YYYYMMDD-<TYPE>-<slug>.md`；L2 生成器 `k3dge incident` | ADR-0019 语境；`engine/protocol.write_incident` |
+| **Incident** | 持续偏离落 `docs/incidents/INC-YYYYMMDD-<TYPE>-<slug>.md`；L2 生成器 `k3dge incident` | ADR-0018 语境；`engine/protocol.write_incident` |
 | **guide-stub / align-pass** | `<!-- k3dge:guide-stub -->` 阻断 seal；`<!-- k3dge:align-pass:<id> -->` 是 seal 的 reviews 入场券 | `specs/engine §3` |
 
 ### 3.4 MCP 与对外 harness（peer）
@@ -133,9 +133,9 @@
 ### 文档体系
 | ID | 主题（文件名） | 一句话 |
 | --- | --- | --- |
-| ADR-0003 | tasks-backlog-merge | tasks 与 backlog 合并为单一日历状态容器 |
+| ADR-0018 | tasks-backlog-merge | tasks 与 backlog 合并为单一日历状态容器 |
 | ADR-0018 | doc-readme-anchor-governance | 每种文档类型 README 锚点 + AUTHORING 寻址治理 |
-| ADR-0019 | protocol-load-proof-abandoned | 协议加载证明废弃；`PIPELINE_PROTOCOL_NOT_FOUND` 静态守卫 |
+| ADR-0018 | protocol-load-proof-abandoned | 协议加载证明废弃；`PIPELINE_PROTOCOL_NOT_FOUND` 静态守卫 |
 | ADR-0023 | low-authority-archive-tier | 低权威归档层（挪走不删） |
 | ADR-0025 | audit-evidence-exchange-topology | 送检包拓扑：git-tree oid 身份 + 单文件位置 + 棘轮交换 |
 
@@ -163,7 +163,7 @@
 | ID | 主题（文件名） | 一句话 |
 | --- | --- | --- |
 | ADR-0004 | version-and-changelog | 版本三件套镜像 + CHANGELOG 自动维护 |
-| ADR-0015 | downstream-first-domain-and-protocol-pack | 下游至少一域 + 协议打包（init 幂等不覆盖） |
+| ADR-0005 | downstream-first-domain-and-protocol-pack | 下游至少一域 + 协议打包（init 幂等不覆盖） |
 
 ### 审计报告
 | ID | 主题（文件名） | 一句话 |

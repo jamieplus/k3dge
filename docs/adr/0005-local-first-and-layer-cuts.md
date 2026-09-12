@@ -13,6 +13,7 @@ Note: ① 就地修订（补 VCS 源形态）2026-09-05，经 Core Maintainer �
       ⑤ 去 changelog 化（删「（2026-09-05 就地补记）」与「原句作废」元叙述）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ⑥ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ⑦ **合并原 ADR「Harness Responsibility Split」入本条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：职责切分与本地自用同属一层；被并者 0020 删除，全仓指针改指本条（含模板镜像/协议/rules）。原「三 harness」来源消失，冲突处以 ADR-0025 为准。过闸口径 = manual fallback。
+      ⑧ **合并原 ADR「下游 init 被门禁咬住」入本条 §2.8**（物理删旧文件）2026-09-12，经 Core Maintainer 本轮显式授权：下游 init 属"本地自用/init"一决策；被并者 0015 删除，指针改指本条。过闸口径 = manual fallback。
 ---
 
 # ADR-0005: 本地自用、职责切分、审计独立 harness
@@ -63,7 +64,7 @@ seal 只拦该标记，闸条件见 ADR-0004 §2.1.3。
 **透镜规程不进 `src/k3dge`**：不做审计判断、不发透镜。
 `k3dge audit` 子命令指**审计线在消费侧的线管理**（submit/status/show/advance/materialize/close），不是透镜。
 细则见 ADR-0025 §2.9.2。
-协议兜底与传输细节见 ADR-0006 §2.2/§2.3、ADR-0019 §2.3；报告 schema 见 ADR-0017。
+协议兜底与传输细节见 ADR-0006 §2.2/§2.3、ADR-0018 §2.8；报告 schema 见 ADR-0017。
 k3dge 只留 `docs/reviews/` 槽位与 seal 证据；MCP `k3dge_5pass_audit_prompt` 只指路，不演进规程。
 
 ### 2.7 harness 职责边界（原独立 ADR，合并入本条；「三 harness」历史让位于 ADR-0025 合并审计模块）
@@ -72,6 +73,12 @@ k3dge 只留 `docs/reviews/` 槽位与 seal 证据；MCP `k3dge_5pass_audit_prom
 - **doc review ≠ idea scoring**：k3dge 只验「报告存在」，不判优劣；「定得对不对 / 有无更简做法」归 soft review。
 - **k3dge 文档硬闸** = 各 `docs/<type>/.schema.json` 结构闸（结构 only，never merit）；ADR 冲突/覆盖的**事实**由 `k3dge_adr_index` 供，**判断**归 k3dit。
 - 原「three sibling harnesses」来源消失；冲突处以 ADR-0025 为准。
+
+### 2.8 下游 init 被门禁咬住（原独立 ADR，合并入本条）
+1. **`NO_DOMAINS`**：`manifest.domains` 为空则 `evaluate` 失败——空壳不得声称门禁可用（k3dit init 后 `domains: {}` 曾假绿）。
+2. **第一条域**：scaffold 用目录名（或 `--name`）登记一域 `src/<name>/` + `docs/specs/<name>/spec.md` + `tests/unit/<name>/`；已有非空 domains 不改，空 domains 的 manifest 会被升级。
+3. **init 后 `k3dge sync`**：补首域 Contract Hash，避免立刻 `CONTRACT_HASH_MISSING`。
+4. **协议包与本仓特化拆开**：`reviews-readme.md` 进 `PAIRS`（与模板字节锁），`reviews/LEFTOVERS.md` 不进（实例特有、空表）；scaffold 写 `docs/guides/mcp-bridge.md`、`docs/reviews/{README,LEFTOVERS}.md`、`docs/adr/README.md`、`.gitignore`；`AGENTS.md` 仍与模板字节锁，但正文读**本仓** `overview/adr`（harness 自身 ADR 留在 k3dge 检出）。
 
 ## 3. 产生后果 (Consequences)
 - **正**：本仓可直接 `./k3dge-init.sh`；align/check 测集不再分叉；封板无法用任意 md 冒充 align 产物；审计与一致性门禁解耦。

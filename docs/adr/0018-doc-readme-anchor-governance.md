@@ -10,11 +10,13 @@ Note: ① 就地修订（protocols/ 描述对齐 ADR-0025 合并审计模块，�
       ② 正交收尾（catalog 排除 `archive/` 与 ADR-0023 §2.2 互指）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ③ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
       ④ **合并原 ADR「docs 判据与投影的语义分工」入本条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：docs 判据/投影与托管布局同属"docs 治理"一决策；被并者 0002 删除，全仓指针改指本条（**保留本条 §2.3/§2.4/§2.6/§2.8 节号**）。过闸口径 = manual fallback。
+      ⑤ **合并原 ADR「No load-proof」入本条 §2.11**（物理删旧文件）2026-09-12，经 Core Maintainer 本轮显式授权：同属 docs 寻址/装载决策；被并者 0019 删除，指针改指本条。过闸口径 = manual fallback。
+      ⑥ **合并原 ADR「tasks 与 backlog 合并」入本条 §2.12**（物理删旧文件）2026-09-12，经 Core Maintainer 本轮显式授权：tasks 目录属托管文档布局；被并者 0003 删除，指针改指本条。过闸口径 = manual fallback。
 ---
 
 # ADR-0018: Docs 治理（托管布局 + 判据/投影分工）
 
-> **Related**: ADR-0019（协议装载废弃）、ADR-0023（archive 契约）
+> **Related**: ADR-0018（协议装载废弃）、ADR-0023（archive 契约）
 
 ## 1. 上下文 (Context)
 
@@ -48,6 +50,8 @@ Note: ① 就地修订（protocols/ 描述对齐 ADR-0025 合并审计模块，�
    - Quality is a window inside that module, not a separate peer; it has no independent fallback.
 9. **判据 vs 投影（原独立 ADR，合并入本条）**：`docs/architecture/overview.md` = **一致性判据**（人写常驻，Agent 跨域改动必读；含依赖方向、数据流、全局不变量）；`docs/generated/*` = **投影**（`k3dge sync` 从 manifest 派生，可随时重建，**永不作为一致性判据**）。`docs/generated/` 即 reference 侧目录（消除旧 `docs/reference/` 同名混淆）。
 10. **成对物纪律**（写入 `AGENTS.md`）：动任何"看似冗余"的成对物前，必查 `docs/adr/` 与全局不变量；无据则停下来询问，不得自作主张合并/删除。
+11. **不设装载证明（原独立 ADR，合并入本条）**：不恢复 protocol resolve/attend/challenge/exclusive IO/`protocols.toml`（`engine.protocol` 只留 `write_incident`）；payload/routing 按 §2.3，peer fallback 按 §2.8。硬底＝`scripts/pre-commit` + CI `k3dge check`；`k3dge-commit:` token 只是 hook 细节（缺＝WARN），不升级成 proof-of-read。跳过 Authoring 不是机器事件（代价＝结构闸红 + k3dit 文本质量 findings）。Reopen：宿主提供 agent 看不见的 pre-action 强制（policy gateway）。
+12. **tasks 单目录 + Status 成熟度（原独立 ADR，合并入本条）**：`docs/backlog/` 与 `docs/tasks/` 合并为单一 `docs/tasks/`；成熟度用条目 `Status`：`idea → deferred → in-progress → done`；backlog 纪律（自包含摘要、开工扫盘、模糊召回）并入 `docs/tasks/AUTHORING.md` 与 `k3dge task list --json`；memo / branches 保持独立。
 
 ## 3. 产生后果 (Consequences)
 

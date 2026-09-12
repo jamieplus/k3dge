@@ -14,7 +14,7 @@ Note: ① 就地修订（rules 集合由 00–03 更新为 00–10；quality har
 
 # ADR-0010: `AGENTS.md` 是唯一发现面；`.agent/` 是进程配置（rules 是其协议切片）
 
-> **Related**: ADR-0019（协议装载废弃）、ADR-0018（成对物动前须有 ADR）
+> **Related**: ADR-0018（协议装载废弃）、ADR-0018（成对物动前须有 ADR）
 
 ## 1. 上下文 (Context)
 

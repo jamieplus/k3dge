@@ -2,7 +2,7 @@
 
 > 给**已经 `k3dge-init` 过的工程仓**看：k3dge 源更新之后，什么会跟着变、什么不会、该怎么升。本仓自举另走 `TEMPLATE_DRIFT`，不要把那把锁套到下游。
 >
-> 设计依据：ADR-0006（并列 harness 模型、脚手架幂等、MCP 零漂移）、ADR-0005（`K3DGE_SOURCE` / editable）、ADR-0015（下游至少一域）。
+> 设计依据：ADR-0006（并列 harness 模型、脚手架幂等、MCP 零漂移）、ADR-0005（`K3DGE_SOURCE` / editable）、ADR-0005（下游至少一域）。
 
 ## 两层 harness
 
@@ -35,7 +35,7 @@ Agent 用的索引工具（`k3dge task list`、MCP `k3dge_task_list` / `k3dge_sy
 
 - 再执行 `pip install -e "${K3DGE_SOURCE}[mcp]"` → 判定核换成当前源（含 MCP）
 - scaffold 只**补当时还不存在的新模板文件**（例如后来才有的 `docs/guides/mcp-bridge.md`、`.gitignore`）
-- `manifest.domains` 仍为空时，写入第一条域（ADR-0015）
+- `manifest.domains` 仍为空时，写入第一条域（ADR-0005）
 - `k3dge sync`、`pre-commit install`（含 `--hook-type commit-msg`）
 
 **不会做**

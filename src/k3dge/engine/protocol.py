@@ -5,7 +5,7 @@ human-visible incident note when an agent ignores the soft gate. The audit
 protocol's two fallback layers (审计 `audit_default.md` / 复审 `verify_default.md`)
 are configured in `.agent/pipeline.toml` via manual-step `protocol` references and
 validated by `k3dge check` (PIPELINE_PROTOCOL_NOT_FOUND) — there is no longer a
-central `.agent/protocols.toml` registry. See ADR-0019.
+central `.agent/protocols.toml` registry. See ADR-0018.
 """
 
 from __future__ import annotations

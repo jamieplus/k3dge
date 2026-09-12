@@ -9,14 +9,6 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
-      "path": "docs/adr/0003-tasks-backlog-merge.md",
-      "type": "adr",
-      "id": "ADR-0003",
-      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Accepted",
-      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
-    },
-    {
       "path": "docs/adr/0004-milestone-lifecycle-governance.md",
       "type": "adr",
       "id": "ADR-0004",
@@ -73,14 +65,6 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
-      "path": "docs/adr/0015-downstream-first-domain-and-protocol-pack.md",
-      "type": "adr",
-      "id": "ADR-0015",
-      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Accepted",
-      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
-    },
-    {
       "path": "docs/adr/0017-report-schema-v2.md",
       "type": "adr",
       "id": "ADR-0017",
@@ -92,14 +76,6 @@
       "path": "docs/adr/0018-doc-readme-anchor-governance.md",
       "type": "adr",
       "id": "ADR-0018",
-      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Accepted",
-      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
-    },
-    {
-      "path": "docs/adr/0019-protocol-load-proof-abandoned.md",
-      "type": "adr",
-      "id": "ADR-0019",
       "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
