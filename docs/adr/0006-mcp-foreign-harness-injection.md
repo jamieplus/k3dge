@@ -16,7 +16,7 @@ Note: ① 就地修订（非 Amend/Supersede）2026-09-02，经 Core Maintainer 
 
 # ADR-0006: 对外注入面与并列 harness 编排（入向兼容层 + 出向通道）
 
-> **Related**: ADR-0005（本地自用 / 职责切分）、ADR-0010（rules 切片）、ADR-0016（吸收纪律）、ADR-0021（doc-audit 非阻断）
+> **Related**: ADR-0005（本地自用 / 职责切分）、ADR-0010（rules 切片）、ADR-0009（吸收纪律）、ADR-0021（doc-audit 非阻断）
 >
 > **`Status: Draft` 的保留理由**：
 > - ① 入向（本仓 server）在 `mcp` 2.x 下起不来，先搁置（`docs/tasks/archive/M7/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.done.md`）。
@@ -25,7 +25,7 @@ Note: ① 就地修订（非 Amend/Supersede）2026-09-02，经 Core Maintainer 
 
 ## 1. 上下文 (Context)
 
-- k3dge 先在本仓自用（ADR-0007 自举）；下一步用它开发并列 harness（audit / cache；quality 后并入 audit，ADR-0025），不把它们长进 `src/k3dge`。
+- k3dge 先在本仓自用（ADR-0009 自举）；下一步用它开发并列 harness（audit / cache；quality 后并入 audit，ADR-0025），不把它们长进 `src/k3dge`。
 - 两者都涉及"k3dge 如何与外部 harness 对接"，易与"MCP 是给本仓终端用户的第二套界面"混淆。
 - 拓扑约束＝**不对称的从属 + 对等的地位**：k3dge 只管一致性自治，peers 的功能由 k3dge 调用来完成（功能从属）；但各自独立成仓、各自发 MCP server、可被别的 harness 使用（地位对等）。
 - 旧稿只把 MCP 定义成**入向**（外部 harness 注入 k3dge），出向（k3dge 连 peers）没有位置；`engine/pipeline_runner.py` 的 `mcp` 传输里只有 `shutil.which("k3dit")` 探针——"k3dge 使唤 peers"停在注释里。

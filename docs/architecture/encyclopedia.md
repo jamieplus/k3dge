@@ -60,7 +60,7 @@
 | **TEMPLATE_DRIFT** | 自举仓脚手架字节锁：`engine/pairs.PAIRS` 比对 `templates/assets`，引擎不 import `k3dge.templates` | ADR-0014 |
 | **merge-base 基准** | 校验基准 = `merge-base(main, HEAD)`，code 可先落地、spec 分支内收敛 | ADR-0001 |
 | **Verification Matrix** | spec §4 的"场景 → 测试文件"表；`align` 跑 Full Matrix | ADR-0001 / ADR-0004 |
-| **三件套（版本）** | `pyproject.toml` / `.agent/manifest.json` / `src/k3dge/__init__.py` 版本镜像；不一致 = `VERSION_MISMATCH` | ADR-0013 |
+| **三件套（版本）** | `pyproject.toml` / `.agent/manifest.json` / `src/k3dge/__init__.py` 版本镜像；不一致 = `VERSION_MISMATCH` | ADR-0004 |
 
 ### 3.2 生命周期与审计
 
@@ -162,10 +162,8 @@
 ### 自举与版本
 | ID | 主题（文件名） | 一句话 |
 | --- | --- | --- |
-| ADR-0007 | self-hosting-bootstrap | 自举：k3dge 用自己的门禁治理自己的开发 |
-| ADR-0013 | version-and-changelog | 版本三件套镜像 + CHANGELOG 自动维护 |
+| ADR-0004 | version-and-changelog | 版本三件套镜像 + CHANGELOG 自动维护 |
 | ADR-0015 | downstream-first-domain-and-protocol-pack | 下游至少一域 + 协议打包（init 幂等不覆盖） |
-| ADR-0016 | pattern-absorption-protocol | 模式吸收协议（外部 idea 成熟后入主干） |
 
 ### 审计报告
 | ID | 主题（文件名） | 一句话 |

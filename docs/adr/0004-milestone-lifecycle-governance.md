@@ -11,6 +11,7 @@ Note: ① 就地修订（钉=写源/单份 12 列报告、封板资格归 `audit
       ③ 正交收尾（seal 闸/closure 定义复述改指 owner）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ④ 去 changelog 化（正文只留现行决策：删「修正（date）」层与「原稿/旧句/现稿」元叙述；章节号不重排）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ⑤ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
+      ⑥ **合并原 ADR「自动版本与变更日志」入本条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：版本递增是 `seal` 生命周期的一环（§2.3）；被并者 0013 删除，全仓指针改指本条。过闸口径 = manual fallback。
 ---
 
 # ADR-0004: 里程碑生命周期治理（Milestone Lifecycle Governance）
@@ -100,6 +101,13 @@ Note: ① 就地修订（钉=写源/单份 12 列报告、封板资格归 `audit
 - 同一次 `seal` 把本里程碑的 `docs/reviews/*.md`（文件名含该 id，或正文含 `<!-- k3dge:align-pass:<id> -->`）移入 `docs/reviews/archive/<id>/`；其他里程碑的文件不动。
 - 相对链接（LEFTOVERS.md）改写为 `archive/<id>/…`；失败则回滚移动并还原 LEFTOVERS.md。
 - archive 契约（默认不扫、显式 `include_archive`）见 ADR-0023 §2.2。
+
+### 2.3 版本与变更日志（原独立 ADR，合并入本条）
+- **单源**：`pyproject.toml` 的 `project.version` 唯一事实源；`k3dge version bump` 镜像至 `.agent/manifest.json` 与 `src/k3dge/__init__.py`；三者不一致时门禁 `VERSION_MISMATCH` 阻断。
+- **入口**：`k3dge version show` / `k3dge version bump [--major|--minor|--patch|--set X.Y.Z] [-m msg]`；bump 同时追加 `CHANGELOG.md`（Keep a Changelog + SemVer），原子写、失败回滚。
+- **seal 联动**：`seal` 成功自动 `patch` bump + CHANGELOG 条目（`Seal milestone <id>.`）；`--no-version-bump` 可跳过；CLI 与 MCP 行为一致。
+- **失败语义**：`bump_version` 原子；`seal` 后自动 bump 失败**不回滚已归档 tasks**，仅 stderr / MCP `version_bump_failed` 告警——禁止"归档成功、版本一半"被静默忽略。
+- **不引入** hatch-vcs / setuptools_scm（自举期 `pip install -e` 已满足）。重开条件：需 `git tag` 驱动或 PyPI 发布。
 
 ## 3. 产生后果 (Consequences)
 - **正面**：确定性验收 + 防过度工程 + 上下文经济性闭环；`engine` 扩展为"门禁判定与生命周期治理核心"（边界见 `overview.md` / `engine/spec.md`）。

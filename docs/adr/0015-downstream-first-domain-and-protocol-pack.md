@@ -12,7 +12,7 @@ Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一
 # ADR-0015: 下游 init 必须能被门禁咬住，协议包不得带本仓特化
 
 ## 1. 上下文 (Context)
-- 自举生产级（ADR-0007）已立：本仓 `k3dge check` 能拦住契约漂移。
+- 自举生产级（ADR-0009）已立：本仓 `k3dge check` 能拦住契约漂移。
 - 下游工程生产级是另一条线：空仓 `k3dge-init` 之后，门禁必须保护**这个工程的代码**。
 - Agent 协议不能指到不存在的 k3dge ADR / 本仓审计索引。
 - 实证：k3dit init 后 `domains: {}`，`k3dge check` 假绿。

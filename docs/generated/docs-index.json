@@ -41,14 +41,6 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
-      "path": "docs/adr/0007-self-hosting-bootstrap.md",
-      "type": "adr",
-      "id": "ADR-0007",
-      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Accepted",
-      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
-    },
-    {
       "path": "docs/adr/0008-unsolicited-doc-triggers.md",
       "type": "adr",
       "id": "ADR-0008",
@@ -81,14 +73,6 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
-      "path": "docs/adr/0013-version-and-changelog.md",
-      "type": "adr",
-      "id": "ADR-0013",
-      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Accepted",
-      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
-    },
-    {
       "path": "docs/adr/0014-template-drift-in-engine.md",
       "type": "adr",
       "id": "ADR-0014",
@@ -100,14 +84,6 @@
       "path": "docs/adr/0015-downstream-first-domain-and-protocol-pack.md",
       "type": "adr",
       "id": "ADR-0015",
-      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Accepted",
-      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
-    },
-    {
-      "path": "docs/adr/0016-pattern-absorption-protocol.md",
-      "type": "adr",
-      "id": "ADR-0016",
       "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"

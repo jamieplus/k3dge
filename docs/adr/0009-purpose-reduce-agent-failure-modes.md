@@ -8,9 +8,10 @@ Date: 2026-08-24
 Deciders: Core Maintainer
 Note: ① 就地修订（正交去重：后继 harness 名单不再复述，名单以 ADR-0025 §2.4 为准）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。
       ② 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
+      ③ **合并原 ADR「自举开发」与「外部模式吸收纪律」入本条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：二者都是"目的"的阶段立场与吸收立场；被并者 0007/0016 删除，全仓指针改指本条。过闸口径 = manual fallback。
 ---
 
-# ADR-0009: k3dge 的目的是给后续项目收住 Agent 的常见失败态
+# ADR-0009: k3dge 的目的与立场（收住失败态 + 自举 + 吸收纪律）
 
 ## 1. 上下文 (Context)
 开发 k3dge 不是为了列一张「Agent 会犯的错」清单；用户说不了、也不必一一列举。
@@ -24,7 +25,17 @@ k3dge 存在，是为了 **后面开发的项目**（含后继 harness）少踩�
 - 自举成功的标准：同一套东西能罩住 **下一个仓**（k3dit 已是第一个），而不是只在 k3dge 仓里自洽。
 - 不把「减少幻觉/减少局部破坏」做成新的 check 规则或新域。
   - 那是目的语言；实现仍是 ADR-0001 的 L0/L1/L2 与协议条款。
+- **当前唯一生产路径是自举**（用 k3dge 开发 k3dge，原独立 ADR）：改本仓代码必须过本仓门禁。
+  - 「生产 ready」＝能作为本仓硬门禁拦住自举中的契约漂移，**不是** PyPI ready；安装默认 editable（ADR-0005）是自举所需，非权宜。
+  - 不为此阶段做：发布流程、未知下游安装 UX、多租户 MCP。第二个仓出现时设 `K3DGE_SOURCE` 指向本检出即可；名单见 ADR-0025 §2.4。
+- **外部模式与资产吸收纪律**（洁净室 + License 分级，原独立 ADR）：
+  - **四不**：不增域、不抢 `AGENTS.md` 常驻、不引重包、不直接贴代码。
+  - **洁净室**：只吸模型/状态机/思想，独立重写，剥离商标/Logo。
+  - **License 分级**：MIT/Apache 可重写（大段提示词附署名）；GPL 仅思想；Proprietary 仅人机工效。
+  - **固化**：吸收后当轮 `k3dge sync` 锁 spec 哈希 + 单测 + k3dit 无版权遗留。
 
 ## 3. 产生后果 (Consequences)
 - 评价 k3dge 有没有用：看 k3dit 等后继仓上 Agent 是否更难漂、更难默默改契约，而不是看清单覆盖了几种失败。
 - 用户只需说做什么。不必为每一种漂移再发明一条门禁。
+- **自举**：Agent 不要把「缺 PyPI / 缺通用安装向导」写成 blocker；优先修自举路径上的问题（文档/测试/门禁缺口会直接伤到开发自己）。
+- **吸收**：`AGENTS.md` 保持微内核，吸收规程下沉到 `rules/09-absorption` 按需激活；每吸一次付 `sync` + k3dit 复核成本。

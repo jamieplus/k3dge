@@ -17,7 +17,7 @@ Note: ① 就地修订（补 VCS 源形态）2026-09-05，经 Core Maintainer �
 # ADR-0005: 本地自用、职责切分、审计独立 harness
 
 ## 1. 上下文 (Context)
-k3dge 先在本仓自用，不按 PyPI 发行假设设计；自举开发的阶段定义见 ADR-0007。
+k3dge 先在本仓自用，不按 PyPI 发行假设设计；自举开发的阶段定义见 ADR-0009。
 同时定下六处未定设计：安装源、engine/cli 职责、契约覆盖面、封板证据、guides 桩与 seal 互打、审计透镜位置。
 
 ## 2. 决策 (Decision)
