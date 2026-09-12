@@ -263,19 +263,55 @@ class ConsistencyEngine:
                     "(src/spec/tests) so the gate can protect this repo",
                 )
             )
+        modified_domains, specs_touched, dom_vs = self._collect_modified_domains(files, manifest)
+        violations.extend(dom_vs)
+
+        touched = modified_domains | specs_touched
+        if force_full:
+            touched = set(manifest.domains)
+            modified_domains = set(manifest.domains)
+
+        if run_tests:
+            violations.extend(self._run_affected_tests(modified_domains, manifest))
+
+        for domain in sorted(touched):
+            violations.extend(self._check_domain(domain, manifest))
+
+        violations.extend(self._check_version_consistency())
+
+        self._warn_changelog_done(files)
+
+        violations.extend(self._check_template_drift(manifest))
+
+        violations.extend(self._check_pipeline())
+
+        violations.extend(self._check_docs(files, force_full))
+
+        return GateReport(
+            passed=not violations,
+            changed_files=tuple(files),
+            modified_domains=tuple(sorted(modified_domains)),
+            violations=tuple(violations),
+        )
+
+    def _collect_modified_domains(self, files, manifest: Manifest):
+        """按改动文件归域：返回 (modified_domains, specs_touched, violations)。
+
+        docs 根直放 / 未注册域（package_root 下无域映射）在此报。
+        """
         modified_domains: Set[str] = set()
         specs_touched: Set[str] = set()
-
+        out: List[Violation] = []
         for path in files:
             if manifest.is_ignored(path):
                 continue
             if path.endswith("__init__.py"):
                 continue
-            # 强制 docs/ 根下不直放文档；唯一例外是 docs/README.md（根索引/治理总纲）。其余需置于细分目录
+            # docs/ 根下不直放文档；唯一例外 docs/README.md（根索引/治理总纲）
             if path.startswith("docs/") and "/" not in path[5:] and not path.endswith("/"):
                 name = path[5:]
                 if name and not name.startswith(".") and name not in (".DS_Store", "README.md"):
-                    violations.append(
+                    out.append(
                         Violation(
                             "DOCS_ROOT_DISALLOWED",
                             f"docs root file '{path}' must be in a subdirectory (e.g. docs/generated/, docs/guides/); create a new subdirectory if none fits",
@@ -283,18 +319,15 @@ class ConsistencyEngine:
                         )
                     )
                     continue
-
             spec_domain = manifest.domain_for_spec(path)
             if spec_domain is not None:
                 specs_touched.add(spec_domain)
                 continue
-
             if not manifest.under_package_root(path):
                 continue
-
             domain = manifest.domain_for_src(path)
             if domain is None:
-                violations.append(
+                out.append(
                     Violation(
                         "UNREGISTERED_DOMAIN",
                         f"'{path}' lives under package_root but no domain maps it",
@@ -303,45 +336,40 @@ class ConsistencyEngine:
                 )
                 continue
             modified_domains.add(domain)
+        return modified_domains, specs_touched, out
 
-        touched = modified_domains | specs_touched
-        if force_full:
-            touched = set(manifest.domains)
-            modified_domains = set(manifest.domains)
+    def _run_affected_tests(self, modified_domains: Set[str], manifest: Manifest) -> List[Violation]:
+        """批量跑 touched 域测试；跨域：公开哈希变化时带 depends_on 该域的消费方（ADR-0001 决策点 6）。"""
+        affected = set(modified_domains)
+        for d in sorted(manifest.domains):
+            if set(manifest.depends_on(d)) & affected:
+                affected.add(d)
+        batch_refs: dict[str, set[str]] = {}
+        for domain in sorted(affected):
+            ref = manifest.domains.get(domain, {}).get("tests", "")
+            if ref and (self.workspace_root / ref).exists():
+                batch_refs.setdefault(ref, set()).add(domain)
+        return _run_batch_tests(self.workspace_root, manifest, batch_refs)
 
-        # 收集所有 touched 域的 tests 路径，去重后批量执行（直接基于 manifest，不爬 spec 表格）
-        # 跨域影响：某域公开哈希变化时，跑声明 depends_on 该域的消费方域测试（ADR-0001 决策点 6）
-        if run_tests:
-            affected = set(modified_domains)
-            for d in sorted(manifest.domains):
-                if set(manifest.depends_on(d)) & affected:
-                    affected.add(d)
-            batch_refs: dict[str, set[str]] = {}
-            for domain in sorted(affected):
-                ref = manifest.domains.get(domain, {}).get("tests", "")
-                if ref and (self.workspace_root / ref).exists():
-                    batch_refs.setdefault(ref, set()).add(domain)
-            violations.extend(_run_batch_tests(self.workspace_root, manifest, batch_refs))
-
-        for domain in sorted(touched):
-            violations.extend(self._check_domain(domain, manifest))
-
-        # 版本一致性：pyproject.toml ↔ .agent/manifest.json ↔ src/k3dge/__init__.py 必须同值
+    def _check_version_consistency(self) -> List[Violation]:
+        """pyproject ↔ manifest ↔ __init__ 版本同值；异常即 VERSION_MISMATCH。"""
         try:
             from k3dge.engine.version import validate_versions
 
-            violations.extend(validate_versions(self.workspace_root))
+            return list(validate_versions(self.workspace_root))
         except Exception as exc:
-            violations.append(
+            return [
                 Violation(
                     "VERSION_MISMATCH",
                     f"version validation failed: {exc}",
                     file_path=str(self.workspace_root / "pyproject.toml"),
                 )
-            )
+            ]
 
-        # 轻量 P3：任务手改 done 未进 CHANGELOG Unreleased 时 WARN（不硬卡，仅提示，避免漏记）
-        # 仅检查 living tasks（docs/tasks/*.md），不含 archive/（已封板，其标题已在版本化历史中）
+    def _warn_changelog_done(self, files) -> None:
+        """轻量 P3：任务手改 done 未进 CHANGELOG Unreleased 时 WARN（best-effort，不硬卡）。"""
+        import sys
+
         try:
             from k3dge.engine.milestone import TITLE_RE as _MilestoneTitleRE, parse_frontmatter
 
@@ -378,8 +406,6 @@ class ConsistencyEngine:
                         tm = _MilestoneTitleRE.search(t_content)
                         title = tm.group(1).strip() if tm else task_path.stem
                         if title and title not in unreleased_block:
-                            import sys
-
                             print(
                                 f"[WARN][CHANGELOG] Task '{title}' marked done ({p}) not in CHANGELOG.md ## [Unreleased]; "
                                 f"run 'k3dge task done' or ensure _append_to_unreleased succeeded",
@@ -388,7 +414,9 @@ class ConsistencyEngine:
         except Exception:
             pass
 
-        # 脚手架镜像漂移：assets ↔ 本仓文件必须一致（仅 manifest.self_hosting=true 时，ADR-0014 显式声明）
+    def _check_template_drift(self, manifest: Manifest) -> List[Violation]:
+        """脚手架镜像漂移：assets ↔ 本仓文件一致（仅 self_hosting=true，ADR-0014）。"""
+        out: List[Violation] = []
         try:
             is_self_host = bool(getattr(manifest, "self_hosting", False))
             if is_self_host:
@@ -410,7 +438,7 @@ class ConsistencyEngine:
                             continue
                         repo_text = _without_pins(repo_path.read_text(encoding="utf-8")).rstrip("\n")
                         if asset_text != repo_text:
-                            violations.append(
+                            out.append(
                                 Violation(
                                     "TEMPLATE_DRIFT",
                                     f"template drift: assets/{asset} != {rel}",
@@ -434,29 +462,27 @@ class ConsistencyEngine:
                 except Exception:
                     pass
         except Exception as exc:
-            violations.append(
+            out.append(
                 Violation(
                     "TEMPLATE_DRIFT",
                     f"template drift check failed: {exc}",
                     file_path="src/k3dge/engine/pairs.py",
                 )
             )
+        return out
 
-        # 生命周期总线治理：pipeline.toml 语义硬门控（纯静态；文件不存在则优雅跳过，存在则 100% 严格）
+    def _check_pipeline(self) -> List[Violation]:
+        """pipeline.toml 语义硬门控（纯静态；文件不存在则优雅跳过）。"""
+        out: List[Violation] = []
         try:
             from k3dge.engine.pipeline_schema import validate_pipeline_config
 
             for code, msg in validate_pipeline_config(self.workspace_root):
-                violations.append(
-                    Violation(
-                        code,
-                        msg,
-                        domain="pipelines",
-                        file_path=".agent/pipeline.toml",
-                    )
+                out.append(
+                    Violation(code, msg, domain="pipelines", file_path=".agent/pipeline.toml")
                 )
         except Exception as exc:
-            violations.append(
+            out.append(
                 Violation(
                     "PIPELINE_SCHEMA_INVALID",
                     f"pipeline validation crashed: {exc}",
@@ -464,39 +490,37 @@ class ConsistencyEngine:
                     file_path=".agent/pipeline.toml",
                 )
             )
+        return out
 
+    def _check_docs(self, files, force_full: bool) -> List[Violation]:
+        """docs 目录结构/索引校验（force_full 或本批触 docs 时）。"""
         docs_touched = any(str(p).replace("\\", "/").startswith("docs/") for p in files)
-        if force_full or docs_touched:
-            try:
-                from k3dge.engine.doc_catalog import validate_docs, validate_docs_index
+        if not (force_full or docs_touched):
+            return []
+        try:
+            from k3dge.engine.doc_catalog import validate_docs, validate_docs_index
 
-                types = None
-                if not force_full:
-                    types = sorted(
-                        {
-                            Path(p).parts[1]
-                            for p in files
-                            if str(p).replace("\\", "/").startswith("docs/")
-                            and len(Path(p).parts) > 1
-                        }
-                    )
-                violations.extend(validate_docs(self.workspace_root, types=types))
-                violations.extend(validate_docs_index(self.workspace_root))
-            except Exception as extra:
-                violations.append(
-                    Violation(
-                        "DOC_SCHEMA_INVALID",
-                        f"docs catalog check crashed: {extra}",
-                        file_path="docs",
-                    )
+            types = None
+            if not force_full:
+                types = sorted(
+                    {
+                        Path(p).parts[1]
+                        for p in files
+                        if str(p).replace("\\", "/").startswith("docs/")
+                        and len(Path(p).parts) > 1
+                    }
                 )
-
-        return GateReport(
-            passed=not violations,
-            changed_files=tuple(files),
-            modified_domains=tuple(sorted(modified_domains)),
-            violations=tuple(violations),
-        )
+            return list(validate_docs(self.workspace_root, types=types)) + list(
+                validate_docs_index(self.workspace_root)
+            )
+        except Exception as extra:
+            return [
+                Violation(
+                    "DOC_SCHEMA_INVALID",
+                    f"docs catalog check crashed: {extra}",
+                    file_path="docs",
+                )
+            ]
 
     def _check_domain(self, domain: str, manifest: Manifest) -> List[Violation]:
         out, spec_path, content = self._load_domain_spec(domain, manifest)

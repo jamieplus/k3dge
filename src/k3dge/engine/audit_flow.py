@@ -13,10 +13,11 @@ import json
 from pathlib import Path
 from typing import Dict, Optional
 
+from k3dge.engine import report_table
 from k3dge.engine.pipeline_runner import run_action
 
 STATE_REL = ".agent/audit_jobs.json"
-_REPORT_HEADER_TOKEN = "ID|日期|严重度|优先级|类型|问题描述|位置|状态|处置|验证|复审|验收"
+_REPORT_HEADER_TOKEN = report_table.TABLE_HEADER
 
 
 # ---------- 编排状态（k3dge 自己的事实，不是 peer 的） ----------
@@ -203,7 +204,7 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
 
     payload = env.get("payload") or {}
     report_md = payload.get("report_markdown", "")
-    if _REPORT_HEADER_TOKEN.replace("|", "") not in report_md.replace("|", "").replace(" ", ""):
+    if not report_table.has_table(report_md):
         job["state"] = "failed"
         _save_state(workspace, state)
         return {"state": "failed", "error": "FORMAT", "detail": "report 缺少 12 列表头（ADR-0017）"}

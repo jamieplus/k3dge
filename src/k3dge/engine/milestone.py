@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from k3dge.engine import report_table
 from k3dge.engine.evaluator import ConsistencyEngine
 
 STATUS_RE = re.compile(r"-\s+\*\*Status\*\*:\s*([\w-]+)", re.IGNORECASE)
@@ -193,70 +194,37 @@ def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, mi
                 # fall back to title-token matching without milestone filter
                 if title_token not in text and stem_token[:20] not in text:
                     continue
+            header, rows = report_table.parse_rows(
+                text, required=("ID", "问题描述", "状态", "处置"))
+            if header is None:
+                continue
             lines = text.splitlines()
-            header_idx = -1
-            header_cols: list[str] | None = None
-            for i, raw in enumerate(lines):
-                stripped = raw.strip()
-                if not stripped.startswith("|"):
-                    continue
-                cols = [c.strip() for c in stripped.strip("|").split("|")]
-                # Skip separator line
-                if cols and all(set(c.replace(":", "").replace("-", "").strip()) == set() or set(c) <= {"-", ":"} for c in cols):
-                    continue
-                # Detect 9-col header
-                if "ID" in cols and "问题描述" in cols and "状态" in cols:
-                    header_idx = i
-                    header_cols = cols
-                    break
-            if header_idx == -1 or header_cols is None:
-                continue
-            # Find column indices
-            try:
-                id_idx = header_cols.index("ID")
-                desc_idx = header_cols.index("问题描述")
-                status_idx = header_cols.index("状态")
-                disp_idx = header_cols.index("处置")
-            except ValueError:
-                continue
-            changed = False
-            fid = ""   # 表无匹配行时的绑定兜底（原 'fid' in locals() 探测属作用域耦合）
             new_lines = lines[:]
-            for i in range(header_idx + 2, len(lines)):
-                raw = lines[i]
-                if not raw.strip().startswith("|"):
-                    # End of table
-                    break
-                cols = [c.strip() for c in raw.strip("|").split("|")]
-                if len(cols) != len(header_cols):
+            changed = False
+            fid = ""   # 表无匹配行时的绑定兜底
+            for i, row in rows:
+                if row.get("状态") != "待修":
                     continue
-                status = cols[status_idx]
-                if status != "待修":
-                    continue
-                desc = cols[desc_idx]
-                fid = cols[id_idx]
-                # Match if task title is in desc, or fid in task stem, or desc words in title
-                hit = False
-                if title_token and title_token[:15] and title_token[:15] in desc:
-                    hit = True
-                elif fid and fid in stem_token:
-                    hit = True
-                elif desc and desc[:15] in title_token:
-                    hit = True
+                desc = row.get("问题描述", "")
+                fid = row.get("ID", "")
+                # Match if task title is in desc, or fid in task stem, or desc head in title
+                hit = bool(
+                    (title_token and title_token[:15] and title_token[:15] in desc)
+                    or (fid and fid in stem_token)
+                    or (desc and desc[:15] in title_token)
+                )
                 if not hit:
                     continue
-                # Flip status and disposition
-                cols[status_idx] = "已修"
-                # Ensure disposition contains 已修
-                disp = cols[disp_idx]
+                row["状态"] = "已修"
+                disp = row.get("处置", "")
                 if "已修" not in disp:
-                    cols[disp_idx] = f"已修 → {task_path.name}（{disp[:40]}）" if disp else f"已修 → {task_path.name}"
-                new_lines[i] = "| " + " | ".join(cols) + " |"
+                    row["处置"] = (f"已修 → {task_path.name}（{disp[:40]}）" if disp
+                                   else f"已修 → {task_path.name}")
+                new_lines[i] = "| " + " | ".join(row[h] for h in header) + " |"
                 changed = True
             if not changed:
                 continue
             # Append/ensure ## 回填 section (quoted to avoid k3dit second-table check)
-            backfill_marker = f"> | {fid or 'ID'} |"
             # Check if a backfill section already mentions this task
             if task_path.name not in text:
                 # Find or create ## 回填 section at end
@@ -963,7 +931,7 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
 # produced 12-col report. The work agent fixes; k3dit audits; k3dge routes.
 # ---------------------------------------------------------------------------
 
-_AUDIT_HEADER = "ID|日期|严重度|优先级|类型|问题描述|位置|状态|处置|验证|复审|验收"
+_AUDIT_HEADER = report_table.TABLE_HEADER
 
 
 def _align_review_path(workspace: Path, milestone_id: str) -> Optional[Path]:
@@ -1090,42 +1058,12 @@ def persist_external_audit_report(
 
 
 def _parse_audit_stats(text: str) -> dict:
-    """Count 待修 / 有意留 / 已修 rows in a 12-col audit table."""
-    counts = {"待修": 0, "有意留": 0, "已修": 0, "total": 0}
-    lines = text.splitlines()
-    header_idx = -1
-    header_cols = None
-    for i, raw in enumerate(lines):
-        s = raw.strip()
-        if not s.startswith("|"):
-            continue
-        cols = [c.strip() for c in s.strip("|").split("|")]
-        if cols and set("".join(cols)) <= set("-: ") and any(set(c) for c in cols):
-            continue  # separator row
-        if "ID" in cols and "状态" in cols:
-            header_idx = i
-            header_cols = cols
-            break
-    if header_idx == -1 or header_cols is None:
-        return counts
-    try:
-        status_idx = header_cols.index("状态")
-        id_idx = header_cols.index("ID")
-    except ValueError:
-        return counts
-    for raw in lines[header_idx + 1 :]:
-        s = raw.strip()
-        if not s.startswith("|"):
-            break
-        cols = [c.strip() for c in s.strip("|").split("|")]
-        if len(cols) != len(header_cols):
-            continue
-        status = cols[status_idx]
-        if status in counts:
-            counts[status] += 1
-            counts["total"] += 1
-            counts.setdefault("_ids_" + status, []).append(cols[id_idx])
-    return counts
+    """Count 待修 / 有意留 / 已修 rows in a 12-col audit table.
+
+    单一解析器：委托 `report_table.count_statuses`（value-2），与 `_count_status`、
+    封板闸同口径。
+    """
+    return report_table.count_statuses(text)
 
 
 def _ensure_leftovers(workspace: Path, text: str, report_path: Path) -> None:

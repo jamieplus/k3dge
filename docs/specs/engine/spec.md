@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:294c841c7d446800003cc360080e227bfc7dce523d3d3fb7b89450038fbc16ef`
-- **Last Updated**: 2026-09-11
+- **Contract Hash**: `sha256:eb62f7a917a32ee861aba4d0708064bafc4e821f658ab951beab00607c13a8eb`
+- **Last Updated**: 2026-09-12
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -45,6 +45,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict
 from typing import Optional
+from k3dge.engine import report_table
 from k3dge.engine.pipeline_runner import run_action
 STATE_REL = '.agent/audit_jobs.json'
 submit_audit(workspace: Path, milestone_id: str, targets: Optional[list]=None, io=None, role: str='audit') -> dict
@@ -195,6 +196,7 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from typing import Tuple
+from k3dge.engine import report_table
 from k3dge.engine.evaluator import ConsistencyEngine
 STATUS_RE = re.compile('-\\s+\\*\\*Status\\*\\*:\\s*([\\w-]+)', re.IGNORECASE)
 MILESTONE_RE = re.compile('-\\s+\\*\\*Milestone\\*\\*:\\s*([^\\n\\r]+)', re.IGNORECASE)
@@ -299,6 +301,17 @@ validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
 from __future__ import annotations
 from pathlib import Path
 write_incident(workspace: Path, target: str | None, task_type: str | None, task_id: str, detail: str) -> Path
+from __future__ import annotations
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+TABLE_HEADER = 'ID|日期|严重度|优先级|类型|问题描述|位置|状态|处置|验证|复审|验收'
+STATUSES = ('待修', '有意留', '已修')
+has_table(text: str) -> bool
+find_table(text: str, required: Tuple[str, ...]=('ID', '状态'))
+parse_rows(text: str, required: Tuple[str, ...]=('ID', '状态')) -> Tuple[Optional[List[str]], List[Tuple[int, Dict[str, str]]]]
+count_statuses(text: str) -> Dict[str, object]
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
