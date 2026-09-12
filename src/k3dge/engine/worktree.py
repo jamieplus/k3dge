@@ -170,6 +170,9 @@ def _run_landing_gate(workspace: Path) -> dict:
     gate = workspace / "scripts" / "gate.py"
     doc = workspace / "scripts" / "pre-commit"
     if gate.is_file():
+        # 先 sync：审计若动过公开符号，spec 接口/契约哈希须先回写（AGENTS：Public signature→sync），
+        # 否则 check 必报 CONTRACT_DRIFT。sync 确定性幂等，随后 check 验同一结果。
+        steps.append(("sync", [sys.executable, str(gate), "sync"]))
         steps.append(("check", [sys.executable, str(gate), "check"]))
     if doc.is_file():
         steps.append(("doc-gate", [sys.executable, str(doc), "--scan"]))
