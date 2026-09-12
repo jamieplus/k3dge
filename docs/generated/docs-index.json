@@ -516,9 +516,9 @@
       "path": "docs/tasks/2026-09-04-M7-feat-ratchet_real_run_backlog.md",
       "type": "tasks",
       "id": "2026-09-04-M7-feat-ratchet_real_run_backlog",
-      "title": "首案真跑前遗留清单（k3dge 侧）",
+      "title": "首案真跑前遗留（k3dge 侧）——复核后剩余",
       "status": "idea",
-      "tokens": "首案真跑前遗留清单（k3dge 侧）"
+      "tokens": "首案真跑前遗留（k3dge 侧）——复核后剩余"
     },
     {
       "path": "docs/tasks/2026-09-05-M8-chore-eval_harness_needed.md",
@@ -527,14 +527,6 @@
       "title": "eval 盲测纪律待立 harness（memo P2→P3 降级项）",
       "status": "idea",
       "tokens": "eval 盲测纪律待立 harness（memo P2→P3 降级项）"
-    },
-    {
-      "path": "docs/tasks/2026-09-10-M8-feat-hall_harvest_repo_scope.md",
-      "type": "tasks",
-      "id": "2026-09-10-M8-feat-hall_harvest_repo_scope",
-      "title": "Hall 收成接入 AUDIT.md 侧车 + @file/@repo v2 钉",
-      "status": "idea",
-      "tokens": "Hall 收成接入 AUDIT.md 侧车 + @file/@repo v2 钉"
     },
     {
       "path": "docs/tasks/2026-09-12-M9-feat-next_hook_progressive_disclosure.md",

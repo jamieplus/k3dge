@@ -7,6 +7,8 @@ date: 2026-09-10
 
 # Hall 收成接入 AUDIT.md 侧车 + @file/@repo v2 钉
 
+> **处置（2026-09-12）**：**归档**——过时。ADR-0025 §2.7 已把 `@repo`/`AUDIT.md` 侧车列为**非目标**；Hall 收成只认窗内 `@line` 钉（`hall._harvest_to_artifact` → `pins.harvest_pins`）。不再接侧车入账本。留档备查（git 历史 + 本档）。
+
 - **Status**: idea
 - **Milestone**: M9
 - **Priority**: P2
