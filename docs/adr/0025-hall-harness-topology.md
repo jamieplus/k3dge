@@ -180,17 +180,17 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 **收钉（修/核）——席只增/翻，拔钉归 Hall**
 - 钉/树驱动，不设 `accepted` 二值；**任何席都不删钉**——删除＝账本结论的机械后果，归 Hall；席删＝自证 + 毁锚。
 - 修席（行动窗，不签）逐条：**接受并改＝改码 + 翻 `pending→fixnote`（note=改法）**（主张"这条改了、待独立验"，仍 open、不结案）；有意留＝翻 `pending→leftover`（how）；误报＝翻 `pending→disputed`（how）；不碰＝留 `pending`。不产 items、不删钉。
-- 复核窗（独立钥）：**输入＝账本（findings 行）+ `facts/present.md`（`.orig→现线` 代码 diff）+ `facts/verify.txt`（机械底现状）+ `facts/tests.json`（相关测试）**——没这份料，"独立 retest"就是空话（真跑坐实：复核窗只有"已修"声明、零可核材料 → 只能信或瞎翻）。逐条判真伪——**认可＝翻 `fixnote→fixed` 且给具体依据（符号/调用点/测试名 + 反证尝试；纯复述 diff 或空理由＝该窗 FORMAT）、不认可＝翻 `fixnote→pending`（打回，受 MAX_BOUNCE）**。**沉默（留 fixnote）＝未验 ⇒ 不算通过**。复核**不删钉**（删除归 Hall）。复核与修/判用**不同模型**（第二双眼睛）。
+- 复核窗（独立钥）：**输入＝账本（findings 行）+ `facts/present.md`（`.orig→现线` 代码 diff）+ `facts/tests.json`（相关测试）**——没这份料，"独立 retest"就是空话（真跑坐实：复核窗只有"已修"声明、零可核材料 → 只能信或瞎翻）。逐条判真伪——**认可＝翻 `fixnote→fixed` 且给具体依据（符号/调用点/测试名 + 反证尝试；纯复述 diff 或空理由＝该窗 FORMAT）、不认可＝翻 `fixnote→pending`（打回，受 MAX_BOUNCE）**。**沉默（留 fixnote）＝未验 ⇒ 不算通过**。复核**不删钉**（删除归 Hall）。复核与修/判用**不同模型**（第二双眼睛）。
 - **处置/验证＝两窗署名 + 盲对比（两阶段复核）**：修席 `fixnote` note＝报告 `处置`（改了什么/为什么）；R1 复核**看不到它**（物化抹 note、`how` 置空），独立写 `fixed` note＝报告 `验证`。**R2** Hall 才把 `处置‖验证` 并置（`compare.md`）交**复核席**裁决：一致 ⇒ 追写 `复审:通过`；不一致 ⇒ 翻 `pending` 打回；沉默＝未裁。Hall 只**封/并/识别标记**，不判语义（`_text_overlap` 退役）。
-- **拔钉在 R2 通过 + verify 绿之后**（`_finish`），不在 R1：`fixed` 是四门齐备后的终态，R1 拔早会让 R2 无对比对象。
+- **拔钉在 R2 通过之后**（`_finish`），不在 R1：`fixed` 是终态，R1 拔早会让 R2 无对比对象。
 
-> 正向背书治"不碰"，present diff 治"没料查"，`fixed` 必须带 diff 指向理由治"碰了但没看"——三层缺一仍是橡皮章。verify 命令是机械底（catch 改坏测试），catch 不了"没核对设计根因"，故与 present 互补。
+> 正向背书治"不碰"，present diff 治"没料查"，`fixed` 必须带 diff 指向理由治"碰了但没看"——三层缺一仍是橡皮章。代码"改坏测试"由**消费侧落点/CI** 兜底（Note ㉖），不在审计侧；审计只判"改得对不对"。
 
-**结案前机械 verify（Retest 独立硬门）**
-- `verify` 命令**由被审仓随送审信封带入**（`k3dit_audit_submit(verify=…)` 存入工单；k3dge 默认 `k3dge check` + `python -m pytest -q`），Hall **只执行、不拟定**。
-- Hall 在**进入 closing 前**在已 advance 的审计线上跑**逐条 `evidence`（`fixed` 且带证据者）+ 仓级 `verify`**；**任一非零/超时 ⇒ 本笔不得结案**：把 `fixed` 回退 `pending`（打回，并重钉回线供修席再翻）或超 MAX_BOUNCE 升级，失败项入账本/通告牌。逐条证据把"机械底"从仓级一条细化到每条发现；正向背书 + 真码差 + 机械底绿，三者齐才 `fixed`。
-- **代码执行面（承认）**：verify 是被审仓自带命令，Hall 只执行、不拟定——同信任域下的受控执行（§1）；限定 `cwd`＝审计线现场、超时封顶（默认 1800s）、命令与结果入账。
-- **未尽项完结（不升级的出口）**：反复打回达 MAX_BOUNCE / verify 连续红 ⇒ **不 kill**；未关条目留 `pending`，出报告（`<!-- k3dge:incomplete -->` + 未尽项清单 + 人工旗）、工单 `done` 供 k3dge collect——`待修>0` ⇒ 不闭环、封板照堵。人据 `[NEXT]` 授意 CLI agent 处理（如"模板对只需 `k3dge sync`"）。判据机械＝达 MAX_BOUNCE；用于"硬限制（scope 外/隐藏文件对）修不全"这类。
+**机械闸不在审计侧（verify 解耦，Note ㉖）**
+- 审计侧**不执行任何被审仓代码**（原"结案前 Hall 跑 verify/evidence"已删）：`fixed` 语义＝**复核背书**（改得对不对），非"机械验证通过"。
+- 钉尾 `evidence=<命令>` 退为**证据主张**（进报告「验证」栏兜底），审计侧不跑。
+- 代码能不能跑/过闸归**消费侧落点**：k3dge pre-commit `check` + CI `pytest`/`check --with-tests`（环境正确、时机在落地）。`audit_closed`（审计完备）与机械绿分家，`seal` 两者都要。
+- **未尽项完结（不升级的出口）**：反复打回达 MAX_BOUNCE ⇒ **不 kill**；未关条目留 `pending`，出报告（`<!-- k3dge:incomplete -->` + 未尽项清单 + 人工旗）、工单 `done` 供 k3dge collect——`待修>0` ⇒ 不闭环、封板照堵。人据 `[NEXT]` 授意 CLI agent 处理（如"模板对只需 `k3dge sync`"）。判据机械＝达 MAX_BOUNCE；用于"硬限制（scope 外/隐藏文件对）修不全"这类。
 
 **state 推导（Hall，含机械拔钉）**
 - 判读后：见心跳 → `harvest_pins(窗 src)`，逐条 `pending` 钉收成 items。
@@ -198,8 +198,8 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
   - `pending→fixnote` 且目标文件 diff≠∅ ⇒ **`fixnote`（proposed-fixed，仍 open 待复核）**；
   - 翻成 `fixnote` 但目标文件 diff=∅ ⇒ 该窗 FORMAT（主张改了却没动码＝谎报）；
   - 翻 leftover/disputed ⇒ 对应态；未碰仍 pending ⇒ 留 open。
-- 核后（**Hall 机械拔钉**）：复核把认可项翻成 `fixed` 钉 → **Hall 把 `fixed` 钉拔除、账本置 `fixed`**；仍留 `fixnote`（复核未背书）＝未验 ⇒ 保持 open、闭不了案；被翻回 `pending` ⇒ 打回。**且 closing 前 verify 必须绿**（见下），否则 `fixed` 不成立。
-- **不变量**：钉集合＝账本状态的投影；`fixed`＝**修主张(fixnote ∧ 真码差) ∧ 复核正向背书(fixnote→fixed) ∧ verify 绿 ∧ Hall 拔钉** 四合；席不得凭删标记或沉默毁证据/自证结案，删除动作全程只在 Hall。
+- 核后（**Hall 机械拔钉**）：复核把认可项翻成 `fixed` 钉 → **Hall 把 `fixed` 钉拔除、账本置 `fixed`**；仍留 `fixnote`（复核未背书）＝未验 ⇒ 保持 open、闭不了案；被翻回 `pending` ⇒ 打回。
+- **不变量**：钉集合＝账本状态的投影；`fixed`＝**修主张(fixnote ∧ 真码差) ∧ 复核正向背书(fixnote→fixed) ∧ Hall 拔钉** 三合（机械闸在消费侧，Note ㉖）；席不得凭删标记或沉默毁证据/自证结案，删除动作全程只在 Hall。
 - 物化时在 Hall 私域存只读原快照 `{K3DIT_HALL_ROOT}/.run/{job}/{window}.orig`（窗 root 外）；不给窗塞 `.git`。present diff 由 Hall 按 finding location 归到每条注入复核窗（"判断只读账本"，diff 作物证由进程供给）。
 
 **done 信号**
@@ -229,7 +229,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 | 代码审计窗 | Pass 1-4 + 安全/正确性深审 + 性能8族 + 反例/边界 | 安全·正确性·缺陷·竞态·破坏性·隐蔽·冲突·覆盖 | 无上限（真阻断） | diff/trace 指针、数据流/污点、锁图 |
 | 价值窗 | code-judo / Approval Bar / 结构红旗（判"该不该阻断"） | 复杂度·结构·冗余·性能·设计 | 复杂度·结构·冗余·性能≤中/P2 | k3lity scan_facts（CC/行数/重复度） |
 | 修席窗（行动窗，非透镜） | 无（改码 + 翻 `fixnote`/`leftover`/`disputed`；见 §2.7） | — | — | 待关 findings + 窗内 `pending` 钉 + `.orig` |
-| 复核窗（独立钥） | Retest：看 `present.md`（修席 `.orig→现` diff）+ conformance/LTL | — | — | findings 账本 + present diff + 结案 `verify` 命令 |
+| 复核窗（独立钥） | Retest：看 `present.md`（修席 `.orig→现` diff）+ conformance/LTL | — | — | findings 账本 + present diff |
 
 价值窗独立于代码窗：前者审"设计值不值"（含工具预计算事实）、后者审"这段贵不贵/对不对"（diff 内），对照面不同、不共钥。
 
