@@ -42,23 +42,37 @@ def _spec_violation_path(workspace: Path, manifest: Manifest, domain: str) -> Op
 
 
 def _package_prefix(manifest: Manifest, domain: str) -> str:
-    """Top-level import package for a domain's src (e.g. `src/k3dge/engine` -> `k3dge`).
+    """Top-level import package for the repo's domains (manifest-derived, never hardcoded).
 
-    Derived from manifest (package_root + the domain's src), never hardcoded: downstream
-    repos use a different package name (k3dit/k3che), so a baked-in `k3dge.` made the
+    = basename of the longest common ancestor dir of all domains' `src`. Handles both
+    `package_root` conventions without relying on `__init__.py`:
+      - k3dge: `src/k3dge/{engine,cli,…}` -> `k3dge`  (package_root = src/k3dge)
+      - k3dit: `src/k3dit`               -> `k3dit`   (package_root = src)
+    Downstream repos use a different package name, so a baked-in `k3dge.` made the
     reverse-import ban silently no-op there (code-6).
     """
-    src_rel = manifest.src_path(domain)
-    if not src_rel:
+    srcs = [str(p).replace("\\", "/").strip("/")
+            for p in (manifest.src_path(d) for d in manifest.domains) if p]
+    own = str(manifest.src_path(domain) or "").replace("\\", "/").strip("/")
+    if not srcs and own:
+        srcs = [own]
+    if not srcs:
         return ""
-    root = manifest.package_root.replace("\\", "/").rstrip("/")
-    rel = src_rel.replace("\\", "/")
-    if root and rel.startswith(root + "/"):
-        rel = rel[len(root) + 1 :]
-    elif rel == root:
+    parts = srcs[0].split("/")
+    for s in srcs[1:]:
+        seg = s.split("/")
+        i = 0
+        while i < len(parts) and i < len(seg) and parts[i] == seg[i]:
+            i += 1
+        parts = parts[:i]
+    if not parts:
         return ""
-    parts = [p for p in rel.split("/") if p]
-    return parts[0] if parts else ""
+    if parts[-1] in {"src", "lib", "source"}:
+        # domains are sibling packages directly under a generic root -> package = next seg
+        own_parts = own.split("/") if own else []
+        if len(own_parts) > len(parts):
+            return own_parts[len(parts)]
+    return parts[-1]
 
 
 def _shape_change_documented(workspace: Path, domain: str, spec_content: str, sym_diff: dict) -> bool:
