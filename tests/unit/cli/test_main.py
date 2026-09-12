@@ -428,3 +428,26 @@ def test_find_workspace_confines_to_mcp_root():
                 os.environ.pop(k, None)
             else:
                 os.environ[k] = v
+
+
+def test_status_deep_vs_summary(monkeypatch, capsys):
+    """ADR-0008 §2：默认摘要前 10 + 还有 N 条提示；--deep 出全量。"""
+    import argparse
+
+    from k3dge.cli import main as m
+    from k3dge.cli import status as st
+
+    obj = {
+        "ok": True, "domains": ["d"], "gate_passed": True, "modified_domains": [],
+        "drift": [], "pipeline": {"configured": True, "issues": []},
+        "unfinished_tasks": [{"task": f"t{i}", "title": f"T{i}", "status": "idea"} for i in range(12)],
+        "next": None, "cache": None,
+    }
+    monkeypatch.setattr(st, "workspace_status", lambda ws: obj)
+    monkeypatch.setattr(m, "_find_workspace", lambda *a, **k: Path("."))
+    assert m.cmd_status(argparse.Namespace(json=False, deep=False)) == 0
+    out = capsys.readouterr().out
+    assert "Unfinished tasks (12)" in out and "2 more" in out and "T11" not in out
+    assert m.cmd_status(argparse.Namespace(json=False, deep=True)) == 0
+    out2 = capsys.readouterr().out
+    assert "T11" in out2 and "more" not in out2

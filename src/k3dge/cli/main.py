@@ -1129,9 +1129,13 @@ def cmd_status(args: argparse.Namespace) -> int:
             + (f" ({len(status_obj['pipeline']['issues'])} issue(s))" if status_obj["pipeline"]["issues"] else "")
         )
         if status_obj["unfinished_tasks"]:
-            print(f"Unfinished tasks ({len(status_obj['unfinished_tasks'])}):")
-            for t in status_obj["unfinished_tasks"][:10]:
+            tasks = status_obj["unfinished_tasks"]
+            shown = tasks if getattr(args, "deep", False) else tasks[:10]
+            print(f"Unfinished tasks ({len(tasks)}):")
+            for t in shown:
                 print(f"  - [{t['status'] or '?'}] {t['title']}")
+            if len(tasks) > len(shown):
+                print(f"  … {len(tasks) - len(shown)} more (k3dge status --deep)")
         else:
             print("Unfinished tasks: none")
         cache = status_obj.get("cache")
@@ -1329,6 +1333,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="synthesized workspace state: domains / drift / pipeline / unfinished tasks",
     )
     p_status.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    p_status.add_argument("--deep", action="store_true",
+                          help="show full unfinished task list (default: first 10, ADR-0008 §2)")
     p_status.set_defaults(func=cmd_status)
 
     # Hidden hooks used by the live git hooks (scripts/pre-commit, scripts/commit-msg).
