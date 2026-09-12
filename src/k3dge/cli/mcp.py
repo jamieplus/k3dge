@@ -626,6 +626,6 @@ def k3dge_adr_index(workspace_path: Optional[str] = None) -> str:
 if __name__ == "__main__":
     import os as _os
 
-    # ADR-0026：MCP 服务进程钉住启动 CWD 作服务根，_find_workspace 据此收敛 workspace_path
+    # ADR-0006：MCP 服务进程钉住启动 CWD 作服务根，_find_workspace 据此收敛 workspace_path
     _os.environ.setdefault("K3DGE_MCP_ROOT", str(Path.cwd().resolve()))
     mcp.run()

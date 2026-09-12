@@ -11,6 +11,7 @@ Note: ① 就地修订（非 Amend/Supersede）2026-09-02，经 Core Maintainer 
       ③ 就地修订（出向调用清单补 `k3dge audit` 审计线管理）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ④ 去 changelog 化（删「就地修订留痕」块与「旧句/现予澄清/替换旧句」元叙述；Draft 理由保留为现行陈述）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ⑤ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与章节号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
+      ⑥ MCP `workspace_path` 收敛并入 §2.2（就地增补，原拟单列一条独立 ADR，经 Core Maintainer 2026-09-11 否决"一条小决策占一个 ADR"）2026-09-11，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：MCP 服务根 `K3DGE_MCP_ROOT`（启动 CWD），`workspace_path` 默认须在内、越界拒，跨仓 `K3DGE_ALLOW_EXTERNAL_WORKSPACE=1`。过闸口径 = manual fallback。
 ---
 
 # ADR-0006: 对外注入面与并列 harness 编排（入向兼容层 + 出向通道）
@@ -56,6 +57,7 @@ k3dge 是**一致性元门禁**；下列 peer 是独立仓，各自挂 k3dge（`
   - 脚手架幂等不覆盖已有 `AGENTS.md` / `scripts/init.sh`——协议升级要再同步这两份，不是 init 回退。
 - **透镜审计不在 `src/k3dge`**（ADR-0005 §2.6）：MCP prompt 只指路，不在桥里演进规程。
 - **信任边界**：本机 stdio 信任边界＝调起该 MCP 的 OS 用户（S-13）；k3dge 作为出向客户端同样成立；网络化后再重开鉴权。
+- **入向 `workspace_path` 收敛**：MCP 服务进程启动钉**服务根**（启动 CWD）为 `K3DGE_MCP_ROOT`；`workspace_path` 默认须在服务根之内，越界即拒（显式化，不静默旁路窗/仓物理隔离，ADR-0025 §2.7）；跨仓须显式 `K3DGE_ALLOW_EXTERNAL_WORKSPACE=1`。非 MCP 直调（CLI/测试）不设服务根 ⇒ 语义不变。
 - **harness 身份不混用**：其它 harness 自定入口，禁止共用 `k3dge_*` 工具名装成一个进程；一个 peer 的传输只准命中它自己的 server / CLI（§2.3）。
 
 ### 2.3 MCP 的方向性不变量

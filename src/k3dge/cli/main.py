@@ -29,7 +29,7 @@ def _find_workspace(start: Optional[Path] = None, workspace_path: Optional[str] 
     if workspace_path:
         p = Path(workspace_path).resolve()
         root = p if p.is_dir() else p.parent
-        # 越界显式化（ADR-0026）：MCP 服务进程集 K3DGE_MCP_ROOT=启动 CWD；此参数默认须落在
+        # 越界显式化（ADR-0006）：MCP 服务进程集 K3DGE_MCP_ROOT=启动 CWD；此参数默认须落在
         # 服务根之内——否则一个任意 workspace_path 就旁路了窗/仓物理隔离（ADR-0025 §2.7）。
         # 非 MCP 直调（CLI/测试）不设该 env，保持原语义。
         mcp_root = os.environ.get("K3DGE_MCP_ROOT", "").strip()
@@ -39,7 +39,7 @@ def _find_workspace(start: Optional[Path] = None, workspace_path: Optional[str] 
             if not (root == base or root.is_relative_to(base)):
                 raise ValueError(
                     f"workspace_path 越出 MCP 服务根：{root} 不在 {base} 之内；"
-                    "跨仓须显式设 K3DGE_ALLOW_EXTERNAL_WORKSPACE=1（ADR-0026）"
+                    "跨仓须显式设 K3DGE_ALLOW_EXTERNAL_WORKSPACE=1（ADR-0006）"
                 )
         return root
     origin = (start or Path.cwd()).resolve()

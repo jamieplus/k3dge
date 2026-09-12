@@ -24,7 +24,7 @@ date: 2026-09-12
   - 闸1（状态）：范围内 ADR 不得为 `Draft/Proposed`；`Superseded/Deprecated` 须带 `Superseded by`/否决理由。
   - 闸2（落地）：每条 `Accepted` ADR 带落地指针（如 `Landed-by: docs/specs/<domain>/spec.md §x` / `src/…` / task id），且指针**可解析**（文件/节/id 存在）。
 - 让 `k3dge_adr_index`（`analyze_adr_coverage`）出"未 Accepted / 未落地"事实，seal 据此拒。
-- 需新 ADR（ADR-0027）定义"ADR＝事实源 + 落地指针"契约与状态提升流程。
+- **不单列 ADR**（经 Core Maintainer 2026-09-11 否决"一条小决策占一个 ADR"）：本规则并入**「硬闸契约」**（gate 配置/spec，归属见 `2026-09-12-M9-refactor-gates_config_inventory`），作为其中一条 gate rule——契约里声明 `adr_all_accepted` + `adr_landed`，执行器按契约跑。
 
 ## 边界与拆分（规则 08）
 

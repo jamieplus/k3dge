@@ -17,6 +17,8 @@ date: 2026-09-12
 
 把可声明的阈值/开关/文案抽成配置，逻辑留代码；消除"改个阈值/文案要改源码"。
 
+**本票即「硬闸契约」的落点**：所有 gate rule（含 `2026-09-12-M9-feat-seal_adr_gate` 的"封版 ADR 须 Accepted 且落地"）声明在**同一份契约**里，执行器按契约跑——**不再一条规则一个 ADR**（Core Maintainer 2026-09-11 定）。
+
 ## 上下文/切入点（初始盘点）
 
 - `scripts/pre-commit:37-38`：`_CHECK_PREFIXES` / `_CHECK_SUFFIXES`（触发 check 的路径面）。
