@@ -201,6 +201,14 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
+      "path": "docs/adr/0026-mcp-workspace-root-confinement.md",
+      "type": "adr",
+      "id": "ADR-0026",
+      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
+      "status": "Proposed",
+      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
+    },
+    {
       "path": "docs/architecture/encyclopedia.md",
       "type": "architecture",
       "id": "encyclopedia",

@@ -108,7 +108,6 @@ def k3dge_check(
     force_full: bool = False,
 ) -> str:
     """Run k3dge consistency gate directly via ConsistencyEngine."""
-# k3dit:leftover code-2 ADR-0006 S-13 信任域=OS用户；锁CWD会废跨仓 workspace_path（既有测试/流程），收敛属编排，改需ADR
     ws = _find_workspace(workspace_path=workspace_path)
     report: GateReport = ConsistencyEngine(ws).evaluate(run_tests=with_tests, force_full=force_full)
     payload = _to_json(report)
@@ -625,4 +624,8 @@ def k3dge_adr_index(workspace_path: Optional[str] = None) -> str:
 
 
 if __name__ == "__main__":
+    import os as _os
+
+    # ADR-0026：MCP 服务进程钉住启动 CWD 作服务根，_find_workspace 据此收敛 workspace_path
+    _os.environ.setdefault("K3DGE_MCP_ROOT", str(Path.cwd().resolve()))
     mcp.run()

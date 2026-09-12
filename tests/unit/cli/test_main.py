@@ -392,3 +392,39 @@ class TestCli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_find_workspace_confines_to_mcp_root():
+    """ADR-0026：MCP 服务根存在时 workspace_path 越界报错；显式 opt-in 才放行。"""
+    import os
+    import tempfile
+    from pathlib import Path
+
+    from k3dge.cli.main import _find_workspace
+
+    saved = {k: os.environ.get(k) for k in ("K3DGE_MCP_ROOT", "K3DGE_ALLOW_EXTERNAL_WORKSPACE")}
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            root = tmp / "root"
+            (root / "sub").mkdir(parents=True)
+            outside = tmp / "outside"
+            outside.mkdir()
+            os.environ["K3DGE_MCP_ROOT"] = str(root)
+            os.environ.pop("K3DGE_ALLOW_EXTERNAL_WORKSPACE", None)
+            assert _find_workspace(workspace_path=str(root / "sub")) == (root / "sub").resolve()
+            try:
+                _find_workspace(workspace_path=str(outside))
+                raise AssertionError("越界应 raise")
+            except ValueError:
+                pass
+            os.environ["K3DGE_ALLOW_EXTERNAL_WORKSPACE"] = "1"
+            assert _find_workspace(workspace_path=str(outside)) == outside.resolve()
+            os.environ.pop("K3DGE_MCP_ROOT", None)
+            assert _find_workspace(workspace_path=str(outside)) == outside.resolve()
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
