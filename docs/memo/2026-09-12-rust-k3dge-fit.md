@@ -13,7 +13,7 @@ Rust 的静态类型与穷尽匹配让"未处理的边"无法通过编译——�
 | Rust 特性 | 对 agent 的护栏 |
 | --- | --- |
 | `enum` + 穷尽 `match` | 状态机**漏一分支＝编译错**（相位/状态迁移不可漏） |
-| `Result<T,E>` | 显式错误，根治 k3ge 的「空 `except` 吞错」债 |
+| `Result<T,E>` | 显式错误，根治 k3dge 的「空 `except` 吞错」债 |
 | 所有权/借用 | 无别名/数据竞争，确定性强 |
 | 类型化结构体 | 信封/契约是类型而非 dict，形状错编译期抓 |
 | trait + 模块可见性 | 天然映射"事实归属/边界"纪律（规则 08） |
@@ -22,7 +22,7 @@ Rust 的静态类型与穷尽匹配让"未处理的边"无法通过编译——�
 ## 3. 代价 / 风险
 - **模型熟练度**：语料远少于 Python → agent 更易在借用/lifetime 上打转，"防漂移"可能变成"编译错空转"。
 - **自举丢失**：现 `pip install -e` 改完即用；Rust 加编译步，dogfood 变慢。
-- **多语言碎片**：k3dit/k3che/席包装/Hall 全 Python，k3ge 成 Rust 孤岛（跨进程传输仍可行）。
+- **多语言碎片**：k3dit/k3che/席包装/Hall 全 Python，k3dge 成 Rust 孤岛（跨进程传输仍可行）。
 - **生态**：tree-sitter 是 Rust 友好（Py+TS 一套）；但 MCP Rust 生态弱于 Python `mcp`。
 - **工作量**：engine/contract/doc_catalog/milestone/MCP/CLI/tests/模板全重写。
 - **冲突**：`ADR-0001` 明定「Python 3.10+ 标准库（核心零依赖）」——重写须**新 ADR supersede**，且 crates 依赖与"零依赖"相抵。
