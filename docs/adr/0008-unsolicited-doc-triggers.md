@@ -1,5 +1,5 @@
 ---
-Status: Proposed
+Status: Accepted
 # Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
 # NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
@@ -13,6 +13,7 @@ Note: ① 就地修订（里程碑触发对齐 ADR-0004 §2.1.4：seal 前必须
       ④ 去 changelog 化（删「原句作废」元叙述）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ⑤ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ⑥ 就地增补 §2「渐进披露」并**状态 Accepted→Proposed**（先降 Proposed 以允许就地改正文）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：把"下一跳引导 + 纵深按需"并入本 ADR（它讲触发/next），不单列新 ADR。过闸口径 = manual fallback。
+      ⑦ 2026-09-12 转 `Accepted`：经 Core Maintainer 显式批准（渐进披露核心已落：`[NEXT]` 纵深指针 + 默认摘要/`--deep` + AGENTS 微核预算）；过闸口径 = manual fallback。
 ---
 
 # ADR-0008: 触发式文档维护与先读已敲定设计
