@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:1d94f19acb31236be2fb8bdcae8c04f06e6fd2da1e7dbd6249b8be8cda97c2f7`
+- **Contract Hash**: `sha256:eb92a51057d7d9affdb510b66009c6e78e6f91a746c6f01d74ff5138dd77ff2b`
 - **Last Updated**: 2026-09-12
 
 ## 1. Domain Boundary & Responsibilities
@@ -30,6 +30,12 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 extract_ts_interface(path: Path) -> str
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+adrs_all_accepted(workspace: Path) -> Optional[str]
+adr_landed(workspace: Path) -> Optional[str]
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
@@ -146,7 +152,7 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 REL = '.agent/gates.toml'
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed']}}}
 load(workspace: Path) -> Dict[str, Any]
 get(workspace: Path, section: str, key: str) -> Any
 preconditions(workspace: Path, kind: str) -> list
@@ -207,6 +213,7 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from typing import Tuple
+from k3dge.engine import adr_gate
 from k3dge.engine import gates
 from k3dge.engine import report_table
 from k3dge.engine.evaluator import ConsistencyEngine

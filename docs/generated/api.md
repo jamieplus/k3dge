@@ -113,6 +113,15 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 extract_ts_interface(path: Path) -> str
+# adr_gate.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+adrs_all_accepted(workspace: Path) -> Optional[str]
+    # doc: 未 Accepted 的 ADR 汇总；全 Accepted（或无 ADR）⇒ None。
+adr_landed(workspace: Path) -> Optional[str]
+    # doc: Accepted ADR 须带可解析 `Landed-by:`；否则汇总；全满足 ⇒ None。
 # audit_checklist.py
 from __future__ import annotations
 from pathlib import Path
@@ -264,7 +273,7 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 REL = '.agent/gates.toml'
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed']}}}
 load(workspace: Path) -> Dict[str, Any]
     # doc: 缺省 ∪ `.agent/gates.toml`（段内覆盖；`checks.<kind>` 逐键覆盖）；文件缺失/坏 ⇒ 缺省。
 get(workspace: Path, section: str, key: str) -> Any
@@ -336,6 +345,7 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from typing import Tuple
+from k3dge.engine import adr_gate
 from k3dge.engine import gates
 from k3dge.engine import report_table
 from k3dge.engine.evaluator import ConsistencyEngine

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from k3dge.engine import gates, report_table
+from k3dge.engine import adr_gate, gates, report_table
 from k3dge.engine.evaluator import ConsistencyEngine
 
 STATUS_RE = re.compile(r"-\s+\*\*Status\*\*:\s*([\w-]+)", re.IGNORECASE)
@@ -911,6 +911,8 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
             f"[SEAL REJECTED] Unfilled guide stubs detected in docs/guides/: {unfilled}.\n"
             f"  Complete the documentation before milestone seal." if unfilled else None
         ),
+        "adrs_all_accepted": lambda: adr_gate.adrs_all_accepted(workspace),
+        "adr_landed": lambda: adr_gate.adr_landed(workspace),
     }
     for gid in gates.preconditions(workspace, "seal"):
         fn = gate_fns.get(gid)

@@ -63,7 +63,8 @@ Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一
    - 重开：templates 运行时需读 `PAIRS` 时，把表抽到两边都能 import 的无依赖模块（仍禁止 engine import templates）。
 8. **硬闸契约（`.agent/gates.toml`）**：闸的**声明式阈值/开关**在此覆盖；缺省在 `engine/gates.DEFAULTS`（唯一源），执行器读契约；配置缺失/坏 ⇒ 回落缺省（**闸不因配置坏而失效**）。
    - 契约只承载**数据**，不含逻辑/表达式（不长第二套判定语言）。
-   - 首批：`[audit_trigger] c2_nesting_max / volume_max`；后续 gate rule（含封版 ADR 闸）按同一契约声明。
+   - **编排单元**：`[checks.<kind>].preconditions` 声明该单元消费的闸 id（全绿才继续）；`seal` 首批＝`tasks_all_done/align_pass/guides_filled/adrs_all_accepted/adr_landed`。未实现的 id 视为配置错（拒绝）。
+   - **ADR＝事实源**：封版要求范围内 ADR 全 `Accepted` 且各带**可解析落地指针** `Landed-by: <路径> [§节]`（`engine/adr_gate`）；只验结构事实，不判决策内容（归 k3dit）。
 
 本 ADR 只定实现；目的语言（减少漂移、幻觉、修局部坏整体等，不必穷举）见 ADR-0009。
 
