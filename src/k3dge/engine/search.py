@@ -140,19 +140,40 @@ def _run_ripgrep(workspace: Path, query: str) -> Optional[List[str]]:
     return [ln for ln in res.stdout.splitlines() if ln.strip()]
 
 
+def _gitignored_prefixes(workspace: Path) -> set:
+    """git 忽略的路径前缀（`.gitignore`/`.git/info/exclude`），供兜底对齐 rg。
+
+    rg 默认尊重 `.gitignore`，兜底路径必须同口径，否则无 rg 时命中集多出被忽略文件
+    （code-7 残留）。非 git 仓 / git 缺席 ⇒ 空集（退化为原行为）。"""
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(workspace), "ls-files", "--others", "--ignored",
+             "--exclude-standard", "--directory"],
+            capture_output=True, text=True)
+    except OSError:
+        return set()
+    if r.returncode != 0:
+        return set()
+    return {ln.strip().rstrip("/") for ln in r.stdout.splitlines() if ln.strip()}
+
+
 def _python_search(workspace: Path, query: str) -> List[str]:
     """rg 缺席时的兜底，刻意对齐 rg 语义：query 当正则（非法正则回退子串）、
-    跳过 .git/.venv/venv/node_modules/__pycache__/docs/generated（code-7：原纯子串 +
-    整扫 .venv/node_modules 使命中集随 rg 装否而变）。"""
+    跳过 .git/.venv/venv/node_modules/__pycache__/docs/generated 与 `.gitignore` 项
+    （code-7：原纯子串 + 整扫 .venv/node_modules + 不读 .gitignore 使命中集随 rg 装否而变）。"""
     out: List[str] = []
     try:
         rx = re.compile(query)
     except re.error:
         rx = None
     skip_dirs = {".git", ".venv", "venv", "node_modules", "__pycache__"}
+    ignored = _gitignored_prefixes(workspace)
     for path in workspace.rglob("*"):
         rel_parts = path.relative_to(workspace).parts
         if not path.is_file() or set(rel_parts) & skip_dirs or rel_parts[:2] == ("docs", "generated"):
+            continue
+        rel = str(path.relative_to(workspace)).replace("\\", "/")
+        if any(rel == p or rel.startswith(p + "/") for p in ignored):
             continue
         try:
             if path.stat().st_size > 1_000_000:   # 体积闸：超大文件不整读（A-2）
@@ -163,7 +184,6 @@ def _python_search(workspace: Path, query: str) -> List[str]:
             text = path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        rel = str(path.relative_to(workspace)).replace("\\", "/")
         for i, line in enumerate(text.splitlines(), 1):
             if (rx.search(line) if rx is not None else query in line):
                 out.append(f"{rel}:{i}:{line}")

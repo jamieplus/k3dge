@@ -202,15 +202,15 @@
 ```
 DRAFT →(milestone align: Full Matrix, 无人问)→ ALIGNED
       →(账齐/C2≥5/体积≥8 量化触发)→ AUDIT_SUGGESTED → 问「要审吗?」N=继续干活
-      →(milestone audit)→ AUDITING：audit(k3dit)+quality(k3lity) 各出 12 列
+      →(milestone audit)→ AUDITING：合并审计模块出**一份** 12 列（quality 是模块内窗口，非独立报告/peer）
           待修>0 → 问「agent 修?」→ 重审；>3 次未闭环 → ESCALATED 转人工
-          两份报告 待修=0 → SEAL_READY → 问「封板?」→(milestone seal)→ SEALED → closure(收摊)
+          一份报告 待修=0 → SEAL_READY → 问「封板?」→(milestone seal)→ SEALED → closure(收摊)
 ```
 
 要点（判据见 [`overview.md`](overview.md) §6–7 与 `peer_contract`）：
 - **审计闭环 = 封板唯一界限**；自动触发只服务「要不要审」，「要不要封」只在闭环后出现一次。
 - 交换介质 = 审计线（分支+现场）+ 钉（§3.2/§3.4）；`sign-report` 署名才算结案；`collect` 幂等可重试，`EXPIRED/NOT_FOUND` ⇒ 锁新基线重送。
-- `on_seal_enter`（audit+quality 两份必做）与 `on_pre_seal`（各自 verify）配置在 `.agent/pipeline.toml`；两条腿都验完 seal 才放行。
+- `on_seal_enter`（合并审计模块**一份**必做）与 `on_pre_seal`（该报告 verify）配置在 `.agent/pipeline.toml`；闭环验完 seal 才放行。
 - 外来审计源经 `k3dge milestone audit-submit`（MCP `k3dge_submit_audit_report`，`--kind quality` 同理）落盘即计入闭环。
 - 发现用 `k3dit:pending <ID>` 钉在位置（仅指针）；已修删钉，有意留改 `k3dit:leftover`。
 
