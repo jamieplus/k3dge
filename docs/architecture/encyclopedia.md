@@ -74,7 +74,7 @@
 | **审计线 Audit Line** | gate 类唯一输入形式：一单一线（`k3dit/<单>` 分支 + worktree checkout），锁点 L 即 `baseline`；袋/独立库/打包器全部退役 | ADR-0025；`peer_contract §3` |
 | **棘轮 Ratchet** | 一工单 = 一快照，单内审↔修可多程；submit/collect 两态；`claim` 即续租；快照推进一律 `git update-ref` CAS | `peer_contract §1.4` |
 | **席位 seat** | 审计机构经 seat 连接组件上岗；`sign-report` 署名才算结案 | `peer_contract §1.4` / §2 |
-| **doc-audit** | `check` 后、**非阻断**的文档作者合规审计：k3dit 报告 + 建带 Milestone 的 task | ADR-0021 |
+| **doc-audit** | `check` 后、**非阻断**的文档作者合规审计：k3dit 报告 + 建带 Milestone 的 task | ADR-0022 |
 | **预筛 Pre-filter** | 人工入口审计的三条件复用（闭环报告 + 基线同 + lens 版本同）；自动入口不预筛 | `peer_contract §7` |
 
 ### 3.3 文档体系
@@ -118,7 +118,7 @@
 | `docs/branches/` | 红闸分支勘误记录 | 见 `docs/branches/` | — |
 | `docs/protocols/` | 审计/质量/复核协议 + Peer Contract | 改动 = 契约变更，需 `k3dge sync` + 下游跟随 | `k3dge doc list --type protocols` |
 
-> 结构门禁（commit）：staged `docs/**` 需该类型 `README.md` + `AUTHORING.md` 齐；`check` 绿后给 `[NEXT] doc_audit`（`k3dge doc-audit` 非阻断，ADR-0021）。
+> 结构门禁（commit）：staged `docs/**` 需该类型 `README.md` + `AUTHORING.md` 齐；`check` 绿后给 `[NEXT] doc_audit`（`k3dge doc-audit` 非阻断，ADR-0022）。
 
 ## 5. 决策索引（ADR 全表）
 
@@ -144,7 +144,7 @@
 | --- | --- | --- |
 | ADR-0004 | milestone-lifecycle-governance | 里程碑生命周期/封板状态机与执行口径 |
 | ADR-0008 | unsolicited-doc-triggers | 文档改动触发的非请求式审计触发器 |
-| ADR-0021 | doc-audit-post-check-non-blocking | `doc-audit` 在 check 之后、非阻断，建带 Milestone 的 task |
+| ADR-0022 | doc-audit-post-check-non-blocking | `doc-audit` 在 check 之后、非阻断，建带 Milestone 的 task |
 | ADR-0022 | task-maps-to-audit-report | task 映射到审计报告条目 |
 
 ### Agent 与 harness
@@ -182,7 +182,7 @@
 | 里程碑 | `k3dge milestone audit <id>`（棘轮步进）、`k3dge milestone seal <id>`、`k3dge milestone align` |
 | 任务 | `k3dge task list --json` / `k3dge task create` / `k3dge task done` |
 | 文档寻址 | `k3dge doc list` / `k3dge doc where <id>` / `k3dge doc grep <word> [--line]` |
-| 文档审计 | `k3dge doc-audit`（check 之后、非阻断，ADR-0021） |
+| 文档审计 | `k3dge doc-audit`（check 之后、非阻断，ADR-0022） |
 | 符号定位 | `k3dge where <symbol>`（file:line）；`k3dge search` / `k3dge index` |
 | 审计钉 | `k3dge markers [--json|--check]` |
 | 送检与棘轮 | `k3dge audit <submit|status|advance|close>`（审计线：锁线→交件→验→merge→删线） |

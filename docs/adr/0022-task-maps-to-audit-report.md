@@ -10,9 +10,10 @@ Note: ① 就地修订（钉=写源、报告=投影，对齐 ADR-0025 §2.7；�
       ② 正交去重（钉收钉细节改指 ADR-0025 §2.7）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ③ 正交收尾（seal 全 done 闸复述改指 ADR-0004 §2.1.3）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ④ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
+      ⑤ **合并原 ADR「doc-audit 后置、非阻断」入本条 §2.2**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：doc-audit 与 report-task 同属"审计报告如何收口"一决策；被并者 0021 删除，全仓指针改指本条。过闸口径 = manual fallback。
 ---
 
-# ADR-0022: task 对应审计报告（1 report = 1 task），不再一条 bug 一个 task
+# ADR-0022: 审计报告的收口（1 report = 1 task；doc-audit 后置非阻断）
 
 ## 1. 上下文 (Context)
 
@@ -44,6 +45,17 @@ Note: ① 就地修订（钉=写源、报告=投影，对齐 ADR-0025 §2.7；�
 
 - 不取消 task——task 仍是里程碑闸与 `task list` 的可见单元（`ADR-0004 §2.1.3`）；只是单元从 finding 上移到 report。
 - 不在 task 里复制 finding 明细（那会成第三份事实：报告改了、task 没改）；task 只存 `report:` 指针 + 一行摘要。
+
+### 2.2 doc-audit 后置、非阻断（原独立 ADR，合并入本条）
+
+- **doc-audit 在 `check` 之后，不在 `check` 之内**（T-01 边界；`check` 恒静态，定义见 ADR-0006 §2.3.2）：check 绿后经 `[NEXT] state=doc_audit` 指一条**非阻断**后续步 `k3dge doc-audit`。
+- **只出两样**：
+  1. **报告**：路由 `k3dit.actions.audit`（`mcp→cli→manual`），做 **authoring 合规**；k3dit/人产 12 列，k3dge 不伪造发现。
+  2. **task**：`k3dge` 机械建一个带 `Milestone: <当前>` 的 `doc-audit` task（同里程碑幂等，仅一个未关闭）。
+- **耐久 = task 归里程碑**：封板闸要求任务全 `done`（ADR-0004 §2.1.3）；故本轮不改、里程碑闭环轮也得改——"不阻断"却不丢。
+- **范围切分**：doc-audit 只管 authoring 合规；**ADR 冲突/覆盖留在里程碑审计**（`k3dge_adr_index` 事实 + k3dit 判），不在每次 commit 做。
+- **非阻断 ≠ 无后果**：命令恒返回 0；产出的 task 进 backlog，由既有 seal 闸兜底。
+- 非目标：不把 k3dit/MCP/LLM 塞进 `check`；不在 `check` 里写 review/task；doc-audit 不判"值不值得写"（soft review）。
 
 ## 3. 产生后果 (Consequences)
 

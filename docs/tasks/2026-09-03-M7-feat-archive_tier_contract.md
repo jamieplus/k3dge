@@ -26,7 +26,7 @@ date: 2026-09-03
 ## 落地清单
 
 1. `k3dge doc list --type <t> --archive`：把既有开关透出到 CLI（MCP `k3dge_doc_list` 同步加参数），输出头部明写一行「低权威层：判定以现行视图为准」。不带 `--archive` 时输出必须与今日**逐字节相同**。
-2. 增量去向提醒（**非阻断**，`ADR-0021` 同族）：`k3dge doc-audit` 的待核清单里加入"**本轮 diff 新**进 `archive/` 且无 `Superseded-by`/`Legacy note`"的文件；不改 `check` 判定集、不影响退出码（`ADR-0006` §2.3.2：`check` 仍是纯静态硬闸）。
+2. 增量去向提醒（**非阻断**，`ADR-0022` 同族）：`k3dge doc-audit` 的待核清单里加入"**本轮 diff 新**进 `archive/` 且无 `Superseded-by`/`Legacy note`"的文件；不改 `check` 判定集、不影响退出码（`ADR-0006` §2.3.2：`check` 仍是纯静态硬闸）。
 3. 存量 106 份不批量补标记、不批量删除（物理删除需人显式授权）。
 
 ## 验收

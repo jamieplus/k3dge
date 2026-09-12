@@ -22,7 +22,7 @@ date: 2026-09-02
 - 现状 `check` 对 ADR 只验结构：`docs/adr/.schema.json`（`filename`/`h1`/`sections`/`section_order`/`frontmatter.Status` 枚举），**不读 `Status` 的语义**。
 - 本次实践样本：`docs/adr/0006-mcp-foreign-harness-injection.md` 被就地修订并置 `Draft`，其 `Deciders:` 行携带"过闸口径 = `manual` fallback"字样 —— 这正是可被机验的结构化事实，但目前无人消费。
 - 边界约束（不得破）：`ADR-0006` §2.3 保留「`check` 不连 MCP、不跑 CLI（T-01）」。所以区分只能落在**文档静态事实**上（`Status` + 过闸口径标记），不能变成"check 去问 peer 有没有审过"。
-- 关联既有决策：`ADR-0012`（证据链三环：产物/消费者/到达）、`ADR-0021`（doc-audit 非阻断、`[NEXT] doc_audit` 在 check 之后）。
+- 关联既有决策：`ADR-0012`（证据链三环：产物/消费者/到达）、`ADR-0022`（doc-audit 非阻断、`[NEXT] doc_audit` 在 check 之后）。
 
 ## 验收
 

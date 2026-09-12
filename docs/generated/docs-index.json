@@ -105,14 +105,6 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
-      "path": "docs/adr/0021-doc-audit-post-check-non-blocking.md",
-      "type": "adr",
-      "id": "ADR-0021",
-      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Draft",
-      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
-    },
-    {
       "path": "docs/adr/0022-task-maps-to-audit-report.md",
       "type": "adr",
       "id": "ADR-0022",

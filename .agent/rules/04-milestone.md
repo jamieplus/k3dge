@@ -22,7 +22,7 @@
 
 * **人工入口** —— `k3dge milestone audit <id>` / `k3dge milestone seal [--yes] <id>` 都是人工主动入口，走同一套流程。`--yes` 跳过「要不要封」的提问，但不跳过审计。
 
-* **doc-audit（后置、非阻断，T-01）** —— `check` 保持静态硬闸，**不跑透镜**。docs 改动时 `check` 绿后给 `[NEXT] doc_audit`，由 `k3dge doc-audit` 承接：路由 `k3dit.actions.audit` 做 **authoring 合规**（k3dit/人出报告，k3dge 不伪造），并机械建一个带 `Milestone` 的 `doc-audit` task（幂等）。恒返回 0，但 task 进里程碑 backlog → **本轮不改，封板「全 done」闸也会逼它闭环**。ADR 冲突/覆盖不在这，仍只在里程碑审计（ADR-0005）。详见 ADR-0021。
+* **doc-audit（后置、非阻断，T-01）** —— `check` 保持静态硬闸，**不跑透镜**。docs 改动时 `check` 绿后给 `[NEXT] doc_audit`，由 `k3dge doc-audit` 承接：路由 `k3dit.actions.audit` 做 **authoring 合规**（k3dit/人出报告，k3dge 不伪造），并机械建一个带 `Milestone` 的 `doc-audit` task（幂等）。恒返回 0，但 task 进里程碑 backlog → **本轮不改，封板「全 done」闸也会逼它闭环**。ADR 冲突/覆盖不在这，仍只在里程碑审计（ADR-0005）。详见 ADR-0022。
 
 * **外来审计源落盘** —— 人贴/agent 转发的报告经 `k3dge milestone audit-submit <id> [--file <报告.md> | -]`（或 MCP `k3dge_submit_audit_report`）落盘为 `docs/reviews/YYYY-MM-DD-<id>-<scope>-audit.md` 本版报告（缺 12 列表头自动补；最新覆盖旧）。该报告 待修=0 才算闭环。（`--kind quality` 保留为 legacy，不再有独立质量腿。）
 

@@ -16,7 +16,7 @@ Note: ① 就地修订（非 Amend/Supersede）2026-09-02，经 Core Maintainer 
 
 # ADR-0006: 对外注入面与并列 harness 编排（入向兼容层 + 出向通道）
 
-> **Related**: ADR-0005（本地自用 / 职责切分）、ADR-0010（rules 切片）、ADR-0009（吸收纪律）、ADR-0021（doc-audit 非阻断）
+> **Related**: ADR-0005（本地自用 / 职责切分）、ADR-0010（rules 切片）、ADR-0009（吸收纪律）、ADR-0022（doc-audit 非阻断）
 >
 > **`Status: Draft` 的保留理由**：
 > - ① 入向（本仓 server）在 `mcp` 2.x 下起不来，先搁置（`docs/tasks/archive/M7/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.done.md`）。
