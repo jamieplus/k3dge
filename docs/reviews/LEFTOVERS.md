@@ -10,7 +10,7 @@ Denial reason and reopen condition live here only.
 | S-13 | MCP 任意 `workspace_path`：本地 stdio = OS 用户；改网络 MCP 必须重开 | [2026-08-24-8dim-vibe-audit.md](archive/untagged/2026-08-24-8dim-vibe-audit.md) |
 | F-14 / LR-5 | `_replace_between_all` O(N²)：spec ≪ 100KB，可读性优先 | [2026-08-23-5pass-audit.md](archive/untagged/2026-08-23-5pass-audit.md) |
 | F-15 / LR-6 | milestone 重复读盘：活跃任务少，OS 缓存够 | 同上 |
-| R3-1 | 三处域表行：4 域 + ADR-0002 判据/投影不可合并 | [2026-08-21-line-by-line.md](archive/untagged/2026-08-21-line-by-line.md) |
+| R3-1 | 三处域表行：4 域 + ADR-0018 判据/投影不可合并 | [2026-08-21-line-by-line.md](archive/untagged/2026-08-21-line-by-line.md) |
 | R3-4 | 函数内 import subprocess：L2 冷路径 | 同上 |
 | P1-06 | `K3DGE_BASE_SHA` 是 argv 不是 shell | [2026-08-25-pass1-robustness-security.md](archive/untagged/2026-08-25-pass1-robustness-security.md) |
 | P1-09 | `test_command_template`：能改 manifest 已能改命令 | 同上 |

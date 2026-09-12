@@ -14,14 +14,14 @@ Note: ① 就地修订（rules 集合由 00–03 更新为 00–10；quality har
 
 # ADR-0010: `AGENTS.md` 是唯一发现面；`.agent/` 是进程配置（rules 是其协议切片）
 
-> **Related**: ADR-0019（协议装载废弃）、ADR-0002（成对物动前须有 ADR）
+> **Related**: ADR-0019（协议装载废弃）、ADR-0018（成对物动前须有 ADR）
 
 ## 1. 上下文 (Context)
 
 - `AGENTS.md` 是主流 harness（Grok / Codex / Claude Code / Cursor）自动加载的面；`.agent/` 是目录名兼 `_find_workspace` 的 workspace 标记，内含 `manifest.json` / `rules/` / `docs.toml`。
 - 实证否决「Agent 会自己发现 `.agent/`」：harness 只加载仓库根 `AGENTS.md`，不扫点目录；列目录工具默认不显示点目录。依赖"被发现"才起作用的目录＝没按设计起作用。
 - `.agent/rules/*.md` 没有自动加载消费者；与 `AGENTS.md` 重叠时若无「谁赢」会漂。
-- 成对物（`AGENTS.md` ↔ `.agent/rules/`）动前必须有 ADR（ADR-0002）；本条是那张卡。
+- 成对物（`AGENTS.md` ↔ `.agent/rules/`）动前必须有 ADR（ADR-0018）；本条是那张卡。
 - `k3dge check` 写死 `.agent/manifest.json`——那是进程硬编码，不需被逛到（对标 `.git`）。
 
 ## 2. 决策 (Decision)

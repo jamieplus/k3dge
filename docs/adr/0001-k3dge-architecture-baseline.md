@@ -46,7 +46,7 @@ Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一
 6. **契约边界的机器消费者（补全规格闸）**：`spec` 的 §1 边界 / §3 不变量 / §4 矩阵必须有消费者，不能只锁 §2 哈希。
    - **域依赖声明**：`manifest.domains[].depends_on` 声明可达依赖方向。
      - engine 机检逆向 import 禁止；将现有 `engine ↛ templates` 的 `TEMPLATE_DRIFT` 特例升为通用规则。
-     - `overview.md` 的依赖图仍是判据，可执行副本在 manifest；见 ADR-0002。
+     - `overview.md` 的依赖图仍是判据，可执行副本在 manifest；见 ADR-0018。
    - **不变量具名（书写约定，未机检）**：§3 每条不变量应具名。
      - 理想上每条都对应某 Verification Matrix 行；有名字无测试 = 结构红。
      - 该「具名不变量须出现在矩阵行」的对应关系当前未机检，仅作书写约定，不阻断。

@@ -9,9 +9,12 @@ Deciders: Core Maintainer
 Note: ① 就地修订（protocols/ 描述对齐 ADR-0025 合并审计模块，撤销独立 quality peer/fallback）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。
       ② 正交收尾（catalog 排除 `archive/` 与 ADR-0023 §2.2 互指）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ③ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
+      ④ **合并原 ADR「docs 判据与投影的语义分工」入本条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：docs 判据/投影与托管布局同属"docs 治理"一决策；被并者 0002 删除，全仓指针改指本条（**保留本条 §2.3/§2.4/§2.6/§2.8 节号**）。过闸口径 = manual fallback。
 ---
 
-# ADR-0018: Managed document layout (Authoring, template, Gate, catalog)
+# ADR-0018: Docs 治理（托管布局 + 判据/投影分工）
+
+> **Related**: ADR-0019（协议装载废弃）、ADR-0023（archive 契约）
 
 ## 1. 上下文 (Context)
 
@@ -43,6 +46,8 @@ Note: ① 就地修订（protocols/ 描述对齐 ADR-0025 合并审计模块，�
 7. **Consumers:** k3dge = `.schema.json` + catalog; k3dit = `AUTHORING.md` + diff (text quality, ADR set coherence); k3lity = whether an agreement is a good idea (soft, never a commit gate).
 8. **`docs/protocols/`** holds the merged audit module's peer fallbacks (`audit_default.md` / `verify_default.md`, ADR-0025).
    - Quality is a window inside that module, not a separate peer; it has no independent fallback.
+9. **判据 vs 投影（原独立 ADR，合并入本条）**：`docs/architecture/overview.md` = **一致性判据**（人写常驻，Agent 跨域改动必读；含依赖方向、数据流、全局不变量）；`docs/generated/*` = **投影**（`k3dge sync` 从 manifest 派生，可随时重建，**永不作为一致性判据**）。`docs/generated/` 即 reference 侧目录（消除旧 `docs/reference/` 同名混淆）。
+10. **成对物纪律**（写入 `AGENTS.md`）：动任何"看似冗余"的成对物前，必查 `docs/adr/` 与全局不变量；无据则停下来询问，不得自作主张合并/删除。
 
 ## 3. 产生后果 (Consequences)
 
@@ -50,3 +55,4 @@ Note: ① 就地修订（protocols/ 描述对齐 ADR-0025 合并审计模块，�
 - **Down**: every type directory must keep `AUTHORING.md`; types that add `.schema.json` must keep existing files legal or they go red.
   - Dotfiles are easy to miss in a file listing — intended for the gate file only.
 - **Reopen when**: a harness can inject Authoring at the IO boundary without owning the agent runtime; or catalog tokens are proven too thin for recall.
+- **判据/投影**：职责分明，同类混淆有 ADR 可查；代价＝两处域表手工同步（接受，换取判据文件不被生成逻辑覆盖）；升级条件＝第 3 对语义相近产物出现或第 2 次同类事故 → 再考虑 `manifest` 的 docs_registry 创建期拦截。

@@ -9,14 +9,6 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
-      "path": "docs/adr/0002-docs-reference-vs-architecture-semantics.md",
-      "type": "adr",
-      "id": "ADR-0002",
-      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Accepted",
-      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
-    },
-    {
       "path": "docs/adr/0003-tasks-backlog-merge.md",
       "type": "adr",
       "id": "ADR-0003",

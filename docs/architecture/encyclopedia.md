@@ -133,7 +133,6 @@
 ### 文档体系
 | ID | 主题（文件名） | 一句话 |
 | --- | --- | --- |
-| ADR-0002 | docs-reference-vs-architecture-semantics | spec=契约 / ADR=决策 的语义切分；reference 分层 |
 | ADR-0003 | tasks-backlog-merge | tasks 与 backlog 合并为单一日历状态容器 |
 | ADR-0018 | doc-readme-anchor-governance | 每种文档类型 README 锚点 + AUTHORING 寻址治理 |
 | ADR-0019 | protocol-load-proof-abandoned | 协议加载证明废弃；`PIPELINE_PROTOCOL_NOT_FOUND` 静态守卫 |
