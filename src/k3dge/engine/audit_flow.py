@@ -66,7 +66,7 @@ def _count_status(report_md: str) -> Dict[str, int]:
     len != 表头 的截断行），与封板闸 `audit_trigger.audit_closed` 同源——不再固定
     cells[7] 取状态（code-13：同一报告两口径待修数会分歧，截断行可误判闭环）。
     """
-    # k3dit:fixnote code-13 删固定 cells[7]/len>=8 口径，改委托 milestone._parse_audit_stats（表头+跳截断行），与封板闸同源
+    # k3dit:fixed code-13 _count_status :72 改委托 _parse_audit_stats(表头定位、截断行跳),封板闸同源;截断行计数再分歧=没修对
     from k3dge.engine.milestone import _parse_audit_stats
 
     stats = _parse_audit_stats(report_md)

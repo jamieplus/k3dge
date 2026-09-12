@@ -663,7 +663,7 @@ class ConsistencyEngine:
         src_dir = self.workspace_root / src_rel
         if not src_dir.exists():
             return out
-        # k3dit:fixnote code-6 包前缀不再硬编码 k3dge.，改由 manifest 推导（package_root+域src首段）；下游跨域导入现能匹配，禁令不再空转
+        # k3dit:fixed code-6 _package_prefix :44 从 manifest 推导包名,:671 正则 re.escape;下游包(如 k3dit)反导入再漏=没修对
         pkg = _package_prefix(manifest, domain)
         if not pkg:
             return out

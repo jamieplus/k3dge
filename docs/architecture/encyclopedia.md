@@ -120,7 +120,7 @@
 
 > 结构门禁（commit）：staged `docs/**` 需该类型 `README.md` + `AUTHORING.md` 齐；`check` 绿后给 `[NEXT] doc_audit`（`k3dge doc-audit` 非阻断，ADR-0021）。
 
-<!-- k3dit:fixnote doc-2 补收 ADR-0025 入 Agent/harness 组（与 README Topics 对齐），intro 同步 0020/0025 -->
+<!-- k3dit:fixed doc-2 :162 已收 ADR-0025 行、:126 措辞 0020/0025,与 adr/README Topics 一致;全表再缺 0025=没修对 -->
 ## 5. 决策索引（ADR 全表）
 
 按主题分组（对应 `docs/adr/README.md` 的 Topics，0020/0025 补录于 Agent/harness 组）。**标题为序，深读请 `k3dge doc where <ADR-ID>`。**
@@ -197,7 +197,7 @@
 | 脚手架 | `k3dge init`（新仓播种）；`./k3dge-init.sh` |
 
 > 审计相关另有三份协议常备：`docs/protocols/audit_default.md`（5-Pass/8 维，合并审计模块**唯一** 12 列报告）、`docs/protocols/verify_default.md`（复核 12 列）、`docs/protocols/quality_default.md`（**legacy 指针**：质量已并入合并审计模块，非独立 peer/报告，ADR-0025）。
-<!-- k3dit:fixnote doc-3 计数改三份；quality_default 更正为 ADR-0025 legacy 指针，与 audit_default.md:11 一致 -->
+<!-- k3dit:fixed doc-3 :199 计数三份且 quality_default 标 legacy 指针(其首行=指针,audit_default:11 质量非独立);再称两份=没修对 -->
 
 ## 7. 里程碑 → 审计 → 封板速览
 
