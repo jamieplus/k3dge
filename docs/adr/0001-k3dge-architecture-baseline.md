@@ -4,6 +4,7 @@ Status: Accepted
 # NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
+Landed-by: src/k3dge/engine/evaluator.py
 Date: 2026-08-19
 Deciders: Core Maintainer
 Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit` 无输出，no live lens）。

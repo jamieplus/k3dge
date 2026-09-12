@@ -1,9 +1,10 @@
 ---
-Status: Draft
+Status: Accepted
 # Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
 # NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
+Landed-by: src/k3dge/cli/mcp.py
 Date: 2026-08-24
 Deciders: Core Maintainer
 Note: ① 就地修订（非 Amend/Supersede）2026-09-02，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md` Record lifecycle 合成条；过闸口径 = `manual` fallback（实测 `[PEER-MANUAL] action 'k3dit.actions.audit' has no live lens`），未经真 k3dit 透镜复审。
@@ -12,6 +13,7 @@ Note: ① 就地修订（非 Amend/Supersede）2026-09-02，经 Core Maintainer 
       ④ 去 changelog 化（删「就地修订留痕」块与「旧句/现予澄清/替换旧句」元叙述；Draft 理由保留为现行陈述）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ⑤ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与章节号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
       ⑥ MCP `workspace_path` 收敛并入 §2.2（就地增补，原拟单列一条独立 ADR，经 Core Maintainer 2026-09-11 否决"一条小决策占一个 ADR"）2026-09-11，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：MCP 服务根 `K3DGE_MCP_ROOT`（启动 CWD），`workspace_path` 默认须在内、越界拒，跨仓 `K3DGE_ALLOW_EXTERNAL_WORKSPACE=1`。过闸口径 = manual fallback。
+      ⑦ 2026-09-12 转 `Accepted`：经 Core Maintainer 显式批准（M9 内容项「ADR 成事实源」），补 `Landed-by` 指针；过闸口径 = manual fallback。
 ---
 
 # ADR-0006: 对外注入面与并列 harness 编排（入向兼容层 + 出向通道）

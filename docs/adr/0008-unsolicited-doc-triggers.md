@@ -4,6 +4,7 @@ Status: Proposed
 # NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
+Landed-by: src/k3dge/engine/nextstep.py
 Date: 2026-08-24
 Deciders: Core Maintainer
 Note: ① 就地修订（里程碑触发对齐 ADR-0004 §2.1.4：seal 前必须审计闭环）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。

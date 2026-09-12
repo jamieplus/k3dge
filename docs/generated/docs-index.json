@@ -29,7 +29,7 @@
       "type": "adr",
       "id": "ADR-0006",
       "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Draft",
+      "status": "Accepted",
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
@@ -85,7 +85,7 @@
       "type": "adr",
       "id": "ADR-0022",
       "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Draft",
+      "status": "Accepted",
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
@@ -93,7 +93,7 @@
       "type": "adr",
       "id": "ADR-0023",
       "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Proposed",
+      "status": "Accepted",
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
@@ -101,7 +101,7 @@
       "type": "adr",
       "id": "ADR-0025",
       "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Proposed",
+      "status": "Accepted",
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {

@@ -1,13 +1,15 @@
 ---
-Status: Proposed
+Status: Accepted
 # Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
 # NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
+Landed-by: src/k3dge/engine/doc_catalog.py
 Date: 2026-09-03
 Deciders: Core Maintainer
 Note: ① 正交收尾（pre-commit 治理件规则改指 ADR-0018 §2.6；archive 隐身与 §2.4 互指）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。
       ② 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
+      ③ 2026-09-12 转 `Accepted`：经 Core Maintainer 显式批准（M9 内容项「ADR 成事实源」），补 `Landed-by` 指针；过闸口径 = manual fallback。
 ---
 
 # ADR-0023: 低权威层归属（archive 契约；不建 legacy 目录，也不维护历史编号映射）

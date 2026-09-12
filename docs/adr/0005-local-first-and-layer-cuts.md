@@ -4,6 +4,7 @@ Status: Accepted
 # NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
+Landed-by: src/k3dge/cli/main.py
 Date: 2026-08-24
 Deciders: Core Maintainer
 Note: ① 就地修订（补 VCS 源形态）2026-09-05，经 Core Maintainer 本轮显式授权（「resource 指向 GitHub」指令），依 `docs/adr/AUTHORING.md`。

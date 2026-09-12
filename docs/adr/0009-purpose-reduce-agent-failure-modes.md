@@ -4,6 +4,7 @@ Status: Accepted
 # NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
+Landed-by: AGENTS.md
 Date: 2026-08-24
 Deciders: Core Maintainer
 Note: ① 就地修订（正交去重：后继 harness 名单不再复述，名单以 ADR-0025 §2.4 为准）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。

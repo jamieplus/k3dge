@@ -1,9 +1,10 @@
 ---
-Status: Proposed
+Status: Accepted
 # Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
 # NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
+Landed-by: src/k3dge/engine/audit_flow.py
 Date: 2026-09-05
 Deciders: Core Maintainer
 Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）：合并语义明确为「audit/quality 内容精细编排为一个模块（同屋檐、多窗多席）」；判断权威分离载体由「独立工件/独立发布轨」改定为「签名钥 + 席位隔离 + 章在人手」；W4 改中性保管表述。授权人：Core Maintainer。
@@ -37,6 +38,7 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 # as a numbered segment (① ② ③ …): who/when authorized and how it actually passed the
 # gate (real lens vs manual fallback). Append segments; do not erase old traces.
 # See docs/adr/AUTHORING.md.
+      (40) 2026-09-12 转 `Accepted`：经 Core Maintainer 显式批准（M9 内容项「ADR 成事实源」），补 `Landed-by` 指针；过闸口径 = manual fallback。
 ---
 
 # ADR-0025: 审计模块（audit+quality）——Hall 确定性编排 + 物理隔离子席位

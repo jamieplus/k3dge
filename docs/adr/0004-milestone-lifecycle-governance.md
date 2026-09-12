@@ -4,6 +4,7 @@ Status: Accepted
 # NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
+Landed-by: src/k3dge/engine/milestone.py
 Date: 2026-08-23
 Deciders: Core Maintainer
 Note: ① 就地修订（钉=写源/单份 12 列报告、封板资格归 `audit_closed`、审计模块合并）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。

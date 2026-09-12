@@ -4,6 +4,7 @@ Status: Accepted
 # NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
+Landed-by: .agent/rules/07-audit.md
 Date: 2026-08-24
 Deciders: Core Maintainer
 Note: ① 就地修订（rules 集合由 00–03 更新为 00–10；quality harness 表述对齐 ADR-0025 合并模型）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。
