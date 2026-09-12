@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P1
 date: 2026-09-06
@@ -7,7 +7,7 @@ date: 2026-09-06
 
 # G3: W1 席目录墙 + 签名钥验签（先 opencode/pi 两宿主）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P1
 - **可检索摘要**: Hall spawn 窗口时建专属目录+deny-by-default 权限配置+env 清洗并校验，做"Hall 按窗 scope 把审计线现场拷进各窗"取代"席碰仓"；每窗一钥文件，collect验签、不匹配拒收；前置依赖 G3b 探测结论

@@ -1,6 +1,6 @@
 ---
 status: idea
-milestone: M8
+milestone: M9
 priority: P2
 date: 2026-09-10
 ---
@@ -8,7 +8,7 @@ date: 2026-09-10
 # Hall 收成接入 AUDIT.md 侧车 + @file/@repo v2 钉
 
 - **Status**: idea
-- **Milestone**: M8
+- **Milestone**: M9
 - **Priority**: P2
 - **可检索摘要**: ADR-0025 §2.7 非目标已承认：Hall 窗收成只认窗内 `@line` 钉（`@file` 头部块同语法可收）；`@repo`/`AUDIT.md` 侧车条目不进 Hall 流程。peer_contract §8 的 `scope ∈ line|file|repo` 与执行面不等价，多文件发现会漏进账本。
 - **Date**: 2026-09-10

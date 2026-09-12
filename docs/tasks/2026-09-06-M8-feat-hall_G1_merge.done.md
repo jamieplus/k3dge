@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P1
 date: 2026-09-06
@@ -7,7 +7,7 @@ date: 2026-09-06
 
 # G1: 审计模块合并 + 接口冻结（一本账）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P1
 - **可检索摘要**: audit 为主、quality 编排去掉并入 audit：k3dit 为底，k3lity 的编排面（jobs/rounds/seats/serve）退役、扫描能力（quality/deslop/harness）作为工具面并入；接口=原 audit 面（mcp 工具名/cli 子命令保留）；k3dge 消费侧不动是迁移红线

@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P2
 date: 2026-09-06
@@ -7,7 +7,7 @@ date: 2026-09-06
 
 # G6: 割接（seal hook/消费侧/k3lity 归档）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P2
 - **可检索摘要**: seal hook 触发词从双动作改为单 peer+窗参数，pipeline schema/AGENTS 触发表随动，k3lity 仓废留归档；`audit advance` 主权切清（修席窗能力，Hall 只调度）；前置要求 G2 人肉窗全链跑通

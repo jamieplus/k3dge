@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P2
 date: 2026-09-06
@@ -7,7 +7,7 @@ date: 2026-09-06
 
 # G5: W2 轮间清场 + W6 看门狗注入
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P2
 - **可检索摘要**: 每轮结束销毁/轮换席目录（防残留）；Hall spawn 时注入三重预算（轮数/token/无进展，W6 计数在大厅不在席），触发停机+签名清单+escalated；计数器桩 `fuse()` 已有 task（idle_fuse_counter），本 task 做 Hall 侧接线

@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P0
 date: 2026-09-06
@@ -7,7 +7,7 @@ date: 2026-09-06
 
 # G3b: CLI root 白名单能力实测（W1 前置探测）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P0
 - **可检索摘要**: W1 墙依赖"agent cli 原生访问控制（deny-by-default + root 限定）"，但 pi/claude/codex 的 root 限定能力均未验证——若全系无此能力，W1 需改用容器/namespace 方案；这是唯一可能推翻方案的探测项，故 P0 先行

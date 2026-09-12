@@ -641,99 +641,99 @@
       "tokens": "eval 盲测纪律待立 harness（memo P2→P3 降级项）"
     },
     {
-      "path": "docs/tasks/2026-09-05-M8-feat-idle_fuse_counter.md",
+      "path": "docs/tasks/2026-09-05-M8-feat-idle_fuse_counter.done.md",
       "type": "tasks",
-      "id": "2026-09-05-M8-feat-idle_fuse_counter",
+      "id": "2026-09-05-M8-feat-idle_fuse_counter.done",
       "title": "空转熔断机制化（W6 活性墙的最小实现）",
-      "status": "idea",
+      "status": "done",
       "tokens": "空转熔断机制化（W6 活性墙的最小实现）"
     },
     {
-      "path": "docs/tasks/2026-09-06-M8-feat-hall_G1_merge.md",
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G1_merge.done.md",
       "type": "tasks",
-      "id": "2026-09-06-M8-feat-hall_G1_merge",
+      "id": "2026-09-06-M8-feat-hall_G1_merge.done",
       "title": "G1: 审计模块合并 + 接口冻结（一本账）",
-      "status": "idea",
+      "status": "done",
       "tokens": "G1: 审计模块合并 + 接口冻结（一本账）"
     },
     {
-      "path": "docs/tasks/2026-09-06-M8-feat-hall_G2_kernel.md",
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G2_kernel.done.md",
       "type": "tasks",
-      "id": "2026-09-06-M8-feat-hall_G2_kernel",
+      "id": "2026-09-06-M8-feat-hall_G2_kernel.done",
       "title": "G2: Hall 内核常驻进程（人肉窗先行）",
-      "status": "idea",
+      "status": "done",
       "tokens": "G2: Hall 内核常驻进程（人肉窗先行）"
     },
     {
-      "path": "docs/tasks/2026-09-06-M8-feat-hall_G3_wall.md",
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G3_wall.done.md",
       "type": "tasks",
-      "id": "2026-09-06-M8-feat-hall_G3_wall",
+      "id": "2026-09-06-M8-feat-hall_G3_wall.done",
       "title": "G3: W1 席目录墙 + 签名钥验签（先 opencode/pi 两宿主）",
-      "status": "idea",
+      "status": "done",
       "tokens": "G3: W1 席目录墙 + 签名钥验签（先 opencode/pi 两宿主）"
     },
     {
-      "path": "docs/tasks/2026-09-06-M8-feat-hall_G3b_cli_root_probe.md",
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G3b_cli_root_probe.done.md",
       "type": "tasks",
-      "id": "2026-09-06-M8-feat-hall_G3b_cli_root_probe",
+      "id": "2026-09-06-M8-feat-hall_G3b_cli_root_probe.done",
       "title": "G3b: CLI root 白名单能力实测（W1 前置探测）",
-      "status": "idea",
+      "status": "done",
       "tokens": "G3b: CLI root 白名单能力实测（W1 前置探测）"
     },
     {
-      "path": "docs/tasks/2026-09-06-M8-feat-hall_G4_windows.md",
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G4_windows.done.md",
       "type": "tasks",
-      "id": "2026-09-06-M8-feat-hall_G4_windows",
+      "id": "2026-09-06-M8-feat-hall_G4_windows.done",
       "title": "G4: 窗版工单 + 工具事实注入 + 复核声明模型",
-      "status": "idea",
+      "status": "done",
       "tokens": "G4: 窗版工单 + 工具事实注入 + 复核声明模型"
     },
     {
-      "path": "docs/tasks/2026-09-06-M8-feat-hall_G5_watchdog.md",
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G5_watchdog.done.md",
       "type": "tasks",
-      "id": "2026-09-06-M8-feat-hall_G5_watchdog",
+      "id": "2026-09-06-M8-feat-hall_G5_watchdog.done",
       "title": "G5: W2 轮间清场 + W6 看门狗注入",
-      "status": "idea",
+      "status": "done",
       "tokens": "G5: W2 轮间清场 + W6 看门狗注入"
     },
     {
-      "path": "docs/tasks/2026-09-06-M8-feat-hall_G6_cutover.md",
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G6_cutover.done.md",
       "type": "tasks",
-      "id": "2026-09-06-M8-feat-hall_G6_cutover",
+      "id": "2026-09-06-M8-feat-hall_G6_cutover.done",
       "title": "G6: 割接（seal hook/消费侧/k3lity 归档）",
-      "status": "idea",
+      "status": "done",
       "tokens": "G6: 割接（seal hook/消费侧/k3lity 归档）"
     },
     {
-      "path": "docs/tasks/2026-09-06-M8-feat-hall_G7_tests.md",
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G7_tests.done.md",
       "type": "tasks",
-      "id": "2026-09-06-M8-feat-hall_G7_tests",
+      "id": "2026-09-06-M8-feat-hall_G7_tests.done",
       "title": "G7: Hall 测试骨架（W1/W2/W6/账本复算）",
-      "status": "idea",
+      "status": "done",
       "tokens": "G7: Hall 测试骨架（W1/W2/W6/账本复算）"
     },
     {
-      "path": "docs/tasks/2026-09-06-M8-feat-hall_G8_observe.md",
+      "path": "docs/tasks/2026-09-06-M8-feat-hall_G8_observe.done.md",
       "type": "tasks",
-      "id": "2026-09-06-M8-feat-hall_G8_observe",
+      "id": "2026-09-06-M8-feat-hall_G8_observe.done",
       "title": "G8: 进程侧观测（统计席位+逃逸率+观测行）",
-      "status": "idea",
+      "status": "done",
       "tokens": "G8: 进程侧观测（统计席位+逃逸率+观测行）"
     },
     {
-      "path": "docs/tasks/2026-09-10-M8-chore-audit_module_doc_align.md",
+      "path": "docs/tasks/2026-09-10-M8-chore-audit_module_doc_align.done.md",
       "type": "tasks",
-      "id": "2026-09-10-M8-chore-audit_module_doc_align",
+      "id": "2026-09-10-M8-chore-audit_module_doc_align.done",
       "title": "k3dge 侧文档/配置对齐合并审计模块（单份 12 列报告、无独立 quality fallback）",
-      "status": "idea",
+      "status": "done",
       "tokens": "k3dge 侧文档/配置对齐合并审计模块（单份 12 列报告、无独立 quality fallback）"
     },
     {
-      "path": "docs/tasks/2026-09-10-M8-feat-fix_seat_diff_accept.md",
+      "path": "docs/tasks/2026-09-10-M8-feat-fix_seat_diff_accept.done.md",
       "type": "tasks",
-      "id": "2026-09-10-M8-feat-fix_seat_diff_accept",
+      "id": "2026-09-10-M8-feat-fix_seat_diff_accept.done",
       "title": "修席接受改由快照 diff 推断（禁二值空翻已修）",
-      "status": "idea",
+      "status": "done",
       "tokens": "修席接受改由快照 diff 推断（禁二值空翻已修）"
     },
     {
@@ -745,27 +745,27 @@
       "tokens": "Hall 收成接入 AUDIT.md 侧车 + @file/@repo v2 钉"
     },
     {
-      "path": "docs/tasks/2026-09-10-M8-fix-judge_skip_leftover.md",
+      "path": "docs/tasks/2026-09-10-M8-fix-judge_skip_leftover.done.md",
       "type": "tasks",
-      "id": "2026-09-10-M8-fix-judge_skip_leftover",
+      "id": "2026-09-10-M8-fix-judge_skip_leftover.done",
       "title": "判读席禁止重提已 leftover",
-      "status": "idea",
+      "status": "done",
       "tokens": "判读席禁止重提已 leftover"
     },
     {
-      "path": "docs/tasks/2026-09-11-M8-fix-audit_scope_template_drift.md",
+      "path": "docs/tasks/2026-09-11-M8-fix-audit_scope_template_drift.done.md",
       "type": "tasks",
-      "id": "2026-09-11-M8-fix-audit_scope_template_drift",
+      "id": "2026-09-11-M8-fix-audit_scope_template_drift.done",
       "title": "审计 scope=src 时模板 pairs 不可同步致 verify TEMPLATE_DRIFT 假红",
-      "status": "idea",
+      "status": "done",
       "tokens": "审计 scope=src 时模板 pairs 不可同步致 verify TEMPLATE_DRIFT 假红"
     },
     {
-      "path": "docs/tasks/2026-09-11-M8-fix-ratchet_pending_misjudge.md",
+      "path": "docs/tasks/2026-09-11-M8-fix-ratchet_pending_misjudge.done.md",
       "type": "tasks",
-      "id": "2026-09-11-M8-fix-ratchet_pending_misjudge",
+      "id": "2026-09-11-M8-fix-ratchet_pending_misjudge.done",
       "title": "核 milestone 棘轮对 collect=open(待修>0) 是否误判 closed",
-      "status": "idea",
+      "status": "done",
       "tokens": "核 milestone 棘轮对 collect=open(待修>0) 是否误判 closed"
     }
   ]

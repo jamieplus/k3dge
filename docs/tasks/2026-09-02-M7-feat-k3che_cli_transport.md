@@ -1,6 +1,6 @@
 ---
 status: idea
-milestone: M8
+milestone: M9
 priority: P3
 date: 2026-09-02
 ---
@@ -8,7 +8,7 @@ date: 2026-09-02
 # k3che 补 cli 传输面（mcp/cli 成对）
 
 - **Status**: idea
-- **Milestone**: M7
+- **Milestone**: M9
 - **Priority**: P3
 - **可检索摘要**: peers 中只有 k3che 没有 `cli.py` 与 `k3che` 控制台脚本，MCP 不可用时它无退路（`pipeline.toml` 里 `[peers.k3che]` 只有 `mcp→skip`），与 k3dit/k3lity 不成对
 - **Date**: 2026-09-02

@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P2
 date: 2026-09-05
@@ -7,7 +7,7 @@ date: 2026-09-05
 
 # 空转熔断机制化（W6 活性墙的最小实现）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P2
 - **可检索摘要**: agent 空转（同一动作+同一错误反复重试）现无机制拦截——`check` 只在 commit 时跑，不在 agent 循环里；需把 `(动作签名,结果签名)` 连续 N 全等检测做成机制（宿主 hook 计数器或大厅看门狗），触发即停机 surface 转人工

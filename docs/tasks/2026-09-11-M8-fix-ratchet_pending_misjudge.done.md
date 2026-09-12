@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P2
 date: 2026-09-11
@@ -7,7 +7,7 @@ date: 2026-09-11
 
 # 核 milestone 棘轮对 collect=open(待修>0) 是否误判 closed
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P2
 - **Date**: 2026-09-11

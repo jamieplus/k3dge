@@ -1,6 +1,6 @@
 ---
 status: idea
-milestone: M8
+milestone: M9
 priority: P1
 date: 2026-09-04
 ---
@@ -8,7 +8,7 @@ date: 2026-09-04
 # 首案真跑前遗留清单（k3dge 侧）
 
 - **Status**: idea
-- **Milestone**: M7
+- **Milestone**: M9
 - **Priority**: P1
 - **可检索摘要**: 十单收口＋G1/G2 后清点：G3 封板判定未换源（seal 仍走 scaffold 旧链）、G4 号段发放与席位身份未实现、.mcp.json 解释器靠 landing、§7 复用预筛三条件未实现、audit 四动词 CLI 烟测欠账
 - **Date**: 2026-09-04

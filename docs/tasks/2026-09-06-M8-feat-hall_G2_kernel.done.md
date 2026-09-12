@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P1
 date: 2026-09-06
@@ -7,7 +7,7 @@ date: 2026-09-06
 
 # G2: Hall 内核常驻进程（人肉窗先行）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P1
 - **可检索摘要**: 把"agent 幂等步进"换成常驻调度进程（叫号→物化→收集→验签→推进→通告牌 + watch 账本事件循环），闭包计数表达"审计+复核双闭合才 seal"；窗口先由人肉担任（人当席跑通全链），自动派席放最后

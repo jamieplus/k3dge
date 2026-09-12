@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P1
 date: 2026-09-10
@@ -7,7 +7,7 @@ date: 2026-09-10
 
 # 判读席禁止重提已 leftover
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P1
 - **可检索摘要**: 活体 a950ab294b34：判读在已有 `k3dit:leftover Q-1/Q-8` 的同一函数上再钉 pending（code-1/value-6 等），违协议「不重提已修或有意留」

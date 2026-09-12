@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P1
 date: 2026-09-10
@@ -7,7 +7,7 @@ date: 2026-09-10
 
 # 修席接受改由快照 diff 推断（禁二值空翻已修）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P1
 - **可检索摘要**: 活体 a950ab294b34：修席 accepted:true，`_apply_live` 把 25 条 pending 全翻已修；main↔线除 25 枚钉和 incidents/_template.md 外无代码改——报告撒谎

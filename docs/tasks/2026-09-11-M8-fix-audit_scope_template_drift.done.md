@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P2
 date: 2026-09-11
@@ -7,7 +7,7 @@ date: 2026-09-11
 
 # 审计 scope=src 时模板 pairs 不可同步致 verify TEMPLATE_DRIFT 假红
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P2
 - **Date**: 2026-09-11

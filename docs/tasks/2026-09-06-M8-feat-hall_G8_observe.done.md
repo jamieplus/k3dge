@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P2
 date: 2026-09-06
@@ -7,7 +7,7 @@ date: 2026-09-06
 
 # G8: 进程侧观测（统计席位+逃逸率+观测行）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P2
 - **可检索摘要**: 统计席位（程序控制+收尾度量+回归测试）落 Hall 进程侧（不占判读窗、无签名钥）：逃逸率/误诊率/窗口漂移只进通告牌与观测行、不进闸；归属裁决见 ADR-0025 §2.4

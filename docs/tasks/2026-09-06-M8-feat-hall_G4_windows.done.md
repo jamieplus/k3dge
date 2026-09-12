@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P2
 date: 2026-09-06
@@ -7,7 +7,7 @@ date: 2026-09-06
 
 # G4: 窗版工单 + 工具事实注入 + 复核声明模型
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P2
 - **可检索摘要**: claim 按窗分版（代码窗=透镜对口、复核窗=对照面+账本、价值窗=注入 k3lity 扫描事实）；Hall 先跑确定性扫描/可达性、事实落窗目录（席不重算）；复核窗补机读声明模型（rounds 状态机+时序），否则 conformance 无从谈起

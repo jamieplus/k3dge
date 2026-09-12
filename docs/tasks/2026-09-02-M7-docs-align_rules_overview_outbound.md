@@ -1,6 +1,6 @@
 ---
 status: idea
-milestone: M8
+milestone: M9
 priority: P1
 date: 2026-09-02
 ---
@@ -8,7 +8,7 @@ date: 2026-09-02
 # rules/07 与 overview 对齐 ADR-0006 出向编排与 downgrade 表述
 
 - **Status**: idea
-- **Milestone**: M7
+- **Milestone**: M9
 - **Priority**: P1
 - **可检索摘要**: `overview.md` 把 agent 画成调 peer 的编排者、`rules/07` 的角色流同调，与 `ADR-0006` §2.3/§2.4（k3dge 调 peer、失败即 escalated 且显式表述 downgrade）冲突，需同步
 - **Date**: 2026-09-02

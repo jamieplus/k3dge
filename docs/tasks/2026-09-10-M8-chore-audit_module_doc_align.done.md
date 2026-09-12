@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P2
 date: 2026-09-10
@@ -7,7 +7,7 @@ date: 2026-09-10
 
 # k3dge 侧文档/配置对齐合并审计模块（单份 12 列报告、无独立 quality fallback）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P2
 - **可检索摘要**: ADR 已于 2026-09-10 对齐 ADR-0025 合并审计模块（0004/0006/0018/0020/0022），但 `AGENTS.md`、`.agent/pipeline.toml`、`docs/protocols/quality_default.md` 仍写 audit+quality 两份 12 列报告与独立 quality peer/fallback，需同批改齐

@@ -1,6 +1,6 @@
 ---
 status: idea
-milestone: M8
+milestone: M9
 priority: P2
 date: 2026-09-03
 ---
@@ -8,7 +8,7 @@ date: 2026-09-03
 # 把出口同构与日志只追加变成机验
 
 - **Status**: idea
-- **Milestone**: M7
+- **Milestone**: M9
 - **Priority**: P2
 - **可检索摘要**: `ADR-0008` 的「三出口同构」与「审计痕迹只可追加」目前只靠人写测试守；本任务把它们变成闸：命令级同构断言 + 静态禁对 `logs/**` 覆写
 - **Date**: 2026-09-03

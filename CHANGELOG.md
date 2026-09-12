@@ -7,9 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- k3dge 侧文档/配置对齐合并审计模块（单份 12 列报告、无独立 quality fallback）
+
+### Added
+- G1: 审计模块合并 + 接口冻结（一本账）
+
+- G2: Hall 内核常驻进程（人肉窗先行）
+- G3: W1 席目录墙 + 签名钥验签（先 opencode/pi 两宿主）
+- G3b: CLI root 白名单能力实测（W1 前置探测）
+- G4: 窗版工单 + 工具事实注入 + 复核声明模型
+- G5: W2 轮间清场 + W6 看门狗注入
+- G6: 割接（seal hook/消费侧/k3lity 归档）
+- G7: Hall 测试骨架（W1/W2/W6/账本复算）
+- G8: 进程侧观测（统计席位+逃逸率+观测行）
+- 修席接受改由快照 diff 推断（禁二值空翻已修）
+- 空转熔断机制化（W6 活性墙的最小实现）
 ### Fixed
 - doc-audit: 文档作者合规审计（architecture 等 3 处）
 
+- 核 milestone 棘轮对 collect=open(待修>0) 是否误判 closed
+- 审计 scope=src 时模板 pairs 不可同步致 verify TEMPLATE_DRIFT 假红
+- 判读席禁止重提已 leftover
 ## [0.1.9] - 2026-09-05
 
 ### Added

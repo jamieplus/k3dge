@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M8
 priority: P2
 date: 2026-09-06
@@ -7,7 +7,7 @@ date: 2026-09-06
 
 # G7: Hall 测试骨架（W1/W2/W6/账本复算）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M8
 - **Priority**: P2
 - **可检索摘要**: W1 穿墙测试（窗内读根外/邻窗断言拒绝）、W2 轮换断言、W6 熔断演练、Hall 账本可复算测试（确定性可复现）；可与 G3/G5 并行写，先行定义断言即是契约

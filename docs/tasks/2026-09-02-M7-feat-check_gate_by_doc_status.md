@@ -1,6 +1,6 @@
 ---
 status: deferred
-milestone: M8
+milestone: M9
 priority: P2
 date: 2026-09-02
 ---
@@ -8,7 +8,7 @@ date: 2026-09-02
 # check 按文档 Status（Draft/Accepted）区分过闸口径
 
 - **Status**: deferred
-- **Milestone**: M7
+- **Milestone**: M9
 - **Priority**: P2
 - **可检索摘要**: 未跑通流程的 ADR 只能按 `manual` fallback 过闸，其 `Status` 却与已跑通的决策同等计分；`check`（及审计闸）应按文档 `Status` 区分严格度 —— **本轮不迭代，仅登记**
 - **Date**: 2026-09-02

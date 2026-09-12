@@ -1,6 +1,6 @@
 ---
 status: idea
-milestone: M8
+milestone: M9
 priority: P3
 date: 2026-09-03
 ---
@@ -8,7 +8,7 @@ date: 2026-09-03
 # 归档契约落地（去向标记提醒 + 显式 --archive 出口）
 
 - **Status**: idea
-- **Milestone**: M7
+- **Milestone**: M9
 - **Priority**: P3
 - **可检索摘要**: `ADR-0023` §2.2 立了归档三条件，但实测三处 `archive/` 共 106 份 `.md`、带去向标记的 0 份；本任务只补两件小事（增量提醒 + 显式出口），**不含**任何旧编号映射或歧义告警（那条已被 `ADR-0023` §2.3 删除）
 - **Date**: 2026-09-03
