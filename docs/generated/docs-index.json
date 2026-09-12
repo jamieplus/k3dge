@@ -497,6 +497,14 @@
       "tokens": "审计：文档审计（ADR-0024/0025 + AGENTS/rules/pipeline/protocols/tasks + k3dit spec）"
     },
     {
+      "path": "docs/reviews/2026-09-11-M8-audit.md",
+      "type": "reviews",
+      "id": "2026-09-11-M8-audit",
+      "title": "审计：src,docs（milestone M8）",
+      "status": "",
+      "tokens": "审计：src,docs（milestone M8）"
+    },
+    {
       "path": "docs/specs/_template/spec.md",
       "type": "specs",
       "id": "spec",
