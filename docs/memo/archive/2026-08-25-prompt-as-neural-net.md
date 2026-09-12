@@ -1,5 +1,7 @@
 # Memo: Prompt as Neural Net — 稀疏门控解释框架
 
+> **Legacy note（归档 2026-09-12）**: 稀疏门控已实现（`AGENTS.md` 微内核 + `.agent/rules/*` 切片，ADR-0010）；仅作解释框架。注：`AGENTS.md` 现 59 行（本 memo 记 51）。
+
 - **类型**：模糊概念（解释话语体系，非可执行方案）
 - **念头**：`https://blog.kunchenguid.com/p/your-agentsmd-is-a-neural-net` 将 `Prompt` 类比神经网络：过长 `AGENTS.md` 致全连接注意力稀释与跨规则梯度干扰；解法为稀疏门控路由（`AGENTS.md` 微内核仅常驻底线 + 路由，`.agent/rules/*.md` 按需激活）与硬约束下沉（确定性校验移出 `Prompt` 至 `engine` 物理阻断）。`k3dge` 现 `51` 行微内核已是该隐喻的最简工程解，无需再为此改代码
 - **触发场景**：用户喂该文给 `Gemini` 得三点采纳后，问"这套话术如何学习、是否加 ADR"

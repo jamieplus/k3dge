@@ -273,22 +273,6 @@
       "tokens": "Incident: 合并审计模块/postmortem 落地后设计文档滞后于已决行为"
     },
     {
-      "path": "docs/memo/2026-08-21-deferred-standards.md",
-      "type": "memo",
-      "id": "2026-08-21-deferred-standards",
-      "title": "Memo: 未落地的对标项（6 类标准评估小结）",
-      "status": "",
-      "tokens": "Memo: 未落地的对标项（6 类标准评估小结）"
-    },
-    {
-      "path": "docs/memo/2026-08-25-prompt-as-neural-net.md",
-      "type": "memo",
-      "id": "2026-08-25-prompt-as-neural-net",
-      "title": "Memo: Prompt as Neural Net — 稀疏门控解释框架",
-      "status": "",
-      "tokens": "Memo: Prompt as Neural Net — 稀疏门控解释框架"
-    },
-    {
       "path": "docs/memo/2026-09-12-rust-k3dge-fit.md",
       "type": "memo",
       "id": "2026-09-12-rust-k3dge-fit",
