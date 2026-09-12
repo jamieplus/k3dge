@@ -1,5 +1,5 @@
 ---
-Status: Accepted
+Status: Proposed
 # Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
 # NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
@@ -11,6 +11,7 @@ Note: ① 就地修订（里程碑触发对齐 ADR-0004 §2.1.4：seal 前必须
       ③ 正交收尾（里程碑触发条件改指 ADR-0004 §2.1.2/§2.1.4）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ④ 去 changelog 化（删「原句作废」元叙述）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ⑤ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
+      ⑥ 就地增补 §2「渐进披露」并**状态 Accepted→Proposed**（先降 Proposed 以允许就地改正文）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：把"下一跳引导 + 纵深按需"并入本 ADR（它讲触发/next），不单列新 ADR。过闸口径 = manual fallback。
 ---
 
 # ADR-0008: 触发式文档维护与先读已敲定设计
@@ -38,10 +39,14 @@ Note: ① 就地修订（里程碑触发对齐 ADR-0004 §2.1.4：seal 前必须
   - 新 Agent 只补执行缺口（漏触发、漏 sync），不升级成另一套方法论。
 - **k3dge 原意（0001）**：Soft Prompting 不够，所以用目录契约 + 哈希 + git 硬闸，让 Agent 在完成**用户说的任务**时保持代码与 spec 一致。
   - 用户负责说做什么；Agent 负责不漂。
+- **渐进披露（next-hook 引导）**：与"触发"同源——状态机每条边经 `[NEXT]` 只推**最小下一步 + 指针**（doc id / ADR 节 / 命令），纵深**按需拉取**，不把全文灌进上下文。
+  - 默认输出摘要、全量藏 `--json`/`--deep`；`AGENTS.md` 微核与命令 stdout 守预算（**数值归硬闸契约，不进本 ADR**）。
+  - 静态"地图"仍要（`AGENTS.md` 路由公式，ADR-0018 §2.3 / ADR-0019）：防"藏太深找不到"。
 
 ## 3. 产生后果 (Consequences)
 
 - 漏写 ADR/漏 sync 是违反协议，不是「用户没叫」。
+- 渐进披露的代价：可发现性下降、往返增多；靠「钩子点名具体 doc + 确定性硬闸兜错」缓解。
   - 违反本 ADR 的典型样子：用户说「文档该自动维护」，Agent 立刻发明一张触发表让用户逐条认。
   - 正确做法是映射到 `AGENTS.md §12` 与各 `docs/<type>/AUTHORING.md`；缺的只问「是不是就是这些已经写过的时机」。
 - 用户在场时仍以用户当轮口令为准；不在场时以 ADR 为准，不靠聊天记忆。

@@ -61,7 +61,7 @@
       "type": "adr",
       "id": "ADR-0008",
       "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Accepted",
+      "status": "Proposed",
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
@@ -631,6 +631,14 @@
       "title": "Hall 收成接入 AUDIT.md 侧车 + @file/@repo v2 钉",
       "status": "idea",
       "tokens": "Hall 收成接入 AUDIT.md 侧车 + @file/@repo v2 钉"
+    },
+    {
+      "path": "docs/tasks/2026-09-12-M9-feat-next_hook_progressive_disclosure.md",
+      "type": "tasks",
+      "id": "2026-09-12-M9-feat-next_hook_progressive_disclosure",
+      "title": "next-hook 引导 / 渐进披露落地（ADR-0008 §2）",
+      "status": "idea",
+      "tokens": "next-hook 引导 / 渐进披露落地（ADR-0008 §2）"
     },
     {
       "path": "docs/tasks/2026-09-12-M9-feat-seal_adr_gate.md",
