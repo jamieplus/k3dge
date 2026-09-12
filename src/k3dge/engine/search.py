@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from k3dge.engine import gates
+
 INDEX_REL = "docs/generated/symbol-index.json"
 _MAX_CONTEXT = 3
 
@@ -203,6 +205,7 @@ def search(
     raw = _run_ripgrep(workspace, query)
     if raw is None:
         raw = _python_search(workspace, query)
+    context = max(0, min(context, int(gates.get(workspace, "search", "context_max"))))
     locs: List[Location] = []
     for ln in raw:
         # format: file:line:content

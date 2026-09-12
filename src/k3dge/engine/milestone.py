@@ -690,17 +690,37 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
         listing = "\n".join(f"  - {t.path.name} (status: {t.status})" for t in invalid)
         return False, f"Invalid Status (not idea|deferred|in-progress|done):\n{listing}", tasks
 
+    # 前置闸/动作：读「硬闸契约」`[checks.align]`（ADR-0001 §2 第 8 条）。
     pending = [t for t in tasks if t.status != "done"]
-    if pending:
-        msg = f"Cannot align milestone '{milestone_id}'. {len(pending)} pending tasks:\n" + "\n".join(
-            f"  - {t.path.name} (status: {t.status})" for t in pending
-        )
-        return False, msg, tasks
 
-    # 1. Full Matrix = 同一套 ConsistencyEngine（force_full，不复制 L2）
-    report = ConsistencyEngine(workspace).evaluate(run_tests=True, force_full=True)
-    if not report.passed:
-        return False, f"Regression tests failed during milestone alignment:\n{report.render()}", tasks
+    def _tasks_all_done():
+        if pending:
+            return f"Cannot align milestone '{milestone_id}'. {len(pending)} pending tasks:\n" + "\n".join(
+                f"  - {t.path.name} (status: {t.status})" for t in pending
+            )
+        return None
+
+    def _full_matrix():
+        report = ConsistencyEngine(workspace).evaluate(run_tests=True, force_full=True)
+        if not report.passed:
+            return f"Regression tests failed during milestone alignment:\n{report.render()}"
+        return None
+
+    _reg = {"tasks_all_done": _tasks_all_done, "full_matrix": _full_matrix}
+    for _gid in gates.preconditions(workspace, "align"):
+        _fn = _reg.get(_gid)
+        if _fn is None:
+            return False, f"[ALIGN REJECTED] gate contract references unknown gate id: '{_gid}'", tasks
+        _err = _fn()
+        if _err:
+            return False, _err, tasks
+    for _aid in gates.actions(workspace, "align"):
+        _fn = _reg.get(_aid)
+        if _fn is None:
+            return False, f"[ALIGN REJECTED] gate contract references unknown action id: '{_aid}'", tasks
+        _err = _fn()
+        if _err:
+            return False, _err, tasks
 
     # 2. 生成极简对齐评审报告
     today = datetime.date.today().isoformat()
