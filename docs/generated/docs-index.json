@@ -81,14 +81,6 @@
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
     },
     {
-      "path": "docs/adr/0011-agent-dir-is-harness-config.md",
-      "type": "adr",
-      "id": "ADR-0011",
-      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
-      "status": "Accepted",
-      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
-    },
-    {
       "path": "docs/adr/0012-assertion-evidence-chain.md",
       "type": "adr",
       "id": "ADR-0012",

@@ -155,7 +155,7 @@
 | ADR-0006 | mcp-foreign-harness-injection | MCP 注入：外部 harness 调 k3dge 事实，禁私有重实现 |
 | ADR-0009 | purpose-reduce-agent-failure-modes | 目的：减少 Agent 失败模式（漂移/幻觉/修局部坏整体） |
 | ADR-0010 | agent-rules-are-protocol-slices | `.agent/rules/*` 是协议切片（ADR-0010 slice 化），AGENTS.md 为真 |
-| ADR-0011 | agent-dir-is-harness-config | `.agent/` 是进程配置，不是可浏览的发现面 |
+| ADR-0010 | agent-dir-is-harness-config | `.agent/` 是进程配置，不是可浏览的发现面 |
 | ADR-0012 | assertion-evidence-chain | 证据链三环节：产物 + 消费者 + 到达 |
 | ADR-0020 | harness-responsibility-split | harness 职责切分（审计/质量/检索各管一块，k3dit/k3lity/k3che） |
 | ADR-0025 | hall-harness-topology | Hall/harness 拓扑：三窗（判读/修/复核）+ 钉＝写源 + 拔钉归 Hall |

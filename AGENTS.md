@@ -6,7 +6,7 @@ You are inside a spec-gate harness. `k3dge check` blocks bad commits, not this p
 
 **Read first**: run `k3dge status` for current workspace state; then `docs/architecture/overview.md` + `k3dge doc where ADR-0001` (ADR-0008 for triggers).
 
-This file is the **only auto-loaded surface**. `.agent/` is process config, not a browsed folder (ADR-0011).
+This file is the **only auto-loaded surface**. `.agent/` is process config, not a browsed folder (ADR-0010).
 
 ## Core Invariants
 

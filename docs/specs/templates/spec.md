@@ -62,7 +62,7 @@ main(argv: Optional[Sequence[str]]=None) -> int
 ## 3. State Machine & Invariants
 - 脚手架幂等：已存在的文件不被覆盖（除明确安全的模板外）。
 - `.agent/rules/*.md` 从 `templates/assets/rules/` 整文件拷出，禁止空标题桩；必须含 Rule 02（ADR-0010）。
-- `.agent/README.md` 从 `templates/assets/agent-readme.md` 拷出（ADR-0011：标明本目录是进程配置，不是 Agent 发现面）。
+- `.agent/README.md` 从 `templates/assets/agent-readme.md` 拷出（ADR-0010：标明本目录是进程配置，不是 Agent 发现面）。
 
 ## 4. Verification Matrix
 | Scenario ID | Level | Input Condition | Expected Outcome | Test File |

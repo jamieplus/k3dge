@@ -41,7 +41,7 @@ Do not judge whether the decision is a *good* idea (k3lity, soft). k3dit may fla
 
 ## Record lifecycle (from `README.md`; enforce where a machine can)
 
-**没有任何 ADR 操作是无条件的。** 下表每行的"例外"列一旦动用，都必须由**人类在本轮显式授权**，并把痕迹写进该 ADR 的 `Note:` 字段——agent 不得自行选用例外路径，历史授权也不构成常备许可（`ADR-0011` / `ADR-0012`）。
+**没有任何 ADR 操作是无条件的。** 下表每行的"例外"列一旦动用，都必须由**人类在本轮显式授权**，并把痕迹写进该 ADR 的 `Note:` 字段——agent 不得自行选用例外路径，历史授权也不构成常备许可（`ADR-0010` / `ADR-0012`）。
 
 | 操作 | 默认路径（无条件可用） | 需显式人工授权的例外 | 机验码 |
 | --- | --- | --- | --- |
