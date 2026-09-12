@@ -513,12 +513,44 @@
       "tokens": "eval 盲测纪律待立 harness（memo P2→P3 降级项）"
     },
     {
+      "path": "docs/tasks/2026-09-12-M9-docs-adr_isolation_evidence.md",
+      "type": "tasks",
+      "id": "2026-09-12-M9-docs-adr_isolation_evidence",
+      "title": "WikiSkill ablation 实证入 ADR-0025 W1 依据（执行席隔离）",
+      "status": "idea",
+      "tokens": "WikiSkill ablation 实证入 ADR-0025 W1 依据（执行席隔离）"
+    },
+    {
+      "path": "docs/tasks/2026-09-12-M9-docs-spec_boundary_fill.md",
+      "type": "tasks",
+      "id": "2026-09-12-M9-docs-spec_boundary_fill",
+      "title": "补 spec §1 边界：engine/cli In-Scope 漏列模块",
+      "status": "idea",
+      "tokens": "补 spec §1 边界：engine/cli In-Scope 漏列模块"
+    },
+    {
+      "path": "docs/tasks/2026-09-12-M9-feat-escape_metric.md",
+      "type": "tasks",
+      "id": "2026-09-12-M9-feat-escape_metric",
+      "title": "逃逸率/趋势度量：触发口径 + 观测行",
+      "status": "idea",
+      "tokens": "逃逸率/趋势度量：触发口径 + 观测行"
+    },
+    {
       "path": "docs/tasks/2026-09-12-M9-feat-next_hook_progressive_disclosure.md",
       "type": "tasks",
       "id": "2026-09-12-M9-feat-next_hook_progressive_disclosure",
       "title": "next-hook 引导 / 渐进披露落地（ADR-0008 §2）",
       "status": "idea",
       "tokens": "next-hook 引导 / 渐进披露落地（ADR-0008 §2）"
+    },
+    {
+      "path": "docs/tasks/2026-09-12-M9-feat-process_audit.md",
+      "type": "tasks",
+      "id": "2026-09-12-M9-feat-process_audit",
+      "title": "过程审计面（SQA）：里程碑证据链时间序/完整性入硬闸契约",
+      "status": "idea",
+      "tokens": "过程审计面（SQA）：里程碑证据链时间序/完整性入硬闸契约"
     },
     {
       "path": "docs/tasks/2026-09-12-M9-feat-seal_adr_gate.md",
