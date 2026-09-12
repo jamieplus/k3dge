@@ -143,6 +143,7 @@ sequenceDiagram
 
 ## 8. 决策与有意留索引
 
+<!-- k3dit:pending doc-1 sev=中 prio=P1 type=悬空指针 本行称"旧号映射见 docs/adr/README.md"，但 README 只有 ## Topics、无任何旧号映射；ADR-0023 §2.3 明定"历史编号不维护映射表"，指针落空且与决策相抵。 -->
 已定案决策：寻址用 `k3dge doc list --type adr`；主题与旧号映射见 [`docs/adr/README.md`](../adr/README.md)。
 
 有意留（活文档常驻表）：[`docs/reviews/LEFTOVERS.md`](../reviews/LEFTOVERS.md) 为唯一事实源。
