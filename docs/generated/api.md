@@ -264,11 +264,15 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 REL = '.agent/gates.toml'
-DEFAULTS: Dict[str, Dict[str, Any]] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}}
-load(workspace: Path) -> Dict[str, Dict[str, Any]]
-    # doc: 缺省 ∪ `.agent/gates.toml`（段内覆盖）；文件缺失/坏 ⇒ 缺省。
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled']}}}
+load(workspace: Path) -> Dict[str, Any]
+    # doc: 缺省 ∪ `.agent/gates.toml`（段内覆盖；`checks.<kind>` 逐键覆盖）；文件缺失/坏 ⇒ 缺省。
 get(workspace: Path, section: str, key: str) -> Any
     # doc: 读某闸的某阈值（含缺省）。
+preconditions(workspace: Path, kind: str) -> list
+    # doc: 某编排单元（`check`/`align`/`seal`）的前置闸 id 列表。
+actions(workspace: Path, kind: str) -> list
+    # doc: 某编排单元的动作 id 列表。
 # manifest.py
 from __future__ import annotations
 from pathlib import Path
@@ -332,6 +336,7 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from typing import Tuple
+from k3dge.engine import gates
 from k3dge.engine import report_table
 from k3dge.engine.evaluator import ConsistencyEngine
 STATUS_RE = re.compile('-\\s+\\*\\*Status\\*\\*:\\s*([\\w-]+)', re.IGNORECASE)

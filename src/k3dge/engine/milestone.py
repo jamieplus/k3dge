@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from k3dge.engine import report_table
+from k3dge.engine import gates, report_table
 from k3dge.engine.evaluator import ConsistencyEngine
 
 STATUS_RE = re.compile(r"-\s+\*\*Status\*\*:\s*([\w-]+)", re.IGNORECASE)
@@ -897,21 +897,28 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
             f"{[t.path.name for t in invalid]}"
         )
 
+    # 前置闸：读「硬闸契约」`[checks.seal].preconditions`（ADR-0001 §2 第 8 条）——
+    # 执行器按声明跑闸；未实现的 id 视为配置错（拒绝，不让声明空转）。
     pending = [t for t in tasks if t.status != "done"]
-    if pending:
-        return False, f"Cannot seal milestone '{milestone_id}'. Tasks not done: {[t.path.name for t in pending]}"
-
-    gate_err = _seal_review_gate(workspace, milestone_id, tasks)
-    if gate_err:
-        return False, gate_err
-
-    # 闸机 2: docs/guides/ 不得残留 k3dge:guide-stub
     unfilled = scan_unfilled_guides(workspace)
-    if unfilled:
-        return False, (
+    gate_fns = {
+        "tasks_all_done": lambda: (
+            f"Cannot seal milestone '{milestone_id}'. Tasks not done: "
+            f"{[t.path.name for t in pending]}" if pending else None
+        ),
+        "align_pass": lambda: _seal_review_gate(workspace, milestone_id, tasks),
+        "guides_filled": lambda: (
             f"[SEAL REJECTED] Unfilled guide stubs detected in docs/guides/: {unfilled}.\n"
-            f"  Complete the documentation before milestone seal."
-        )
+            f"  Complete the documentation before milestone seal." if unfilled else None
+        ),
+    }
+    for gid in gates.preconditions(workspace, "seal"):
+        fn = gate_fns.get(gid)
+        if fn is None:
+            return False, f"[SEAL REJECTED] gate contract references unknown gate id: '{gid}'"
+        err = fn()
+        if err:
+            return False, err
 
     return _seal_archive(workspace, milestone_id, tasks)
 

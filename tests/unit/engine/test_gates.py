@@ -31,3 +31,13 @@ def test_malformed_falls_back_to_defaults():
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d, "this is not toml = = =\n")
         assert gates.get(ws, "audit_trigger", "c2_nesting_max") == 5
+
+
+def test_seal_preconditions_default_and_override():
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d)
+        assert gates.preconditions(ws, "seal") == ["tasks_all_done", "align_pass", "guides_filled"]
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, "[checks.seal]\npreconditions = []\n")
+        assert gates.preconditions(ws, "seal") == []
+        assert gates.get(ws, "audit_trigger", "c2_nesting_max") == 5

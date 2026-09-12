@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:1fb1edf5b81cfa476d1f25c26958e8ecc09c4b563e8de3c5141c1bea61f70faa`
+- **Contract Hash**: `sha256:1d94f19acb31236be2fb8bdcae8c04f06e6fd2da1e7dbd6249b8be8cda97c2f7`
 - **Last Updated**: 2026-09-12
 
 ## 1. Domain Boundary & Responsibilities
@@ -146,9 +146,11 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 REL = '.agent/gates.toml'
-DEFAULTS: Dict[str, Dict[str, Any]] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}}
-load(workspace: Path) -> Dict[str, Dict[str, Any]]
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled']}}}
+load(workspace: Path) -> Dict[str, Any]
 get(workspace: Path, section: str, key: str) -> Any
+preconditions(workspace: Path, kind: str) -> list
+actions(workspace: Path, kind: str) -> list
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
@@ -205,6 +207,7 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from typing import Tuple
+from k3dge.engine import gates
 from k3dge.engine import report_table
 from k3dge.engine.evaluator import ConsistencyEngine
 STATUS_RE = re.compile('-\\s+\\*\\*Status\\*\\*:\\s*([\\w-]+)', re.IGNORECASE)
