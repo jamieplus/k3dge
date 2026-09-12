@@ -28,43 +28,52 @@ from dataclasses import dataclass
 from typing import Optional
 
 # Success / neutral states: the option text is the single source of truth.
+# `pointers` = 纵深指针（doc id / ADR 节 / 命令），推"去哪取细节"而非灌正文（ADR-0008 §2 渐进披露）。
 STATE_OPTIONS: dict = {
-    "normal": {"note": "常规提交门禁通过"},
+    "normal": {"note": "常规提交门禁通过", "pointers": ["AGENTS.md §12"]},
     "pending_findings": {
         "ask": "有 findings 钉在代码/文档里；继续处理这些 pending？",
         "if_y": "修完删 `k3dit:pending <ID>` 标记；有意留改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）",
         "if_n": "stop",
+        "pointers": ["peer_contract §8", "k3dge doc where ADR-0025"],
     },
     "ratchet_open": {
         "note": "有在办棘轮工单（ADR-0025）：进程不等人，但账必须可见",
         "if_y": "k3dge audit status <job> 查对端；席位侧一圈见契约 §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）",
+        "pointers": ["k3dge audit status <id>", "peer_contract §1.4", "ADR-0025 §2.7"],
     },
     "doc_audit": {
         "note": "docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断——`k3dge doc-audit` 出报告(k3dit)+建里程碑 task（本轮不改，封板轮也得闭环）",
+        "pointers": ["ADR-0022 §2.2", "k3dge doc-audit"],
     },
     "audit_suggested": {
         "ask": "要审吗？(y/N，无倒计时)",
         "if_y": "k3dge milestone audit <id>（必审，待修=0 才谈封板）",
         "if_n": "stop（继续干活）",
+        "pointers": ["ADR-0004 §2.1.5", "k3dge milestone audit <id>"],
     },
     "seal_ready": {
         "ask": "审计已闭环（待修=0），封板？(y/N，无倒计时)",
         "if_y": "k3dge milestone seal <id>（align→归档+版本+指针）",
         "if_n": "stop（里程碑继续挂着，不封）",
+        "pointers": ["ADR-0004 §2.1.4", "docs/reviews/"],
     },
     "audit_needed": {
         "note": "未审计不可封板（封=归档+版本+指针，非界限）：先 k3dge milestone audit <id>",
+        "pointers": ["ADR-0004 §2.1.6", "k3dge milestone audit <id>"],
     },
     "audit_open": {
         "ask": "agent 修？(倒计时默认修)",
         "if_y": "修完重跑 k3dge milestone audit <id>（重审）",
         "if_n": "stop / 转人工干预",
+        "pointers": ["ADR-0022", "k3dge milestone audit <id>"],
     },
     "escalated": {
         "note": "verify 连续 >3 次未闭环，转人工干预：k3dge milestone audit-submit <id> 或人工复核",
+        "pointers": ["k3dge milestone audit-submit <id>", "docs/incidents/"],
     },
-    "sealed": {"note": "已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑"},
-    "deferred": {"note": "已放弃封板（当普通提交结束）"},
+    "sealed": {"note": "已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑", "pointers": ["docs/reviews/*-closure.md", "ADR-0004 §2.1.4"]},
+    "deferred": {"note": "已放弃封板（当普通提交结束）", "pointers": ["AGENTS.md §12"]},
     # `new_domain` is a cross-cutting trigger the hard gate does not turn red on
     # but has a file-level signal. Architecture/overview updates are intentionally
     # NOT a hook — they are done inside the milestone closure note (ADR-0004).
@@ -72,6 +81,7 @@ STATE_OPTIONS: dict = {
         "ask": "新建 src/ 域未在 manifest 注册？",
         "if_y": "补 manifest + spec + tests，再 k3dge sync 回写契约",
         "if_n": "stop",
+        "pointers": ["ADR-0005 §2.8", "k3dge sync"],
     },
 }
 
@@ -86,6 +96,7 @@ class NextStep:
     if_y: Optional[str] = None
     if_n: Optional[str] = None
     reasons: Optional[list] = None
+    pointers: Optional[list] = None
 
     @classmethod
     def from_state(cls, state: str, milestone: str, *, pending: Optional[int] = None, reasons: Optional[list] = None) -> "NextStep":
@@ -99,6 +110,7 @@ class NextStep:
             if_n=opt.get("if_n"),
             note=opt.get("note"),
             reasons=reasons,
+            pointers=opt.get("pointers"),
         )
 
     def _fill(self, text: Optional[str]) -> Optional[str]:
@@ -125,6 +137,8 @@ class NextStep:
             lines.append(f"  if n: {if_n}")
         if self.note:
             lines.append(f"  note: {self.note}")
+        if self.pointers:
+            lines.append("  pointers: " + " | ".join(self._fill(p) or p for p in self.pointers))
         return "\n".join(lines)
 
     def render_mcp(self) -> dict:
@@ -144,6 +158,8 @@ class NextStep:
             d["if_n"] = if_n
         if self.note:
             d["note"] = self.note
+        if self.pointers:
+            d["pointers"] = [self._fill(p) or p for p in self.pointers]
         return d
 
 

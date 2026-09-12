@@ -224,3 +224,24 @@ class TestIncompleteReport(TestCase):
         p = ws / "docs" / "reviews" / "2026-09-01-M7-audit.md"
         p.write_text("<!-- k3dge:incomplete -->\n" + _clean, encoding="utf-8")
         self.assertFalse(audit_trigger.audit_closed(ws, "M7"))
+
+
+class TestNextStepPointers(TestCase):
+    def test_pointers_surface_depth_not_prose(self) -> None:
+        ns = nextstep.NextStep.from_state("seal_ready", "M7")
+        cli = ns.render_cli()
+        self.assertIn("pointers:", cli)
+        self.assertIn("ADR-0004 §2.1.4", cli)
+        d = ns.render_mcp()
+        self.assertIn("pointers", d)
+        self.assertIn("ADR-0004 §2.1.4", d["pointers"])
+
+    def test_pointers_fill_id(self) -> None:
+        d = nextstep.NextStep.from_state("audit_suggested", "M7").render_mcp()
+        self.assertIn("k3dge milestone audit M7", d["pointers"])
+        self.assertNotIn("<id>", " ".join(d["pointers"]))
+
+    def test_all_states_have_pointers(self) -> None:
+        for state in nextstep.STATE_OPTIONS:
+            ns = nextstep.NextStep.from_state(state, "M7")
+            self.assertTrue(ns.pointers, f"state {state} 缺 pointers")
