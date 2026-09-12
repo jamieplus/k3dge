@@ -289,14 +289,6 @@
       "tokens": "Memo: Prompt as Neural Net — 稀疏门控解释框架"
     },
     {
-      "path": "docs/memo/2026-09-05-graph-lens-for-audit-and-qa.md",
-      "type": "memo",
-      "id": "2026-09-05-graph-lens-for-audit-and-qa",
-      "title": "Memo: 图论视角在审计/项目优化上的应用（为 audit vs QA 职责讨论铺底）",
-      "status": "",
-      "tokens": "Memo: 图论视角在审计/项目优化上的应用（为 audit vs QA 职责讨论铺底）"
-    },
-    {
       "path": "docs/memo/2026-09-12-rust-k3dge-fit.md",
       "type": "memo",
       "id": "2026-09-12-rust-k3dge-fit",
@@ -535,6 +527,22 @@
       "title": "封版策略配置文件（何时可封 + 封板做什么）",
       "status": "idea",
       "tokens": "封版策略配置文件（何时可封 + 封板做什么）"
+    },
+    {
+      "path": "docs/tasks/2026-09-12-M9-feat-state_machine_lens.md",
+      "type": "tasks",
+      "id": "2026-09-12-M9-feat-state_machine_lens",
+      "title": "状态机转移图透镜：可达性/死状态/非法跃迁/闭包",
+      "status": "idea",
+      "tokens": "状态机转移图透镜：可达性/死状态/非法跃迁/闭包"
+    },
+    {
+      "path": "docs/tasks/2026-09-12-M9-feat-task_dag_lens.md",
+      "type": "tasks",
+      "id": "2026-09-12-M9-feat-task_dag_lens",
+      "title": "任务 DAG 透镜：blocking 环检测 + CPM 关键路径",
+      "status": "idea",
+      "tokens": "任务 DAG 透镜：blocking 环检测 + CPM 关键路径"
     },
     {
       "path": "docs/tasks/2026-09-12-M9-refactor-gates_config_inventory.md",

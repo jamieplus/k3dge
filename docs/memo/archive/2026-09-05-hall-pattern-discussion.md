@@ -44,4 +44,4 @@
 - `docs/adr/0025-hall-harness-topology.md`（Proposed：拓扑 + 窗口划分 + 墙；下一步讨论方法论细节时以此为准）。
 - `docs/adr/0020-harness-responsibility-split.md`（负责列不因拓扑合并而废除，管的是"审什么"；窗口划分将在其基础上演进）。
 - `docs/adr/0024-audit-evidence-exchange-topology.md`（主权四章、bundle 单文件、章笔分离、审计钉）。
-- `docs/memo/2026-09-05-graph-lens-for-audit-and-qa.md`（图论三分段——图事实/判读/闸语义，窗口职责试金石）。
+- `docs/memo/archive/2026-09-05-graph-lens-for-audit-and-qa.md`（图论三分段——图事实/判读/闸语义，窗口职责试金石）。

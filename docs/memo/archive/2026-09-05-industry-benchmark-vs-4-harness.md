@@ -65,6 +65,6 @@
 ## 5. 相关
 
 - `docs/adr/0025-hall-harness-topology.md`（六判读窗划分 + 行业对标三列对账）
-- `docs/memo/2026-09-05-graph-lens-for-audit-and-qa.md`（图论三分段，职责划分试金石）
+- `docs/memo/archive/2026-09-05-graph-lens-for-audit-and-qa.md`（图论三分段，职责划分试金石）
 - `docs/memo/archive/2026-09-05-hall-pattern-discussion.md`（大厅推演账）
 - k3dit `docs/guides/protocol.md`、k3lity `src/k3lity/harness.py`、k3che `src/k3che/learn.py`
