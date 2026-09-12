@@ -179,6 +179,7 @@ class ConsistencyEngine:
             return []
         return [p.strip() for p in out.stdout.splitlines() if p.strip()]
 
+# k3dit:pending value-1 sev=中 prio=P2 type=结构 evaluate:182 god-method 283行/CC61，一个方法混居≥9类门控：manifest加载+git diff/staged+docs根策略+spec/src域映射+测试批跑/depends_on+版本一致+CHANGELOG done告警+模板漂移(self-host)+pipeline硬门+docs校验，各段自包 try/except 塞 Violation；远超 M7-quality Q-3 已接受带(CC11-19 argparse 派，不覆盖本函数)，应下沉为独立门控子检查（_check_domain 已有抽取先例可循）
     def evaluate(self, run_tests: bool = False, force_full: bool = False, staged: bool = False) -> GateReport:
         try:
             manifest = Manifest.load(self.workspace_root)

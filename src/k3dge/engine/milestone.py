@@ -155,6 +155,7 @@ def _append_to_unreleased(workspace: Path, task_path: Path) -> bool:
         return False
 
 
+# k3dit:pending value-2 sev=中 prio=P2 type=冗余 12列审计报告「扫 reviews/*.md→跳 aux→utf-8 读→按表头定位列→按状态计数/翻状态」逻辑各写一遍且口径不一：本函数(CC50，含列索引/index/翻转/## 回填内联解析)、_parse_audit_stats:1084、_find_report:1011、audit_flow._count_status:70、audit_flow.collect_audit:165(CC31) 共≥5套；code-13 已抓到 _count_status 与 _parse_audit_stats 两口径分歧即为此重复的直接代价。应收敛为单一表格解析/遍历器，其余仅调用
 def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, milestone: str | None) -> None:
     """Best-effort auto-backfill for audit reviews when a task is marked done.
 
