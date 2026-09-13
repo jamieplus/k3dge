@@ -52,4 +52,5 @@ date: 2026-09-13
 - ✅ `doc_catalog._validate_file`（CC38，Q-1 → <11）：拆 8 个 schema 检查 helper，`_validate_file` 退为编排；行为不变（`b2eb8f8`）。
 - 🔁 登记册按审计原判重校（剔 Q-3，标有意留）。
 - ✅ `pipeline_schema.validate_pipeline_config`（CC29，Q-1/Q-2 → <11）：拆 `_validate_legacy_keys`/`_validate_roles`/`_validate_peers`/`_validate_pipelines`，退为编排；行为不变（`7695d17`）。剩 `_validate_transports` CC19。
-- ⬜ 余按上表逐函数进行。
+- ✅ 本会话已拆：<code>doc_catalog._validate_file</code>(38)、<code>pipeline_schema.validate_pipeline_config</code>(29)、<code>contract.extract_python_interface</code>(24)/<code>_get_all_names</code>(15)/<code>_fmt_class</code>(16)、<code>changelog._append_to_unreleased</code>(18)、<code>version.bump_version</code>(14)/<code>append_changelog</code>(16)。（另 <code>_auto_backfill_reviews</code> 等随 A-1 迁移至 task_write 等模块。）
+- ⬜ 余（非派）：<code>audit_flow.collect_audit</code>(36)、<code>task_write._auto_backfill_reviews</code>(34)、<code>milestone_audit.run_audit_flow</code>(19)/<code>_ratchet_audit_step</code>(18)、<code>pipeline_schema._validate_transports</code>(19)、<code>evaluator._run_batch_tests</code>(20)/<code>_warn_changelog_done</code>(16)、<code>manifest.__init__</code>(17)、<code>worktree.merge_back</code>(16)、<code>doc_catalog.grep_docs</code>(16)、<code>seal._seal_archive</code>(16) 等，逐块一 diff 一测试。
