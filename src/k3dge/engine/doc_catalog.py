@@ -326,131 +326,138 @@ def _load_schema(workspace: Path, typ: str) -> Tuple[Optional[dict], Optional[Vi
 
 
 # k3dit:leftover Q-3 CC40 _validate_file 拆校验分支为子函数
-def _validate_file(workspace: Path, typ: str, path: Path, schema: dict, seen: dict) -> List[Violation]:
-    rel = str(path.relative_to(workspace)).replace("\\", "/")
-    out: List[Violation] = []
+def _validate_filename(typ, schema, path, rel, seen):
     pat = schema.get("filename")
     ident = path.stem
     if pat:
         try:
             rgx = re.compile(pat)
         except re.error as exc:
-            return [
-                Violation(
-                    "DOC_SCHEMA_INVALID",
-                    f"{_schema_rel(typ)} filename regex invalid: {exc}",
-                    file_path=_schema_rel(typ),
-                )
-            ]
+            return [Violation("DOC_SCHEMA_INVALID",
+                              f"{_schema_rel(typ)} filename regex invalid: {exc}",
+                              file_path=_schema_rel(typ))], ident, False
         m = rgx.match(path.name)
         if not m:
-            out.append(
-                Violation(_code(schema, "filename"), f"filename does not match {pat}: {path.name}", file_path=rel)
-            )
-            return out
+            return [Violation(_code(schema, "filename"),
+                              f"filename does not match {pat}: {path.name}", file_path=rel)], ident, False
         if m.lastindex:
             ident = m.group(1)
             seen.setdefault(ident, []).append(path.name)
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        out.append(Violation(_code(schema, "filename"), f"cannot read: {exc}", file_path=rel))
-        return out
+    return [], ident, True
+
+
+def _validate_h1(schema, text, path, rel, ident):
+    out: List[Violation] = []
     h1_pat = schema.get("h1")
     if h1_pat:
         filled = h1_pat.replace("{id}", re.escape(ident))
         if not re.search(filled, text, re.MULTILINE | re.IGNORECASE):
-            out.append(
-                Violation(_code(schema, "h1"), f"H1 does not match `{h1_pat}` (id={ident}): {path.name}", file_path=rel)
-            )
+            out.append(Violation(_code(schema, "h1"),
+                                f"H1 does not match `{h1_pat}` (id={ident}): {path.name}", file_path=rel))
+    return out
+
+
+def _validate_sections_when(schema, path, text, rel):
+    out: List[Violation] = []
     for frag, secs in (schema.get("sections_when") or {}).items():
         if frag and frag in path.name:
             for sec in secs or []:
                 if sec not in text:
-                    out.append(
-                        Violation(
-                            _code(schema, "sections_when"),
-                            f"required section '{sec}' missing in {path.name} (matched '{frag}')",
-                            file_path=rel,
-                        )
-                    )
+                    out.append(Violation(_code(schema, "sections_when"),
+                                        f"required section '{sec}' missing in {path.name} (matched '{frag}')",
+                                        file_path=rel))
+    return out
+
+
+def _validate_sections(schema, path, text, rel):
+    out: List[Violation] = []
     for heading in schema.get("sections") or []:
         if heading not in text:
-            # allow regex headings
             try:
                 ok = bool(re.search(heading, text, re.MULTILINE))
             except re.error:
                 ok = False
             if not ok:
-                out.append(
-                    Violation(
-                        _code(schema, "sections"),
-                        f"missing section `{heading}`: {path.name}",
-                        file_path=rel,
-                    )
-                )
-    fm_spec = schema.get("frontmatter") or {}
+                out.append(Violation(_code(schema, "sections"),
+                                    f"missing section `{heading}`: {path.name}", file_path=rel))
+    return out
+
+
+def _validate_section_order(schema, path, text, rel):
     if schema.get("section_order"):
         bad = check_section_order(text)
         if bad:
-            out.append(
-                Violation(
-                    _code(schema, "section_order", "DOC_SECTION_ORDER"),
-                    f"section number out of order (must ascend): {bad[0]} before {bad[1]}: {path.name}",
-                    file_path=rel,
-                )
-            )
-    if fm_spec:
-        fm = _frontmatter(text)
-        for key, rule in fm_spec.items():
-            val = fm.get(key, "")
-            if rule == "date":
-                if not _DATE_RE.match(val):
-                    out.append(
-                        Violation(
-                            _code(schema, "frontmatter"),
-                            f"{key} missing or not YYYY-MM-DD: {path.name}",
-                            file_path=rel,
-                        )
-                    )
-            elif isinstance(rule, list):
-                if not _status_ok(val, rule):
-                    out.append(
-                        Violation(
-                            _code(schema, "frontmatter"),
-                            f"{key}={val!r} not in {rule}: {path.name}",
-                            file_path=rel,
-                        )
-                    )
-    hdr_spec = schema.get("headers") or {}
-    if hdr_spec:
-        hdrs = _headers(text)
-        fm = _frontmatter(text)
-        for key, rule in hdr_spec.items():
-            val = hdrs.get(key) or fm.get(key.lower()) or fm.get(key) or ""
-            if isinstance(rule, list) and not _status_ok(val, [str(x) for x in rule]):
-                out.append(
-                    Violation(
-                        _code(schema, "headers"),
-                        f"{key}={val!r} not in {rule}: {path.name}",
-                        file_path=rel,
-                    )
-                )
-    index_rel = schema.get("index")
-    if index_rel:
-        idx_path = _type_dir(workspace, typ) / index_rel
-        idx_text = idx_path.read_text(encoding="utf-8") if idx_path.is_file() else ""
-        token = ident
-        if not re.search(rf"^\|\s*{re.escape(token)}\s*\|", idx_text, re.MULTILINE) and token not in idx_text:
-            out.append(
-                Violation(
-                    _code(schema, "index"),
-                    f"{index_rel} has no row for `{token}`: {path.name}",
-                    file_path=rel,
-                )
-            )
+            return [Violation(_code(schema, "section_order", "DOC_SECTION_ORDER"),
+                              f"section number out of order (must ascend): {bad[0]} before {bad[1]}: {path.name}",
+                              file_path=rel)]
+    return []
+
+
+def _validate_frontmatter(schema, path, text, rel):
+    fm_spec = schema.get("frontmatter") or {}
+    if not fm_spec:
+        return []
+    out: List[Violation] = []
+    fm = _frontmatter(text)
+    for key, rule in fm_spec.items():
+        val = fm.get(key, "")
+        if rule == "date":
+            if not _DATE_RE.match(val):
+                out.append(Violation(_code(schema, "frontmatter"),
+                                    f"{key} missing or not YYYY-MM-DD: {path.name}", file_path=rel))
+        elif isinstance(rule, list):
+            if not _status_ok(val, rule):
+                out.append(Violation(_code(schema, "frontmatter"),
+                                    f"{key}={val!r} not in {rule}: {path.name}", file_path=rel))
     return out
 
+
+def _validate_headers(schema, path, text, rel):
+    hdr_spec = schema.get("headers") or {}
+    if not hdr_spec:
+        return []
+    out: List[Violation] = []
+    hdrs = _headers(text)
+    fm = _frontmatter(text)
+    for key, rule in hdr_spec.items():
+        val = hdrs.get(key) or fm.get(key.lower()) or fm.get(key) or ""
+        if isinstance(rule, list) and not _status_ok(val, [str(x) for x in rule]):
+            out.append(Violation(_code(schema, "headers"),
+                                f"{key}={val!r} not in {rule}: {path.name}", file_path=rel))
+    return out
+
+
+def _validate_index(workspace, typ, schema, path, rel, ident):
+    index_rel = schema.get("index")
+    if not index_rel:
+        return []
+    idx_path = _type_dir(workspace, typ) / index_rel
+    idx_text = idx_path.read_text(encoding="utf-8") if idx_path.is_file() else ""
+    token = ident
+    if not re.search(rf"^\|\s*{re.escape(token)}\s*\|", idx_text, re.MULTILINE) and token not in idx_text:
+        return [Violation(_code(schema, "index"),
+                          f"{index_rel} has no row for `{token}`: {path.name}", file_path=rel)]
+    return []
+
+
+def _validate_file(workspace: Path, typ: str, path: Path, schema: dict, seen: dict) -> List[Violation]:
+    rel = str(path.relative_to(workspace)).replace("\\", "/")
+    out, ident, ok = _validate_filename(typ, schema, path, rel, seen)
+    if not ok:
+        return out
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        out.append(Violation(_code(schema, "filename"), f"cannot read: {exc}", file_path=rel))
+        return out
+    out += _validate_h1(schema, text, path, rel, ident)
+    out += _validate_sections_when(schema, path, text, rel)
+    out += _validate_sections(schema, path, text, rel)
+    out += _validate_section_order(schema, path, text, rel)
+    out += _validate_frontmatter(schema, path, text, rel)
+    out += _validate_headers(schema, path, text, rel)
+    out += _validate_index(workspace, typ, schema, path, rel, ident)
+    return out
 
 def validate_docs(workspace: Path, types: Optional[Iterable[str]] = None) -> List[Violation]:
     """Structure-only gate. Types without ``.schema.json`` are skipped."""
