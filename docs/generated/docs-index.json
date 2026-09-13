@@ -441,14 +441,6 @@
       "tokens": "eval 盲测纪律待立 harness（memo P2→P3 降级项）"
     },
     {
-      "path": "docs/tasks/2026-09-12-M9-docs-adr_isolation_evidence.md",
-      "type": "tasks",
-      "id": "2026-09-12-M9-docs-adr_isolation_evidence",
-      "title": "WikiSkill 残项入 ADR 层：W1 隔离实证 + PURPOSE 回指惯例",
-      "status": "done",
-      "tokens": "WikiSkill 残项入 ADR 层：W1 隔离实证 + PURPOSE 回指惯例"
-    },
-    {
       "path": "docs/tasks/2026-09-12-M9-feat-escape_metric.md",
       "type": "tasks",
       "id": "2026-09-12-M9-feat-escape_metric",
