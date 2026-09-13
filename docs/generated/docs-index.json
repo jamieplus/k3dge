@@ -401,14 +401,6 @@
       "tokens": "拆分 engine/milestone.py 上帝模块（首案 A-1）+ 复杂度债登记册"
     },
     {
-      "path": "docs/tasks/2026-09-04-M7-chore-except_logging.md",
-      "type": "tasks",
-      "id": "2026-09-04-M7-chore-except_logging",
-      "title": "空 except 治理（质量席 Q-6 转票，36 处）",
-      "status": "done",
-      "tokens": "空 except 治理（质量席 Q-6 转票，36 处）"
-    },
-    {
       "path": "docs/tasks/2026-09-05-M8-chore-eval_harness_needed.md",
       "type": "tasks",
       "id": "2026-09-05-M8-chore-eval_harness_needed",
