@@ -425,14 +425,6 @@
       "tokens": "逃逸率/趋势度量：触发口径 + 观测行"
     },
     {
-      "path": "docs/tasks/2026-09-12-M9-refactor-gates_config_inventory.md",
-      "type": "tasks",
-      "id": "2026-09-12-M9-refactor-gates_config_inventory",
-      "title": "硬闸/next 钩子/阈值 盘点与配置化",
-      "status": "done",
-      "tokens": "硬闸/next 钩子/阈值 盘点与配置化"
-    },
-    {
       "path": "docs/tasks/2026-09-13-M9-chore-context_budget_metrics.md",
       "type": "tasks",
       "id": "2026-09-13-M9-chore-context_budget_metrics",
