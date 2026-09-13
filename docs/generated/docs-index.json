@@ -377,14 +377,6 @@
       "tokens": "Domain Specification: templates"
     },
     {
-      "path": "docs/tasks/2026-09-02-M7-feat-check_gate_by_doc_status.md",
-      "type": "tasks",
-      "id": "2026-09-02-M7-feat-check_gate_by_doc_status",
-      "title": "check 按文档 Status（Draft/Accepted）区分过闸口径",
-      "status": "deferred",
-      "tokens": "check 按文档 Status（Draft/Accepted）区分过闸口径"
-    },
-    {
       "path": "docs/tasks/2026-09-04-M7-chore-engine_milestone_py_A_1_1547_6.md",
       "type": "tasks",
       "id": "2026-09-04-M7-chore-engine_milestone_py_A_1_1547_6",

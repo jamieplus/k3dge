@@ -1,5 +1,5 @@
 ---
-status: deferred
+status: done
 milestone: M9
 priority: P2
 date: 2026-09-02
@@ -7,7 +7,7 @@ date: 2026-09-02
 
 # check 按文档 Status（Draft/Accepted）区分过闸口径
 
-- **Status**: deferred
+- **Status**: done
 - **Milestone**: M9
 - **Priority**: P2
 - **可检索摘要**: 未跑通流程的 ADR 只能按 `manual` fallback 过闸，其 `Status` 却与已跑通的决策同等计分；`check`（及审计闸）应按文档 `Status` 区分严格度 —— **本轮不迭代，仅登记**
@@ -39,3 +39,7 @@ date: 2026-09-02
 ## Related
 
 - `docs/tasks/2026-09-02-M7-docs-adr0006_inplace_revise.done.md`（本项由该次就地修订暴露）
+
+## 收尾（2026-09-13 决定：won't-do，被取代）
+- **裁决**：不做（`Status` 语义不进 `check`）。理由：① `check` 恒静态、不判文档 merit（T-01），"manual fallback vs real lens" 属模糊语义、机验会噪声（本仓多条 Accepted ADR 的 Note 含 "manual fallback"）；② 本项原始关切"`Accepted` 过早"已由 **封版 ADR 硬闸**（`adrs_all_accepted`＋`adr_landed`）与 `docs/adr/AUTHORING.md` 生命周期（就地修订须人授权 + `Note:` 留痕）覆盖；③ 证据链完整性另有 `evidence_chain` 闸（报告署名+入库）。
+- 如后续确需，可基于**结构化**事实（如 `Note:` 里显式 `real lens:` 标记）重启，而非文本模糊匹配。
