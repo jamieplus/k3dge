@@ -409,20 +409,12 @@
       "tokens": "把出口同构与日志只追加变成机验"
     },
     {
-      "path": "docs/tasks/2026-09-04-M7-chore-cc_debt_register.md",
-      "type": "tasks",
-      "id": "2026-09-04-M7-chore-cc_debt_register",
-      "title": "复杂度债登记（质量席 Q-1/Q-2/Q-4/Q-5/Q-7 转票）",
-      "status": "idea",
-      "tokens": "复杂度债登记（质量席 Q-1/Q-2/Q-4/Q-5/Q-7 转票）"
-    },
-    {
       "path": "docs/tasks/2026-09-04-M7-chore-engine_milestone_py_A_1_1547_6.md",
       "type": "tasks",
       "id": "2026-09-04-M7-chore-engine_milestone_py_A_1_1547_6",
-      "title": "拆分 engine/milestone.py 上帝模块（首案 A-1：1547 行 6+ 关注点）",
+      "title": "拆分 engine/milestone.py 上帝模块（首案 A-1）+ 复杂度债登记册",
       "status": "idea",
-      "tokens": "拆分 engine/milestone.py 上帝模块（首案 A-1：1547 行 6+ 关注点）"
+      "tokens": "拆分 engine/milestone.py 上帝模块（首案 A-1）+ 复杂度债登记册"
     },
     {
       "path": "docs/tasks/2026-09-04-M7-chore-except_logging.md",
