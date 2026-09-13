@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:9b43b16c552f2bba746915a939ca61f51f351ad827721f5a733cfb18da4d90aa`
+- **Contract Hash**: `sha256:7d95c86a88c4e37dbb474a54c19aacb1c7ca07f9003bdb9f8c673b885c7b8252`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -250,6 +250,17 @@ from k3dge.engine.milestone_pointer import bump_milestone
 from k3dge.engine.milestone_pointer import get_current_milestone
 from k3dge.engine.milestone_pointer import set_current_milestone
 from k3dge.engine.seal import scan_unfilled_guides
+from k3dge.engine.milestone_audit import scan_pending_findings
+from k3dge.engine.task_index import MILESTONE_RE
+from k3dge.engine.task_index import PRIORITY_RE
+from k3dge.engine.task_index import STATUS_RE
+from k3dge.engine.task_index import TITLE_RE
+from k3dge.engine.task_index import parse_frontmatter
+from k3dge.engine.align import run_milestone_alignment
+from k3dge.engine.milestone_pointer import bump_milestone
+from k3dge.engine.milestone_pointer import get_current_milestone
+from k3dge.engine.milestone_pointer import set_current_milestone
+from k3dge.engine.seal import scan_unfilled_guides
 scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
 from k3dge.engine.task_index import MilestoneTask
 from k3dge.engine.task_index import TaskIndex
@@ -259,10 +270,18 @@ from k3dge.engine.task_write import create_task
 from k3dge.engine.task_write import mark_task_done
 from k3dge.engine.seal import seal_milestone
 from k3dge.engine.seal import seal_preconditions_error
-persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
+from k3dge.engine.milestone_audit import persist_external_audit_report
 from k3dge.engine.doc_audit import run_doc_audit
-run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
+from k3dge.engine.milestone_audit import run_audit_flow
 run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Tuple
+scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
+persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
+run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
 from __future__ import annotations
 from __future__ import annotations
 from pathlib import Path

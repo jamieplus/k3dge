@@ -386,6 +386,17 @@ from k3dge.engine.milestone_pointer import bump_milestone
 from k3dge.engine.milestone_pointer import get_current_milestone
 from k3dge.engine.milestone_pointer import set_current_milestone
 from k3dge.engine.seal import scan_unfilled_guides
+from k3dge.engine.milestone_audit import scan_pending_findings
+from k3dge.engine.task_index import MILESTONE_RE
+from k3dge.engine.task_index import PRIORITY_RE
+from k3dge.engine.task_index import STATUS_RE
+from k3dge.engine.task_index import TITLE_RE
+from k3dge.engine.task_index import parse_frontmatter
+from k3dge.engine.align import run_milestone_alignment
+from k3dge.engine.milestone_pointer import bump_milestone
+from k3dge.engine.milestone_pointer import get_current_milestone
+from k3dge.engine.milestone_pointer import set_current_milestone
+from k3dge.engine.seal import scan_unfilled_guides
 scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
     # doc: 未决 findings（语法 v1：pending/disputed/fixnote 计 open）。
 from k3dge.engine.task_index import MilestoneTask
@@ -396,13 +407,23 @@ from k3dge.engine.task_write import create_task
 from k3dge.engine.task_write import mark_task_done
 from k3dge.engine.seal import seal_milestone
 from k3dge.engine.seal import seal_preconditions_error
-persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
-    # doc: Persist a human/agent-submitted audit report as the canonical on-disk report.
+from k3dge.engine.milestone_audit import persist_external_audit_report
 from k3dge.engine.doc_audit import run_doc_audit
-run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
-    # doc: Independent audit entry: the merged audit module (ADR-0025) produces ONE
+from k3dge.engine.milestone_audit import run_audit_flow
 run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
     # doc: Seal = archive + version + pointer. Requires a *closed* audit first.
+# milestone_audit.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Tuple
+scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
+    # doc: 未决 findings（语法 v1：pending/disputed/fixnote 计 open）。
+persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
+    # doc: Persist a human/agent-submitted audit report as the canonical on-disk report.
+run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
+    # doc: Independent audit entry: the merged audit module (ADR-0025) produces ONE
 # milestone_files.py
 from __future__ import annotations
 # milestone_pointer.py
