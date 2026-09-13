@@ -433,14 +433,6 @@
       "tokens": "状态机转移图透镜：可达性/死状态/非法跃迁/闭包"
     },
     {
-      "path": "docs/tasks/2026-09-12-M9-feat-task_dag_lens.md",
-      "type": "tasks",
-      "id": "2026-09-12-M9-feat-task_dag_lens",
-      "title": "任务 DAG 透镜：blocking 环检测 + CPM 关键路径",
-      "status": "done",
-      "tokens": "任务 DAG 透镜：blocking 环检测 + CPM 关键路径"
-    },
-    {
       "path": "docs/tasks/2026-09-12-M9-refactor-gates_config_inventory.md",
       "type": "tasks",
       "id": "2026-09-12-M9-refactor-gates_config_inventory",
