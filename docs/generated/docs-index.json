@@ -505,14 +505,6 @@
       "tokens": "封版 ADR 硬闸（所有 ADR 须 Accepted 且落地，ADR 成事实源）"
     },
     {
-      "path": "docs/tasks/2026-09-12-M9-feat-seal_policy_config.done.md",
-      "type": "tasks",
-      "id": "2026-09-12-M9-feat-seal_policy_config.done",
-      "title": "封版策略配置文件（何时可封 + 封板做什么）",
-      "status": "done",
-      "tokens": "封版策略配置文件（何时可封 + 封板做什么）"
-    },
-    {
       "path": "docs/tasks/2026-09-12-M9-feat-state_machine_lens.md",
       "type": "tasks",
       "id": "2026-09-12-M9-feat-state_machine_lens",
