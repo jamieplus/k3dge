@@ -37,6 +37,34 @@ def _require_relative_path(label: str, val: Any) -> str:
     return posix
 
 
+def _parse_ignore(data: Dict[str, Any]) -> List[str]:
+    ignore = data.get("ignore", [])
+    if ignore is None:
+        ignore = []
+    if not isinstance(ignore, list) or not all(isinstance(x, str) for x in ignore):
+        raise ManifestError("'ignore' must be a list of strings")
+    return ignore
+
+
+def _validate_domain(domain: str, cfg, domains: dict) -> None:
+    """验证 + 就地归一化单域 cfg（路径、depends_on）。"""
+    if not isinstance(cfg, dict):
+        raise ManifestError(f"domain '{domain}' config must be a dict, got {type(cfg).__name__}")
+    for key in ("src", "spec", "tests"):
+        val = cfg.get(key)
+        if val:
+            cfg[key] = _require_relative_path(f"domain '{domain}' {key}", val)
+    dep = cfg.get("depends_on", [])
+    if dep is None:
+        dep = []
+    if not isinstance(dep, list) or not all(isinstance(x, str) for x in dep):
+        raise ManifestError(f"domain '{domain}' depends_on must be a list of strings")
+    for x in dep:
+        if x not in domains:
+            raise ManifestError(f"domain '{domain}' depends_on references unknown domain '{x}'")
+    cfg["depends_on"] = dep
+
+
 class Manifest:
     def __init__(self, data: Dict[str, Any]) -> None:
         self.data = data
@@ -44,14 +72,8 @@ class Manifest:
         if "self_hosting" in data and not isinstance(data["self_hosting"], bool):
             raise ManifestError("'self_hosting' must be a boolean")
         self.self_hosting: bool = bool(data.get("self_hosting", False))
-        package_root = data.get("package_root", "src")
-        self.package_root: str = _require_relative_path("package_root", package_root)
-        ignore = data.get("ignore", [])
-        if ignore is None:
-            ignore = []
-        if not isinstance(ignore, list) or not all(isinstance(x, str) for x in ignore):
-            raise ManifestError("'ignore' must be a list of strings")
-        self.ignore: List[str] = ignore
+        self.package_root: str = _require_relative_path("package_root", data.get("package_root", "src"))
+        self.ignore: List[str] = _parse_ignore(data)
         tmpl = data.get("test_command_template")
         if tmpl is not None and not isinstance(tmpl, str):
             raise ManifestError("'test_command_template' must be a string")
@@ -59,23 +81,7 @@ class Manifest:
         if not isinstance(self.domains, dict):
             raise ManifestError("'domains' must be an object")
         for domain, cfg in self.domains.items():
-            if not isinstance(cfg, dict):
-                raise ManifestError(f"domain '{domain}' config must be a dict, got {type(cfg).__name__}")
-            for key in ("src", "spec", "tests"):
-                val = cfg.get(key)
-                if val:
-                    cfg[key] = _require_relative_path(f"domain '{domain}' {key}", val)
-            dep = cfg.get("depends_on", [])
-            if dep is None:
-                dep = []
-            if not isinstance(dep, list) or not all(isinstance(x, str) for x in dep):
-                raise ManifestError(f"domain '{domain}' depends_on must be a list of strings")
-            for x in dep:
-                if x not in self.domains:
-                    raise ManifestError(
-                        f"domain '{domain}' depends_on references unknown domain '{x}'"
-                    )
-            cfg["depends_on"] = dep
+            _validate_domain(domain, cfg, self.domains)
 
     def depends_on(self, domain: str) -> List[str]:
         """Domains whose contract this domain is allowed to import (ADR-0001 decision 6)."""

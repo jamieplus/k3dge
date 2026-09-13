@@ -198,6 +198,32 @@ GREP_MAX_FILES = 20
 GREP_MAX_LINES_PER_FILE = 8
 
 
+def _compile_query(q: str, ignore_case: bool):
+    """编译为 regex；非法模式回退为字面量。"""
+    flags = re.IGNORECASE if ignore_case else 0
+    try:
+        return re.compile(q, flags)
+    except re.error:
+        return re.compile(re.escape(q), flags)
+
+
+def _grep_file(rgx, rel: str, text: str, line: bool) -> List[dict]:
+    """单文件命中 → [{path}|{path,line}]；无命中空。行模式每文件封顶。"""
+    out: List[dict] = []
+    if not line:
+        if rgx.search(text):
+            out.append({"path": rel})
+        return out
+    n = 0
+    for i, raw in enumerate(text.splitlines(), start=1):
+        if rgx.search(raw):
+            out.append({"path": rel, "line": i})
+            n += 1
+            if n >= GREP_MAX_LINES_PER_FILE:
+                break
+    return out
+
+
 def grep_docs(
     workspace: Path,
     query: str,
@@ -216,11 +242,7 @@ def grep_docs(
     q = (query or "").strip()
     if not q:
         return []
-    flags = re.IGNORECASE if ignore_case else 0
-    try:
-        rgx = re.compile(q, flags)
-    except re.error:
-        rgx = re.compile(re.escape(q), flags)
+    rgx = _compile_query(q, ignore_case)
     types = [typ] if typ else iter_doc_types(workspace)
     hits: List[dict] = []
     files_used = 0
@@ -235,21 +257,9 @@ def grep_docs(
             except (OSError, UnicodeDecodeError):
                 continue
             rel = str(path.relative_to(workspace)).replace("\\", "/")
-            if not line:
-                if rgx.search(text):
-                    hits.append({"path": rel})
-                    files_used += 1
-                continue
-            n = 0
-            matched_file = False
-            for i, raw in enumerate(text.splitlines(), start=1):
-                if rgx.search(raw):
-                    hits.append({"path": rel, "line": i})
-                    n += 1
-                    matched_file = True
-                    if n >= GREP_MAX_LINES_PER_FILE:
-                        break
-            if matched_file:
+            found = _grep_file(rgx, rel, text, line)
+            if found:
+                hits.extend(found)
                 files_used += 1
     return hits
 
