@@ -70,7 +70,7 @@ class TestHints(unittest.TestCase):
                 return TransportResult(True, "manual", "ok")
 
             with mock.patch("k3dge.engine.pipeline_runner.run_action", side_effect=fake_action), \
-                 mock.patch.object(ms, "_changed_docs", return_value=["docs/adr/0006.md"]), \
+                 mock.patch("k3dge.engine.doc_audit._changed_docs", return_value=["docs/adr/0006.md"]), \
                  mock.patch.object(ms, "get_current_milestone", return_value="M1"):
                 status, msg = ms.run_doc_audit(ws)
             self.assertEqual(status, "reported")

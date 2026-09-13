@@ -355,7 +355,7 @@ class TestDocAudit(TestCase):
     def test_creates_one_milestone_task(self) -> None:
         ws = _ws()
         created = Path("docs/tasks/2026-09-02-M1-audit-doc-audit.md")
-        with mock.patch.object(ms, "_changed_docs", return_value=["docs/guides/a.md"]), \
+        with mock.patch("k3dge.engine.doc_audit._changed_docs", return_value=["docs/guides/a.md"]), \
              mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL), \
              mock.patch.object(ms, "scan_milestone_tasks", return_value=[]), \
              mock.patch.object(ms, "create_task", return_value=(True, "ok", created)) as ct:
@@ -369,7 +369,7 @@ class TestDocAudit(TestCase):
         ws = _ws()
         existing = mock.Mock(path=Path("docs/tasks/x-audit-doc-audit.done.md"), status="done")
         open_task = mock.Mock(path=Path("docs/tasks/y-audit-doc-audit.md"), status="in-progress")
-        with mock.patch.object(ms, "_changed_docs", return_value=["docs/guides/a.md"]), \
+        with mock.patch("k3dge.engine.doc_audit._changed_docs", return_value=["docs/guides/a.md"]), \
              mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL), \
              mock.patch.object(ms, "scan_milestone_tasks", return_value=[existing, open_task]), \
              mock.patch.object(ms, "create_task") as ct:

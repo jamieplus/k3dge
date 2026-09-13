@@ -218,6 +218,14 @@ resolve_base(workspace: Path) -> str
     # doc: Return the base ref for branch-level diffing, falling back to HEAD.
 get_changed_files(workspace: Path) -> List[str]
     # doc: Return all files changed relative to merge-base, including uncommitted work.
+# doc_audit.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Tuple
+run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]
+    # doc: Non-blocking doc-audit, run AFTER the hard gate (never inside `check`).
 # doc_catalog.py
 from __future__ import annotations
 from pathlib import Path
@@ -394,8 +402,7 @@ seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
     # doc: 纯归档动作：id 合法 + 有任务 + 状态合法 → `_seal_archive`。策略闸在 `seal_preconditions_error`。
 persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
     # doc: Persist a human/agent-submitted audit report as the canonical on-disk report.
-run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]
-    # doc: Non-blocking doc-audit, run AFTER the hard gate (never inside `check`).
+from k3dge.engine.doc_audit import run_doc_audit
 run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
     # doc: Independent audit entry: the merged audit module (ADR-0025) produces ONE
 run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]

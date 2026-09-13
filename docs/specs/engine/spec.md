@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:8f07dc4a54a2772a3b7539bacb8042c492e0682879fd485eeea3c3ca00c916c8`
+- **Contract Hash**: `sha256:961af3e96bae1c36240a6a7115637b3c4bd04e21cf4ee9eacff6fe05da2b48f7`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -106,6 +106,12 @@ BASE_CANDIDATES = ('origin/main', 'origin/master', 'main', 'master')
 class GitError(RuntimeError)
 resolve_base(workspace: Path) -> str
 get_changed_files(workspace: Path) -> List[str]
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Tuple
+run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
@@ -252,7 +258,7 @@ run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, 
 seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
 persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
-run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]
+from k3dge.engine.doc_audit import run_doc_audit
 run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
 run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
 from __future__ import annotations
