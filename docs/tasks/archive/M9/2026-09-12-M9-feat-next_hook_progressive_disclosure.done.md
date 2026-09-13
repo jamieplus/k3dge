@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P1
 date: 2026-09-12
@@ -7,7 +7,7 @@ date: 2026-09-12
 
 # next-hook 引导 / 渐进披露落地（ADR-0008 §2）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M9
 - **Priority**: P1
 - **可检索摘要**: 按 ADR-0008 §2「渐进披露」实现——`[NEXT]` 只推最小下一步+指针，纵深按需；默认摘要、`--deep`/`--json` 取全量；守预算。
@@ -31,3 +31,9 @@ date: 2026-09-12
 - 事实归属：契约/文案＝ADR-0008 + 硬闸契约（数值）；执行＝`engine/nextstep.py` 与各命令。
 - 边界检查：`nextstep` 只出"边+指针"，不承载纵深内容（内容留在被指的 doc）。
 - 桩子先行：先给 `[NEXT]` 加 `pointers`（行为兼容），再逐状态把 `note` 散文降为指针，最后上预算检查。
+
+## 收尾（2026-09-12 已落·核心达成）
+- 已满足：全状态 `pointers`（doc id / ADR 节 / 命令），`NextStep.render_cli` 出 `pointers: a | b`、`render_mcp` 出 `pointers[]`；`note` 与指针并存。`status --deep`（默认前 10 + "… N more"）。`AGENTS.md` 80 行微核预算 WARN（`evaluator.py:450`，模板侧；本仓 59 行）。
+- 残余分流（不在本票）：
+  - ①命令 stdout **默认上限** → 并入 `2026-09-12-M9-refactor-gates_config_inventory`（阈值配置化）。
+  - ②预算**度量**（命令行数 / 被加载 doc 数 / 往返次数）→ 新票 `2026-09-12-M9-chore-context_budget_metrics`（暂缓）。

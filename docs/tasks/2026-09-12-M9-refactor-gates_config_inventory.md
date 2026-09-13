@@ -29,6 +29,7 @@ date: 2026-09-12
 - `engine/nextstep.py`：各 state 的 `ask`/`if_y`/`if_n`/`note` 文案（硬编码）。
 - `engine/milestone.py`：seal 条件/动作（与 `seal_policy_config` 重叠，见该票）。
 - `engine/evaluator.py`：gate 规则码（`MANIFEST_INVALID` 等）。
+- 命令 stdout **默认上限**（渐进披露预算；来自 `next_hook_progressive_disclosure` 残余①）：各命令输出面的默认行/字节上限。
 - 目标：新增/并入配置（拟 `.agent/gates.toml` 或并入 `pipeline.toml`），代码只做执行。
 
 ## 边界与拆分

@@ -481,14 +481,6 @@
       "tokens": "逃逸率/趋势度量：触发口径 + 观测行"
     },
     {
-      "path": "docs/tasks/2026-09-12-M9-feat-next_hook_progressive_disclosure.md",
-      "type": "tasks",
-      "id": "2026-09-12-M9-feat-next_hook_progressive_disclosure",
-      "title": "next-hook 引导 / 渐进披露落地（ADR-0008 §2）",
-      "status": "idea",
-      "tokens": "next-hook 引导 / 渐进披露落地（ADR-0008 §2）"
-    },
-    {
       "path": "docs/tasks/2026-09-12-M9-feat-process_audit.md",
       "type": "tasks",
       "id": "2026-09-12-M9-feat-process_audit",
@@ -519,6 +511,14 @@
       "title": "硬闸/next 钩子/阈值 盘点与配置化",
       "status": "idea",
       "tokens": "硬闸/next 钩子/阈值 盘点与配置化"
+    },
+    {
+      "path": "docs/tasks/2026-09-13-M9-chore-context_budget_metrics.md",
+      "type": "tasks",
+      "id": "2026-09-13-M9-chore-context_budget_metrics",
+      "title": "上下文预算度量：命令 stdout 行数 / 被加载 doc 数 / 往返",
+      "status": "idea",
+      "tokens": "上下文预算度量：命令 stdout 行数 / 被加载 doc 数 / 往返"
     }
   ]
 }
