@@ -425,14 +425,6 @@
       "tokens": "逃逸率/趋势度量：触发口径 + 观测行"
     },
     {
-      "path": "docs/tasks/2026-09-12-M9-feat-state_machine_lens.md",
-      "type": "tasks",
-      "id": "2026-09-12-M9-feat-state_machine_lens",
-      "title": "状态机转移图透镜：可达性/死状态/非法跃迁/闭包",
-      "status": "done",
-      "tokens": "状态机转移图透镜：可达性/死状态/非法跃迁/闭包"
-    },
-    {
       "path": "docs/tasks/2026-09-12-M9-refactor-gates_config_inventory.md",
       "type": "tasks",
       "id": "2026-09-12-M9-refactor-gates_config_inventory",
