@@ -51,4 +51,5 @@ date: 2026-09-13
 ## 进度（2026-09-13）
 - ✅ `doc_catalog._validate_file`（CC38，Q-1 → <11）：拆 8 个 schema 检查 helper，`_validate_file` 退为编排；行为不变（`b2eb8f8`）。
 - 🔁 登记册按审计原判重校（剔 Q-3，标有意留）。
+- ✅ `pipeline_schema.validate_pipeline_config`（CC29，Q-1/Q-2 → <11）：拆 `_validate_legacy_keys`/`_validate_roles`/`_validate_peers`/`_validate_pipelines`，退为编排；行为不变（`7695d17`）。剩 `_validate_transports` CC19。
 - ⬜ 余按上表逐函数进行。
