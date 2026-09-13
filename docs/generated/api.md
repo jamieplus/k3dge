@@ -357,11 +357,9 @@ TITLE_RE = re.compile('^#\\s+(.+)$', re.MULTILINE)
 GUIDE_STUB_RE = re.compile('<!--\\s*k3dge:guide-stub\\s*-->', re.IGNORECASE)
 parse_frontmatter(content: str) -> dict[str, str]
     # doc: Strict frontmatter parser: only `---` block at start, YAML-like `key: value`.
-get_current_milestone(workspace: Path) -> str
-    # doc: Current milestone cursor, default M0; stored in .agent/milestone.
-set_current_milestone(workspace: Path, milestone_id: str) -> None
-bump_milestone(workspace: Path) -> str
-    # doc: M0 → M1 → M2 …; writes new cursor and returns it.
+from k3dge.engine.milestone_pointer import bump_milestone
+from k3dge.engine.milestone_pointer import get_current_milestone
+from k3dge.engine.milestone_pointer import set_current_milestone
 scan_unfilled_guides(workspace: Path) -> List[str]
     # doc: Names of guide stubs in docs/guides/ still carrying `<!-- k3dge:guide-stub -->`.
 scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
@@ -398,6 +396,15 @@ run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt
     # doc: Independent audit entry: the merged audit module (ADR-0025) produces ONE
 run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
     # doc: Seal = archive + version + pointer. Requires a *closed* audit first.
+# milestone_pointer.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+get_current_milestone(workspace: Path) -> str
+    # doc: Current milestone cursor, default M0; stored in .agent/milestone.
+set_current_milestone(workspace: Path, milestone_id: str) -> None
+bump_milestone(workspace: Path) -> str
+    # doc: M0 → M1 → M2 …; writes new cursor and returns it.
 # models.py
 from __future__ import annotations
 from dataclasses import dataclass

@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:700e7e6ef668a364c027fe480b1cd712d8d23e1acc93596e6463466a6072e914`
+- **Contract Hash**: `sha256:243727c92392e375582139f3aa0d37cf260d99fcecd5561db9b23ff97ac647b4`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -225,9 +225,9 @@ PRIORITY_RE = re.compile('-\\s+\\*\\*Priority\\*\\*:\\s*(\\S+)', re.IGNORECASE)
 TITLE_RE = re.compile('^#\\s+(.+)$', re.MULTILINE)
 GUIDE_STUB_RE = re.compile('<!--\\s*k3dge:guide-stub\\s*-->', re.IGNORECASE)
 parse_frontmatter(content: str) -> dict[str, str]
-get_current_milestone(workspace: Path) -> str
-set_current_milestone(workspace: Path, milestone_id: str) -> None
-bump_milestone(workspace: Path) -> str
+from k3dge.engine.milestone_pointer import bump_milestone
+from k3dge.engine.milestone_pointer import get_current_milestone
+from k3dge.engine.milestone_pointer import set_current_milestone
 scan_unfilled_guides(workspace: Path) -> List[str]
 scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
 class MilestoneTask
@@ -252,6 +252,12 @@ persist_external_audit_report(workspace: Path, milestone_id: str, content: str, 
 run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]
 run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
 run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+get_current_milestone(workspace: Path) -> str
+set_current_milestone(workspace: Path, milestone_id: str) -> None
+bump_milestone(workspace: Path) -> str
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
