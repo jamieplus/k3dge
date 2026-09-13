@@ -281,6 +281,14 @@
       "tokens": "Memo: Rust × vibe coding 契合性——Rust k3dge 可行性"
     },
     {
+      "path": "docs/memo/2026-09-13-agent-dev-tools-absorption-eval.md",
+      "type": "memo",
+      "id": "2026-09-13-agent-dev-tools-absorption-eval",
+      "title": "Memo: Agent 开发工具吸收评估——codegraph / open-code-review / worktrunk",
+      "status": "",
+      "tokens": "Memo: Agent 开发工具吸收评估——codegraph / open-code-review / worktrunk"
+    },
+    {
       "path": "docs/protocols/audit_default.md",
       "type": "protocols",
       "id": "audit_default",
@@ -375,6 +383,38 @@
       "title": "Domain Specification: templates",
       "status": "Active",
       "tokens": "Domain Specification: templates"
+    },
+    {
+      "path": "docs/tasks/2026-09-13-M9-chore-worktree_lifecycle.md",
+      "type": "tasks",
+      "id": "2026-09-13-M9-chore-worktree_lifecycle",
+      "title": "worktree 生命周期吸收（hooks 类型/自动 prune/list 状态）",
+      "status": "idea",
+      "tokens": "worktree 生命周期吸收（hooks 类型/自动 prune/list 状态）"
+    },
+    {
+      "path": "docs/tasks/2026-09-13-M9-feat-affected_tests.md",
+      "type": "tasks",
+      "id": "2026-09-13-M9-feat-affected_tests",
+      "title": "受影响测试映射（import 传递 → 测试文件，喂 selective L2）",
+      "status": "idea",
+      "tokens": "受影响测试映射（import 传递 → 测试文件，喂 selective L2）"
+    },
+    {
+      "path": "docs/tasks/2026-09-13-M9-feat-single_mcp_tool.md",
+      "type": "tasks",
+      "id": "2026-09-13-M9-feat-single_mcp_tool",
+      "title": "评估 MCP 面收敛单强工具 k3dge_explore",
+      "status": "idea",
+      "tokens": "评估 MCP 面收敛单强工具 k3dge_explore"
+    },
+    {
+      "path": "docs/tasks/2026-09-13-M9-feat-symbol_graph_store.md",
+      "type": "tasks",
+      "id": "2026-09-13-M9-feat-symbol_graph_store",
+      "title": "符号/边图 + FTS（stdlib sqlite3，升 symbol-index.json）",
+      "status": "idea",
+      "tokens": "符号/边图 + FTS（stdlib sqlite3，升 symbol-index.json）"
     },
     {
       "path": "docs/tasks/2026-09-13-M9-refactor-cc_debt_remaining.md",
