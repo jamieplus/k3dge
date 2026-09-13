@@ -10,6 +10,8 @@ from typing import List, Optional
 
 from k3dge.engine.milestone_files import _is_doc_aux
 
+_ALLOWED_STATUS = frozenset({"idea", "deferred", "in-progress", "done"})
+
 STATUS_RE = re.compile(r"-\s+\*\*Status\*\*:\s*([\w-]+)", re.IGNORECASE)
 MILESTONE_RE = re.compile(r"-\s+\*\*Milestone\*\*:\s*([^\n\r]+)", re.IGNORECASE)
 PRIORITY_RE = re.compile(r"-\s+\*\*Priority\*\*:\s*(\S+)", re.IGNORECASE)

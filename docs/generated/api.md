@@ -122,6 +122,16 @@ adrs_all_accepted(workspace: Path) -> Optional[str]
     # doc: 未 Accepted 的 ADR 汇总；全 Accepted（或无 ADR）⇒ None。
 adr_landed(workspace: Path) -> Optional[str]
     # doc: Accepted ADR 须带可解析 `Landed-by:`；否则汇总；全满足 ⇒ None。
+# align.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Tuple
+from k3dge.engine import gates
+from k3dge.engine.evaluator import ConsistencyEngine
+from k3dge.engine.task_index import MilestoneTask
+from k3dge.engine.task_index import scan_milestone_tasks
+run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]
 # audit_checklist.py
 from __future__ import annotations
 from pathlib import Path
@@ -372,6 +382,7 @@ from k3dge.engine.task_index import STATUS_RE
 from k3dge.engine.task_index import TITLE_RE
 from k3dge.engine.task_index import parse_frontmatter
 GUIDE_STUB_RE = re.compile('<!--\\s*k3dge:guide-stub\\s*-->', re.IGNORECASE)
+from k3dge.engine.align import run_milestone_alignment
 from k3dge.engine.milestone_pointer import bump_milestone
 from k3dge.engine.milestone_pointer import get_current_milestone
 from k3dge.engine.milestone_pointer import set_current_milestone
@@ -385,7 +396,6 @@ from k3dge.engine.task_index import list_tasks
 from k3dge.engine.task_index import scan_milestone_tasks
 from k3dge.engine.task_write import create_task
 from k3dge.engine.task_write import mark_task_done
-run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]
 seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]
     # doc: 策略层：按「硬闸契约」`[checks.seal].preconditions` 求值全部前置闸，返回首个错误（None=全绿）。
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]

@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:4eb826d15eaccea4b91c5f688042797ee3a0c5fdccc9b289212517e3d77a7ff7`
+- **Contract Hash**: `sha256:84b67c347ad2650257f73c338ecc94d968c6b7b793e407077f39e9da8903ffb6`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -37,6 +37,15 @@ from typing import List
 from typing import Optional
 adrs_all_accepted(workspace: Path) -> Optional[str]
 adr_landed(workspace: Path) -> Optional[str]
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Tuple
+from k3dge.engine import gates
+from k3dge.engine.evaluator import ConsistencyEngine
+from k3dge.engine.task_index import MilestoneTask
+from k3dge.engine.task_index import scan_milestone_tasks
+run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
@@ -237,6 +246,7 @@ from k3dge.engine.task_index import STATUS_RE
 from k3dge.engine.task_index import TITLE_RE
 from k3dge.engine.task_index import parse_frontmatter
 GUIDE_STUB_RE = re.compile('<!--\\s*k3dge:guide-stub\\s*-->', re.IGNORECASE)
+from k3dge.engine.align import run_milestone_alignment
 from k3dge.engine.milestone_pointer import bump_milestone
 from k3dge.engine.milestone_pointer import get_current_milestone
 from k3dge.engine.milestone_pointer import set_current_milestone
@@ -248,7 +258,6 @@ from k3dge.engine.task_index import list_tasks
 from k3dge.engine.task_index import scan_milestone_tasks
 from k3dge.engine.task_write import create_task
 from k3dge.engine.task_write import mark_task_done
-run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]
 seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
 persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
