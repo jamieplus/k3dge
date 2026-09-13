@@ -541,6 +541,21 @@ REQUIRED_SECTIONS: List[Tuple[str, 're.Pattern[str]']] = [('Domain Boundary & Re
 CONTRACT_HASH_RE = re.compile('\\*\\*Contract Hash\\*\\*:\\s*`?sha256:([0-9a-f]{64})`?', re.IGNORECASE)
 validate_structure(content: str) -> List[str]
 extract_contract_hash(content: str) -> Optional[str]
+# task_dag.py
+from __future__ import annotations
+from graphlib import CycleError
+from graphlib import TopologicalSorter
+from pathlib import Path
+from typing import Dict
+from typing import List
+blocking_graph(workspace: Path) -> Dict[str, List[str]]
+    # doc: task → 其 `blocking` 依赖（只连仓内已知 task stem）。
+blocking_cycles(workspace: Path) -> Dict[str, object]
+    # doc: 互阻工单＝死锁队列：出事实（`cyclic` + 首个环路径）。
+critical_path(workspace: Path) -> Dict[str, object]
+    # doc: 最长阻塞链（按节点数）。有环 ⇒ 退化为空（由 `blocking_cycles` 报环）。
+summary(workspace: Path) -> Dict[str, object]
+    # doc: 观测件：环 + 关键路径（不判定）。
 # version.py
 from __future__ import annotations
 from pathlib import Path

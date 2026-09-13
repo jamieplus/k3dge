@@ -437,7 +437,7 @@
       "type": "tasks",
       "id": "2026-09-12-M9-feat-task_dag_lens",
       "title": "任务 DAG 透镜：blocking 环检测 + CPM 关键路径",
-      "status": "idea",
+      "status": "done",
       "tokens": "任务 DAG 透镜：blocking 环检测 + CPM 关键路径"
     },
     {

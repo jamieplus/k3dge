@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:91aad8467928b7804fc055886072da1f3680c6fda1c9da699fb6cf76d6fdfd62`
+- **Contract Hash**: `sha256:fc4dbe47546143bd8ec0ccd2cca7d0a6184c4a486ff0acc361204884f3a9eb66`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -365,6 +365,16 @@ REQUIRED_SECTIONS: List[Tuple[str, 're.Pattern[str]']] = [('Domain Boundary & Re
 CONTRACT_HASH_RE = re.compile('\\*\\*Contract Hash\\*\\*:\\s*`?sha256:([0-9a-f]{64})`?', re.IGNORECASE)
 validate_structure(content: str) -> List[str]
 extract_contract_hash(content: str) -> Optional[str]
+from __future__ import annotations
+from graphlib import CycleError
+from graphlib import TopologicalSorter
+from pathlib import Path
+from typing import Dict
+from typing import List
+blocking_graph(workspace: Path) -> Dict[str, List[str]]
+blocking_cycles(workspace: Path) -> Dict[str, object]
+critical_path(workspace: Path) -> Dict[str, object]
+summary(workspace: Path) -> Dict[str, object]
 from __future__ import annotations
 from pathlib import Path
 from typing import Tuple

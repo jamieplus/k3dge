@@ -128,6 +128,8 @@ def workspace_status(workspace: Path) -> Dict[str, Any]:
                     }
                 )
 
+    from k3dge.engine import task_dag
+
     return {
         "domains": sorted(manifest.domains),
         "gate_passed": report.passed,
@@ -135,6 +137,7 @@ def workspace_status(workspace: Path) -> Dict[str, Any]:
         "drift": drift,
         "pipeline": pipeline,
         "unfinished_tasks": unfinished,
+        "task_dag": task_dag.summary(workspace),
         "next": (ns.render_mcp() if (ns := lifecycle_next(workspace)) is not None else None),
         "cache": cache_observability(workspace),
     }
