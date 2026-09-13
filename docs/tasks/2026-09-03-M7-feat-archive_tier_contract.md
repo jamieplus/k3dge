@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P3
 date: 2026-09-03
@@ -7,7 +7,7 @@ date: 2026-09-03
 
 # 归档契约落地（去向标记提醒 + 显式 --archive 出口）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M9
 - **Priority**: P3
 - **可检索摘要**: `ADR-0023` §2.2 立了归档三条件，但实测三处 `archive/` 共 106 份 `.md`、带去向标记的 0 份；本任务只补两件小事（增量提醒 + 显式出口），**不含**任何旧编号映射或歧义告警（那条已被 `ADR-0023` §2.3 删除）
@@ -46,3 +46,10 @@ date: 2026-09-03
 
 - 决策：`docs/adr/0023-low-authority-archive-tier.md`（§2.1 不建 legacy 目录；§2.2 三条契约；§2.3 明确删表且不建机器出口）
 - 同一批次但不相关：`docs/tasks/2026-09-03-M7-feat-gate_exit_and_trail_checks.md`
+
+## 收尾（2026-09-13 已落）
+- **出口**：CLI `doc list`/`grep` 现带 `--include-archive`（`CMD` 透出本已存在），补**低权威头**「低权威层：archive/ 仅为低权威留档，判定以现行视图为准」；不带时输出逐字节不变。MCP `k3dge_doc_list`/`k3dge_doc_grep` 已带该参数。
+- **增量提醒**（非阻断）：`_new_archive_without_note` 只对**本轮 diff 新进** `docs/**/archive/` 且缺 `Superseded-by`/`Legacy note` 的文件报警，并入 `doc-audit` 待核 task；不动 `check` 判定集/退出码（ADR-0006 §2.3.2）。
+- **存量** 106 份不动（不批量补/删）。
+- 测试 `tests/unit/engine/test_archive_tier.py`（增量检测 + CLI 头部）。295 passed；check 绿。
+- 顺带修 `docs/adr/AUTHORING.md` ↔ 模板副本 PAIRS 漂移（`adr_isolation_evidence` 引入）。

@@ -1274,6 +1274,36 @@ def _changed_docs(workspace: Path) -> List[str]:
     return docs
 
 
+def _new_archive_without_note(workspace: Path) -> List[str]:
+    """本轮 diff **新进** `docs/**/archive/` 且缺去向标记（`Superseded-by`/`Legacy note`）的文档。
+
+    ADR-0023 §2.2 归档三条件；**只对增量生效**（存量不批量灌噪声），非阻断。
+    """
+    import subprocess
+
+    try:
+        out = subprocess.run(["git", "status", "--porcelain"], cwd=workspace,
+                             capture_output=True, text=True)
+        lines = out.stdout.splitlines()
+    except Exception:
+        return []
+    res: List[str] = []
+    for ln in lines:
+        if len(ln) < 4:
+            continue
+        code, path = ln[:2].strip(), ln[3:].strip()
+        if code not in ("A", "R") or "archive" not in path.split("/") or not path.endswith(".md"):
+            continue
+        try:
+            txt = (workspace / path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if "Superseded-by" in txt or "Legacy note" in txt:
+            continue
+        res.append(path)
+    return sorted(res)
+
+
 def _ensure_doc_audit_task(workspace: Path, milestone_id: str, docs: List[str], report: Optional[str] = None):
     """Idempotently open a milestone-scoped doc-audit task (the durability hook).
 
@@ -1405,7 +1435,8 @@ def run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]:
     io = io or sys.stderr
     mid = get_current_milestone(workspace)
     docs = _changed_docs(workspace)
-    if not docs:
+    archive_unguarded = _new_archive_without_note(workspace)
+    if not docs and not archive_unguarded:
         return "clean", "no managed docs changed; nothing to doc-audit."
 
     try:
@@ -1421,14 +1452,15 @@ def run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]:
     # Bind the task to the report it audits (1 report = 1 task, ADR-0022) if present.
     found = _find_report(workspace, mid, "audit")
     report_rel = found[0].relative_to(workspace).as_posix() if found else None
-    task = _ensure_doc_audit_task(workspace, mid, docs, report=report_rel)
+    task = _ensure_doc_audit_task(workspace, mid, docs + archive_unguarded, report=report_rel)
     _attach_k3che_hints(workspace, docs, io=io)  # 服务性提示；失败=无提示，绝不无审计
+    note = f"；另有 {len(archive_unguarded)} 份新归档缺去向标记（ADR-0023 §2.2）" if archive_unguarded else ""
     if task is None:
         return "reported", (
-            f"doc-audit: {len(docs)} 处文档改动；已有未关闭的 doc-audit task（不重复建）。"
+            f"doc-audit: {len(docs)} 处文档改动{note}；已有未关闭的 doc-audit task（不重复建）。"
         )
     return "reported", (
-        f"doc-audit: 报告由 k3dit/人产出，已开里程碑 task `{task.name}`（非阻断；本轮不改，封板闸也会逼这轮闭环）。"
+        f"doc-audit: 报告由 k3dit/人产出，已开里程碑 task `{task.name}`（非阻断；本轮不改，封板闸也会逼这轮闭环）{note}。"
     )
 
 

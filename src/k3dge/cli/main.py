@@ -295,6 +295,8 @@ def cmd_doc(args: argparse.Namespace) -> int:
         if getattr(args, "as_json", False):
             print(json.dumps({"ok": True, "count": len(rows), "docs": rows}, indent=2, ensure_ascii=False))
         else:
+            if getattr(args, "include_archive", False):
+                print("[DOC] 低权威层：archive/ 仅为低权威留档，判定以现行视图为准")
             if not rows:
                 print("[DOC] no matches")
             for c in rows:
@@ -326,6 +328,8 @@ def cmd_doc(args: argparse.Namespace) -> int:
         if getattr(args, "as_json", False):
             print(json.dumps({"ok": True, "count": len(rows), "hits": rows}, indent=2, ensure_ascii=False))
         else:
+            if getattr(args, "include_archive", False):
+                print("[DOC] 低权威层：archive/ 仅为低权威留档，判定以现行视图为准")
             if not rows:
                 print("[DOC] no matches")
             for h in rows:

@@ -397,7 +397,7 @@
       "type": "tasks",
       "id": "2026-09-03-M7-feat-archive_tier_contract",
       "title": "归档契约落地（去向标记提醒 + 显式 --archive 出口）",
-      "status": "idea",
+      "status": "done",
       "tokens": "归档契约落地（去向标记提醒 + 显式 --archive 出口）"
     },
     {
