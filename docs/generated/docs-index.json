@@ -385,9 +385,9 @@
       "tokens": "Domain Specification: templates"
     },
     {
-      "path": "docs/tasks/2026-09-13-M9-refactor-cc_debt_remaining.md",
+      "path": "docs/tasks/2026-09-13-refactor-cc_debt_remaining.md",
       "type": "tasks",
-      "id": "2026-09-13-M9-refactor-cc_debt_remaining",
+      "id": "2026-09-13-refactor-cc_debt_remaining",
       "title": "复杂度债续（非 milestone 文件）：CC≥11 函数逐个拆",
       "status": "idea",
       "tokens": "复杂度债续（非 milestone 文件）：CC≥11 函数逐个拆"

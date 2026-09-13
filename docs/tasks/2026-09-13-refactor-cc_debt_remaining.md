@@ -1,6 +1,5 @@
 ---
 status: idea
-milestone: M9
 priority: P3
 date: 2026-09-13
 ---
@@ -8,7 +7,6 @@ date: 2026-09-13
 # 复杂度债续（非 milestone 文件）：CC≥11 函数逐个拆
 
 - **Status**: idea
-- **Milestone**: M9
 - **Priority**: P3
 - **可检索摘要**: A-1 已拆完 `milestone.py`（1692→114 facade）；本票接续 **k3lity 质量席首程（`docs/reviews/archive/M7/2026-09-04-M7-quality.md`）Q-1/Q-2/Q-4/Q-5** 的非 argparse 派 CC 重函数，逐函数拆/降（Simplify-first，一 diff 一测试）。**Q-3（argparse 派函数）审计已判 `有意留`，不列、不刷指标。**
 - **Date**: 2026-09-13
