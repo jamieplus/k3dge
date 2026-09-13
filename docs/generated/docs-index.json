@@ -497,14 +497,6 @@
       "tokens": "过程审计面（SQA）：里程碑证据链时间序/完整性入硬闸契约"
     },
     {
-      "path": "docs/tasks/2026-09-12-M9-feat-seal_adr_gate.md",
-      "type": "tasks",
-      "id": "2026-09-12-M9-feat-seal_adr_gate",
-      "title": "封版 ADR 硬闸（所有 ADR 须 Accepted 且落地，ADR 成事实源）",
-      "status": "idea",
-      "tokens": "封版 ADR 硬闸（所有 ADR 须 Accepted 且落地，ADR 成事实源）"
-    },
-    {
       "path": "docs/tasks/2026-09-12-M9-feat-state_machine_lens.md",
       "type": "tasks",
       "id": "2026-09-12-M9-feat-state_machine_lens",
