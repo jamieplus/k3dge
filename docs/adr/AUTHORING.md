@@ -29,6 +29,7 @@ Do not judge whether the decision is a *good* idea (k3lity, soft). k3dit may fla
 - **少叠括号**：括号不嵌套；加粗只标规则关键词，不标整句。
 - **标题用名词短语**：不堆斜杠（「人工入口 / Checklist / loop」拆节或取中心词）。
 - **语言**：中文为主；代码标识符用行内 `code`，不把英文术语串当句法。
+- **缘起回指（PURPOSE）**：重大透镜/规则修订，在 `Decision` 里写驱动它的 pattern/缘由（一条即可），使决策可追溯到动机；并入本惯例，不新开机制。
 
 ## 术语（canonical terms）
 
