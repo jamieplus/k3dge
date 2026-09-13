@@ -1,54 +1,54 @@
 # Memo: Agent 开发工具吸收评估——codegraph / open-code-review / worktrunk
 
 - **类型**: 可落地（三源；clean-room，许可均宽松）
-- **念头**: 扫 workspace 下三个开源项目（均为**宽松许可**：codegraph MIT、open-code-review Apache-2.0、worktrunk MIT/Apache-2.0），判"可直接用 / 可吸收(clean-room)"与归属（`Consistency→k3dge` / `Audit→k3dit` / `Memory→k3che`）。
-- **触发场景**: 2026-09-13 维护者道"下了几个开源项目（codegraph/open-code-review/worktrunk），扫描评估直接用或吸收的可能"。
+- **念头**: 扫 workspace 下三个开源项目（codegraph MIT、open-code-review Apache-2.0、worktrunk MIT/Apache-2.0），判**哪些能增强 k3dge 系统的能力**（而非扩基建/囤储备）。
+- **触发场景**: 2026-09-13 维护者道"下了 codegraph/open-code-review/worktrunk，评估直接用或吸收"；随后定方针：**不是扩基建/增储备，而是 enhance 系统、增强能力**。
 - **Date**: 2026-09-13
 
-## 1. codegraph（MIT；TS + Rust kernel）
-**是什么**: 本地语义代码图。tree-sitter 解析 20+ 语言 → 本地 SQLite 知识图（symbols/edges/files + FTS5）；MCP **单一强工具** `codegraph_explore`（一次调用＝verbatim 源码 + 调用链 + blast radius）；CLI `affected`/`impact`/`callers`/`callees`/`query`；文件监听自动增量同步 + 每文件 **staleness banner**。
+## 0. 判据（方针）
+**"它让 k3dge/k3dit 新能做**什么**、或让既有**能力明显更准**吗？"**
+- 是 → **能力增量**，做。
+- 只是多一层存储 / 多一个 peer / 多一张"以后再说"的票 → **基建/储备**，不做。
+- **增强 ≠ adopt**：可**借其技术**增强，不背其**平台**（Node/Rust/SQLite 平台、自带 LLM/agent）。
 
-- **可直接用**: 作**外部 service peer**（MCP）喂席/agent "surgical context + blast radius"。合 ADR-0006 peer 模型（service，`mcp→skip`）；不进 k3ge 本体，不破零依赖。**纯 Python 小仓收益相对我们已有 `import_graph`/`blast_radius` 有限。**
-- **可吸收（clean-room；k3ge 可 stdlib 落地）**:
-  - ⭐ **SQLite(stdlib `sqlite3`) 符号/边图 + FTS** 取代扁平 `docs/generated/symbol-index.json`——不破零依赖，最大吸收点。
-  - ⭐ **`affected`**：传递 import → 受影响**测试文件**（我们 `blast_radius` 已有下游模块，缺"测试映射"）→ 直接喂 `check --with-tests` 选择性 L2。
-  - **单工具 MCP 论**（"one strong tool 胜过菜单"）→ 评估把 k3ge MCP 面收敛一个 `k3dge_explore`（NEXT+事实+指针）。
-  - **staleness banner**（点名 pending 文件）→ 与 `DOC_INDEX_STALE` 同类，吸收其"显式点名"诚实模式。
+## 1. codegraph（MIT；TS + Rust kernel）
+tree-sitter 解析 20+ 语言 → 本地 SQLite 知识图（symbols/edges/files + FTS5）；MCP 单工具 `codegraph_explore`；CLI `affected`/`impact`/`callers`/`callees`；监听自动增量同步。
+
+- **能力增量**: 依赖/影响从**近似 → 可用**（真代码图 / 调用链 / blast radius）+ **changed→affected tests**。我们现只有 `import_graph` 近似。
+- **落法（借技术不背平台）**: stdlib 把 `import_graph`/`blast_radius` 升到"边更全 + **模块→测试映射**"，喂既有 `check --with-tests`；**不引 Node/Rust/SQLite 平台**。
+- **不做的（基建）**: 换 SQLite+FTS 存储（换存储不产生新能力；某闸确需图边时，把**最小图边**并入该能力即可——本 memo 已并入 `affected_tests`）。作 service peer / 拉平台 = 基建，需 ADR 且非本方针首选。
 
 ## 2. open-code-review（Apache-2.0；Go）
-**是什么**: 阿里内部育出的 AI 代码评审 CLI（`ocr`）。核心＝**确定性工程 × Agent 混合**：确定性侧＝精确选文件/过滤、**Smart file bundling**（按亲和分单元+子 agent 隔离上下文+并发）、**模板引擎式细粒度规则匹配**、**外置 positioning/reflection 模块**；Agent 侧＝动态决策+检索。含 `scan`（无 diff 全量审）、**delegation mode**（宿主自带 LLM，OCR 只出选文件+规则）、session viewer、**AACR-Bench**（50 repo/200 PR/1505 真值；F1/precision/recall）。
+AI 代码评审 CLI（`ocr`）；核心＝**确定性工程 × Agent 混合**：精确选文件、Smart file bundling、**模板引擎式规则匹配**、**外置 positioning/reflection**；含 `scan`、delegation mode、session viewer、**AACR-Bench**。
 
-- **可直接用**: 作 k3dit **code-lens 后端候选**（pipeline peer：CLI/MCP/delegation）。许可允许；但其自带 LLM+agent 与 k3dit Hall/席位**架构重叠**，直用前需 ADR/契约评估。
-- **可吸收（clean-room；价值高）**:
-  - ⭐ **positioning + reflection 后处理模块**——专治"位置漂移/内容不准"，正对应我们"位置钉/钉漂移"。可立后处理 pass（复核窗或 Hall）校正 findings 的 `location` 与内容一致性。
-  - ⭐ **AACR-Bench 评测法**＝ k3dit `feat-eval_harness` 的**实操蓝本**（指标/数据集/纪律）。
-  - **模板引擎式规则匹配** → 强化 k3dit **窗卡 + `JUDGE_TYPE_DOMAIN`** 走向声明/模板驱动。
-  - **Smart bundling** → k3dit 窗/批改进（相关文件绑成一个 review 单元）。
-  - **精确选文件/过滤** → k3dit 物化/范围裁选。
-  - **delegation mode** → 与"席在机构侧、k3dge 不代笔"同构，**外部佐证**。
+- **能力增量**: **审计保真度**——定位(positioning)+反射(reflection) 把"席判易漂"→"确定性校正"；模板化规则把判定从散文→机制。
+- **落法**: 机制进 k3dit（确定性后处理 pass + 规则声明化）；**不引进其自带 LLM/agent**（与 Hall 席位重叠，越位 ADR-0006）。
+- **AACR-Bench** = k3dit `feat-eval_harness` 的实操蓝本（指标/数据集/纪律）。
 
 ## 3. worktrunk（MIT/Apache-2.0；Rust）
-**是什么**: `wt` = 为并行 agent 设计的 git worktree 管理器（`switch/list/merge/remove` + hooks + LLM commit + 共享 build cache reflink + branch 寻址）。
+git worktree 管理器（为并行 agent）：`switch/list/merge/remove` + hooks + 共享 build cache。
 
-- **可直接用**: 纯 git worktree 操作可**局部委托 `wt`**；但 k3ge `worktree.py` 含 spec-gate 专属（baseline ref、`merge_back` accept_dirty、`strip_pins`、落点闸），**不可整体替换**。
-- **可吸收（clean-room；k3ge）**:
-  - **pre-merge / post-merge hooks** ↔ 我们"落点闸先验后并"（`merge_back`）——吸收其 hook 类型划分。
-  - **"与 main 同 commit ⇒ 后台自动 remove worktree"** → 强化 `prune_finished`。
-  - **`wt list` 状态表**（ahead/behind/dirty/unpushed/CI）→ `status`/`audit status` 观测面参考。
-  - **`cargo-affected`（覆盖驱动选测）+ `[workspace.metadata.affected.rule]` 输入→测试规则**：与 codegraph `affected` **同一思路**；"快照读不到覆盖 ⇒ 强制选测防漏"值得吸收，对齐我们**选择性 L2**。
+- **能力增量**: **选测更准**（`cargo-affected` 覆盖驱动选测 + `[metadata.affected.rule]` 输入规则防漏）——与 codegraph `affected` 同源，并入该能力。
+- **非能力（不囤）**: worktree 生命周期本身 k3ge 已够（`worktree.py`＋落点闸）；hook 命名 / `wt list` 美观 = 体验，非能力。
 
-## 4. 交汇点（公共信号）
-1. **changed→affected tests**（codegraph `affected` ≡ worktrunk `cargo-affected`）＝ k3ge **选择性 L2** 的正解。
-2. **审计质量可测**（OCR AACR-Bench）＝ k3dit `eval_harness` 蓝本。
-3. **worktree 生命周期 + hook 化**（worktrunk）＝ k3ge 审计线编排。
+## 4. 能力增量 vs 基建/储备
+| 项 | 类别 | 处置 |
+| --- | --- | --- |
+| 规则声明/模板化（OCR） | **能力**（闸更准） | 做 → k3dit `feat-rule_template_matching` |
+| 定位+反射后处理（OCR） | **能力**（审计更真） | 做 → k3dit `feat-position_reflection` |
+| 依赖感知 + affected tests（codegraph/worktrunk） | **能力**（check/CI 更准） | 做 → k3ge `feat-affected_tests`（含最小图边 + 防漏选测） |
+| AACR-Bench 蓝本（OCR） | **能力**（评测可测） | 并入既有 k3dit `feat-eval_harness` |
+| FTS/explore 检索参照（codegraph） | 参照 | 并入既有 k3che `absorb_p3_recall_reflect_guard` |
+| SQLite+FTS 符号平台 | 基建（换存储） | **不囤**（并入 affected 的最小图边） |
+| 单强 MCP 工具 | 体验（非能力） | **不囤** |
+| Smart file bundling | 覆盖/体验 | **不囤**（并入参照，不单列） |
+| worktree 生命周期/hook | 已够 | **不囤** |
+| codegraph 作 peer / OCR 作 code-lens 后端 | **adopt 平台** | 仅 ADR 评估，非本方针 |
 
-## 5. 归属与处置（已转票；见 Related）
-- k3ge：`feat-affected_tests`、`feat-symbol_graph_store`、`feat-single_mcp_tool`、`chore-worktree_lifecycle`。
-- k3dit：`feat-position_reflection`、`feat-rule_template_matching`、`feat-file_bundling`；**AACR-Bench 蓝本并入既有 `feat-eval_harness`**。
-- k3che：FTS/`explore` 检索面参照并入既有 `feat-absorb_p3_recall_reflect_guard`。
-- **直用（非吸收）**：codegraph 作 service peer、OCR 作 k3dit code-lens 后端——**均需先 ADR/契约评估**，本 memo 不自动立项。
+## 5. 净效果
+k3dge 仍是"小而确定的闸"，但**闸更准（依赖感知）、审计更真（定位/规则机制化）**——**增强能力**，不是变大。
 
 ## 6. 相关
 - 吸收规范：`.agent/rules/09-absorption.md`（clean-room / 去品牌 / 路由 peer / 1 行署名）。
-- `docs/adr/0006-mcp-foreign-harness-injection.md`（peer 方向性不变量）、`docs/adr/0025-hall-harness-topology.md`（审计模块）。
+- `docs/adr/0001`（零依赖）、`docs/adr/0006`（peer 方向性不变量 / sidecar 不重粘 work+check）、`docs/adr/0025`（审计模块）。
 - 既有吸收先例：`docs/memo/archive/2026-09-06-deeptutor-absorption-eval.md`、`.../2026-09-05-industry-benchmark-vs-4-harness.md`。

@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P3
 date: 2026-09-13
@@ -27,3 +27,6 @@ date: 2026-09-13
 
 ## 验收
 - 审计线生命周期语义与 worktrunk hook 类型对齐；`status` 出 ahead/behind/dirty 观测；零依赖。
+
+## 收尾（2026-09-13 关停/并入）
+- worktree 生命周期 k3ge 已够（`worktree.py`＋落点闸）；hook 命名/list 美观＝体验，非能力。**不囤**。

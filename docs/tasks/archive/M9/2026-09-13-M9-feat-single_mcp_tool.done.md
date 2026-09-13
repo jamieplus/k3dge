@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P3
 date: 2026-09-13
@@ -23,3 +23,6 @@ date: 2026-09-13
 
 ## 验收
 - 默认暴露 `k3dge_explore`；其余可开关恢复；行为等价、无判定漂移。
+
+## 收尾（2026-09-13 关停/并入）
+- 单一 MCP 入口＝体验（非能力）；本方针下**不囤**。

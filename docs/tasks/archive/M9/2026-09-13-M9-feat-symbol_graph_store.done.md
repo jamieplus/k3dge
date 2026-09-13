@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P2
 date: 2026-09-13
@@ -27,3 +27,6 @@ date: 2026-09-13
 
 ## 验收
 - 索引可重建、与现 `symbol-index.json` 等价或更全；`check` 的 `DOC_INDEX_STALE` 同源点名 pending；零依赖。
+
+## 收尾（2026-09-13 关停/并入）
+- 换存储不产生新能力；最小图边并入 `feat-affected_tests`。**不囤**（方针：增强能力，非扩基建）。
