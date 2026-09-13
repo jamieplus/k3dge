@@ -433,14 +433,6 @@
       "tokens": "空 except 治理（质量席 Q-6 转票，36 处）"
     },
     {
-      "path": "docs/tasks/2026-09-04-M7-feat-ratchet_real_run_backlog.md",
-      "type": "tasks",
-      "id": "2026-09-04-M7-feat-ratchet_real_run_backlog",
-      "title": "首案真跑前遗留（k3dge 侧）——复核后剩余",
-      "status": "done",
-      "tokens": "首案真跑前遗留（k3dge 侧）——复核后剩余"
-    },
-    {
       "path": "docs/tasks/2026-09-05-M8-chore-eval_harness_needed.md",
       "type": "tasks",
       "id": "2026-09-05-M8-chore-eval_harness_needed",
