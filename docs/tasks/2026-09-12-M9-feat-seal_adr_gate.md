@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P1
 date: 2026-09-12
@@ -7,7 +7,7 @@ date: 2026-09-12
 
 # 封版 ADR 硬闸（所有 ADR 须 Accepted 且落地，ADR 成事实源）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M9
 - **Priority**: P1
 - **可检索摘要**: 封版加硬闸——范围内 ADR 必须 `Status: Accepted` 且决策已落地（带可解析的落地指针），使 ADR 成为事实源。
@@ -31,3 +31,9 @@ date: 2026-09-12
 - 事实归属：ADR 文档拥有 `Status`/`Landed-by`；闸归 engine（`audit_trigger`/seal 侧）做结构校验；"落地是否真成立"归 k3dit（语义）。
 - 边界检查：闸不解析 ADR 决策语义（那是 k3dit）；只验状态枚举与指针可解析，不做第二套判定语言。
 - 桩子先行：先落 `Landed-by` 字段 + 指针解析器（对少数 ADR 试点），再全量上闸 + 提升流程。
+
+## 收尾（2026-09-12 已落·已满足）
+- 两道闸已实现于 `engine/adr_gate.py`：`adrs_all_accepted`（拦 Draft/Proposed/无 Status）、`adr_landed`（Accepted 须带可解析 `Landed-by: <路径>`）。
+- 已作为 gate rule 接入**硬闸契约** `[checks.seal].preconditions`（不单列 ADR，遵 Core Maintainer 2026-09-11 定），执行器 `seal_preconditions_error` 按契约跑。
+- 实测：`adrs_all_accepted`/`adr_landed` 均 PASS；13 条 ADR 全 `Accepted` 且带 `Landed-by`。
+- 边界不变：只验状态枚举 + 指针可解析，不判决策语义（归 k3dit）。
