@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P2
 date: 2026-09-04
@@ -7,7 +7,7 @@ date: 2026-09-04
 
 # 拆分 engine/milestone.py 上帝模块（首案 A-1）+ 复杂度债登记册
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M9
 - **Priority**: P2
 - **Date**: 2026-09-04
@@ -91,6 +91,10 @@ date: 2026-09-04
 - 逐模块/逐函数闭环（每步一 diff 一测试）；或质量席复程改判；不得整体销账。
 
 ## 进度（2026-09-13）
+- **收尾（2026-09-13 完成）**：`engine/milestone.py` **1692 → 114**（纯 re-export facade）；13 块拆出 13 个模块：`prompt` / `milestone_pointer` / `milestone_files` / `audit_report` / `doc_audit` / `review_archive` / `task_index` / `changelog` / `task_write` / `align` / `seal` / `seal_flow` / `milestone_audit`。
+- 每块一 diff 一测试、re-export 保调用面、必要处惰性 import 避环；`306 passed`、check 绿。
+- 剩余 CC 债（`milestone.py` 之外）**另立** `2026-09-13-M9-refactor-cc_debt_remaining`（不整体销账）。
+- 历史分块记录（1–12）见下，留痕。
 - **首块 ✅**：`_Prompt` → `engine/prompt.py`（`milestone` 以 `_Prompt` 别名兼容）。1692 → 1670。
 - **第二块 ✅**：`get/set/bump_milestone` + `_validate_milestone_id` + `_SAFE_MILESTONE_ID_RE` → `engine/milestone_pointer.py`（milestone re-export，行为不变）。1670 → 1629。
 - **第三块 ✅**：`_has_milestone_token` / `_is_doc_aux` / `_is_review_aux` / `_filename_milestone` / `_DOC_AUX_NAMES` / `_REVIEW_AUX` / `_FILENAME_MILESTONE_RE` → `engine/milestone_files.py`（re-export）。1629 → 1601。

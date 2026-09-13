@@ -381,8 +381,16 @@
       "type": "tasks",
       "id": "2026-09-04-M7-chore-engine_milestone_py_A_1_1547_6",
       "title": "拆分 engine/milestone.py 上帝模块（首案 A-1）+ 复杂度债登记册",
-      "status": "idea",
+      "status": "done",
       "tokens": "拆分 engine/milestone.py 上帝模块（首案 A-1）+ 复杂度债登记册"
+    },
+    {
+      "path": "docs/tasks/2026-09-13-M9-refactor-cc_debt_remaining.md",
+      "type": "tasks",
+      "id": "2026-09-13-M9-refactor-cc_debt_remaining",
+      "title": "复杂度债续（非 milestone 文件）：CC≥11 函数逐个拆",
+      "status": "idea",
+      "tokens": "复杂度债续（非 milestone 文件）：CC≥11 函数逐个拆"
     }
   ]
 }
