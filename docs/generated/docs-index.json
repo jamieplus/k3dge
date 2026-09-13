@@ -393,14 +393,6 @@
       "tokens": "受影响测试映射（import 传递 → 测试文件，喂 selective L2）"
     },
     {
-      "path": "docs/tasks/2026-09-13-M9-feat-dist_singlefile.md",
-      "type": "tasks",
-      "id": "2026-09-13-M9-feat-dist_singlefile",
-      "title": "分发：零依赖单件 zipapp（供下游/无 venv 宿主）",
-      "status": "done",
-      "tokens": "分发：零依赖单件 zipapp（供下游/无 venv 宿主）"
-    },
-    {
       "path": "docs/tasks/2026-09-13-M9-refactor-cc_debt_remaining.md",
       "type": "tasks",
       "id": "2026-09-13-M9-refactor-cc_debt_remaining",
