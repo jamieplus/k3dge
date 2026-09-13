@@ -9,6 +9,13 @@ volume_max = 8
 [search]
 context_max = 3
 
+[markers]
+max_note = 80
+max_note_pending = 500
+
+[output]
+default_lines = 10
+
 # 编排单元：preconditions（闸 id，全绿才继续）+ actions（动作 id）。
 # seal 消费这组闸；执行器读契约跑（ADR-0001 §2 第 8 条）。
 [checks.seal]

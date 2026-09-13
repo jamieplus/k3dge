@@ -112,7 +112,8 @@ def _line_index(text: str, pos: int) -> int:
     return bisect.bisect_right(starts, pos)
 
 
-def parse_text(rel: str, text: str) -> Tuple[List[Marker], List[str]]:
+def parse_text(rel: str, text: str, *, max_note: int = _MAX_NOTE,
+               max_note_pending: int = _MAX_NOTE_PENDING) -> Tuple[List[Marker], List[str]]:
     lines = text.splitlines()
     hb = head_block_end(lines)
     markers: List[Marker] = []
@@ -122,10 +123,10 @@ def parse_text(rel: str, text: str) -> Tuple[List[Marker], List[str]]:
         line_no = _line_index(text, m.start())
         kind = m.group("kind")
         note = m.group("note") or ""
-        cap = _MAX_NOTE_PENDING if kind == "pending" else _MAX_NOTE
+        cap = max_note_pending if kind == "pending" else max_note
         if len(note) > cap:
-            problems.append(f"{rel}:{line_no} note 超 {cap} 字符（pending≤{_MAX_NOTE_PENDING}，"
-                            f"其余≤{_MAX_NOTE}；正文超应拆多条钉）")
+            problems.append(f"{rel}:{line_no} note 超 {cap} 字符（pending≤{max_note_pending}，"
+                            f"其余≤{max_note}；正文超应拆多条钉）")
             note = note[:cap] + "…"
         markers.append(
             Marker(
@@ -173,6 +174,10 @@ def parse_sidecar(text: str) -> Tuple[List[Marker], List[str]]:
 
 
 def extract(workspace: Path, roots: Sequence[str] = ("src", "docs")) -> Tuple[List[Marker], List[str]]:
+    from k3dge.engine import gates
+
+    max_note = int(gates.get(workspace, "markers", "max_note"))
+    max_note_pending = int(gates.get(workspace, "markers", "max_note_pending"))
     markers: List[Marker] = []
     problems: List[str] = []
     for rel, path in _iter_scan_files(workspace, roots):
@@ -180,7 +185,7 @@ def extract(workspace: Path, roots: Sequence[str] = ("src", "docs")) -> Tuple[Li
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             continue
-        ms, ps = parse_text(rel, text)
+        ms, ps = parse_text(rel, text, max_note=max_note, max_note_pending=max_note_pending)
         markers.extend(ms)
         problems.extend(ps)
     side = workspace / SIDECAR

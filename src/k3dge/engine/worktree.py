@@ -117,7 +117,11 @@ def strip_pins(workspace: Path, job: str) -> dict:
     """收官去钉：删审计线 worktree 里独占一行的钉；行尾钉不动（只上报）。
     **除 leftover 外**的钉永不进主干（§3③）——leftover 作有意留的长期文献随文件留下，故不删。
     扫描面是全树（present 的 roots 限定之外也得兜住）。返回 {stripped_files, stripped_lines, suspicious, kept}。"""
+    from k3dge.engine import gates
     from k3dge.engine.markers import _SCAN_SUFFIXES, _SKIP_DIR_PARTS, parse_text
+
+    _mn = int(gates.get(workspace, "markers", "max_note"))
+    _mnp = int(gates.get(workspace, "markers", "max_note_pending"))
 
     wt = ensure(workspace, job)
     files: list = []
@@ -134,7 +138,7 @@ def strip_pins(workspace: Path, job: str) -> dict:
             text = p.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             continue
-        ms, _ = parse_text(rel, text)
+        ms, _ = parse_text(rel, text, max_note=_mn, max_note_pending=_mnp)
         if not ms:
             continue
         src = text.splitlines()

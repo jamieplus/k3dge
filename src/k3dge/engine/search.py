@@ -110,8 +110,8 @@ def where(workspace: Path, symbol: str) -> List[Location]:
     return [Location(file=h["file"], line=h.get("line")) for h in hits]
 
 
-def _snippet_window(path: Path, line_no: int, context: int) -> str:
-    context = max(0, min(context, _MAX_CONTEXT))
+def _snippet_window(path: Path, line_no: int, context: int, cap: int = _MAX_CONTEXT) -> str:
+    context = max(0, min(context, cap))
     try:
         lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
@@ -205,7 +205,8 @@ def search(
     raw = _run_ripgrep(workspace, query)
     if raw is None:
         raw = _python_search(workspace, query)
-    context = max(0, min(context, int(gates.get(workspace, "search", "context_max"))))
+    cap = int(gates.get(workspace, "search", "context_max"))
+    context = max(0, min(context, cap))  # 单源 context_max；_snippet_window 按同一 cap 钳（不硬编 3）
     locs: List[Location] = []
     for ln in raw:
         # format: file:line:content
@@ -221,7 +222,7 @@ def search(
             continue
         snippet_text: Optional[str] = None
         if snippet:
-            snip = _snippet_window(workspace / head, line_no, context)
+            snip = _snippet_window(workspace / head, line_no, context, cap=cap)
             snippet_text = snip[:max_snippet]
         locs.append(Location(file=head, line=line_no, snippet=snippet_text))
     return locs

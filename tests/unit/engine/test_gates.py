@@ -44,3 +44,15 @@ def test_seal_preconditions_default_and_override():
         ws = _ws(d, "[checks.seal]\npreconditions = []\n")
         assert gates.preconditions(ws, "seal") == []
         assert gates.get(ws, "audit_trigger", "c2_nesting_max") == 5
+
+
+def test_markers_and_output_defaults_and_override():
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d)
+        assert gates.get(ws, "markers", "max_note") == 80
+        assert gates.get(ws, "markers", "max_note_pending") == 500
+        assert gates.get(ws, "output", "default_lines") == 10
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, "[markers]\nmax_note = 200\n")
+        assert gates.get(ws, "markers", "max_note") == 200
+        assert gates.get(ws, "markers", "max_note_pending") == 500

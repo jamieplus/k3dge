@@ -273,7 +273,7 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 REL = '.agent/gates.toml'
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}}}
 load(workspace: Path) -> Dict[str, Any]
     # doc: 缺省 ∪ `.agent/gates.toml`（段内覆盖；`checks.<kind>` 逐键覆盖）；文件缺失/坏 ⇒ 缺省。
 get(workspace: Path, section: str, key: str) -> Any
@@ -329,7 +329,7 @@ class Marker
     key(self) -> Tuple[str, str]
 head_block_end(lines: Sequence[str]) -> int
     # doc: 首个连续注释块（含空行）的结束行号（0-based 开区间）。允许 shebang/encoding。
-parse_text(rel: str, text: str) -> Tuple[List[Marker], List[str]]
+parse_text(rel: str, text: str, *, max_note: int=_MAX_NOTE, max_note_pending: int=_MAX_NOTE_PENDING) -> Tuple[List[Marker], List[str]]
 parse_sidecar(text: str) -> Tuple[List[Marker], List[str]]
     # doc: AUDIT.md：`## k3dit:<kind> <id>@repo <note>` ＋ 可选 `- files:`/`- why:` 行。
 extract(workspace: Path, roots: Sequence[str]=('src', 'docs')) -> Tuple[List[Marker], List[str]]

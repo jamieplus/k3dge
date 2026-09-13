@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P2
 date: 2026-09-12
@@ -7,7 +7,7 @@ date: 2026-09-12
 
 # 硬闸/next 钩子/阈值 盘点与配置化
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M9
 - **Priority**: P2
 - **可检索摘要**: 盘点散在代码里的闸/阈值/next 文案/钩子，区分"声明式数据"与"执行逻辑"，把前者收敛为配置文件。
@@ -37,3 +37,10 @@ date: 2026-09-12
 - 事实归属：配置＝阈值/开关/文案的声明；引擎＝执行与判定逻辑。
 - 边界检查：配置不承载逻辑（无脚本/表达式），避免长出第二套判定语言。
 - 桩子先行：先出"清单 + 拟 schema"供评审，再分小步迁移；每步行为不变 + 测试。
+
+## 收尾（2026-09-13 已落）
+- 契约新增 `[markers]`（`max_note`/`max_note_pending`）与 `[output]`（`default_lines`）→ `gates.DEFAULTS` + `.agent/gates.toml`；`markers.parse_text` 增可选 caps，`extract` / `worktree.strip_pins` 从契约读；`status` 默认行数改读 `output.default_lines`。
+- 修 `search` 二次 clamp：`_snippet_window` 改按调用方 cap（`search.context_max`）而非硬编 3，否则自定义阈值失效。
+- **已配置盘点**：`audit_trigger`(c2/volume)、`search.context_max`、`markers.*`、`output.default_lines`、`[checks.seal|align]`。**仍留代码（有意）**：`nextstep` 各 state 文案（引导文本非阈值）、CLI argparse 派形状。
+- 测试：`test_gates`（markers/output 缺省+覆盖）、`test_markers`（note cap 可配）。306 passed；check 绿。
+- 注：本票并入了 stdout 预算（`next_hook` 残项），以 `[output].default_lines` 作最小落点；**全体命令**统一 stdout 预算仍属 `context_budget_metrics`。

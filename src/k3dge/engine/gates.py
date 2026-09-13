@@ -20,6 +20,8 @@ REL = ".agent/gates.toml"
 DEFAULTS: Dict[str, Any] = {
     "audit_trigger": {"c2_nesting_max": 5, "volume_max": 8},
     "search": {"context_max": 3},
+    "markers": {"max_note": 80, "max_note_pending": 500},
+    "output": {"default_lines": 10},
     # 编排单元：preconditions（闸 id，全绿才继续）+ actions（动作 id）。见 ADR-0001 §2 第 8 条。
     "checks": {
         "seal": {"preconditions": ["tasks_all_done", "audit_closed", "evidence_chain", "align_pass", "guides_filled",

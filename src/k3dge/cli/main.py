@@ -1133,8 +1133,11 @@ def cmd_status(args: argparse.Namespace) -> int:
             + (f" ({len(status_obj['pipeline']['issues'])} issue(s))" if status_obj["pipeline"]["issues"] else "")
         )
         if status_obj["unfinished_tasks"]:
+            from k3dge.engine import gates as _gates
+
             tasks = status_obj["unfinished_tasks"]
-            shown = tasks if getattr(args, "deep", False) else tasks[:10]
+            cap = int(_gates.get(workspace, "output", "default_lines"))
+            shown = tasks if getattr(args, "deep", False) else tasks[:cap]
             print(f"Unfinished tasks ({len(tasks)}):")
             for t in shown:
                 print(f"  - [{t['status'] or '?'}] {t['title']}")

@@ -105,3 +105,14 @@ def test_adjacent_pins_last_line_not_swallowed():
     ms, _ = parse_text("a.py", text)
     assert [(m.id, m.line) for m in ms] == [("P-1", 2), ("P-2", 3)]
     assert [m.note for m in ms] == ["", "note here"]  # note 是本行内容，不是下一行
+
+
+def test_parse_text_note_cap_configurable():
+    from k3dge.engine.markers import parse_text
+
+    long_note = "x" * 120
+    txt = f"# k3dit:leftover Q-1 {long_note}\n"
+    _, problems = parse_text("a.py", txt)  # 默认 leftover ≤80
+    assert any("超" in p for p in problems)
+    _, problems2 = parse_text("a.py", txt, max_note=200)
+    assert not any("超" in p for p in problems2)
