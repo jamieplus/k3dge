@@ -458,9 +458,9 @@ def _peer_fallback_warn(peer: str, reason: str, fallback: str) -> None:
     """Highlighted warning when an external peer is unavailable and we fall back to default."""
     msg = f"Peer '{peer}' failed ({reason}) → fallback to DEFAULT '{fallback}'"
     # High-visibility: red background + yellow text + plain fallback for non-TTY
-    banner = f"\033[1;41m[WARN][HARNESS FALLBACK]\033[0m \033[1;33m{msg}\033[0m"
+    banner = f"\033[1;41mWARN[DOWNGRADE]\033[0m \033[1;33m{msg}\033[0m"
     print(banner, file=sys.stderr)
-    print(f"[WARN][HARNESS FALLBACK] {msg}", file=sys.stderr)
+    print(f"WARN[DOWNGRADE] {msg}", file=sys.stderr)
 
 
 def _peer_fallback(pcfg: dict) -> str:

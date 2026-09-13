@@ -377,14 +377,6 @@
       "tokens": "Domain Specification: templates"
     },
     {
-      "path": "docs/tasks/2026-09-02-M7-docs-align_rules_overview_outbound.md",
-      "type": "tasks",
-      "id": "2026-09-02-M7-docs-align_rules_overview_outbound",
-      "title": "rules/07 与 overview 对齐 ADR-0006 出向编排与 downgrade 表述",
-      "status": "idea",
-      "tokens": "rules/07 与 overview 对齐 ADR-0006 出向编排与 downgrade 表述"
-    },
-    {
       "path": "docs/tasks/2026-09-02-M7-feat-check_gate_by_doc_status.md",
       "type": "tasks",
       "id": "2026-09-02-M7-feat-check_gate_by_doc_status",

@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P1
 date: 2026-09-02
@@ -7,7 +7,7 @@ date: 2026-09-02
 
 # rules/07 与 overview 对齐 ADR-0006 出向编排与 downgrade 表述
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M9
 - **Priority**: P1
 - **可检索摘要**: `overview.md` 把 agent 画成调 peer 的编排者、`rules/07` 的角色流同调，与 `ADR-0006` §2.3/§2.4（k3dge 调 peer、失败即 escalated 且显式表述 downgrade）冲突，需同步
@@ -34,3 +34,10 @@ date: 2026-09-02
 ## Related
 
 - `docs/tasks/2026-09-02-M7-feat-peer_outbound_mcp_client.md`（实现主体；本任务是其人读面）
+
+## 收尾（2026-09-13 已落）
+- `overview.md`：C4 与 sequence 的编排主语改回 **k3dge**；agent 只调 k3dge（动词＝读 NEXT / 改码 / 收摊），k3dge 调 peers，失败→`WARN[DOWNGRADE]`。
+- `.agent/rules/07-audit.md`：新增「方向性不变量（唯一编排者＝k3dge）」与「降级须显式」两条（`WARN[DOWNGRADE]` + 后果/哪一级从"进程外证据"降为"自证" + 计入过闸口径 + **agent 总结必须高亮降级＝角色义务**）；模板副本 `templates/assets/rules/07-audit.md` 同步（PAIRS 字节一致）。
+- 代码统一文案：`main.py` / `mcp.py` 旧 `[WARN][HARNESS FALLBACK]` → `WARN[DOWNGRADE]`（`pipeline_runner` 本已用）。
+- `pipeline.toml` 头（k3dge invokes lens）与 `[peers.k3che]`（mcp→skip）经核已合规（M7 后续已改）。
+- 289 passed；`check` 绿（PAIRS 全等）。

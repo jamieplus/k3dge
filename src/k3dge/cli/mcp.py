@@ -581,10 +581,10 @@ def k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippe
         # self-audit, which re-glues work/check (ADR-0006 sidecar boundary). Surface it
         # loudly and forbid self-certifying a seal with this lens.
         banner = (
-            "!!! \033[1;41m[WARN][HARNESS FALLBACK]\033[0m \033[1;33m"
+            "!!! \033[1;41mWARN[DOWNGRADE]\033[0m \033[1;33m"
             f"k3dit audit harness unavailable ({reason}), "
             "falling back to DEFAULT docs/protocols/audit_default.md\033[0m !!!\n"
-            "[WARN][HARNESS FALLBACK] k3dit not found → DEFAULT audit_default.md\n"
+            "WARN[DOWNGRADE] k3dit not found → DEFAULT audit_default.md\n"
             f"[WARN] Reason: {reason}\n"
             "[WARN] lens_source = default-self: 此透镜由干活 agent 自审，不构成独立审计；"
             "seal 前须转人工 / 外部 harness（k3dit）复核，禁止自审即封板。\n\n"

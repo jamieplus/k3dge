@@ -77,16 +77,16 @@ flowchart LR
 
 ```mermaid
 C4Context
-    title Harness 隔离（Agent 编排 + k3dge sidecar + 并列外部 harness）
-    System(agent, "Agent Harness (DSH/Codex/Claude/OpenCode)", "编排者：读 pipeline，调 k3dge 与外部 harness 的 MCP")
-    System_Ext(k3dge, "k3dge (sidecar MCP)", "一致性门禁 / 契约事实")
+    title Harness 隔离（k3dge 编排 + agent 调用 + 并列外部 harness）
+    System(agent, "Agent Harness (DSH/Codex/Claude/OpenCode)", "只调 k3dge：读 NEXT、改码、收摊")
+    System_Ext(k3dge, "k3dge (sidecar MCP)", "唯一编排者 / 一致性门禁：调 peer、契约事实")
     System_Ext(audit, "Audit Harness (k3dit)", "透镜（外部 MCP，不进 engine）")
     System_Ext(cache, "Cache Harness", "记忆/检索（外部 MCP）")
     System_Ext(quality, "Quality Harness", "度量/证伪（外部 MCP）")
-    Rel(agent, k3dge, "MCP stdio", "check/sync/status/incident — 零漂移委托")
-    Rel(agent, audit, "MCP", "透镜不进 engine")
-    Rel(agent, cache, "MCP", "Observer 异步")
-    Rel(agent, quality, "MCP", "verify")
+    Rel(agent, k3dge, "MCP stdio", "check/sync/status/milestone — 零漂移委托")
+    Rel(k3dge, audit, "MCP", "k3dge 调 peer 跑审计；失败→WARN[DOWNGRADE]")
+    Rel(k3dge, cache, "MCP", "Observer 异步")
+    Rel(k3dge, quality, "MCP", "verify")
     UpdateLayoutConfig($c4ShapeInRow="4", $c4BoundaryInRow="1")
 ```
 
@@ -115,7 +115,7 @@ stateDiagram-v2
 ```mermaid
 sequenceDiagram
     participant Agent as Agent Harness (DSH/Codex/Claude/OpenCode)
-    participant K3 as k3dge (sidecar MCP)
+    participant K3 as k3dge (sidecar MCP；唯一编排者)
     participant Audit as Audit Harness (k3dit, ext MCP)
     participant Quality as Quality Harness (k3lity, ext MCP)
     Agent->>K3: read .agent/pipeline.toml (on_seal_enter / on_pre_seal)
@@ -124,13 +124,14 @@ sequenceDiagram
     Agent->>K3: milestone align（Full Matrix，无人问）
     K3-->>Agent: 问「要审吗？」(无倒计时；N=继续干活)
     Agent->>K3: milestone audit <id>
-    Agent->>Audit: milestone audit = 棘轮步进：audit.submit 建单→席位 rounds→audit.collect 落签署件→写回主干
-    Note over Agent,Audit: 交换物=审计线（分支+现场，ADR-0025 重设计：锁线→交件→merge→删线）；席位经机构 seat 连接组件上岗（pi/opencode/…），sign-report 署名才算结案
-    Agent->>Quality: k3lity.actions.quality（mcp→cli→manual；人填不造假分）
-    Note over Agent,Audit: 外来审计源：人贴报告 → k3dge_submit_audit_report 落盘(--kind audit|quality)
-    Audit-->>Agent: 审计 12 列报告（含 待修/有意留/已修）+ 位置钉 k3dit:pending
-    Quality-->>Agent: 质量 12 列报告（k3dge:kind: quality）
-    Agent->>Agent: 任一报告 待修>0? 问「agent 修？」(倒计时默认修) → 重审各报告；>3 次 → escalated 转人工
+    K3->>Audit: 调 peer：audit.submit 建单→席位 rounds→audit.collect 落签署件→写回主干
+    Note over K3,Audit: 唯一编排者=k3dge（agent 不直连 peer）；交换物=审计线（分支+现场，ADR-0025）；sign-report 署名才算结案
+    K3->>Quality: 调 peer：k3lity.actions.quality（mcp→cli→manual；人填不造假分）
+    Audit-->>K3: 审计 12 列报告（含 待修/有意留/已修）+ 位置钉 k3dit:pending
+    Quality-->>K3: 质量 12 列报告（k3dge:kind: quality）
+    Note over K3,Audit: 外来审计源：人贴报告 → k3dge_submit_audit_report 落盘(--kind audit|quality)
+    K3-->>Agent: [NEXT] 待修>0 → 引导 agent 修（倒计时默认修）；重审各报告；>3 次 → escalated 转人工
+    Agent->>Agent: 改码 + 回填报告（agent 侧唯一动作）
     K3-->>Agent: [NEXT] seal_ready（两份报告 待修=0，唯一界限达成）
     Agent->>K3: milestone seal <id>
     K3-->>Agent: 问「封板？」(无倒计时；否=不封，里程碑挂着)
