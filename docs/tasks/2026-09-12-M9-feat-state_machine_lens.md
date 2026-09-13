@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P2
 date: 2026-09-12
@@ -7,7 +7,7 @@ date: 2026-09-12
 
 # 状态机转移图透镜：可达性/死状态/非法跃迁/闭包
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M9
 - **Priority**: P2
 - **可检索摘要**: task 状态枚举 / milestone 生命周期 / rounds `submit→claim→complete→sign→collect` 都是现成图；按声明转移表查可达性/死状态/非法跃迁/转移闭包（大厅规则典）。
@@ -29,3 +29,10 @@ date: 2026-09-12
 
 ## 验收
 - 不可达态 / 无出边非终态 / 未声明跃迁出事实；有声明才检；零依赖。
+
+## 收尾（2026-09-13 已落）
+- **立表（声明源）**：`engine/state_machine.py` 声明 task 状态机 `TASK_STATES` / `TASK_TRANSITIONS`（与 `docs/tasks/AUTHORING.md` 的 Status 枚举、`mark_task_done` 的合法流转一致）。
+- **事实**：`reachable` / `dead_states` / `unreachable` / `undeclared_targets` / `summary`（纯 stdlib，零依赖）。
+- **接入**：`k3dge status --json` / MCP `k3dge_status` 增 `state_machine`（可达/死状态/未声明目标）——**观测不判定**，不进 `check`。
+- 测试 `test_state_machine.py`（默认表 + 自造坏表）。304 passed；check 绿。
+- 注：本仓无现成里程碑声明转移表；本票按"先立表"先落 **task 状态机**（最简、事实现成）。里程碑生命周期表（`overview.md §6`）待后续按同法立。

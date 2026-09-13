@@ -541,6 +541,23 @@ REQUIRED_SECTIONS: List[Tuple[str, 're.Pattern[str]']] = [('Domain Boundary & Re
 CONTRACT_HASH_RE = re.compile('\\*\\*Contract Hash\\*\\*:\\s*`?sha256:([0-9a-f]{64})`?', re.IGNORECASE)
 validate_structure(content: str) -> List[str]
 extract_contract_hash(content: str) -> Optional[str]
+# state_machine.py
+from __future__ import annotations
+from typing import Dict
+from typing import List
+from typing import Set
+TASK_STATES: tuple = ('idea', 'deferred', 'in-progress', 'done')
+TASK_TRANSITIONS: Dict[str, Set[str]] = {'idea': {'deferred', 'in-progress', 'done'}, 'deferred': {'in-progress', 'done'}, 'in-progress': {'done'}, 'done': set()}
+INITIAL = 'idea'
+reachable(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS, start: str=INITIAL) -> Set[str]
+    # doc: 从 `start` BFS 可达的状态集。
+dead_states(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS) -> List[str]
+    # doc: 非终态却无出边＝死状态（悬挂）。
+unreachable(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS, start: str=INITIAL) -> List[str]
+undeclared_targets(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS) -> List[str]
+    # doc: 出边指向的目标未在转移表中作为源声明＝未声明目标。
+summary() -> Dict[str, object]
+    # doc: 观测件：state 数 / 可达 / 死状态 / 未声明目标（不判定）。
 # task_dag.py
 from __future__ import annotations
 from graphlib import CycleError

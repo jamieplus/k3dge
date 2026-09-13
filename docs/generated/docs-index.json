@@ -429,7 +429,7 @@
       "type": "tasks",
       "id": "2026-09-12-M9-feat-state_machine_lens",
       "title": "状态机转移图透镜：可达性/死状态/非法跃迁/闭包",
-      "status": "idea",
+      "status": "done",
       "tokens": "状态机转移图透镜：可达性/死状态/非法跃迁/闭包"
     },
     {

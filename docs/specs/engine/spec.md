@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:fc4dbe47546143bd8ec0ccd2cca7d0a6184c4a486ff0acc361204884f3a9eb66`
+- **Contract Hash**: `sha256:0ba219e4bb619b460e0a03c491ed5d3ea9ef38618cadc8208ab91e628f40a439`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -365,6 +365,18 @@ REQUIRED_SECTIONS: List[Tuple[str, 're.Pattern[str]']] = [('Domain Boundary & Re
 CONTRACT_HASH_RE = re.compile('\\*\\*Contract Hash\\*\\*:\\s*`?sha256:([0-9a-f]{64})`?', re.IGNORECASE)
 validate_structure(content: str) -> List[str]
 extract_contract_hash(content: str) -> Optional[str]
+from __future__ import annotations
+from typing import Dict
+from typing import List
+from typing import Set
+TASK_STATES: tuple = ('idea', 'deferred', 'in-progress', 'done')
+TASK_TRANSITIONS: Dict[str, Set[str]] = {'idea': {'deferred', 'in-progress', 'done'}, 'deferred': {'in-progress', 'done'}, 'in-progress': {'done'}, 'done': set()}
+INITIAL = 'idea'
+reachable(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS, start: str=INITIAL) -> Set[str]
+dead_states(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS) -> List[str]
+unreachable(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS, start: str=INITIAL) -> List[str]
+undeclared_targets(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS) -> List[str]
+summary() -> Dict[str, object]
 from __future__ import annotations
 from graphlib import CycleError
 from graphlib import TopologicalSorter

@@ -128,7 +128,7 @@ def workspace_status(workspace: Path) -> Dict[str, Any]:
                     }
                 )
 
-    from k3dge.engine import task_dag
+    from k3dge.engine import state_machine, task_dag
 
     return {
         "domains": sorted(manifest.domains),
@@ -138,6 +138,7 @@ def workspace_status(workspace: Path) -> Dict[str, Any]:
         "pipeline": pipeline,
         "unfinished_tasks": unfinished,
         "task_dag": task_dag.summary(workspace),
+        "state_machine": state_machine.summary(),
         "next": (ns.render_mcp() if (ns := lifecycle_next(workspace)) is not None else None),
         "cache": cache_observability(workspace),
     }
