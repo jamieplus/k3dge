@@ -141,35 +141,28 @@ def validate_versions(workspace: Path) -> list[Violation]:
     return violations
 
 
-def bump_version(workspace: Path, part: str = "patch", set_version: str | None = None) -> str:
-    """Bump SemVer and mirror to all existing version files atomically. Returns new version."""
-    current = get_version(workspace)
-    if current is None:
-        raise FileNotFoundError("No version found in pyproject.toml or .agent/manifest.json")
+def _next_version(current: str, part: str, set_version) -> str:
+    """算新版本号（set 覆盖 or major/minor/patch 递增）。"""
     if set_version:
-        new_version = set_version.lstrip("v")
-        parse_version(new_version)  # validate
-    else:
-        major, minor, patch = parse_version(current)
-        if part == "major":
-            major += 1
-            minor = 0
-            patch = 0
-        elif part == "minor":
-            minor += 1
-            patch = 0
-        elif part == "patch":
-            patch += 1
-        else:
-            raise ValueError(f"Unknown bump part '{part}': choose major/minor/patch")
-        new_version = format_version(major, minor, patch)
+        nv = set_version.lstrip("v")
+        parse_version(nv)  # validate
+        return nv
+    major, minor, patch = parse_version(current)
+    if part == "major":
+        return format_version(major + 1, 0, 0)
+    if part == "minor":
+        return format_version(major, minor + 1, 0)
+    if part == "patch":
+        return format_version(major, minor, patch + 1)
+    raise ValueError(f"Unknown bump part '{part}': choose major/minor/patch")
 
-    # Prepare new contents first (no writes yet) to catch errors early
-    updates: list[tuple[Path, str]] = []
+
+def _collect_version_updates(workspace: Path, new_version: str) -> list:
+    """准备 (path, new_text)（先算不写，早失败）。"""
+    updates: list = []
     p = _pyproject_path(workspace)
     if p.is_file():
-        text = p.read_text(encoding="utf-8")
-        new_text, n = _VERSION_RE.subn(f'version = "{new_version}"', text, count=1)
+        new_text, n = _VERSION_RE.subn(f'version = "{new_version}"', p.read_text(encoding="utf-8"), count=1)
         if n == 0:
             raise RuntimeError("Failed to update pyproject.toml version")
         updates.append((p, new_text))
@@ -180,13 +173,15 @@ def bump_version(workspace: Path, part: str = "patch", set_version: str | None =
         updates.append((mp, json.dumps(data, indent=2, ensure_ascii=False) + "\n"))
     ip = _init_path(workspace)
     if ip.is_file():
-        itext = ip.read_text(encoding="utf-8")
-        inew, n2 = _INIT_VERSION_RE.subn(f'__version__ = "{new_version}"', itext, count=1)
+        inew, n2 = _INIT_VERSION_RE.subn(f'__version__ = "{new_version}"', ip.read_text(encoding="utf-8"), count=1)
         if n2:
             updates.append((ip, inew))
+    return updates
 
-    # Atomic write per file via tmp+replace, with cross-file rollback on failure
-    originals: dict[Path, str] = {}
+
+def _apply_version_updates(updates: list) -> None:
+    """逐文件原子写；任一失败回滚已写者后 raise。"""
+    originals: dict = {}
     try:
         for path, new_content in updates:
             originals[path] = _read_utf8(path)
@@ -199,7 +194,55 @@ def bump_version(workspace: Path, part: str = "patch", set_version: str | None =
                 pass
         raise
 
+
+def bump_version(workspace: Path, part: str = "patch", set_version: str | None = None) -> str:
+    """Bump SemVer and mirror to all existing version files atomically. Returns new version."""
+    current = get_version(workspace)
+    if current is None:
+        raise FileNotFoundError("No version found in pyproject.toml or .agent/manifest.json")
+    new_version = _next_version(current, part, set_version)
+    _apply_version_updates(_collect_version_updates(workspace, new_version))
     return new_version
+
+
+_CT_MAP = {"feat": "Added", "fix": "Fixed", "audit": "Fixed", "docs": "Changed", "chore": "Changed", "refactor": "Changed", "sec": "Security"}
+_CC_PREFIX = re.compile(r"^\s*(feat|fix|audit|docs|chore|refactor|perf|sec|security)(\(.+\))?\s*:\s*", re.IGNORECASE)
+_PREAMBLE = (
+    "# Changelog\n\n"
+    "All notable changes to this project will be documented in this file.\n\n"
+    "The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\n"
+    "and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n"
+)
+
+
+def _infer_change_type(body: str, change_type):
+    if change_type:
+        return change_type
+    m = _CC_PREFIX.match(body)
+    if not m:
+        return change_type
+    inferred = m.group(1).lower()
+    if inferred == "security":
+        return "sec"
+    if inferred == "perf":
+        return "refactor"
+    return inferred
+
+
+def _insert_version_entry(text: str, entry: str) -> str:
+    """新版本放 [Unreleased] 之后、下一版本前；无 Unreleased 则首个 ## [ 前或文件末。"""
+    uidx = text.find("## [Unreleased]")
+    if uidx != -1:
+        nver = text.find("## [", uidx + len("## [Unreleased]"))
+        if nver != -1:
+            return text[:nver] + entry + text[nver:]
+    else:
+        idx = text.find("## [")
+        if idx != -1:
+            return text[:idx] + entry + text[idx:]
+    if not text.endswith("\n"):
+        text += "\n"
+    return text + "\n" + entry
 
 
 def append_changelog(workspace: Path, new_version: str, notes: str | None = None, change_type: str | None = None) -> Path:
@@ -208,62 +251,16 @@ def append_changelog(workspace: Path, new_version: str, notes: str | None = None
     today = datetime.date.today().isoformat()
     header = f"## [{new_version}] - {today}\n"
     body = notes.strip() if notes and notes.strip() else f"- Milestone sealed / version bump to {new_version}."
-    # Infer change_type from Conventional Commits prefix if not explicitly given (commit → CHANGELOG mapping)
-    # Do this before adding "- " prefix, so "feat: ..." is correctly detected
-    if not change_type:
-        import re as _re_ct
-
-        m = _re_ct.match(r"^\s*(feat|fix|audit|docs|chore|refactor|perf|sec|security)(\(.+\))?\s*:\s*", body, re.IGNORECASE)
-        if m:
-            inferred = m.group(1).lower()
-            if inferred == "security":
-                inferred = "sec"
-            elif inferred == "perf":
-                inferred = "refactor"
-            change_type = inferred
-    # Ensure body is a list — but keep already-sectioned Unreleased body (### Added etc.) as-is
+    change_type = _infer_change_type(body, change_type)
     stripped = body.lstrip()
     if not (stripped.startswith("-") or stripped.startswith("###")):
         body = f"- {body}"
-    # Map change_type to Keep a Changelog subsection
-    type_map = {"feat": "Added", "fix": "Fixed", "audit": "Fixed", "docs": "Changed", "chore": "Changed", "refactor": "Changed", "sec": "Security"}
-    section = type_map.get((change_type or "").lower(), None)
-    if section:
-        entry = f"{header}\n### {section}\n{body}\n\n"
-    else:
-        entry = f"{header}\n{body}\n\n"
-
+    section = _CT_MAP.get((change_type or "").lower())
+    entry = f"{header}\n### {section}\n{body}\n\n" if section else f"{header}\n{body}\n\n"
     if not changelog.exists():
-        # Create with Keep a Changelog preamble
-        preamble = (
-            "# Changelog\n\n"
-            "All notable changes to this project will be documented in this file.\n\n"
-            "The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\n"
-            "and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n"
-        )
-        _atomic_write(changelog, preamble + entry)
+        _atomic_write(changelog, _PREAMBLE + entry)
         return changelog
-
-    text = _read_utf8(changelog)
-    # Keep a Changelog: new version goes after [Unreleased] block, before next version
-    unreleased_idx = text.find("## [Unreleased]")
-    if unreleased_idx != -1:
-        next_ver_idx = text.find("## [", unreleased_idx + len("## [Unreleased]"))
-        if next_ver_idx != -1:
-            new_text = text[:next_ver_idx] + entry + text[next_ver_idx:]
-        else:
-            if not text.endswith("\n"):
-                text += "\n"
-            new_text = text + "\n" + entry
-    else:
-        idx = text.find("## [")
-        if idx != -1:
-            new_text = text[:idx] + entry + text[idx:]
-        else:
-            if not text.endswith("\n"):
-                text += "\n"
-            new_text = text + "\n" + entry
-    _atomic_write(changelog, new_text)
+    _atomic_write(changelog, _insert_version_entry(_read_utf8(changelog), entry))
     return changelog
 
 
