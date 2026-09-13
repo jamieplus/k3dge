@@ -10,6 +10,7 @@ Deciders: Core Maintainer
 Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit` 无输出，no live lens）。
       ② **合并原 ADR「TEMPLATE_DRIFT 锁在 engine」入本条 §2 第 7 条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：engine/templates 边界属架构基线；被并者 0014 删除，全仓指针改指本条。过闸口径 = manual fallback。
       ③ 就地增补 §2 第 8 条「硬闸契约（`.agent/gates.toml`）」（闸的声明式阈值/开关，执行器读契约，缺省在 `engine/gates.DEFAULTS`）2026-09-12，经 Core Maintainer 本轮显式授权（M9 治理配置化），依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback。
+      ④ 就地增补 §2 第 9 条「实现语言基线（Rust 重写否决）」2026-09-13，经 Core Maintainer 本轮会话指令与裁定（据尖刀实验处置实现语言约束），依 `docs/adr/AUTHORING.md`；证据＝`../k3dge-contract-rs` Phase-1（contract parity 14/40，护栏不成立）/Phase-2（`compile_fail` 证 E0004）/Phase-3（双语言漂移对照）。过闸口径 = manual fallback（实测 `command -v k3dit` 无输出，no live lens）。
 ---
 
 # ADR-0001: k3dge 架构设计与工程治理基线
@@ -66,6 +67,10 @@ Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一
    - 契约只承载**数据**，不含逻辑/表达式（不长第二套判定语言）。
    - **编排单元**：`[checks.<kind>].preconditions` 声明该单元消费的闸 id（全绿才继续）；`seal` 首批＝`tasks_all_done/align_pass/guides_filled/adrs_all_accepted/adr_landed`。未实现的 id 视为配置错（拒绝）。
    - **ADR＝事实源**：封版要求范围内 ADR 全 `Accepted` 且各带**可解析落地指针** `Landed-by: <路径> [§节]`（`engine/adr_gate`）；只验结构事实，不判决策内容（归 k3dit）。
+9. **实现语言基线（Rust 重写否决）**：保留 Python 3.10+ 标准库（核心零依赖），**不 Rust 重写**。
+   - 依据尖刀实验（`../k3dge-contract-rs` Phase-1/2/3）：Rust 护栏（漏一分支＝编译错 `E0004`）**只在"自有闭枚举且无 `_` wildcard"时成立**；在**解析外部语言语义**（contract 提取：公开签名归一化哈希）上**不成立**且成本高（需自造 `ast.unparse` 等价 + tree-sitter crates，破零依赖）。
+   - 护栏纪律**以 Python 近似吸收**：自有状态机用 `enum` + `typing.assert_never`（未处理分支交类型检查器暴露），不引 Rust/crates。
+   - 重开：仅当**自有状态机/契约**抽为独立 crate 且证明收益 > 多语言碎片/构建成本时，另立 ADR（不复用本条）。
 
 本 ADR 只定实现；目的语言（减少漂移、幻觉、修局部坏整体等，不必穷举）见 ADR-0009。
 
