@@ -393,14 +393,6 @@
       "tokens": "k3che 补 cli 传输面（mcp/cli 成对）"
     },
     {
-      "path": "docs/tasks/2026-09-03-M7-feat-gate_exit_and_trail_checks.md",
-      "type": "tasks",
-      "id": "2026-09-03-M7-feat-gate_exit_and_trail_checks",
-      "title": "把出口同构与日志只追加变成机验",
-      "status": "done",
-      "tokens": "把出口同构与日志只追加变成机验"
-    },
-    {
       "path": "docs/tasks/2026-09-04-M7-chore-engine_milestone_py_A_1_1547_6.md",
       "type": "tasks",
       "id": "2026-09-04-M7-chore-engine_milestone_py_A_1_1547_6",
