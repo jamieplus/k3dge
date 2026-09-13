@@ -38,6 +38,18 @@ mkdir my-audit-harness && cd my-audit-harness
 
 完成后即可直接开发，无需每次 `source activate`，也无需再手动安装任何东西。
 
+## 分发（单件，零依赖）
+
+自举阶段**不作 PyPI 发布**；给**下游仓 / 无 venv 宿主**一个零依赖单件：
+
+```bash
+./scripts/build-pyz.sh                 # 产出 dist/k3dge.pyz（stdlib `zipapp`，~1.2MB，零第三方）
+python dist/k3dge.pyz --help
+python dist/k3dge.pyz init my-harness  # 或拷到下游用；也可直接 ./dist/k3dge.pyz（带 shebang）
+```
+
+另有标准入口：`[project.scripts] k3dge` ↔ `pip install .` / `pipx install .` / `uv tool install .` 即得 `k3dge` 命令（源码安装；不走 PyPI）。
+
 ## 日常流程
 
 ```bash
