@@ -39,3 +39,18 @@ Python + `uv`/`PyInstaller`/`shiv` 打单件（解决"分发/`k3dge not found`"�
 ## 6. 结论
 Rust 与 vibe coding 的"规约即护栏"确实契合，值得试；但**别全量重写**，先尖刀验"类型系统是否真降 agent 漂移"。
 若走，须先立**新 ADR supersede `ADR-0001` 的实现语言约束**。
+
+## 7. 尖刀实验 Phase-1 结果（2026-09-13，crate `../k3dge-contract-rs`）
+**做法**：Rust + `tree-sitter`/`tree-sitter-python`/`sha2` 移植 contract 引擎（公开接口提取＋归一化＋sha256），与 `engine/contract.py` 做**散列 parity**。
+
+**硬结果**：对 k3dge `src/k3dge/engine`，parity **初版 0/40 → 修 `future_import_statement`＋逐-alias import 后 14/40 (35%)**。26 个未达标分 4 类**语义**分叉（非类型问题）：① 引号归一（`ast.unparse`→单引号，CST 双引号）；② 模块注解常量 `X: T = v` 丢 `: T`；③ CST 把 `# 注释` 折进值；④ 括号式 `from m import (a,b)` 需按 CST 解析 alias。达 parity 需在 Rust 里**重造 Python 表达式 unparser**。
+
+**关键发现（反命题）**：Rust 的「漏一分支＝编译错」**只在闭 `enum` 且不写 `_` wildcard 时**成立。初版漏 `future_import_statement` 时**编译器没拦住**——因为 `match node.kind()` 是**字符串匹配＋`_ => {}` 兜底**，与 Python 一样静默吞边；而 contract 引擎的输入是**外部字符串语法**，tree-sitter 的 `kind: &str` 天然削弱护栏。
+
+**修正后的判断**：
+- Rust 化在 k3dge **自有可枚举的状态机/信封/契约**上是**能力增强**（漏分支/形状错→编译期错）；
+- 在「**解析外部语言语义**（contract 提取）」上是**高成本重写**（自造 unparser＋非零依赖），类型系统帮不上。
+- 故：**不宜据 Phase-1 就 supersede `ADR-0001`**；先做 **Phase-2**（自有闭枚举状态机）验「是否真降 agent 漂移」再定。
+
+## 8. 尖刀实验 Phase-2 结果（2026-09-13）
+自有**闭枚举状态机**（crate `../k3dge-contract-rs` `src/phase.rs`：`TaskState` + 穷尽 `advance`，无 wildcard）：`compile_fail` doctest 证明漏一状态 ⇒ **编译错 E0004**；对照 Python 同漏分支静默。→ **护栏在自有闭枚举上成立且可证**。合 Phase-1：Rust 化**只在"自有状态机/信封/契约"上是能力增强**，在"解析外部语言语义"上是高成本重写。**不据尖刀 supersede `ADR-0001`**；若走，宜**混合**（核心闸/状态机 Rust，解析留 Python）或仅把护栏用于新增自有逻辑。
