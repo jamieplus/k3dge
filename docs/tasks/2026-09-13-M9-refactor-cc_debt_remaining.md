@@ -10,60 +10,45 @@ date: 2026-09-13
 - **Status**: idea
 - **Milestone**: M9
 - **Priority**: P3
-- **可检索摘要**: A-1 已拆完 `milestone.py`（1692→114 facade）；本票接续登记册里**其余文件**的 CC≥11 函数，逐函数拆/降（Simplify-first，一 diff 一测试）。
+- **可检索摘要**: A-1 已拆完 `milestone.py`（1692→114 facade）；本票接续 **k3lity 质量席首程（`docs/reviews/archive/M7/2026-09-04-M7-quality.md`）Q-1/Q-2/Q-4/Q-5** 的非 argparse 派 CC 重函数，逐函数拆/降（Simplify-first，一 diff 一测试）。**Q-3（argparse 派函数）审计已判 `有意留`，不列、不刷指标。**
 - **Date**: 2026-09-13
 
 ## 意图
-不整体销账：把 A-1 合并登记册中除 `milestone.py` 外的 CC≥11 函数逐个收敛。
+不整体销账：把审计 Q-1/Q-2/Q-4/Q-5 指认的 CC 重函数逐个收敛（Q-7 体积＝A-1，已完）。
 
-## 登记册（2026-09-13 实测；grep 式分支计数，非严格 McCabe）
-| CC | 位置 | 函数 |
+## 待拆（非派函数；来源＝审计原判 + 2026-09-13 复测）
+| 来源 | 位置 | 函数 |
 | --- | --- | --- |
-| 38 | `doc_catalog.py` | `_validate_file` |
-| 36 | `audit_flow.py` | `collect_audit` |
-| 29 | `pipeline_schema.py` | `validate_pipeline_config` |
-| 24 | `contract.py` | `extract_python_interface` |
-| 23 | `cli/main.py` | `cmd_milestone` |
-| 21 | `cli/main.py` | `cmd_task` |
-| 20 | `evaluator.py` | `_run_batch_tests` |
-| 19 | `pipeline_schema.py` | `_validate_transports` |
-| 18 | `cli/main.py` | `cmd_doc` |
-| 17 | `manifest.py` | `__init__` |
-| 16 | `worktree.py` | `merge_back` |
-| 16 | `version.py` | `append_changelog` |
-| 16 | `evaluator.py` | `_warn_changelog_done` |
-| 16 | `doc_catalog.py` | `grep_docs` |
-| 16 | `contract.py` | `collect_domain_interface` |
-| 16 | `contract.py` | `_fmt_class` |
-| 16 | `audit_flow.py` | `submit_audit` |
-| 15 | `mcp.py` | `_audit_protocol_with_fallback` |
-| 15 | `cli/main.py` | `_sync_peers_into_mcp` |
-| 15 | `cli/main.py` | `cmd_status` |
-| 15 | `contract.py` | `_get_all_names` |
-| 14 | `worktree.py` | `ensure` |
-| 14 | `version.py` | `bump_version` |
-| 14 | `cli/status.py` | `workspace_status` |
-| 14 | `pipeline_runner.py` | `run_action` |
-| 14 | `cli/main.py` | `cmd_audit` |
-| 13 | `pipeline_runner.py` | `call_mcp_tool` |
-| 13 | `_ts.py` | `_decl_signature` |
-| 12 | `search.py` | `_python_search` |
-| 12 | `markers.py` | `parse_text` |
-| 12 | `evaluator.py` | `_check_domain_imports` |
-| 12 | `evaluator.py` | `_check_verification_matrix` |
-| 12 | `evaluator.py` | `_check_template_drift` |
-| 11 | `worktree.py` | `strip_pins` |
-| 11 | `pipeline_runner.py` | `resolve_action` |
-| 11 | `mcp.py` | `k3dge_milestone_control` |
-| 11 | `cli/main.py` | `_cmd_mcp_probe` |
-| 11 | `evaluator.py` | `_package_prefix` |
-| 11 | `contract.py` | `_symbol_name` |
+| Q-1 | `audit_flow.py` | `collect_audit` |
+| Q-2 | `audit_flow.py` | `submit_audit` |
+| Q-2 | `pipeline_schema.py` | `validate_pipeline_config` |
+| Q-2 | `pipeline_schema.py` | `_validate_transports` |
+| Q-4 | `contract.py` | `extract_python_interface` |
+| Q-4 | `contract.py` | `collect_domain_interface` |
+| Q-4 | `contract.py` | `_fmt_class` |
+| Q-4 | `contract.py` | `_get_all_names` |
+| Q-4 | `contract.py` | `_symbol_name` |
+| Q-2 | `evaluator.py` | `_run_batch_tests` |
+| Q-4 | `evaluator.py` | `_warn_changelog_done` / `_check_domain_imports` / `_check_verification_matrix` / `_check_template_drift` / `_package_prefix` |
+| Q-4 | `doc_catalog.py` | `grep_docs` |
+| Q-4 | `manifest.py` | `Manifest.__init__` |
+| Q-4/Q-5 | `worktree.py` | `merge_back` / `ensure` / `strip_pins` |
+| Q-5 | `version.py` | `append_changelog` / `bump_version` |
+| Q-4 | `_ts.py` | `_decl_signature` |
+| Q-4 | `markers.py` | `parse_text` |
+| Q-2 | `milestone_audit.py`(移入) | `_ratchet_audit_step` / `run_audit_flow` |
+| Q-1/Q-2 | `task_write.py`(移入) | `_auto_backfill_reviews` / `mark_task_done` / `_finalize_task_done` |
+| Q-1/Q-2 | `seal.py`(移入) | `seal_milestone` / `_seal_archive` / `_seal_review_gate` |
+
+## 有意留（Q-3；审计已判，不拆、不刷指标）
+`cli/main.py` 的 `cmd_*`（argparse 派形状天然多分支）+ `_sync_peers_into_mcp` / `_cmd_mcp_probe`；`cli/mcp.py` 的 `_audit_protocol_with_fallback` / `k3dge_milestone_control`；`pipeline_runner.py` 的 `run_action` / `call_mcp_tool` / `resolve_action`；`cli/status.py` 的 `workspace_status`；`search.py` 的 `_python_search`；`nextstep.py`。**记录在册，不拆。**
 
 ## 边界与拆分
 - 事实归属：拆分归本票；CC 阈值口径归 `audit_trigger`/质量工具面。
-- 处置纪律：每函数拆/降**单独成程**（一 diff 一测试）；CLI argparse 派函数（`cmd_*`）若属"派形状天然分支多"，可只调阈值口径不修码（记录）；禁止整体销账。
-- 桩子先行：先挑 `doc_catalog._validate_file`（最高）+ `audit_flow.collect_audit` 两个，各起一程。
+- 处置纪律：每函数拆/降**单独成程**（一 diff 一测试）；**禁止为过闸刷指标**；Q-3 不拆。
+- 桩子先行：先挑 `pipeline_schema.validate_pipeline_config`（自含、已有 `_validate_transports` 分件）→ 再 `contract._fmt_class`/`_get_all_names`。
 
 ## 进度（2026-09-13）
-- ✅ `doc_catalog._validate_file`（CC38 → <11）：拆 `_validate_filename`/`_validate_h1`/`_validate_sections_when`/`_validate_sections`/`_validate_section_order`/`_validate_frontmatter`/`_validate_headers`/`_validate_index`，`_validate_file` 退为编排；行为不变（`b2eb8f8`）。移出清单，剩 `doc_catalog.grep_docs` CC16。
-- ⬜ 余按上表逐函数进行（每程一 diff 一测试）。
+- ✅ `doc_catalog._validate_file`（CC38，Q-1 → <11）：拆 8 个 schema 检查 helper，`_validate_file` 退为编排；行为不变（`b2eb8f8`）。
+- 🔁 登记册按审计原判重校（剔 Q-3，标有意留）。
+- ⬜ 余按上表逐函数进行。
