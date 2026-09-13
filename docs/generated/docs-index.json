@@ -377,14 +377,6 @@
       "tokens": "Domain Specification: templates"
     },
     {
-      "path": "docs/tasks/2026-09-04-M7-chore-engine_milestone_py_A_1_1547_6.md",
-      "type": "tasks",
-      "id": "2026-09-04-M7-chore-engine_milestone_py_A_1_1547_6",
-      "title": "拆分 engine/milestone.py 上帝模块（首案 A-1）+ 复杂度债登记册",
-      "status": "done",
-      "tokens": "拆分 engine/milestone.py 上帝模块（首案 A-1）+ 复杂度债登记册"
-    },
-    {
       "path": "docs/tasks/2026-09-13-M9-refactor-cc_debt_remaining.md",
       "type": "tasks",
       "id": "2026-09-13-M9-refactor-cc_debt_remaining",
