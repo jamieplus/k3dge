@@ -273,7 +273,7 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 REL = '.agent/gates.toml'
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}}}
 load(workspace: Path) -> Dict[str, Any]
     # doc: 缺省 ∪ `.agent/gates.toml`（段内覆盖；`checks.<kind>` 逐键覆盖）；文件缺失/坏 ⇒ 缺省。
 get(workspace: Path, section: str, key: str) -> Any
@@ -385,7 +385,10 @@ create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=
 mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]
     # doc: Mark one living task done. Prefer exact path from list_tasks; else unique filename substring.
 run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]
+seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]
+    # doc: 策略层：按「硬闸契约」`[checks.seal].preconditions` 求值全部前置闸，返回首个错误（None=全绿）。
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
+    # doc: 纯归档动作：id 合法 + 有任务 + 状态合法 → `_seal_archive`。策略闸在 `seal_preconditions_error`。
 persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
     # doc: Persist a human/agent-submitted audit report as the canonical on-disk report.
 run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]

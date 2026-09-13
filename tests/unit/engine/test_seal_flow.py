@@ -214,8 +214,9 @@ class TestSealFlow(TestCase):
         _mk_task(ws)
         _clean_report(ws)
         with mock.patch.object(ms, "run_milestone_alignment", return_value=(True, "ok", [])):
-            with mock.patch.object(ms, "seal_milestone", return_value=(True, "sealed M1")) as seal:
-                status, msg = ms.run_seal_flow(ws, "M1", prompter=ms._Prompt(answers=["y"]))
+            with mock.patch.object(ms, "seal_preconditions_error", return_value=None):
+                with mock.patch.object(ms, "seal_milestone", return_value=(True, "sealed M1")) as seal:
+                    status, msg = ms.run_seal_flow(ws, "M1", prompter=ms._Prompt(answers=["y"]))
         self.assertEqual(status, "sealed")
         seal.assert_called_once()
         # closure note for context compression is written
@@ -226,8 +227,9 @@ class TestSealFlow(TestCase):
         _mk_task(ws)
         _clean_report(ws)
         with mock.patch.object(ms, "run_milestone_alignment", return_value=(True, "ok", [])):
-            with mock.patch.object(ms, "seal_milestone", return_value=(True, "sealed M1")) as seal:
-                status, _ = ms.run_seal_flow(ws, "M1", skip_enter_prompt=True, prompter=ms._Prompt(answers=[]))
+            with mock.patch.object(ms, "seal_preconditions_error", return_value=None):
+                with mock.patch.object(ms, "seal_milestone", return_value=(True, "sealed M1")) as seal:
+                    status, _ = ms.run_seal_flow(ws, "M1", skip_enter_prompt=True, prompter=ms._Prompt(answers=[]))
         self.assertEqual(status, "sealed")
         seal.assert_called_once()
 

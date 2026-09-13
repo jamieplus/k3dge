@@ -22,7 +22,7 @@ DEFAULTS: Dict[str, Any] = {
     "search": {"context_max": 3},
     # 编排单元：preconditions（闸 id，全绿才继续）+ actions（动作 id）。见 ADR-0001 §2 第 8 条。
     "checks": {
-        "seal": {"preconditions": ["tasks_all_done", "align_pass", "guides_filled",
+        "seal": {"preconditions": ["tasks_all_done", "audit_closed", "align_pass", "guides_filled",
                                    "adrs_all_accepted", "adr_landed"],
                  "actions": ["full_matrix", "archive", "closure_note", "prune"]},
         "align": {"preconditions": ["tasks_all_done"], "actions": ["full_matrix"]},

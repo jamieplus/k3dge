@@ -901,7 +901,46 @@ def _seal_archive(workspace: Path, milestone_id: str, tasks: List[MilestoneTask]
         return True, f"{sealed} (milestone bump failed)"
 
 
+def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]:
+    """策略层：按「硬闸契约」`[checks.seal].preconditions` 求值全部前置闸，返回首个错误（None=全绿）。
+
+    与 `seal_milestone`（纯归档动作）分离：**何时可封＝策略（本函数）**，封板归档＝动作。
+    未实现的 id 视为配置错（拒绝，不让声明空转）。
+    """
+    from k3dge.engine.audit_trigger import audit_closed
+
+    tasks = scan_milestone_tasks(workspace, milestone_id)
+    pending = [t for t in tasks if t.status != "done"]
+    unfilled = scan_unfilled_guides(workspace)
+    gate_fns = {
+        "tasks_all_done": lambda: (
+            f"Cannot seal milestone '{milestone_id}'. Tasks not done: "
+            f"{[t.path.name for t in pending]}" if pending else None
+        ),
+        "audit_closed": lambda: (
+            None if audit_closed(workspace, milestone_id)
+            else f"[SEAL REJECTED] Milestone '{milestone_id}' audit not closed（无 12 列报告 / 待修≠0）。"
+        ),
+        "align_pass": lambda: _seal_review_gate(workspace, milestone_id, tasks),
+        "guides_filled": lambda: (
+            f"[SEAL REJECTED] Unfilled guide stubs detected in docs/guides/: {unfilled}.\n"
+            f"  Complete the documentation before milestone seal." if unfilled else None
+        ),
+        "adrs_all_accepted": lambda: adr_gate.adrs_all_accepted(workspace),
+        "adr_landed": lambda: adr_gate.adr_landed(workspace),
+    }
+    for gid in gates.preconditions(workspace, "seal"):
+        fn = gate_fns.get(gid)
+        if fn is None:
+            return f"[SEAL REJECTED] gate contract references unknown gate id: '{gid}'"
+        err = fn()
+        if err:
+            return err
+    return None
+
+
 def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
+    """纯归档动作：id 合法 + 有任务 + 状态合法 → `_seal_archive`。策略闸在 `seal_preconditions_error`。"""
     id_err = _validate_milestone_id(milestone_id)
     if id_err:
         return False, id_err
@@ -916,31 +955,6 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
             f"Cannot seal milestone '{milestone_id}'. Invalid Status: "
             f"{[t.path.name for t in invalid]}"
         )
-
-    # 前置闸：读「硬闸契约」`[checks.seal].preconditions`（ADR-0001 §2 第 8 条）——
-    # 执行器按声明跑闸；未实现的 id 视为配置错（拒绝，不让声明空转）。
-    pending = [t for t in tasks if t.status != "done"]
-    unfilled = scan_unfilled_guides(workspace)
-    gate_fns = {
-        "tasks_all_done": lambda: (
-            f"Cannot seal milestone '{milestone_id}'. Tasks not done: "
-            f"{[t.path.name for t in pending]}" if pending else None
-        ),
-        "align_pass": lambda: _seal_review_gate(workspace, milestone_id, tasks),
-        "guides_filled": lambda: (
-            f"[SEAL REJECTED] Unfilled guide stubs detected in docs/guides/: {unfilled}.\n"
-            f"  Complete the documentation before milestone seal." if unfilled else None
-        ),
-        "adrs_all_accepted": lambda: adr_gate.adrs_all_accepted(workspace),
-        "adr_landed": lambda: adr_gate.adr_landed(workspace),
-    }
-    for gid in gates.preconditions(workspace, "seal"):
-        fn = gate_fns.get(gid)
-        if fn is None:
-            return False, f"[SEAL REJECTED] gate contract references unknown gate id: '{gid}'"
-        err = fn()
-        if err:
-            return False, err
 
     return _seal_archive(workspace, milestone_id, tasks)
 
@@ -1621,7 +1635,7 @@ def run_seal_flow(
 
     prompt = prompter or _Prompt.default()
 
-    if not audit_closed(workspace, milestone_id):
+    if "audit_closed" in gates.preconditions(workspace, "seal") and not audit_closed(workspace, milestone_id):
         msg = f"Milestone {milestone_id}: 未审计（待修未归零或无 12 列报告），不可封板。"
         return "audit_needed", msg + "\n" + nextstep.NextStep.from_state("audit_needed", milestone_id).render_cli()
 
@@ -1642,6 +1656,9 @@ def run_seal_flow(
         return True, ""
 
     def _archive():
+        err = seal_preconditions_error(workspace, milestone_id)
+        if err:
+            return False, err
         return seal_milestone(workspace, milestone_id)
 
     def _closure_note():

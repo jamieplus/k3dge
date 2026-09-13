@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:39e370de11c2cbccd7288a0f9c549f4001dc540ef841609ef4e3189cfa2d1d23`
+- **Contract Hash**: `sha256:6524032fc342c0ec2a9b703375fb42a5dce27103cf48b73daf048827050a2e10`
 - **Last Updated**: 2026-09-12
 
 ## 1. Domain Boundary & Responsibilities
@@ -152,7 +152,7 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 REL = '.agent/gates.toml'
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}}}
 load(workspace: Path) -> Dict[str, Any]
 get(workspace: Path, section: str, key: str) -> Any
 preconditions(workspace: Path, kind: str) -> list
@@ -244,6 +244,7 @@ scan_milestone_tasks(workspace: Path, milestone_id: str) -> List[MilestoneTask]
 create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=None, milestone: Optional[str]=None, priority: str='P2', report: Optional[str]=None) -> Tuple[bool, str, Optional[Path]]
 mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]
 run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]
+seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
 persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
 run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]

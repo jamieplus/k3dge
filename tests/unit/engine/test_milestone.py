@@ -10,6 +10,7 @@ from k3dge.engine.milestone import (
     scan_milestone_tasks,
     run_milestone_alignment,
     seal_milestone,
+    seal_preconditions_error,
     _ALIGN_STUB_MARKER,
     _align_pass_marker,
 )
@@ -19,6 +20,15 @@ def _write_task(path: pathlib.Path, status: str, milestone: str) -> None:
     path.write_text(
         f"# Task\n- **Status**: {status}\n- **Milestone**: {milestone}\n",
         encoding="utf-8",
+    )
+
+
+def _set_seal_gates(ws: pathlib.Path, *gate_ids: str) -> None:
+    """测试用：把契约 `[checks.seal].preconditions` 收窄到指定闸，隔离被测闸。"""
+    (ws / ".agent").mkdir(parents=True, exist_ok=True)
+    body = ", ".join(f'"{g}"' for g in gate_ids)
+    (ws / ".agent" / "gates.toml").write_text(
+        f"[checks.seal]\npreconditions = [{body}]\n", encoding="utf-8"
     )
 
 
@@ -187,10 +197,11 @@ class TestMilestone(unittest.TestCase):
 
     def test_seal_rejects_missing_review(self) -> None:
         _write_task(self.ws / "docs/tasks/x.md", "done", "M10")
-        ok, msg = seal_milestone(self.ws, "M10")
-        self.assertFalse(ok)
-        self.assertIn("SEAL REJECTED", msg)
-        self.assertIn("audit review", msg)
+        _set_seal_gates(self.ws, "align_pass")
+        err = seal_preconditions_error(self.ws, "M10")
+        self.assertIsNotNone(err)
+        self.assertIn("SEAL REJECTED", err)
+        self.assertIn("audit review", err)
         # nothing archived
         self.assertTrue((self.ws / "docs/tasks/x.md").exists())
 
@@ -198,9 +209,10 @@ class TestMilestone(unittest.TestCase):
         _write_task(self.ws / "docs/tasks/x.md", "done", "M1")
         (self.ws / "docs/reviews").mkdir(parents=True)
         (self.ws / "docs/reviews/2026-08-23-M10-align.md").write_text("# Review M10\n", encoding="utf-8")
-        ok, msg = seal_milestone(self.ws, "M1")
-        self.assertFalse(ok)
-        self.assertIn("SEAL REJECTED", msg)
+        _set_seal_gates(self.ws, "align_pass")
+        err = seal_preconditions_error(self.ws, "M1")
+        self.assertIsNotNone(err)
+        self.assertIn("SEAL REJECTED", err)
         self.assertTrue((self.ws / "docs/tasks/x.md").exists())
 
     def test_rejects_path_like_milestone_id(self) -> None:
@@ -234,9 +246,10 @@ class TestMilestone(unittest.TestCase):
         reviews = list((self.ws / "docs/reviews").glob("*M21*"))
         self.assertTrue(reviews)
         self.assertIn(_ALIGN_STUB_MARKER, reviews[0].read_text(encoding="utf-8"))
-        ok, msg = seal_milestone(self.ws, "M21")
-        self.assertFalse(ok)
-        self.assertIn("align stub", msg)
+        _set_seal_gates(self.ws, "align_pass")
+        err = seal_preconditions_error(self.ws, "M21")
+        self.assertIsNotNone(err)
+        self.assertIn("align stub", err)
         self.assertTrue((self.ws / "docs/tasks/x.md").exists())
 
     def test_seal_rollback_reports_incomplete(self) -> None:
@@ -276,9 +289,17 @@ class TestMilestone(unittest.TestCase):
         (self.ws / "docs/reviews/2026-08-24-M13-align.md").write_text(
             "# Handmade M13\nfilled but not from align\n", encoding="utf-8"
         )
-        ok, msg = seal_milestone(self.ws, "M13")
-        self.assertFalse(ok)
-        self.assertIn("align-pass", msg)
+        _set_seal_gates(self.ws, "align_pass")
+        err = seal_preconditions_error(self.ws, "M13")
+        self.assertIsNotNone(err)
+        self.assertIn("align-pass", err)
+
+    def test_seal_gate_audit_closed(self) -> None:
+        _write_task(self.ws / "docs/tasks/x.md", "done", "M17")
+        _set_seal_gates(self.ws, "audit_closed")
+        err = seal_preconditions_error(self.ws, "M17")
+        self.assertIsNotNone(err)
+        self.assertIn("audit not closed", err)
 
     def test_seal_rejects_unfilled_guides(self) -> None:
         _write_task(self.ws / "docs/tasks/x.md", "done", "M12")
@@ -290,10 +311,11 @@ class TestMilestone(unittest.TestCase):
         (self.ws / "docs/guides/user_guide.md").write_text(
             "# User Guide\n<!-- k3dge:guide-stub -->\n", encoding="utf-8"
         )
-        ok, msg = seal_milestone(self.ws, "M12")
-        self.assertFalse(ok)
-        self.assertIn("docs/guides/", msg)
-        self.assertIn("user_guide.md", msg)
+        _set_seal_gates(self.ws, "guides_filled")
+        err = seal_preconditions_error(self.ws, "M12")
+        self.assertIsNotNone(err)
+        self.assertIn("docs/guides/", err)
+        self.assertIn("user_guide.md", err)
 
     def test_seal_archives_untagged_review_with_pass_mark(self) -> None:
         _write_task(self.ws / "docs/tasks/x.md", "done", "M14")

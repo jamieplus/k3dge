@@ -37,7 +37,7 @@ def test_seal_preconditions_default_and_override():
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d)
         assert gates.preconditions(ws, "seal") == [
-            "tasks_all_done", "align_pass", "guides_filled", "adrs_all_accepted", "adr_landed",
+            "tasks_all_done", "audit_closed", "align_pass", "guides_filled", "adrs_all_accepted", "adr_landed",
         ]
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d, "[checks.seal]\npreconditions = []\n")
