@@ -162,6 +162,10 @@ materialize(workspace: Path, job_key: str='', rev: str='', dest: str='') -> dict
     # doc: Hall 只读物化：把 rev（缺=在办单基线）的树解到 dest（不带 .git，不碰线/worktree）。
 prune_finished(workspace: Path) -> dict
     # doc: ⑤ seal 收口钩子：清已结案 job 的 worktree 与审计线（幂等，容错）。
+# audit_report.py
+from __future__ import annotations
+from pathlib import Path
+from k3dge.engine import report_table
 # audit_trigger.py
 from __future__ import annotations
 from pathlib import Path

@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:49ec39edc3d4bff1cc4dfbceff13e6ec4aa1e74650a599c4c8731c6a1ea7a767`
+- **Contract Hash**: `sha256:8f07dc4a54a2772a3b7539bacb8042c492e0682879fd485eeea3c3ca00c916c8`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -64,6 +64,9 @@ open_ratchet_jobs(workspace: Path) -> list
 show_job(workspace: Path, job_key: str='') -> dict
 materialize(workspace: Path, job_key: str='', rev: str='', dest: str='') -> dict
 prune_finished(workspace: Path) -> dict
+from __future__ import annotations
+from pathlib import Path
+from k3dge.engine import report_table
 from __future__ import annotations
 from pathlib import Path
 from typing import List

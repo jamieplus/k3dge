@@ -906,7 +906,15 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
 # produced 12-col report. The work agent fixes; k3dit audits; k3dge routes.
 # ---------------------------------------------------------------------------
 
-_AUDIT_HEADER = report_table.TABLE_HEADER
+# A-1 第四块：report 查找/归类/计数已抽到 `audit_report`；re-export 兼容调用面。
+from k3dge.engine.audit_report import (  # noqa: E402
+    _AUDIT_HEADER,
+    _QUALITY_MARKER_RE,
+    _find_audit_report,
+    _find_report,
+    _parse_audit_stats,
+    _report_kind,
+)
 
 
 def _align_review_path(workspace: Path, milestone_id: str) -> Optional[Path]:
@@ -940,54 +948,6 @@ def _strip_align_stub(workspace: Path, milestone_id: str) -> None:
         return
     if _ALIGN_STUB_MARKER in text:
         p.write_text(text.replace(_ALIGN_STUB_MARKER, "").strip() + "\n", encoding="utf-8")
-
-
-_QUALITY_MARKER_RE = re.compile(r"k3dge:kind:\s*quality", re.IGNORECASE)
-
-
-def _report_kind(name: str, text: str) -> str:
-    """Classify a 12-col report as 'quality' (k3lity) or 'audit' (k3dit)."""
-    if _QUALITY_MARKER_RE.search(text) or "-quality" in name.lower():
-        return "quality"
-    return "audit"
-
-
-def _find_report(workspace: Path, milestone_id: str, kind: str = "audit"):
-    """Return (path, text) of the most recent 12-col report of the given kind."""
-    reviews = workspace / "docs" / "reviews"
-    if not reviews.is_dir():
-        return None
-    candidates = []
-    for f in reviews.iterdir():
-        if not (f.is_file() and f.suffix == ".md" and not _is_review_aux(f.name)):
-            continue
-        try:
-            text = f.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
-        if _AUDIT_HEADER.replace(" ", "") not in text.replace(" ", ""):
-            continue
-        if _report_kind(f.name, text) != kind:
-            continue
-        if milestone_id:
-            fn_ms = _filename_milestone(f.name)
-            if fn_ms:
-                if fn_ms != milestone_id:
-                    continue
-            elif not _has_milestone_token(text, milestone_id):
-                # 报告既无里程碑文件名、正文也无该里程碑 token（如 doc-audit 通稿）：
-                # 不得充当任一里程碑的审计闭环（否则 seal_ready 假阳）。
-                continue
-        candidates.append((f.stat().st_mtime, f, text))
-    if not candidates:
-        return None
-    candidates.sort(reverse=True)
-    return candidates[0][1], candidates[0][2]
-
-
-def _find_audit_report(workspace: Path, milestone_id: str):
-    """Most recent audit (k3dit) report. Back-compat wrapper for kind='audit'."""
-    return _find_report(workspace, milestone_id, "audit")
 
 
 def persist_external_audit_report(
@@ -1030,15 +990,6 @@ def persist_external_audit_report(
     path = reviews / f"{today}-{milestone_id}-{scope}-{suffix}.md"
     path.write_text(content.strip() + "\n", encoding="utf-8")
     return path
-
-
-def _parse_audit_stats(text: str) -> dict:
-    """Count 待修 / 有意留 / 已修 rows in a 12-col audit table.
-
-    单一解析器：委托 `report_table.count_statuses`（value-2），与 `_count_status`、
-    封板闸同口径。
-    """
-    return report_table.count_statuses(text)
 
 
 def _ensure_leftovers(workspace: Path, text: str, report_path: Path) -> None:
