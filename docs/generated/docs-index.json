@@ -393,14 +393,6 @@
       "tokens": "k3che 补 cli 传输面（mcp/cli 成对）"
     },
     {
-      "path": "docs/tasks/2026-09-03-M7-feat-archive_tier_contract.md",
-      "type": "tasks",
-      "id": "2026-09-03-M7-feat-archive_tier_contract",
-      "title": "归档契约落地（去向标记提醒 + 显式 --archive 出口）",
-      "status": "done",
-      "tokens": "归档契约落地（去向标记提醒 + 显式 --archive 出口）"
-    },
-    {
       "path": "docs/tasks/2026-09-03-M7-feat-gate_exit_and_trail_checks.md",
       "type": "tasks",
       "id": "2026-09-03-M7-feat-gate_exit_and_trail_checks",
