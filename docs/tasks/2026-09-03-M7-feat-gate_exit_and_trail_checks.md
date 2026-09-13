@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P2
 date: 2026-09-03
@@ -7,7 +7,7 @@ date: 2026-09-03
 
 # 把出口同构与日志只追加变成机验
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M9
 - **Priority**: P2
 - **可检索摘要**: `ADR-0008` 的「三出口同构」与「审计痕迹只可追加」目前只靠人写测试守；本任务把它们变成闸：命令级同构断言 + 静态禁对 `logs/**` 覆写
@@ -47,3 +47,9 @@ date: 2026-09-03
 
 - 事故：`docs/incidents/INC-20260902-CON-exit-and-trail-blindspot.md` §3 后三条未勾项
 - 席位侧的互补方案（制度化验收复核，不进闸）：`docs/memo/archive/2026-09-02-peer-wiring-and-seat-options.md` §2.1
+
+## 收尾（2026-09-13 已落）
+- **出口同构**：MCP `k3dge_check` / `k3dge_task_list` 现回带 `next`（单一源 `cli/status.lifecycle_next`）；测试 `TestMcpExitIsomorphism` 断言二者与 `k3dge_status.next` 同值。
+- **痕迹只追加闸**（`check` 新增规则，维护者本轮"继续"授权）：`evaluator._check_audit_trail` 静态扫 `src/**` 对 `logs/` 的 `write_text` / `open(...,'w'|'x')` **覆写** → `AUDIT_TRAIL_APPEND_ONLY`；纯静态、不跑进程（T-01 / ADR-0006 §2.3.2 不破）、追加式不报。测试 `test_audit_trail.py`（3 例）。
+- 299 passed；`check` 绿（本仓无自伤）。
+- 注：add 一条 `check` 规则与 ADR-0012 §2 旧取向相抵，本票原列"动手前需维护者点头"；经维护者本轮显式授权落地。

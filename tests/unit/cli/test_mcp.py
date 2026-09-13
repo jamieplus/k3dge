@@ -203,3 +203,24 @@ def test_server_alive_under_mcp2():
     assert "k3dge_check" in tools and "k3dge_status" in tools, tools
     uris = {r.uri for r in asyncio.run(km.mcp.list_resources())}
     assert "spec://manifest" in uris, uris
+
+
+class TestMcpExitIsomorphism(unittest.TestCase):
+    def test_check_and_task_list_carry_same_next(self) -> None:
+        import unittest.mock as mock
+
+        from k3dge.cli import status as status_mod
+        from k3dge.engine import nextstep
+
+        ns = nextstep.NextStep.from_state("audit_suggested", "M1", reasons=["x"])
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".agent").mkdir()
+            (root / ".agent" / "manifest.json").write_text(
+                json.dumps({"package_root": "src", "domains": {}})
+            )
+            with mock.patch.object(status_mod, "lifecycle_next", return_value=ns):
+                chk = json.loads(mcp.k3dge_check(workspace_path=d))
+                tl = json.loads(mcp.k3dge_task_list(workspace_path=d))
+        self.assertEqual(chk["next"], ns.render_mcp())
+        self.assertEqual(tl["next"], ns.render_mcp())

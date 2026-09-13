@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, Set
 
+import ast
 import re
 
 from k3dge.engine import contract, diff, spec_schema
@@ -285,6 +286,8 @@ class ConsistencyEngine:
 
         violations.extend(self._check_pipeline())
 
+        violations.extend(self._check_audit_trail())
+
         violations.extend(self._check_docs(files, force_full))
 
         return GateReport(
@@ -491,6 +494,54 @@ class ConsistencyEngine:
                 )
             )
         return out
+
+    def _check_audit_trail(self) -> List[Violation]:
+        """`ADR-0008`：审计痕迹只可追加。静态扫 `src/**` 里对 `logs/` 的**覆写式**写入（write_text / open 'w'）。
+
+        只判盘上事实（AST 字符串常量 + 写模式），不跑进程。追加式（`open(...,'a')` / 无 `write_text`）不报。
+        """
+        import ast
+
+        src = self.workspace_root / "src"
+        out: List[Violation] = []
+        if not src.is_dir():
+            return out
+        for path in src.rglob("*.py"):
+            if "__pycache__" in path.parts:
+                continue
+            try:
+                tree = ast.parse(path.read_text(encoding="utf-8"))
+            except (OSError, SyntaxError, ValueError):
+                continue
+            rel = path.relative_to(self.workspace_root).as_posix()
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                msg = self._logs_overwrite(node)
+                if msg:
+                    out.append(Violation("AUDIT_TRAIL_APPEND_ONLY", msg, file_path=rel))
+        return out
+
+    @staticmethod
+    def _logs_literal(node) -> bool:
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                if "logs" in sub.value.replace("\\", "/").split("/") or "logs/" in sub.value.replace("\\", "/"):
+                    return True
+        return False
+
+    @classmethod
+    def _logs_overwrite(cls, node) -> str:
+        func = node.func
+        name = func.attr if isinstance(func, ast.Attribute) else (func.id if isinstance(func, ast.Name) else "")
+        if name == "write_text" and cls._logs_literal(node):
+            return "对 logs/ 的 write_text 覆写：审计痕迹只可追加（ADR-0008），改用追加写入。"
+        if name == "open" and node.args:
+            target, mode = node.args[0], (node.args[1] if len(node.args) > 1 else None)
+            wr = isinstance(mode, ast.Constant) and isinstance(mode.value, str) and any(c in mode.value for c in "wx")
+            if cls._logs_literal(target) and (mode is None or wr):
+                return "对 logs/ 的 open(...,'w') 覆写：审计痕迹只可追加（ADR-0008），改用 'a'。"
+        return ""
 
     def _check_docs(self, files, force_full: bool) -> List[Violation]:
         """docs 目录结构/索引校验（force_full 或本批触 docs 时）。"""

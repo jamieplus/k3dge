@@ -114,6 +114,10 @@ def k3dge_check(
     payload["ok"] = report.passed
     payload["render_output"] = report.render()
     payload["force_full"] = force_full
+    from k3dge.cli.status import lifecycle_next
+
+    ns = lifecycle_next(ws)
+    payload["next"] = ns.render_mcp() if ns is not None else None
     return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
@@ -281,10 +285,14 @@ def k3dge_task_list(
     """Index living docs/tasks/*.md (not archive). Returns title/status/milestone/priority, not bodies."""
     ws = _find_workspace(workspace_path=workspace_path)
     rows = milestone.list_tasks(ws, milestone_id=milestone_id, status=status)
+    from k3dge.cli.status import lifecycle_next
+
+    ns = lifecycle_next(ws)
     return json.dumps(
         {
             "ok": True,
             "count": len(rows),
+            "next": ns.render_mcp() if ns is not None else None,
             "tasks": [
                 {
                     "path": str(t.path.relative_to(ws)).replace("\\", "/"),
