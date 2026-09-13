@@ -437,7 +437,7 @@
       "type": "tasks",
       "id": "2026-09-04-M7-feat-ratchet_real_run_backlog",
       "title": "首案真跑前遗留（k3dge 侧）——复核后剩余",
-      "status": "idea",
+      "status": "done",
       "tokens": "首案真跑前遗留（k3dge 侧）——复核后剩余"
     },
     {
@@ -511,6 +511,14 @@
       "title": "上下文预算度量：命令 stdout 行数 / 被加载 doc 数 / 往返",
       "status": "idea",
       "tokens": "上下文预算度量：命令 stdout 行数 / 被加载 doc 数 / 往返"
+    },
+    {
+      "path": "docs/tasks/2026-09-13-M9-feat-audit_prefilter.md",
+      "type": "tasks",
+      "id": "2026-09-13-M9-feat-audit_prefilter",
+      "title": "§7 审计复用预筛：milestone audit 人工入口短路",
+      "status": "idea",
+      "tokens": "§7 审计复用预筛：milestone audit 人工入口短路"
     }
   ]
 }

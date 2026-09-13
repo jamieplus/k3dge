@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P1
 date: 2026-09-04
@@ -7,7 +7,7 @@ date: 2026-09-04
 
 # 首案真跑前遗留（k3dge 侧）——复核后剩余
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M9
 - **Priority**: P1
 - **可检索摘要**: 2026-09-12 复核：原清单多数已过时/已完成；**剩 3 项活**——§7 复用预筛、`.mcp.json` 解释器固化、scaffold 出生即红（`PIPELINE_PEER_UNWIRED`）。
@@ -24,9 +24,9 @@ date: 2026-09-04
 
 ## 剩余（活）
 
-1. **§7 复用预筛三条件**：人工入口 `k3dge milestone audit <id>` 命中「闭环报告 + `provenance.baseline` == 线上基线 + `lens_version` == 当前」⇒ 告知"无审计需要执行" + `--force`，痕迹 `PRE-FILTER` 落 `logs/k3dge.log`。现状：`peer_contract §7` 有规范、**代码无实现**。
-2. **`.mcp.json` 解释器固化**：k3dit/k3che server 由 `"command":"python"` + `PYTHONPATH` 改为各仓 venv **绝对路径**（demo 已验证该形）。现状：`.mcp.json` 仍是 `"python"`。
-3. **scaffold 出生即红（`PIPELINE_PEER_UNWIRED`）**：新下游仓 pipeline 默认绑 k3dit/k3che，但 scaffold 的 `.mcp.json` 不声明 peers ⇒ 首跑 `check` 报红。修法二选一：scaffold 生成**无 role 绑定的空 pipeline**，或 init 在缺 `.mcp.json` 条目时自动注 stub。
+1. **§7 复用预筛三条件** → **拆出** `2026-09-13-M9-feat-audit_prefilter`（跨仓依赖 k3dit `lens_version` 取数源；未就绪前不短路）。
+2. ✅ **`.mcp.json` 解释器固化**：k3dit/k3che 的 `command` 改各仓 venv 绝对路径（`k3dge mcp sync` 只补缺、不覆盖已有 `command`）。
+3. ✅ **scaffold 出生即红（`PIPELINE_PEER_UNWIRED`）**：取方案 b——scaffold 把 pipeline 绑定的 peer 以 stub 写进 `.mcp.json`；测 `test_pipeline_peers_declared_so_birth_not_red`。
 
 ## 边界与拆分
 
