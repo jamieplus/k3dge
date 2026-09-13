@@ -54,3 +54,6 @@ Rust 与 vibe coding 的"规约即护栏"确实契合，值得试；但**别全�
 
 ## 8. 尖刀实验 Phase-2 结果（2026-09-13）
 自有**闭枚举状态机**（crate `../k3dge-contract-rs` `src/phase.rs`：`TaskState` + 穷尽 `advance`，无 wildcard）：`compile_fail` doctest 证明漏一状态 ⇒ **编译错 E0004**；对照 Python 同漏分支静默。→ **护栏在自有闭枚举上成立且可证**。合 Phase-1：Rust 化**只在"自有状态机/信封/契约"上是能力增强**，在"解析外部语言语义"上是高成本重写。**不据尖刀 supersede `ADR-0001`**；若走，宜**混合**（核心闸/状态机 Rust，解析留 Python）或仅把护栏用于新增自有逻辑。
+
+## 9. 尖刀实验 Phase-3 结果（2026-09-13，双语言对照）
+同变更「新增状态并处理所有消费点」：Rust 只加 `TaskState::Blocked`（不改 match）⇒ `cargo build` **E0004 逐点列出 2 处待更新**；补点即绿（迭代 2）。Python 对照：`if/elif` 漏分支⇒**静默 None**，`dict` 漏键⇒**仅调用时 KeyError**（静态不可知）。→ 自有闭枚举上 Rust 把"漏分支"从**人自觉/运行时**变**编译期强制**（能力增强）；外部语义解析上不成立。详见 crate `../k3dge-contract-rs/EXPERIMENT.md`。
