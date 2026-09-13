@@ -99,7 +99,8 @@ date: 2026-09-04
 - **第六块 ✅**：reviews 归档机械 `_living_review_files` / `_reviews_to_archive` / `_rewrite_leftover_links` / `_safe_archive_dir` → `engine/review_archive.py`（re-export）。1346 → 1298。
 - **第七块 ✅**：task 读取族 `parse_frontmatter` / `list_tasks` / `scan_milestone_tasks` / `MilestoneTask` / `TaskIndex` / `STATUS_RE`/`MILESTONE_RE`/`PRIORITY_RE`/`TITLE_RE` → `engine/task_index.py`（re-export）。1298 → 1224。
 - **第八块 ✅**：CHANGELOG 追加 `_append_to_unreleased` / `_changelog_draft_path` → `engine/changelog.py`（re-export）。1224 → 1170。
-- **余块待抽**：task 写入核心（`create_task`/`mark_task_done`/`_resolve_task_target`/`_finalize_task_done`/`_auto_backfill_reviews`）；align；audit_flow；seal 流程。
+- **第九块 ✅**：task 写入核心 `create_task` / `mark_task_done` / `_resolve_task_target` / `_rename_task_done` / `_finalize_task_done` / `_task_report_pointer` / `_report_open_findings` / `_append_task_changelog` / `_backfill_task_reviews` / `_auto_backfill_reviews` → `engine/task_write.py`（re-export；依赖全来自 leaf 模块，无环）。1170 → 861。
+- **余块待抽**：align（`run_milestone_alignment` 一族）；audit-flow（`run_audit_flow`/`_ratchet_audit_step`/`_audit_mode`）；seal 流程（`seal_milestone`/`seal_preconditions_error`/`_seal_archive`/`_seal_review_gate`/`_align_review_path`/`_strip_align_stub`/`run_seal_flow`/`_write_closure_note`/`scan_unfilled_guides`）。
 - **余块待抽**：seal 流程（`seal_milestone`/`seal_preconditions_error`/`_seal_archive`/`_seal_review_gate`/`_align_review_path`/`_strip_align_stub`/`run_seal_flow`/`_write_closure_note`）——最安全攸关，独立一轮；align；audit_flow；tasks（`list_tasks`/`create_task`/`mark_task_done` 一族）。
 - **余块待抽**：report 解析（`_find_report`/`_parse_audit_stats`/`_seal_review_gate`…）→ `engine/audit_report.py`；doc-audit（`run_doc_audit`/`_changed_docs`/`_ensure_doc_audit_task`）→ `engine/doc_audit.py`；seal（`seal_milestone`/`seal_preconditions_error`/`_seal_archive`）；audit_flow；tasks；align。
 - 纪律：每块一 diff 一测试、`k3dge sync` + 全量绿；别名/转发保调用面，行为不变。

@@ -383,10 +383,8 @@ from k3dge.engine.task_index import MilestoneTask
 from k3dge.engine.task_index import TaskIndex
 from k3dge.engine.task_index import list_tasks
 from k3dge.engine.task_index import scan_milestone_tasks
-create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=None, milestone: Optional[str]=None, priority: str='P2', report: Optional[str]=None) -> Tuple[bool, str, Optional[Path]]
-    # doc: Write a living task file. Returns (ok, message, path).
-mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]
-    # doc: Mark one living task done. Prefer exact path from list_tasks; else unique filename substring.
+from k3dge.engine.task_write import create_task
+from k3dge.engine.task_write import mark_task_done
 run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]
 seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]
     # doc: 策略层：按「硬闸契约」`[checks.seal].preconditions` 求值全部前置闸，返回首个错误（None=全绿）。
@@ -626,6 +624,21 @@ class TaskIndex
 list_tasks(workspace: Path, milestone_id: Optional[str]=None, status: Optional[str]=None) -> List[TaskIndex]
     # doc: Index living task files (not archive/, not README). Filters are exact matches.
 scan_milestone_tasks(workspace: Path, milestone_id: str) -> List[MilestoneTask]
+# task_write.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Tuple
+from k3dge.engine import report_table
+from k3dge.engine.milestone_pointer import get_current_milestone
+from k3dge.engine.task_index import MILESTONE_RE
+from k3dge.engine.task_index import TITLE_RE
+from k3dge.engine.task_index import parse_frontmatter
+create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=None, milestone: Optional[str]=None, priority: str='P2', report: Optional[str]=None) -> Tuple[bool, str, Optional[Path]]
+    # doc: Write a living task file. Returns (ok, message, path).
+mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]
+    # doc: Mark one living task done. Prefer exact path from list_tasks; else unique filename substring.
 # version.py
 from __future__ import annotations
 from pathlib import Path

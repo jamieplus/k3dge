@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:58e4ac3157d3696af1eb01272105187d507bd8c93a62c72e96307c2601a04c1b`
+- **Contract Hash**: `sha256:4eb826d15eaccea4b91c5f688042797ee3a0c5fdccc9b289212517e3d77a7ff7`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -246,8 +246,8 @@ from k3dge.engine.task_index import MilestoneTask
 from k3dge.engine.task_index import TaskIndex
 from k3dge.engine.task_index import list_tasks
 from k3dge.engine.task_index import scan_milestone_tasks
-create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=None, milestone: Optional[str]=None, priority: str='P2', report: Optional[str]=None) -> Tuple[bool, str, Optional[Path]]
-mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]
+from k3dge.engine.task_write import create_task
+from k3dge.engine.task_write import mark_task_done
 run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]
 seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
@@ -431,6 +431,18 @@ class TaskIndex
     priority: str
 list_tasks(workspace: Path, milestone_id: Optional[str]=None, status: Optional[str]=None) -> List[TaskIndex]
 scan_milestone_tasks(workspace: Path, milestone_id: str) -> List[MilestoneTask]
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Tuple
+from k3dge.engine import report_table
+from k3dge.engine.milestone_pointer import get_current_milestone
+from k3dge.engine.task_index import MILESTONE_RE
+from k3dge.engine.task_index import TITLE_RE
+from k3dge.engine.task_index import parse_frontmatter
+create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=None, milestone: Optional[str]=None, priority: str='P2', report: Optional[str]=None) -> Tuple[bool, str, Optional[Path]]
+mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]
 from __future__ import annotations
 from pathlib import Path
 from typing import Tuple
