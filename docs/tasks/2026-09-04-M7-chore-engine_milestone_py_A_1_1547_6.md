@@ -98,6 +98,8 @@ date: 2026-09-04
 - **第五块 ✅**：doc-audit 族 `_changed_docs` / `_new_archive_without_note` / `_ensure_doc_audit_task` / `_similar_task_hints` / `_related_doc_hints` / `_attach_k3che_hints` / `run_doc_audit`（+`_AUDIT_EXCLUDE_DOCS`/`_K3CHE_HINT_RE`）→ `engine/doc_audit.py`（milestone 内部依赖惰性 import 避环；re-export）。1552 → 1346。
 - **第六块 ✅**：reviews 归档机械 `_living_review_files` / `_reviews_to_archive` / `_rewrite_leftover_links` / `_safe_archive_dir` → `engine/review_archive.py`（re-export）。1346 → 1298。
 - **第七块 ✅**：task 读取族 `parse_frontmatter` / `list_tasks` / `scan_milestone_tasks` / `MilestoneTask` / `TaskIndex` / `STATUS_RE`/`MILESTONE_RE`/`PRIORITY_RE`/`TITLE_RE` → `engine/task_index.py`（re-export）。1298 → 1224。
+- **第八块 ✅**：CHANGELOG 追加 `_append_to_unreleased` / `_changelog_draft_path` → `engine/changelog.py`（re-export）。1224 → 1170。
+- **余块待抽**：task 写入核心（`create_task`/`mark_task_done`/`_resolve_task_target`/`_finalize_task_done`/`_auto_backfill_reviews`）；align；audit_flow；seal 流程。
 - **余块待抽**：seal 流程（`seal_milestone`/`seal_preconditions_error`/`_seal_archive`/`_seal_review_gate`/`_align_review_path`/`_strip_align_stub`/`run_seal_flow`/`_write_closure_note`）——最安全攸关，独立一轮；align；audit_flow；tasks（`list_tasks`/`create_task`/`mark_task_done` 一族）。
 - **余块待抽**：report 解析（`_find_report`/`_parse_audit_stats`/`_seal_review_gate`…）→ `engine/audit_report.py`；doc-audit（`run_doc_audit`/`_changed_docs`/`_ensure_doc_audit_task`）→ `engine/doc_audit.py`；seal（`seal_milestone`/`seal_preconditions_error`/`_seal_archive`）；audit_flow；tasks；align。
 - 纪律：每块一 diff 一测试、`k3dge sync` + 全量绿；别名/转发保调用面，行为不变。

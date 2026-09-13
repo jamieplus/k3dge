@@ -178,6 +178,10 @@ compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
     # doc: Return (suggested, reasons). Only fires on a quantitative event.
 audit_closed(workspace: Path, milestone_id: str) -> bool
     # doc: True iff the single audit report exists with 待修==0.
+# changelog.py
+from __future__ import annotations
+from pathlib import Path
+from k3dge.engine.task_index import TITLE_RE
 # contract.py
 from __future__ import annotations
 from pathlib import Path

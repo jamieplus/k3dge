@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:5b74fee8fdf59aff4d64fde97003c4e9ed2665bf467f16e0afdb2c4fa0d69b41`
+- **Contract Hash**: `sha256:58e4ac3157d3696af1eb01272105187d507bd8c93a62c72e96307c2601a04c1b`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -76,6 +76,9 @@ from k3dge.engine.milestone import get_current_milestone
 from k3dge.engine.milestone import scan_milestone_tasks
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
 audit_closed(workspace: Path, milestone_id: str) -> bool
+from __future__ import annotations
+from pathlib import Path
+from k3dge.engine.task_index import TITLE_RE
 from __future__ import annotations
 from pathlib import Path
 from typing import List
