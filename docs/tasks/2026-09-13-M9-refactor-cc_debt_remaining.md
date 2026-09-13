@@ -63,3 +63,7 @@ date: 2026-09-13
 - 事实归属：拆分归本票；CC 阈值口径归 `audit_trigger`/质量工具面。
 - 处置纪律：每函数拆/降**单独成程**（一 diff 一测试）；CLI argparse 派函数（`cmd_*`）若属"派形状天然分支多"，可只调阈值口径不修码（记录）；禁止整体销账。
 - 桩子先行：先挑 `doc_catalog._validate_file`（最高）+ `audit_flow.collect_audit` 两个，各起一程。
+
+## 进度（2026-09-13）
+- ✅ `doc_catalog._validate_file`（CC38 → <11）：拆 `_validate_filename`/`_validate_h1`/`_validate_sections_when`/`_validate_sections`/`_validate_section_order`/`_validate_frontmatter`/`_validate_headers`/`_validate_index`，`_validate_file` 退为编排；行为不变（`b2eb8f8`）。移出清单，剩 `doc_catalog.grep_docs` CC16。
+- ⬜ 余按上表逐函数进行（每程一 diff 一测试）。
