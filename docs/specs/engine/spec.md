@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:7d95c86a88c4e37dbb474a54c19aacb1c7ca07f9003bdb9f8c673b885c7b8252`
+- **Contract Hash**: `sha256:9b77d8031803e02c4c57921e0a3830248efe199a60515f39d9f934d5da84cb2c`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -229,51 +229,26 @@ validate(workspace: Path, markers: Sequence[Marker]) -> List[str]
 counts(markers: Iterable[Marker]) -> dict
 open_samples(markers: Sequence[Marker]) -> List[str]
 closure_ok(markers: Sequence[Marker]) -> Tuple[bool, dict]
-from __future__ import annotations
-from dataclasses import dataclass
-from pathlib import Path
-from typing import List
-from typing import Optional
-from typing import Tuple
-from k3dge.engine import adr_gate
-from k3dge.engine import gates
-from k3dge.engine import process_audit
-from k3dge.engine import report_table
-from k3dge.engine.evaluator import ConsistencyEngine
-from k3dge.engine.task_index import MILESTONE_RE
-from k3dge.engine.task_index import PRIORITY_RE
-from k3dge.engine.task_index import STATUS_RE
-from k3dge.engine.task_index import TITLE_RE
-from k3dge.engine.task_index import parse_frontmatter
 from k3dge.engine.align import run_milestone_alignment
-from k3dge.engine.milestone_pointer import bump_milestone
-from k3dge.engine.milestone_pointer import get_current_milestone
-from k3dge.engine.milestone_pointer import set_current_milestone
-from k3dge.engine.seal import scan_unfilled_guides
+from k3dge.engine.doc_audit import run_doc_audit
+from k3dge.engine.milestone_audit import persist_external_audit_report
+from k3dge.engine.milestone_audit import run_audit_flow
 from k3dge.engine.milestone_audit import scan_pending_findings
-from k3dge.engine.task_index import MILESTONE_RE
-from k3dge.engine.task_index import PRIORITY_RE
-from k3dge.engine.task_index import STATUS_RE
-from k3dge.engine.task_index import TITLE_RE
-from k3dge.engine.task_index import parse_frontmatter
-from k3dge.engine.align import run_milestone_alignment
 from k3dge.engine.milestone_pointer import bump_milestone
 from k3dge.engine.milestone_pointer import get_current_milestone
 from k3dge.engine.milestone_pointer import set_current_milestone
+from k3dge.engine.seal import seal_milestone
+from k3dge.engine.seal import seal_preconditions_error
 from k3dge.engine.seal import scan_unfilled_guides
-scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
+from k3dge.engine.seal_flow import run_seal_flow
 from k3dge.engine.task_index import MilestoneTask
 from k3dge.engine.task_index import TaskIndex
 from k3dge.engine.task_index import list_tasks
+from k3dge.engine.task_index import parse_frontmatter
 from k3dge.engine.task_index import scan_milestone_tasks
 from k3dge.engine.task_write import create_task
 from k3dge.engine.task_write import mark_task_done
-from k3dge.engine.seal import seal_milestone
-from k3dge.engine.seal import seal_preconditions_error
-from k3dge.engine.milestone_audit import persist_external_audit_report
-from k3dge.engine.doc_audit import run_doc_audit
-from k3dge.engine.milestone_audit import run_audit_flow
-run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
+__all__ = ['MilestoneTask', 'TaskIndex', 'bump_milestone', 'create_task', 'get_current_milestone', 'list_tasks', 'mark_task_done', 'parse_frontmatter', 'persist_external_audit_report', 'run_audit_flow', 'run_doc_audit', 'run_milestone_alignment', 'run_seal_flow', 'scan_milestone_tasks', 'scan_pending_findings', 'scan_unfilled_guides', 'seal_milestone', 'seal_preconditions_error', 'set_current_milestone']
 from __future__ import annotations
 from pathlib import Path
 from typing import List
@@ -402,6 +377,15 @@ GUIDE_STUB_RE = re.compile('<!--\\s*k3dge:guide-stub\\s*-->', re.IGNORECASE)
 scan_unfilled_guides(workspace: Path) -> List[str]
 seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+from typing import Tuple
+from k3dge.engine import gates
+from k3dge.engine.align import run_milestone_alignment
+from k3dge.engine.seal import seal_milestone
+from k3dge.engine.seal import seal_preconditions_error
+run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path

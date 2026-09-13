@@ -278,7 +278,7 @@ class TestMilestone(unittest.TestCase):
                 raise OSError("rollback blocked")
             return real_move(src, dst)
 
-        with mock.patch("k3dge.engine.milestone.shutil.move", side_effect=flaky_move):
+        with mock.patch("k3dge.engine.seal.shutil.move", side_effect=flaky_move):
             ok, msg = seal_milestone(self.ws, "M22")
         self.assertFalse(ok)
         self.assertIn("rollback incomplete", msg)
@@ -361,7 +361,7 @@ class TestMilestone(unittest.TestCase):
                 raise OSError("disk full")
             return real_move(src, dst)
 
-        with mock.patch("k3dge.engine.milestone.shutil.move", side_effect=flaky_move):
+        with mock.patch("k3dge.engine.seal.shutil.move", side_effect=flaky_move):
             ok, msg = seal_milestone(self.ws, "M15")
         self.assertFalse(ok)
         self.assertTrue((self.ws / "docs/tasks/a.md").exists())

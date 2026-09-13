@@ -195,7 +195,7 @@ class TestSealFlow(TestCase):
     def test_seal_requires_closed_audit(self) -> None:
         ws = _ws()
         _mk_task(ws)  # no report -> audit not closed
-        with mock.patch.object(ms, "seal_milestone", return_value=(True, "sealed")) as seal:
+        with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed")) as seal:
             status, _ = ms.run_seal_flow(ws, "M1", prompter=ms._Prompt(answers=["y"]))
         self.assertEqual(status, "audit_needed")
         seal.assert_not_called()
@@ -204,7 +204,7 @@ class TestSealFlow(TestCase):
         ws = _ws()
         _mk_task(ws)
         _clean_report(ws)
-        with mock.patch.object(ms, "seal_milestone", return_value=(True, "sealed")) as seal:
+        with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed")) as seal:
             status, _ = ms.run_seal_flow(ws, "M1", prompter=ms._Prompt(answers=["n"]))
         self.assertEqual(status, "deferred")
         seal.assert_not_called()
@@ -213,9 +213,9 @@ class TestSealFlow(TestCase):
         ws = _ws()
         _mk_task(ws)
         _clean_report(ws)
-        with mock.patch.object(ms, "run_milestone_alignment", return_value=(True, "ok", [])):
-            with mock.patch.object(ms, "seal_preconditions_error", return_value=None):
-                with mock.patch.object(ms, "seal_milestone", return_value=(True, "sealed M1")) as seal:
+        with mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
+            with mock.patch("k3dge.engine.seal_flow.seal_preconditions_error", return_value=None):
+                with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed M1")) as seal:
                     status, msg = ms.run_seal_flow(ws, "M1", prompter=ms._Prompt(answers=["y"]))
         self.assertEqual(status, "sealed")
         seal.assert_called_once()
@@ -226,9 +226,9 @@ class TestSealFlow(TestCase):
         ws = _ws()
         _mk_task(ws)
         _clean_report(ws)
-        with mock.patch.object(ms, "run_milestone_alignment", return_value=(True, "ok", [])):
-            with mock.patch.object(ms, "seal_preconditions_error", return_value=None):
-                with mock.patch.object(ms, "seal_milestone", return_value=(True, "sealed M1")) as seal:
+        with mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
+            with mock.patch("k3dge.engine.seal_flow.seal_preconditions_error", return_value=None):
+                with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed M1")) as seal:
                     status, _ = ms.run_seal_flow(ws, "M1", skip_enter_prompt=True, prompter=ms._Prompt(answers=[]))
         self.assertEqual(status, "sealed")
         seal.assert_called_once()
