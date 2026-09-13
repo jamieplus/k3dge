@@ -538,6 +538,12 @@ parse_rows(text: str, required: Tuple[str, ...]=('ID', '状态')) -> Tuple[Optio
     # doc: 解析数据行：返回 (header, [(line_idx, {列: 值})])。
 count_statuses(text: str) -> Dict[str, object]
     # doc: 状态列计数（含 `_ids_<状态>`）。封板闸与 `_count_status` 共用此唯一口径。
+# review_archive.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Tuple
 # search.py
 from __future__ import annotations
 from dataclasses import dataclass

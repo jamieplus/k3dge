@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:961af3e96bae1c36240a6a7115637b3c4bd04e21cf4ee9eacff6fe05da2b48f7`
+- **Contract Hash**: `sha256:5a3ca0a331b36f0c71e50f384894648a6db18d6acc70d0e0bd08848e7dcb1254`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -361,6 +361,11 @@ has_table(text: str) -> bool
 find_table(text: str, required: Tuple[str, ...]=('ID', '状态'))
 parse_rows(text: str, required: Tuple[str, ...]=('ID', '状态')) -> Tuple[Optional[List[str]], List[Tuple[int, Dict[str, str]]]]
 count_statuses(text: str) -> Dict[str, object]
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Tuple
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path

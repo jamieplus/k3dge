@@ -228,61 +228,13 @@ from k3dge.engine.milestone_files import (  # noqa: E402
 )
 
 
-def _living_review_files(reviews_dir: Path) -> List[Path]:
-    if not reviews_dir.is_dir():
-        return []
-    return sorted(
-        f for f in reviews_dir.iterdir() if f.is_file() and f.suffix == ".md" and not _is_review_aux(f.name)
-    )
-
-
-def _reviews_to_archive(reviews_dir: Path, milestone_id: str, pass_mark: str) -> List[Path]:
-    """Living reports for this milestone: filename token, or align-pass marker in body.
-
-    Files named for another milestone stay at top-level.
-    """
-    out: List[Path] = []
-    for path in _living_review_files(reviews_dir):
-        named = _filename_milestone(path.name)
-        if named and named != milestone_id:
-            continue
-        if _has_milestone_token(path.name, milestone_id):
-            out.append(path)
-            continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
-        if pass_mark in text:
-            out.append(path)
-    return out
-
-
-def _rewrite_leftover_links(workspace: Path, filename: str, new_href: str) -> None:
-    leftovers = workspace / "docs" / "reviews" / "LEFTOVERS.md"
-    if not leftovers.is_file():
-        return
-    try:
-        text = leftovers.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return
-    updated = text.replace(f"]({filename})", f"]({new_href})")
-    updated = updated.replace(f"](./{filename})", f"]({new_href})")
-    if updated != text:
-        leftovers.write_text(updated, encoding="utf-8")
-
-
-def _safe_archive_dir(workspace: Path, kind: str, milestone_id: str) -> Tuple[Optional[Path], str]:
-    """Return (dir, error). dir is None on path escape."""
-    root = (workspace / "docs" / kind / "archive").resolve()
-    dest = (root / milestone_id).resolve()
-    try:
-        dest.relative_to(root)
-    except ValueError:
-        return None, (
-            f"Invalid milestone id '{milestone_id}': archive path escapes docs/{kind}/archive/"
-        )
-    return dest, ""
+# A-1 第六块：reviews 归档机械已抽到 `review_archive`；re-export 兼容调用面。
+from k3dge.engine.review_archive import (  # noqa: E402
+    _living_review_files,
+    _reviews_to_archive,
+    _rewrite_leftover_links,
+    _safe_archive_dir,
+)
 
 
 def scan_unfilled_guides(workspace: Path) -> List[str]:
