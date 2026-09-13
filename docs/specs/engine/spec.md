@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:84b67c347ad2650257f73c338ecc94d968c6b7b793e407077f39e9da8903ffb6`
+- **Contract Hash**: `sha256:9b43b16c552f2bba746915a939ca61f51f351ad827721f5a733cfb18da4d90aa`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -245,12 +245,11 @@ from k3dge.engine.task_index import PRIORITY_RE
 from k3dge.engine.task_index import STATUS_RE
 from k3dge.engine.task_index import TITLE_RE
 from k3dge.engine.task_index import parse_frontmatter
-GUIDE_STUB_RE = re.compile('<!--\\s*k3dge:guide-stub\\s*-->', re.IGNORECASE)
 from k3dge.engine.align import run_milestone_alignment
 from k3dge.engine.milestone_pointer import bump_milestone
 from k3dge.engine.milestone_pointer import get_current_milestone
 from k3dge.engine.milestone_pointer import set_current_milestone
-scan_unfilled_guides(workspace: Path) -> List[str]
+from k3dge.engine.seal import scan_unfilled_guides
 scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
 from k3dge.engine.task_index import MilestoneTask
 from k3dge.engine.task_index import TaskIndex
@@ -258,8 +257,8 @@ from k3dge.engine.task_index import list_tasks
 from k3dge.engine.task_index import scan_milestone_tasks
 from k3dge.engine.task_write import create_task
 from k3dge.engine.task_write import mark_task_done
-seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]
-seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
+from k3dge.engine.seal import seal_milestone
+from k3dge.engine.seal import seal_preconditions_error
 persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
 from k3dge.engine.doc_audit import run_doc_audit
 run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
@@ -369,6 +368,21 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from typing import Tuple
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Tuple
+from k3dge.engine import adr_gate
+from k3dge.engine import gates
+from k3dge.engine import process_audit
+from k3dge.engine.milestone_pointer import bump_milestone
+from k3dge.engine.task_index import MilestoneTask
+from k3dge.engine.task_index import scan_milestone_tasks
+GUIDE_STUB_RE = re.compile('<!--\\s*k3dge:guide-stub\\s*-->', re.IGNORECASE)
+scan_unfilled_guides(workspace: Path) -> List[str]
+seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]
+seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path

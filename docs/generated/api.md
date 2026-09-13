@@ -381,13 +381,11 @@ from k3dge.engine.task_index import PRIORITY_RE
 from k3dge.engine.task_index import STATUS_RE
 from k3dge.engine.task_index import TITLE_RE
 from k3dge.engine.task_index import parse_frontmatter
-GUIDE_STUB_RE = re.compile('<!--\\s*k3dge:guide-stub\\s*-->', re.IGNORECASE)
 from k3dge.engine.align import run_milestone_alignment
 from k3dge.engine.milestone_pointer import bump_milestone
 from k3dge.engine.milestone_pointer import get_current_milestone
 from k3dge.engine.milestone_pointer import set_current_milestone
-scan_unfilled_guides(workspace: Path) -> List[str]
-    # doc: Names of guide stubs in docs/guides/ still carrying `<!-- k3dge:guide-stub -->`.
+from k3dge.engine.seal import scan_unfilled_guides
 scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
     # doc: 未决 findings（语法 v1：pending/disputed/fixnote 计 open）。
 from k3dge.engine.task_index import MilestoneTask
@@ -396,10 +394,8 @@ from k3dge.engine.task_index import list_tasks
 from k3dge.engine.task_index import scan_milestone_tasks
 from k3dge.engine.task_write import create_task
 from k3dge.engine.task_write import mark_task_done
-seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]
-    # doc: 策略层：按「硬闸契约」`[checks.seal].preconditions` 求值全部前置闸，返回首个错误（None=全绿）。
-seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
-    # doc: 纯归档动作：id 合法 + 有任务 + 状态合法 → `_seal_archive`。策略闸在 `seal_preconditions_error`。
+from k3dge.engine.seal import seal_milestone
+from k3dge.engine.seal import seal_preconditions_error
 persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
     # doc: Persist a human/agent-submitted audit report as the canonical on-disk report.
 from k3dge.engine.doc_audit import run_doc_audit
@@ -544,6 +540,25 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from typing import Tuple
+# seal.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Tuple
+from k3dge.engine import adr_gate
+from k3dge.engine import gates
+from k3dge.engine import process_audit
+from k3dge.engine.milestone_pointer import bump_milestone
+from k3dge.engine.task_index import MilestoneTask
+from k3dge.engine.task_index import scan_milestone_tasks
+GUIDE_STUB_RE = re.compile('<!--\\s*k3dge:guide-stub\\s*-->', re.IGNORECASE)
+scan_unfilled_guides(workspace: Path) -> List[str]
+    # doc: Names of guide stubs in docs/guides/ still carrying `<!-- k3dge:guide-stub -->`.
+seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]
+    # doc: 策略层：按「硬闸契约」`[checks.seal].preconditions` 求值全部前置闸，返回首个错误（None=全绿）。
+seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
+    # doc: 纯归档动作：id 合法 + 有任务 + 状态合法 → `_seal_archive`。策略闸在 `seal_preconditions_error`。
 # search.py
 from __future__ import annotations
 from dataclasses import dataclass
