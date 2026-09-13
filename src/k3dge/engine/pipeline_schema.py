@@ -37,43 +37,18 @@ PipelineViolation = Tuple[str, str]
 
 
 # k3dit:leftover Q-6 CC28 validate_pipeline_config 分拆校验
-def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
-    """Validate `.agent/pipeline.toml`. Returns [] when valid or file absent.
-
-    Rule codes: PIPELINE_SYNTAX_ERROR, PIPELINE_SCHEMA_INVALID,
-    PIPELINE_UNRESOLVED_STAGE, PIPELINE_PROTOCOL_NOT_FOUND.
-    """
-    pipeline_file = workspace / _PIPELINE_REL
-    if not pipeline_file.is_file():
-        return []
-
-    if tomllib is None:
-        return [("PIPELINE_SYNTAX_ERROR",
-                 "tomllib/tomli unavailable; cannot validate .agent/pipeline.toml")]
-
-    try:
-        data = tomllib.loads(pipeline_file.read_text(encoding="utf-8"))
-    except Exception as exc:
-        return [("PIPELINE_SYNTAX_ERROR", f"TOML parse failed: {exc}")]
-
-    errors: List[PipelineViolation] = []
+def _validate_legacy_keys(data) -> List[PipelineViolation]:
     legacy = [k for k in ("harnesses", "hooks") if k in data]
     if legacy:
-        errors.append(
-            (
-                "PIPELINE_SCHEMA_INVALID",
-                "legacy keys %s are not read; migrate to [peers]/[pipelines] (ADR-0006)"
-                % ", ".join(legacy),
-            )
-        )
-    peers = data.get("peers", {})
-    if not isinstance(peers, dict):
-        return [("PIPELINE_SCHEMA_INVALID", "'peers' must be a table")]
-    roles = data.get("roles", {})
-    if roles and not isinstance(roles, dict):
-        return [("PIPELINE_SCHEMA_INVALID", "'roles' must be a table")]
+        return [("PIPELINE_SCHEMA_INVALID",
+                 "legacy keys %s are not read; migrate to [peers]/[pipelines] (ADR-0006)" % ", ".join(legacy))]
+    return []
+
+
+def _validate_roles(roles, servers):
+    """returns (errors, {role: bind})."""
+    errors: List[PipelineViolation] = []
     role_bind: dict = {}
-    servers = _load_mcp_server_names(workspace)
     for r_name, r_cfg in (roles or {}).items():
         bind = r_cfg.get("bind") if isinstance(r_cfg, dict) else None
         kind = r_cfg.get("kind", "gate") if isinstance(r_cfg, dict) else "gate"
@@ -88,8 +63,13 @@ def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
                            f"role '{r_name}' binds to '{bind}' not declared in .mcp.json mcpServers"))
         else:
             role_bind[r_name] = bind
-    declared: set[str] = set()
+    return errors, role_bind
 
+
+def _validate_peers(workspace, peers, servers, role_bind):
+    """returns (errors, declared stage ids)."""
+    errors: List[PipelineViolation] = []
+    declared: set[str] = set()
     for p_name, p_cfg in peers.items():
         if not isinstance(p_cfg, dict):
             errors.append(("PIPELINE_SCHEMA_INVALID", f"peer '{p_name}' must be a table"))
@@ -110,8 +90,11 @@ def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
             declared.add(p_name)
             errors.extend(_validate_transports(
                 workspace, p_cfg.get("transports", []), p_name, servers, role_bind))
+    return errors, declared
 
-    pipelines = data.get("pipelines", {})
+
+def _validate_pipelines(pipelines, declared) -> List[PipelineViolation]:
+    errors: List[PipelineViolation] = []
     if pipelines and not isinstance(pipelines, dict):
         errors.append(("PIPELINE_SCHEMA_INVALID", "'pipelines' must be a table"))
     for pipe_name, pipe_cfg in (pipelines or {}).items():
@@ -122,9 +105,43 @@ def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
         for stage in pipe_cfg.get("stages", []) or []:
             if stage not in declared:
                 errors.append(("PIPELINE_UNRESOLVED_STAGE",
-                               f"stage '{stage}' in pipeline '{pipe_name}' "
-                               f"is not declared in peers"))
+                               f"stage '{stage}' in pipeline '{pipe_name}' is not declared in peers"))
+    return errors
 
+
+# k3dit:leftover Q-6 CC28 validate_pipeline_config 分拆校验
+def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
+    """Validate `.agent/pipeline.toml`. Returns [] when valid or file absent.
+
+    Rule codes: PIPELINE_SYNTAX_ERROR, PIPELINE_SCHEMA_INVALID,
+    PIPELINE_UNRESOLVED_STAGE, PIPELINE_PROTOCOL_NOT_FOUND.
+    """
+    pipeline_file = workspace / _PIPELINE_REL
+    if not pipeline_file.is_file():
+        return []
+
+    if tomllib is None:
+        return [("PIPELINE_SYNTAX_ERROR",
+                 "tomllib/tomli unavailable; cannot validate .agent/pipeline.toml")]
+
+    try:
+        data = tomllib.loads(pipeline_file.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [("PIPELINE_SYNTAX_ERROR", f"TOML parse failed: {exc}")]
+
+    errors: List[PipelineViolation] = _validate_legacy_keys(data)
+    peers = data.get("peers", {})
+    if not isinstance(peers, dict):
+        return [("PIPELINE_SCHEMA_INVALID", "'peers' must be a table")]
+    roles = data.get("roles", {})
+    if roles and not isinstance(roles, dict):
+        return [("PIPELINE_SCHEMA_INVALID", "'roles' must be a table")]
+    servers = _load_mcp_server_names(workspace)
+    r_errs, role_bind = _validate_roles(roles, servers)
+    errors.extend(r_errs)
+    p_errs, declared = _validate_peers(workspace, peers, servers, role_bind)
+    errors.extend(p_errs)
+    errors.extend(_validate_pipelines(data.get("pipelines", {}), declared))
     return errors
 
 
