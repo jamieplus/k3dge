@@ -385,14 +385,6 @@
       "tokens": "Domain Specification: templates"
     },
     {
-      "path": "docs/tasks/2026-09-13-M9-feat-affected_tests.md",
-      "type": "tasks",
-      "id": "2026-09-13-M9-feat-affected_tests",
-      "title": "受影响测试映射（import 传递 → 测试文件，喂 selective L2）",
-      "status": "idea",
-      "tokens": "受影响测试映射（import 传递 → 测试文件，喂 selective L2）"
-    },
-    {
       "path": "docs/tasks/2026-09-13-M9-refactor-cc_debt_remaining.md",
       "type": "tasks",
       "id": "2026-09-13-M9-refactor-cc_debt_remaining",
