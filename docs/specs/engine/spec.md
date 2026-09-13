@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:b1b2befd9ce753827fb7bb06aec5778ae2e8d90401b3759f3a0de0e5279ae7b5`
+- **Contract Hash**: `sha256:700e7e6ef668a364c027fe480b1cd712d8d23e1acc93596e6463466a6072e914`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -325,6 +325,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 evidence_chain_error(workspace: Path, milestone_id: str) -> Optional[str]
+from __future__ import annotations
+class Prompt
+    @classmethod
+    default(cls) -> 'Prompt'
+    isatty(self) -> bool
+    ask(self, question: str, *, countdown=None, default_yes=False) -> bool
 from __future__ import annotations
 from pathlib import Path
 write_incident(workspace: Path, target: str | None, task_type: str | None, task_id: str, detail: str) -> Path

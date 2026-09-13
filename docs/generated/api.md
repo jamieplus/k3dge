@@ -489,6 +489,14 @@ from pathlib import Path
 from typing import Optional
 evidence_chain_error(workspace: Path, milestone_id: str) -> Optional[str]
     # doc: 证据链（完整性 + 可追溯）不满足 ⇒ 返回拒因；满足 ⇒ None。
+# prompt.py
+from __future__ import annotations
+class Prompt
+# doc: Tiny interactive prompter; testable via `answers` injection.
+    @classmethod
+    default(cls) -> 'Prompt'
+    isatty(self) -> bool
+    ask(self, question: str, *, countdown=None, default_yes=False) -> bool
 # protocol.py
 from __future__ import annotations
 from pathlib import Path

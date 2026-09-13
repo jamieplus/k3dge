@@ -89,3 +89,8 @@ date: 2026-09-04
 
 ## 验收
 - 逐模块/逐函数闭环（每步一 diff 一测试）；或质量席复程改判；不得整体销账。
+
+## 进度（2026-09-13）
+- **首块 ✅**：`_Prompt` → `engine/prompt.py`（`milestone` 以 `_Prompt` 别名兼容，行为不变；cli/tests 调用面不动）。`milestone.py` 1692 → 1670 行。
+- **余块待抽**（按内聚度）：report 解析（`_find_report`/`_parse_audit_stats`/`_seal_review_gate`…）→ `engine/audit_report.py`；doc-audit（`run_doc_audit`/`_changed_docs`/`_ensure_doc_audit_task`）→ `engine/doc_audit.py`；seal（`seal_milestone`/`seal_preconditions_error`/`_seal_archive`）；audit_flow；tasks；align。
+- 纪律：每块一 diff 一测试、`k3dge sync` + 全量绿；别名/转发保调用面，行为不变。
