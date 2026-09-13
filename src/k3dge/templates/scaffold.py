@@ -168,6 +168,61 @@ def _ensure_mcp_config(target: Path) -> bool:
     return ensure_mcp_config(target)
 
 
+def _pipeline_servers(target: Path) -> set:
+    """Server names the generated pipeline references（`roles.*.bind` ∪ `[peers.*]`，除 k3dge）。"""
+    import sys
+
+    p = target / ".agent" / "pipeline.toml"
+    if not p.is_file():
+        return set()
+    try:
+        if sys.version_info >= (3, 11):
+            import tomllib as _toml
+        else:
+            import tomli as _toml  # type: ignore
+        data = _toml.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return set()
+    names = set()
+    for r in (data.get("roles") or {}).values():
+        b = r.get("bind") if isinstance(r, dict) else None
+        if isinstance(b, str) and b:
+            names.add(b)
+    names |= set((data.get("peers") or {}).keys())
+    names.discard("k3dge")
+    return names
+
+
+def _ensure_peer_stubs(target: Path) -> None:
+    """把 pipeline 绑定的 peer 以 stub 写进 `.mcp.json`，使 scaffold 出生不因 peer 未登记而红。
+
+    只声明（command=python/`-m <peer>.mcp`/PYTHONPATH=../<peer>/src）；真接线由 `k3dge mcp sync`。
+    不替下游决定绑谁——stub 仅消除「pipeline 绑定 vs .mcp.json 未登记」的出生红。
+    """
+    names = _pipeline_servers(target)
+    if not names:
+        return
+    mcp_path = target / ".mcp.json"
+    try:
+        data = json.loads(mcp_path.read_text(encoding="utf-8")) if mcp_path.is_file() else {"mcpServers": {}}
+        if not isinstance(data, dict):
+            data = {"mcpServers": {}}
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        data = {"mcpServers": {}}
+    servers = data.setdefault("mcpServers", {})
+    changed = False
+    for name in sorted(names):
+        if name in servers:
+            continue
+        servers[name] = {"command": "python", "args": ["-m", f"{name}.mcp"],
+                         "env": {"PYTHONPATH": f"../{name}/src"}}
+        changed = True
+    if changed:
+        tmp = mcp_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(mcp_path)
+
+
 def _ensure_first_domain(target: Path, name: str, today: str) -> None:
     """Write or upgrade an empty manifest so the gate has at least one domain."""
     path = target / ".agent" / "manifest.json"
@@ -260,6 +315,7 @@ def scaffold(target: Path, name: str | None = None) -> None:
     _write_if_missing(target / ".agent" / "docs.toml", DOCS_TOML_TEMPLATE)
     _write_if_missing(target / ".agent" / "pipeline.toml", PIPELINE_TOML_TEMPLATE)
     ensure_mcp_config(target)
+    _ensure_peer_stubs(target)
     _write_if_missing(target / "scripts" / "generate-docs.sh", GENERATE_DOCS_SH_TEMPLATE, executable=True)
     _write_if_missing(target / "scripts" / "generate-docs.ps1", GENERATE_DOCS_PS1_TEMPLATE)
 

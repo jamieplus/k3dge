@@ -104,6 +104,18 @@ class TestScaffold(unittest.TestCase):
         self.assertIn("k3dit", data["domains"])
         self.assertTrue((self.target / "src" / "k3dit" / "__init__.py").is_file())
 
+    def test_pipeline_peers_declared_so_birth_not_red(self) -> None:
+        """item 3：scaffold 把 pipeline 绑定的 peer 以 stub 写进 .mcp.json，出生不报 PIPELINE_PEER_UNWIRED。"""
+        from k3dge.engine.pipeline_schema import validate_pipeline_config
+
+        scaffold(self.target)
+        servers = json.loads((self.target / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]
+        self.assertIn("k3dge", servers)
+        self.assertIn("k3dit", servers)  # pipeline 绑定的 peer 已登记
+        self.assertIn("k3che", servers)
+        codes = [c for c, _ in validate_pipeline_config(self.target)]
+        self.assertNotIn("PIPELINE_PEER_UNWIRED", codes, validate_pipeline_config(self.target))
+
 
 if __name__ == "__main__":
     unittest.main()

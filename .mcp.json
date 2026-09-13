@@ -11,7 +11,7 @@
       }
     },
     "k3dit": {
-      "command": "python",
+      "command": "/Users/jamie/Workspace/k3dit/.venv/bin/python",
       "args": [
         "-m",
         "k3dit.mcp"
@@ -21,7 +21,7 @@
       }
     },
     "k3che": {
-      "command": "python",
+      "command": "/Users/jamie/Workspace/k3che/.venv/bin/python",
       "args": [
         "-m",
         "k3che.mcp"
