@@ -362,13 +362,12 @@ from k3dge.engine import gates
 from k3dge.engine import process_audit
 from k3dge.engine import report_table
 from k3dge.engine.evaluator import ConsistencyEngine
-STATUS_RE = re.compile('-\\s+\\*\\*Status\\*\\*:\\s*([\\w-]+)', re.IGNORECASE)
-MILESTONE_RE = re.compile('-\\s+\\*\\*Milestone\\*\\*:\\s*([^\\n\\r]+)', re.IGNORECASE)
-PRIORITY_RE = re.compile('-\\s+\\*\\*Priority\\*\\*:\\s*(\\S+)', re.IGNORECASE)
-TITLE_RE = re.compile('^#\\s+(.+)$', re.MULTILINE)
+from k3dge.engine.task_index import MILESTONE_RE
+from k3dge.engine.task_index import PRIORITY_RE
+from k3dge.engine.task_index import STATUS_RE
+from k3dge.engine.task_index import TITLE_RE
+from k3dge.engine.task_index import parse_frontmatter
 GUIDE_STUB_RE = re.compile('<!--\\s*k3dge:guide-stub\\s*-->', re.IGNORECASE)
-parse_frontmatter(content: str) -> dict[str, str]
-    # doc: Strict frontmatter parser: only `---` block at start, YAML-like `key: value`.
 from k3dge.engine.milestone_pointer import bump_milestone
 from k3dge.engine.milestone_pointer import get_current_milestone
 from k3dge.engine.milestone_pointer import set_current_milestone
@@ -376,21 +375,10 @@ scan_unfilled_guides(workspace: Path) -> List[str]
     # doc: Names of guide stubs in docs/guides/ still carrying `<!-- k3dge:guide-stub -->`.
 scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
     # doc: 未决 findings（语法 v1：pending/disputed/fixnote 计 open）。
-class MilestoneTask
-    path: Path
-    slug: str
-    status: str
-    milestone: str
-class TaskIndex
-# doc: Top-level docs/tasks/*.md index row. Archive is out of scan horizon.
-    path: Path
-    title: str
-    status: str
-    milestone: str
-    priority: str
-list_tasks(workspace: Path, milestone_id: Optional[str]=None, status: Optional[str]=None) -> List[TaskIndex]
-    # doc: Index living task files (not archive/, not README). Filters are exact matches.
-scan_milestone_tasks(workspace: Path, milestone_id: str) -> List[MilestoneTask]
+from k3dge.engine.task_index import MilestoneTask
+from k3dge.engine.task_index import TaskIndex
+from k3dge.engine.task_index import list_tasks
+from k3dge.engine.task_index import scan_milestone_tasks
 create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=None, milestone: Optional[str]=None, priority: str='P2', report: Optional[str]=None) -> Tuple[bool, str, Optional[Path]]
     # doc: Write a living task file. Returns (ok, message, path).
 mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]
@@ -607,6 +595,33 @@ critical_path(workspace: Path) -> Dict[str, object]
     # doc: 最长阻塞链（按节点数）。有环 ⇒ 退化为空（由 `blocking_cycles` 报环）。
 summary(workspace: Path) -> Dict[str, object]
     # doc: 观测件：环 + 关键路径（不判定）。
+# task_index.py
+from __future__ import annotations
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List
+from typing import Optional
+STATUS_RE = re.compile('-\\s+\\*\\*Status\\*\\*:\\s*([\\w-]+)', re.IGNORECASE)
+MILESTONE_RE = re.compile('-\\s+\\*\\*Milestone\\*\\*:\\s*([^\\n\\r]+)', re.IGNORECASE)
+PRIORITY_RE = re.compile('-\\s+\\*\\*Priority\\*\\*:\\s*(\\S+)', re.IGNORECASE)
+TITLE_RE = re.compile('^#\\s+(.+)$', re.MULTILINE)
+parse_frontmatter(content: str) -> dict[str, str]
+    # doc: Strict frontmatter parser: only `---` block at start, YAML-like `key: value`.
+class MilestoneTask
+    path: Path
+    slug: str
+    status: str
+    milestone: str
+class TaskIndex
+# doc: Top-level docs/tasks/*.md index row. Archive is out of scan horizon.
+    path: Path
+    title: str
+    status: str
+    milestone: str
+    priority: str
+list_tasks(workspace: Path, milestone_id: Optional[str]=None, status: Optional[str]=None) -> List[TaskIndex]
+    # doc: Index living task files (not archive/, not README). Filters are exact matches.
+scan_milestone_tasks(workspace: Path, milestone_id: str) -> List[MilestoneTask]
 # version.py
 from __future__ import annotations
 from pathlib import Path
