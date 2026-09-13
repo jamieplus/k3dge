@@ -613,8 +613,8 @@ def _backfill_task_reviews(workspace: Path, target: Path) -> None:
             mm = MILESTONE_RE.search(t_content)
             t_ms = mm.group(1).strip() if mm else ""
         _auto_backfill_reviews(workspace, target, t_title, t_ms)
-    except Exception:
-        pass
+    except Exception as exc:
+        print(f"[WARN] task done: 报告自动回填跳过（{target.name}: {exc}）；报告仍未回填，封板闸会兜底", file=sys.stderr)
 
 
 def _finalize_task_done(workspace: Path, target: Path, content: str, fm: dict) -> Tuple[bool, str, Optional[Path]]:
@@ -1447,8 +1447,8 @@ def run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]:
             io=io,
             arguments={"target_scope": "docs", "milestone_id": mid or ""},
         )  # peer/manual authors the report
-    except Exception:
-        pass
+    except Exception as exc:
+        print(f"WARN[DOWNGRADE] doc-audit lens routing failed ({exc}); report 仍由 k3dit/人产出", file=sys.stderr)
     # Bind the task to the report it audits (1 report = 1 task, ADR-0022) if present.
     found = _find_report(workspace, mid, "audit")
     report_rel = found[0].relative_to(workspace).as_posix() if found else None

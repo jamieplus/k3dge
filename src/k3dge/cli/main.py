@@ -452,8 +452,8 @@ def cmd_init(args: argparse.Namespace) -> int:
     # Generate initial contract hash for first domain
     try:
         sync_all(target)
-    except Exception:
-        pass
+    except Exception as exc:
+        print(f"[WARN] init: sync_all failed ({exc}); run 'k3dge sync' in {target} manually", file=sys.stderr)
     print(f"[INIT] Successfully initialized k3dge harness in {target}")
     return 0
 
