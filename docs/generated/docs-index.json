@@ -457,14 +457,6 @@
       "tokens": "逃逸率/趋势度量：触发口径 + 观测行"
     },
     {
-      "path": "docs/tasks/2026-09-12-M9-feat-process_audit.md",
-      "type": "tasks",
-      "id": "2026-09-12-M9-feat-process_audit",
-      "title": "过程审计面（SQA）：里程碑证据链时间序/完整性入硬闸契约",
-      "status": "done",
-      "tokens": "过程审计面（SQA）：里程碑证据链时间序/完整性入硬闸契约"
-    },
-    {
       "path": "docs/tasks/2026-09-12-M9-feat-state_machine_lens.md",
       "type": "tasks",
       "id": "2026-09-12-M9-feat-state_machine_lens",
