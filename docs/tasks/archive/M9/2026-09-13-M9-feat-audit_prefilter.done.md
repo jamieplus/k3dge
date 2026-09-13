@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P2
 date: 2026-09-13
@@ -27,3 +27,6 @@ date: 2026-09-13
 ## 边界与拆分
 - 事实归属：报告 `provenance` 拥有 baseline/lens_version；预筛逻辑归 `engine/audit_flow.py`（人工入口）；k3dit `lens_version` 发布值归 peer。
 - 桩子先行：先落"报告存在 + baseline 相等"的形式短路（条件①②）＋ `--force`＋`PRE-FILTER` 痕迹；条件③待 k3dit 侧就绪再接，未就绪则**不短路**（保守＝照跑）。
+
+## 收尾（2026-09-13 拆出跨仓）
+- 拆出 k3dit `feat-report_provenance`（前置：报告落 `baseline`/`lens_version`）；本票待其就绪后在 k3ge `run_audit_flow` 实现预筛。

@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P3
 date: 2026-09-02
@@ -43,3 +43,6 @@ date: 2026-09-02
 ## Related
 
 - `docs/tasks/2026-09-02-M7-feat-peer_outbound_mcp_client.md`（出向通道对 peer 的传输要求）
+
+## 收尾（2026-09-13 拆出跨仓）
+- 归 k3che 产品完善度 → k3che `feat-cli_transport`；k3ge 保持 `[peers.k3che]` `mcp→skip`（service 语义，Note 2026-09-03 已收窄）。

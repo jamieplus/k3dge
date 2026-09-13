@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M9
 priority: P3
 date: 2026-09-13
@@ -23,3 +23,6 @@ date: 2026-09-13
 - 前件：`pointers`（全状态）与 `status --deep` 已落；命令行 stdout 默认上限在 `gates_config_inventory`（本度量为其提供事实依据）。
 - 边界：只统计/出事实（行数、doc 数、往返），不判"超没超"（阈值判定归配置 + 人）。
 - 桩子先行：先落"每条命令 stdout 行数"计数，再谈 doc 数/往返。
+
+## 收尾（2026-09-13 拆出跨仓）
+- 拆出 k3dit `chore-context_budget_metrics`（并入 `observe`）。

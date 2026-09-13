@@ -385,14 +385,6 @@
       "tokens": "check 按文档 Status（Draft/Accepted）区分过闸口径"
     },
     {
-      "path": "docs/tasks/2026-09-02-M7-feat-k3che_cli_transport.md",
-      "type": "tasks",
-      "id": "2026-09-02-M7-feat-k3che_cli_transport",
-      "title": "k3che 补 cli 传输面（mcp/cli 成对）",
-      "status": "idea",
-      "tokens": "k3che 补 cli 传输面（mcp/cli 成对）"
-    },
-    {
       "path": "docs/tasks/2026-09-04-M7-chore-engine_milestone_py_A_1_1547_6.md",
       "type": "tasks",
       "id": "2026-09-04-M7-chore-engine_milestone_py_A_1_1547_6",
@@ -407,30 +399,6 @@
       "title": "eval 盲测纪律待立 harness（memo P2→P3 降级项）",
       "status": "idea",
       "tokens": "eval 盲测纪律待立 harness（memo P2→P3 降级项）"
-    },
-    {
-      "path": "docs/tasks/2026-09-12-M9-feat-escape_metric.md",
-      "type": "tasks",
-      "id": "2026-09-12-M9-feat-escape_metric",
-      "title": "逃逸率/趋势度量：触发口径 + 观测行",
-      "status": "idea",
-      "tokens": "逃逸率/趋势度量：触发口径 + 观测行"
-    },
-    {
-      "path": "docs/tasks/2026-09-13-M9-chore-context_budget_metrics.md",
-      "type": "tasks",
-      "id": "2026-09-13-M9-chore-context_budget_metrics",
-      "title": "上下文预算度量：命令 stdout 行数 / 被加载 doc 数 / 往返",
-      "status": "idea",
-      "tokens": "上下文预算度量：命令 stdout 行数 / 被加载 doc 数 / 往返"
-    },
-    {
-      "path": "docs/tasks/2026-09-13-M9-feat-audit_prefilter.md",
-      "type": "tasks",
-      "id": "2026-09-13-M9-feat-audit_prefilter",
-      "title": "§7 审计复用预筛：milestone audit 人工入口短路",
-      "status": "idea",
-      "tokens": "§7 审计复用预筛：milestone audit 人工入口短路"
     }
   ]
 }
