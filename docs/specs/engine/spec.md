@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:6524032fc342c0ec2a9b703375fb42a5dce27103cf48b73daf048827050a2e10`
-- **Last Updated**: 2026-09-12
+- **Contract Hash**: `sha256:91aad8467928b7804fc055886072da1f3680c6fda1c9da699fb6cf76d6fdfd62`
+- **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -17,7 +17,7 @@
   - 自举仓脚手架字节锁（`TEMPLATE_DRIFT`）：`engine.pairs.PAIRS` 比对 `templates/assets`，不 import `k3dge.templates`（ADR-0001）。
   - 协议治理：`docs/protocols/*.md`（`audit_default.md` / `verify_default.md`）为 pipeline manual fallback；类型写法在各 `docs/<type>/AUTHORING.md`；结构闸是 `docs/<type>/.schema.json`。`engine.doc_catalog` 解析该 JSON、建薄索引、提供 `list_docs` / `where_doc` / `grep_docs`（正文只回 path/line）。`engine.protocol.write_incident` 把持续偏离写入 `docs/incidents/`。
   - 空 `manifest.domains` 报 `NO_DOMAINS`（下游空壳不得假绿）。
-  - 其余引擎面：`markers`（钉语法 v2 解析/校验）、`nextstep`（`[NEXT]` 状态机边 + 纵深指针）、`audit_trigger`（审计触发/闭环计数）、`audit_checklist`、`audit_flow`（审计线消费侧）、`worktree`（审计线 worktree）、`pipeline_runner`（peer 出向 MCP/降级）、`pipeline_schema`（`pipeline.toml` 结构闸）、`gates`（硬闸契约加载）、`adr_gate`（封版 ADR 闸）、`search`（受控检索）。
+  - 其余引擎面：`markers`（钉语法 v2 解析/校验）、`nextstep`（`[NEXT]` 状态机边 + 纵深指针）、`audit_trigger`（审计触发/闭环计数）、`audit_checklist`、`audit_flow`（审计线消费侧）、`worktree`（审计线 worktree）、`pipeline_runner`（peer 出向 MCP/降级）、`pipeline_schema`（`pipeline.toml` 结构闸）、`gates`（硬闸契约加载）、`adr_gate`（封版 ADR 闸）、`process_audit`（证据链完整性/可追溯闸）、`search`（受控检索）。
 - **Out of Scope**:
   - 终端彩色渲染与 CLI 解析（由 `cli` 域负责）。
   - spec 接口块的生成与回写（由 `sync` 域负责）。
@@ -153,7 +153,7 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 REL = '.agent/gates.toml'
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}}}
 load(workspace: Path) -> Dict[str, Any]
 get(workspace: Path, section: str, key: str) -> Any
 preconditions(workspace: Path, kind: str) -> list
@@ -216,6 +216,7 @@ from typing import Optional
 from typing import Tuple
 from k3dge.engine import adr_gate
 from k3dge.engine import gates
+from k3dge.engine import process_audit
 from k3dge.engine import report_table
 from k3dge.engine.evaluator import ConsistencyEngine
 STATUS_RE = re.compile('-\\s+\\*\\*Status\\*\\*:\\s*([\\w-]+)', re.IGNORECASE)
@@ -320,6 +321,10 @@ from typing import List
 from typing import Tuple
 PipelineViolation = Tuple[str, str]
 validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+evidence_chain_error(workspace: Path, milestone_id: str) -> Optional[str]
 from __future__ import annotations
 from pathlib import Path
 write_incident(workspace: Path, target: str | None, task_type: str | None, task_id: str, detail: str) -> Path

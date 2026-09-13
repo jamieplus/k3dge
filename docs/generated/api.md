@@ -273,7 +273,7 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 REL = '.agent/gates.toml'
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}}}
 load(workspace: Path) -> Dict[str, Any]
     # doc: 缺省 ∪ `.agent/gates.toml`（段内覆盖；`checks.<kind>` 逐键覆盖）；文件缺失/坏 ⇒ 缺省。
 get(workspace: Path, section: str, key: str) -> Any
@@ -347,6 +347,7 @@ from typing import Optional
 from typing import Tuple
 from k3dge.engine import adr_gate
 from k3dge.engine import gates
+from k3dge.engine import process_audit
 from k3dge.engine import report_table
 from k3dge.engine.evaluator import ConsistencyEngine
 STATUS_RE = re.compile('-\\s+\\*\\*Status\\*\\*:\\s*([\\w-]+)', re.IGNORECASE)
@@ -482,6 +483,12 @@ from typing import Tuple
 PipelineViolation = Tuple[str, str]
 validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
     # doc: Validate `.agent/pipeline.toml`. Returns [] when valid or file absent.
+# process_audit.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+evidence_chain_error(workspace: Path, milestone_id: str) -> Optional[str]
+    # doc: 证据链（完整性 + 可追溯）不满足 ⇒ 返回拒因；满足 ⇒ None。
 # protocol.py
 from __future__ import annotations
 from pathlib import Path

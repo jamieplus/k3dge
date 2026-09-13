@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from k3dge.engine import adr_gate, gates, report_table
+from k3dge.engine import adr_gate, gates, process_audit, report_table
 from k3dge.engine.evaluator import ConsistencyEngine
 
 STATUS_RE = re.compile(r"-\s+\*\*Status\*\*:\s*([\w-]+)", re.IGNORECASE)
@@ -921,6 +921,7 @@ def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str
             None if audit_closed(workspace, milestone_id)
             else f"[SEAL REJECTED] Milestone '{milestone_id}' audit not closed（无 12 列报告 / 待修≠0）。"
         ),
+        "evidence_chain": lambda: process_audit.evidence_chain_error(workspace, milestone_id),
         "align_pass": lambda: _seal_review_gate(workspace, milestone_id, tasks),
         "guides_filled": lambda: (
             f"[SEAL REJECTED] Unfilled guide stubs detected in docs/guides/: {unfilled}.\n"
