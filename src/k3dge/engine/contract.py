@@ -113,6 +113,22 @@ def _fmt_func(
     return func_line
 
 
+def _class_member(child: ast.AST, include_doc: bool) -> Optional[str]:
+    """一个 class body child → 签名行（公开才出）。"""
+    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and not child.name.startswith("_"):
+        return _fmt_func(child, indent="    ", include_doc=include_doc)
+    if isinstance(child, ast.AnnAssign) and isinstance(child.target, ast.Name) and not child.target.id.startswith("_"):
+        ann = _ann(child.annotation)
+        suffix = f": {ann}" if ann else ""
+        val = f" = {_fmt_value(child.value)}" if child.value is not None else ""
+        return f"    {child.target.id}{suffix}{val}"
+    if isinstance(child, ast.Assign):
+        parts = [f"    {t.id} = {_fmt_value(child.value)}" for t in child.targets
+                 if isinstance(t, ast.Name) and not t.id.startswith("_")]
+        return "\n".join(parts) if parts else None
+    return None
+
+
 def _fmt_class(node: ast.ClassDef, indent: str = "", include_doc: bool = False) -> str:
     bases = ", ".join(_ann(b) for b in node.bases) if node.bases else ""
     header = f"class {node.name}({bases})" if bases else f"class {node.name}"
@@ -121,23 +137,13 @@ def _fmt_class(node: ast.ClassDef, indent: str = "", include_doc: bool = False) 
         first = _doc_first_line(node)
         if first:
             lines.append(f"{indent}# doc: {first}")
-    members = []
     for child in node.body:
-        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and not child.name.startswith("_"):
-            members.append(_fmt_func(child, indent="    ", include_doc=include_doc))
-        elif isinstance(child, ast.AnnAssign) and isinstance(child.target, ast.Name) and not child.target.id.startswith("_"):
-            ann = _ann(child.annotation)
-            suffix = f": {ann}" if ann else ""
-            val = f" = {_fmt_value(child.value)}" if child.value is not None else ""
-            members.append(f"    {child.target.id}{suffix}{val}")
-        elif isinstance(child, ast.Assign):
-            for t in child.targets:
-                if isinstance(t, ast.Name) and not t.id.startswith("_"):
-                    members.append(f"    {t.id} = {_fmt_value(child.value)}")
-    body = lines + members
-    if not body:
+        m = _class_member(child, include_doc)
+        if m:
+            lines.extend(m.split("\n"))
+    if not lines:
         return header
-    return header + "\n" + "\n".join(body)
+    return header + "\n" + "\n".join(lines)
 
 
 class ContractExtractor:
@@ -175,29 +181,72 @@ class TypeScriptExtractor(ContractExtractor):
 _EXTRACTORS: list[ContractExtractor] = [PythonExtractor(), TypeScriptExtractor()]
 
 
+def _str_elts(value: Optional[ast.AST]) -> set:
+    """从 List/Tuple 字面量收集字符串常量集（`__all__` 用）。"""
+    names = set()
+    if isinstance(value, (ast.List, ast.Tuple)):
+        for elt in value.elts:
+            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                names.add(elt.value)
+    return names
+
+
 def _get_all_names(tree: ast.Module) -> Optional[set[str]]:
     for node in tree.body:
         if isinstance(node, ast.Assign):
             for t in node.targets:
-                if isinstance(t, ast.Name) and t.id == "__all__":
-                    if isinstance(node.value, (ast.List, ast.Tuple)):
-                        names = set()
-                        for elt in node.value.elts:
-                            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
-                                names.add(elt.value)
-                        return names
-        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "__all__":
-            if isinstance(node.value, (ast.List, ast.Tuple)):
-                names = set()
-                for elt in node.value.elts:
-                    if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
-                        names.add(elt.value)
-                return names
+                if isinstance(t, ast.Name) and t.id == "__all__" and isinstance(node.value, (ast.List, ast.Tuple)):
+                    return _str_elts(node.value)
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "__all__"
+            and isinstance(node.value, (ast.List, ast.Tuple))
+        ):
+            return _str_elts(node.value)
     return None
 
 
 def _is_public(name: str) -> bool:
     return bool(name) and not name.startswith("_")
+
+
+def _wanted(allow: Optional[set], name: str) -> bool:
+    return (name in allow) if allow is not None else _is_public(name)
+
+
+def _iface_module_const(node, allow: Optional[set]) -> List[str]:
+    """模块级 `Assign/AnnAssign` → 公开常量行（含 `__all__`）。"""
+    out: List[str] = []
+    value = node.value
+    ann_suffix = f": {_ann(node.annotation)}" if isinstance(node, ast.AnnAssign) and node.annotation is not None else ""
+    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+    for t in targets:
+        if not isinstance(t, ast.Name):
+            continue
+        if t.id == "__all__":
+            if allow is not None:
+                out.append(f"__all__ = {sorted(allow)}")
+            continue
+        if not _is_public(t.id) or not _wanted(allow, t.id):
+            continue
+        val = f" = {_fmt_value(value)}" if value is not None else ""
+        out.append(f"{t.id}{ann_suffix}{val}")
+    return out
+
+
+def _iface_import(node, allow: Optional[set]) -> List[str]:
+    """`from … import …` → 公开 re-export 行。"""
+    out: List[str] = []
+    module = ("." * node.level) + (node.module or "")
+    for alias in node.names:
+        if alias.name == "*":
+            continue
+        name = alias.asname or alias.name
+        if not _is_public(name) or not _wanted(allow, name):
+            continue
+        out.append(f"from {module} import {name}")
+    return out
 
 
 def extract_python_interface(source: str, include_doc: bool = False) -> str:
@@ -210,47 +259,17 @@ def extract_python_interface(source: str, include_doc: bool = False) -> str:
     tree = ast.parse(source)
     allow = _get_all_names(tree)
     lines: List[str] = []
-
-    def _wanted(name: str) -> bool:
-        if allow is not None:
-            return name in allow
-        return _is_public(name)
-
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if _wanted(node.name):
+            if _wanted(allow, node.name):
                 lines.append(_fmt_func(node, include_doc=include_doc))
         elif isinstance(node, ast.ClassDef):
-            if _wanted(node.name):
+            if _wanted(allow, node.name):
                 lines.append(_fmt_class(node, include_doc=include_doc))
         elif isinstance(node, (ast.Assign, ast.AnnAssign)):
-            value = node.value
-            ann_suffix = ""
-            if isinstance(node, ast.AnnAssign) and node.annotation is not None:
-                ann_suffix = f": {_ann(node.annotation)}"
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            for t in targets:
-                if not isinstance(t, ast.Name):
-                    continue
-                if t.id == "__all__":
-                    if allow is not None:
-                        lines.append(f"__all__ = {sorted(allow)}")
-                    continue
-                if not _is_public(t.id):
-                    continue
-                if not _wanted(t.id):
-                    continue
-                val = f" = {_fmt_value(value)}" if value is not None else ""
-                lines.append(f"{t.id}{ann_suffix}{val}")
+            lines.extend(_iface_module_const(node, allow))
         elif isinstance(node, ast.ImportFrom):
-            module = ("." * node.level) + (node.module or "")
-            for alias in node.names:
-                if alias.name == "*":
-                    continue
-                name = alias.asname or alias.name
-                if not _is_public(name) or not _wanted(name):
-                    continue
-                lines.append(f"from {module} import {name}")
+            lines.extend(_iface_import(node, allow))
     return "\n".join(lines)
 
 
