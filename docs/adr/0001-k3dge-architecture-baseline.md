@@ -69,7 +69,7 @@ Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一
    - **ADR＝事实源**：封版要求范围内 ADR 全 `Accepted` 且各带**可解析落地指针** `Landed-by: <路径> [§节]`（`engine/adr_gate`）；只验结构事实，不判决策内容（归 k3dit）。
 9. **实现语言基线（Rust 重写否决）**：保留 Python 3.10+ 标准库（核心零依赖），**不 Rust 重写**。
    - 依据尖刀实验（`../k3dge-contract-rs` Phase-1/2/3）：Rust 护栏（漏一分支＝编译错 `E0004`）**只在"自有闭枚举且无 `_` wildcard"时成立**；在**解析外部语言语义**（contract 提取：公开签名归一化哈希）上**不成立**且成本高（需自造 `ast.unparse` 等价 + tree-sitter crates，破零依赖）。
-   - 护栏纪律**以 Python 近似吸收**：自有状态机用 `enum` + `typing.assert_never`（未处理分支交类型检查器暴露），不引 Rust/crates。
+   - 护栏纪律**以 CI 级完备性检查近似吸收**（零依赖、3.10）：自有状态机声明为 `Transition` 表 + 显式 `TERMINAL_STATES`，`engine/state_machine.check_completeness` 在 pytest/`check` 里检**终态/死锁/确定性/目标合法/可达**；消费者走 `resolve()`（**表驱动＝无手写分支可漏**）。**保证面＝commit/CI（非编译期，不引类型检查器）**；只护**声明表**，手写 `match/if` 的消费点不在保护面。
    - 重开：仅当**自有状态机/契约**抽为独立 crate 且证明收益 > 多语言碎片/构建成本时，另立 ADR（不复用本条）。
 
 本 ADR 只定实现；目的语言（减少漂移、幻觉、修局部坏整体等，不必穷举）见 ADR-0009。

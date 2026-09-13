@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:9b77d8031803e02c4c57921e0a3830248efe199a60515f39d9f934d5da84cb2c`
+- **Contract Hash**: `sha256:71e6988aabbe14d353d38d607ecd0df047f6076c114c9481a79965b9c6c5c653`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -413,16 +413,32 @@ CONTRACT_HASH_RE = re.compile('\\*\\*Contract Hash\\*\\*:\\s*`?sha256:([0-9a-f]{
 validate_structure(content: str) -> List[str]
 extract_contract_hash(content: str) -> Optional[str]
 from __future__ import annotations
+from enum import Enum
 from typing import Dict
 from typing import List
+from typing import NamedTuple
+from typing import Optional
+from typing import Sequence
 from typing import Set
-TASK_STATES: tuple = ('idea', 'deferred', 'in-progress', 'done')
-TASK_TRANSITIONS: Dict[str, Set[str]] = {'idea': {'deferred', 'in-progress', 'done'}, 'deferred': {'in-progress', 'done'}, 'in-progress': {'done'}, 'done': set()}
-INITIAL = 'idea'
-reachable(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS, start: str=INITIAL) -> Set[str]
-dead_states(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS) -> List[str]
-unreachable(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS, start: str=INITIAL) -> List[str]
-undeclared_targets(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS) -> List[str]
+class TaskState(Enum)
+    IDEA = 'idea'
+    DEFERRED = 'deferred'
+    IN_PROGRESS = 'in-progress'
+    DONE = 'done'
+class TaskMove(Enum)
+    DEFER = 'defer'
+    START = 'start'
+    FINISH = 'finish'
+class Transition(NamedTuple)
+    source: TaskState
+    move: TaskMove
+    target: TaskState
+INITIAL: TaskState = TaskState.IDEA
+TERMINAL_STATES: frozenset = frozenset({TaskState.DONE})
+TRANSITIONS: tuple = (Transition(TaskState.IDEA, TaskMove.DEFER, TaskState.DEFERRED), Transition(TaskState.IDEA, TaskMove.START, TaskState.IN_PROGRESS), Transition(TaskState.IDEA, TaskMove.FINISH, TaskState.DONE), Transition(TaskState.DEFERRED, TaskMove.START, TaskState.IN_PROGRESS), Transition(TaskState.DEFERRED, TaskMove.FINISH, TaskState.DONE), Transition(TaskState.IN_PROGRESS, TaskMove.FINISH, TaskState.DONE))
+resolve(state: TaskState, move: TaskMove) -> Optional[TaskState]
+check_completeness(transitions: Sequence[Transition], states: Set[TaskState], terminals: frozenset, initial: TaskState) -> List[str]
+completeness_violations() -> List[str]
 summary() -> Dict[str, object]
 from __future__ import annotations
 from graphlib import CycleError

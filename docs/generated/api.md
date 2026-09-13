@@ -597,21 +597,37 @@ validate_structure(content: str) -> List[str]
 extract_contract_hash(content: str) -> Optional[str]
 # state_machine.py
 from __future__ import annotations
+from enum import Enum
 from typing import Dict
 from typing import List
+from typing import NamedTuple
+from typing import Optional
+from typing import Sequence
 from typing import Set
-TASK_STATES: tuple = ('idea', 'deferred', 'in-progress', 'done')
-TASK_TRANSITIONS: Dict[str, Set[str]] = {'idea': {'deferred', 'in-progress', 'done'}, 'deferred': {'in-progress', 'done'}, 'in-progress': {'done'}, 'done': set()}
-INITIAL = 'idea'
-reachable(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS, start: str=INITIAL) -> Set[str]
-    # doc: 从 `start` BFS 可达的状态集。
-dead_states(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS) -> List[str]
-    # doc: 非终态却无出边＝死状态（悬挂）。
-unreachable(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS, start: str=INITIAL) -> List[str]
-undeclared_targets(transitions: Dict[str, Set[str]]=TASK_TRANSITIONS) -> List[str]
-    # doc: 出边指向的目标未在转移表中作为源声明＝未声明目标。
+class TaskState(Enum)
+    IDEA = 'idea'
+    DEFERRED = 'deferred'
+    IN_PROGRESS = 'in-progress'
+    DONE = 'done'
+class TaskMove(Enum)
+    DEFER = 'defer'
+    START = 'start'
+    FINISH = 'finish'
+class Transition(NamedTuple)
+    source: TaskState
+    move: TaskMove
+    target: TaskState
+INITIAL: TaskState = TaskState.IDEA
+TERMINAL_STATES: frozenset = frozenset({TaskState.DONE})
+TRANSITIONS: tuple = (Transition(TaskState.IDEA, TaskMove.DEFER, TaskState.DEFERRED), Transition(TaskState.IDEA, TaskMove.START, TaskState.IN_PROGRESS), Transition(TaskState.IDEA, TaskMove.FINISH, TaskState.DONE), Transition(TaskState.DEFERRED, TaskMove.START, TaskState.IN_PROGRESS), Transition(TaskState.DEFERRED, TaskMove.FINISH, TaskState.DONE), Transition(TaskState.IN_PROGRESS, TaskMove.FINISH, TaskState.DONE))
+resolve(state: TaskState, move: TaskMove) -> Optional[TaskState]
+    # doc: 表驱动唯一入口：`(state, move) -> target | None`（非法＝None，确定性）。
+check_completeness(transitions: Sequence[Transition], states: Set[TaskState], terminals: frozenset, initial: TaskState) -> List[str]
+    # doc: 声明表完备性：终态/死锁/确定性/目标合法/可达。返回违规列表（空＝完备）。
+completeness_violations() -> List[str]
+    # doc: 对内置 task 状态机跑完备性检查（CI 断言 `== []`）。
 summary() -> Dict[str, object]
-    # doc: 观测件：state 数 / 可达 / 死状态 / 未声明目标（不判定）。
+    # doc: 观测件：状态/初态/可达/死状态/违规（不判定）。
 # task_dag.py
 from __future__ import annotations
 from graphlib import CycleError
