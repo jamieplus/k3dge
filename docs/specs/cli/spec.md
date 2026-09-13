@@ -7,7 +7,7 @@
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
-  - 本仓原生入口：`k3dge check` / `sync` / `milestone` / `version` / `task` / `doc list|where|grep|sync`（shell、pre-commit、CI）。
+  - 本仓原生入口：`k3dge check` / `sync` / `milestone` / `version` / `task` / `doc list|where|grep|sync` / `status` / `markers` / `audit` / `search` / `where` / `index` / `commit` / `incident` / `mcp` / `init`（shell、pre-commit、CI）。
   - 对外 harness 注入：`k3dge.cli.mcp` 把同一套 engine 事实以 MCP stdio 交给 DSH / Codex / Claude Code / OpenCode 等，禁止那些工具私有重实现门禁（ADR-0006）。
   - 不负责判定（engine）与透镜审计；`k3dge audit` 是审计线消费侧管理（submit/status/show/advance/materialize/close，ADR-0025 §2.9.2），不是透镜。
   - `check` 支持 `--json` 机器可读输出，以及 `--with-tests`（selective L2）与 `--force-full`（全域 L0/L1）。
