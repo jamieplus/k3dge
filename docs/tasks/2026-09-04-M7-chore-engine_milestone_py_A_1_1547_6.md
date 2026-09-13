@@ -93,5 +93,6 @@ date: 2026-09-04
 ## 进度（2026-09-13）
 - **首块 ✅**：`_Prompt` → `engine/prompt.py`（`milestone` 以 `_Prompt` 别名兼容）。1692 → 1670。
 - **第二块 ✅**：`get/set/bump_milestone` + `_validate_milestone_id` + `_SAFE_MILESTONE_ID_RE` → `engine/milestone_pointer.py`（milestone re-export，行为不变）。1670 → 1629。
+- **第三块 ✅**：`_has_milestone_token` / `_is_doc_aux` / `_is_review_aux` / `_filename_milestone` / `_DOC_AUX_NAMES` / `_REVIEW_AUX` / `_FILENAME_MILESTONE_RE` → `engine/milestone_files.py`（re-export）。1629 → 1601。
 - **余块待抽**：report 解析（`_find_report`/`_parse_audit_stats`/`_seal_review_gate`…）→ `engine/audit_report.py`；doc-audit（`run_doc_audit`/`_changed_docs`/`_ensure_doc_audit_task`）→ `engine/doc_audit.py`；seal（`seal_milestone`/`seal_preconditions_error`/`_seal_archive`）；audit_flow；tasks；align。
 - 纪律：每块一 diff 一测试、`k3dge sync` + 全量绿；别名/转发保调用面，行为不变。

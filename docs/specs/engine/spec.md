@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:243727c92392e375582139f3aa0d37cf260d99fcecd5561db9b23ff97ac647b4`
+- **Contract Hash**: `sha256:49ec39edc3d4bff1cc4dfbceff13e6ec4aa1e74650a599c4c8731c6a1ea7a767`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -252,6 +252,7 @@ persist_external_audit_report(workspace: Path, milestone_id: str, content: str, 
 run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]
 run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
 run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
+from __future__ import annotations
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional

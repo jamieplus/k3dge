@@ -216,44 +216,16 @@ def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, mi
         print(f"[WARN][REVIEW BACKFILL] failed for {task_path.name}: {exc}", file=sys.stderr)
 
 
-def _has_milestone_token(text: str, milestone_id: str) -> bool:
-    """True iff `milestone_id` appears as a path/word token, not a substring of a longer id.
-
-    `M1` must not match `M10` in filenames (`2026-08-23-M10-align.md`) or review body text.
-    """
-    if not milestone_id:
-        return False
-    return (
-        re.search(
-            rf"(?:^|[-_./\s]){re.escape(milestone_id)}(?:[-_./\s]|$)",
-            text,
-        )
-        is not None
-    )
-
-
-# Docs that live inside a docs/<type>/ directory but are never content items:
-# scaffolding/authoring files. Single source — task scanning and review scanning
-# used to keep their own copies and drifted (AUTHORING.md leaked into `task list`).
-_DOC_AUX_NAMES = frozenset({"README.md", "AUTHORING.md", "_template.md"})
-
-
-def _is_doc_aux(name: str) -> bool:
-    """True for structural files inside docs/<type>/ that are never items."""
-    return name in _DOC_AUX_NAMES or name.startswith(".")
-
-
-_REVIEW_AUX = _DOC_AUX_NAMES | frozenset({"LEFTOVERS.md", "leftovers.md"})
-_FILENAME_MILESTONE_RE = re.compile(r"(?:^|[._-])(M\d+)(?:[._-]|$)", re.IGNORECASE)
-
-
-def _is_review_aux(name: str) -> bool:
-    return name in _REVIEW_AUX or name.startswith(".")
-
-
-def _filename_milestone(name: str) -> str | None:
-    m = _FILENAME_MILESTONE_RE.search(name)
-    return m.group(1) if m else None
+# A-1 第三块：命名/甄别帮助已抽到 `milestone_files`；re-export 兼容调用面。
+from k3dge.engine.milestone_files import (  # noqa: E402
+    _DOC_AUX_NAMES,
+    _FILENAME_MILESTONE_RE,
+    _REVIEW_AUX,
+    _filename_milestone,
+    _has_milestone_token,
+    _is_doc_aux,
+    _is_review_aux,
+)
 
 
 def _living_review_files(reviews_dir: Path) -> List[Path]:

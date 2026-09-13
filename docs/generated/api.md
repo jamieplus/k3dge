@@ -396,6 +396,8 @@ run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt
     # doc: Independent audit entry: the merged audit module (ADR-0025) produces ONE
 run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
     # doc: Seal = archive + version + pointer. Requires a *closed* audit first.
+# milestone_files.py
+from __future__ import annotations
 # milestone_pointer.py
 from __future__ import annotations
 from pathlib import Path
