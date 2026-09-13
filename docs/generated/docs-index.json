@@ -449,14 +449,6 @@
       "tokens": "WikiSkill 残项入 ADR 层：W1 隔离实证 + PURPOSE 回指惯例"
     },
     {
-      "path": "docs/tasks/2026-09-12-M9-docs-spec_boundary_fill.md",
-      "type": "tasks",
-      "id": "2026-09-12-M9-docs-spec_boundary_fill",
-      "title": "补 spec §1 边界：engine/cli In-Scope 漏列模块",
-      "status": "done",
-      "tokens": "补 spec §1 边界：engine/cli In-Scope 漏列模块"
-    },
-    {
       "path": "docs/tasks/2026-09-12-M9-feat-escape_metric.md",
       "type": "tasks",
       "id": "2026-09-12-M9-feat-escape_metric",
