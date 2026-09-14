@@ -10,6 +10,7 @@ from pathlib import Path
 from k3dge.engine.task_index import TITLE_RE
 
 _UNRELEASED = "## [Unreleased]"
+# k3dit:pending value-10 sev=低 prio=P3 type=冗余 变更类型→Keep a Changelog 段名映射两处维护：本表 _TYPE_SECTION 与 version.py:208 _CT_MAP 近同（本表缺 sec）；加类型/改段名须改两处易漂。宜单一表互引。evidence=grep -n "_TYPE_SECTION\|_CT_MAP" src/k3dge/engine/changelog.py src/k3dge/engine/version.py
 _TYPE_SECTION = {
     "feat": "Added",
     "fix": "Fixed",

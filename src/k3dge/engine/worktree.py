@@ -251,6 +251,7 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
         return {"ok": False, "mode": "conflict",
                 "message": f"rebase 冲突（{(rb.stderr or rb.stdout).strip()[:120]}）→ 人工处理后重试（§1.4）"}
     pre2 = _git(workspace, "rev-parse", "HEAD").stdout.strip()
+# k3dit:pending value-12 sev=中 prio=P2 type=冗余 merge_back 的 ff→落点闸→红则 reset 回滚三段在 :230-236 与 :254-260 近乎逐字复制（先 ff / rebase 后各一份，仅 pre/pre2 与 mode 有别）；回滚路径漂移即静默放坏改动进主干。应抽单点 helper。evidence=sed -n '229,260p' src/k3dge/engine/worktree.py
     if _git(workspace, "merge", "--ff-only", br).returncode == 0:
         gate = _run_landing_gate(workspace)
         if not gate.get("ok"):

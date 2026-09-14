@@ -81,6 +81,7 @@ def iter_managed_files(workspace: Path, typ: str, *, include_archive: bool = Fal
     return files
 
 
+# k3dit:pending value-11 sev=低 prio=P3 type=冗余 frontmatter 解析两套：本处 _frontmatter(_FM_RE) 与 task_index.parse_frontmatter(:21) 各解同一 --- 块，键大小写口径还不一致（此处保留原键、那边 .lower()）。单一格式宜单一解析器。evidence=grep -n "def parse_frontmatter\|def _frontmatter" src/k3dge/engine/task_index.py src/k3dge/engine/doc_catalog.py
 def _frontmatter(text: str) -> Dict[str, str]:
     m = _FM_RE.match(text)
     meta: Dict[str, str] = {}
