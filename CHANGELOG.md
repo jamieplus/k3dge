@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- audit job cc4125a36936: src,docs
+
 ## [0.1.10] - 2026-09-12
 
 ### Changed

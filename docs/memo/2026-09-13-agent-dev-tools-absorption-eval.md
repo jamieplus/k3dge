@@ -29,14 +29,14 @@ AI 代码评审 CLI（`ocr`）；核心＝**确定性工程 × Agent 混合**：
 git worktree 管理器（为并行 agent）：`switch/list/merge/remove` + hooks + 共享 build cache。
 
 - **能力增量**: **选测更准**（`cargo-affected` 覆盖驱动选测 + `[metadata.affected.rule]` 输入规则防漏）——与 codegraph `affected` 同源，并入该能力。
-- **非能力（不囤）**: worktree 生命周期本身 k3ge 已够（`worktree.py`＋落点闸）；hook 命名 / `wt list` 美观 = 体验，非能力。
+- **非能力（不囤）**: worktree 生命周期本身 k3dge 已够（`worktree.py`＋落点闸）；hook 命名 / `wt list` 美观 = 体验，非能力。
 
 ## 4. 能力增量 vs 基建/储备
 | 项 | 类别 | 处置 |
 | --- | --- | --- |
 | 规则声明/模板化（OCR） | **能力**（闸更准） | 做 → k3dit `feat-rule_template_matching` |
 | 定位+反射后处理（OCR） | **能力**（审计更真） | 做 → k3dit `feat-position_reflection` |
-| 依赖感知 + affected tests（codegraph/worktrunk） | **能力**（check/CI 更准） | 做 → k3ge `feat-affected_tests`（含最小图边 + 防漏选测） |
+| 依赖感知 + affected tests（codegraph/worktrunk） | **能力**（check/CI 更准） | 做 → k3dge `feat-affected_tests`（含最小图边 + 防漏选测） |
 | AACR-Bench 蓝本（OCR） | **能力**（评测可测） | 并入既有 k3dit `feat-eval_harness` |
 | FTS/explore 检索参照（codegraph） | 参照 | 并入既有 k3che `absorb_p3_recall_reflect_guard` |
 | SQLite+FTS 符号平台 | 基建（换存储） | **不囤**（并入 affected 的最小图边） |

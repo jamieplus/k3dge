@@ -29,4 +29,4 @@ date: 2026-09-13
 - 桩子先行：先落"报告存在 + baseline 相等"的形式短路（条件①②）＋ `--force`＋`PRE-FILTER` 痕迹；条件③待 k3dit 侧就绪再接，未就绪则**不短路**（保守＝照跑）。
 
 ## 收尾（2026-09-13 拆出跨仓）
-- 拆出 k3dit `feat-report_provenance`（前置：报告落 `baseline`/`lens_version`）；本票待其就绪后在 k3ge `run_audit_flow` 实现预筛。
+- 拆出 k3dit `feat-report_provenance`（前置：报告落 `baseline`/`lens_version`）；本票待其就绪后在 k3dge `run_audit_flow` 实现预筛。

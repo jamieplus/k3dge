@@ -30,4 +30,4 @@ date: 2026-09-12
 - 至少一个可复算逃逸口径 + 观测行；不阻断任何提交。
 
 ## 收尾（2026-09-13 拆出跨仓）
-- 拆出 k3dit `feat-escape_metric`（逃逸真值/账归 k3dit）；k3ge 触发口径待其就绪。
+- 拆出 k3dit `feat-escape_metric`（逃逸真值/账归 k3dit）；k3dge 触发口径待其就绪。

@@ -30,6 +30,6 @@ date: 2026-09-13
 - **并入**（2026-09-13）：`symbol_graph_store` 取消；确需图边的部分（最小 import/call 边）在本题实现，**不建 SQLite+FTS 平台**（换存储不产生新能力）。
 
 ## 收尾（2026-09-13 误置→重指）
-- **本票误置**：`import_graph`/`blast_radius` 底物在 **k3dit**（`tools/`），k3ge 无此模块。
+- **本票误置**：`import_graph`/`blast_radius` 底物在 **k3dit**（`tools/`），k3dge 无此模块。
 - 实现落 **k3dit `feat-affected_tests`**（`5ed05be`：`import_graph.affected_tests` + `k3dit affected` CLI，150 passed）。
-- k3ge 侧不重建扫描器（避免跨 peer 重复实现）；`symbol_graph_store` 的"最小图边"随该实现吸收。
+- k3dge 侧不重建扫描器（避免跨 peer 重复实现）；`symbol_graph_store` 的"最小图边"随该实现吸收。

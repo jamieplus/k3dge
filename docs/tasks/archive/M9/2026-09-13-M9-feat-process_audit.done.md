@@ -33,4 +33,4 @@ date: 2026-09-12
 - 新增 `engine/process_audit.py :: evidence_chain_error`：里程碑闭环 12 列报告**署名完整**（`审计人`/`透镜来源` 非空）＋**已入库**（git 跟踪）→ 否则拒。
 - 接入硬闸契约：`[checks.seal].preconditions` 增 `evidence_chain`（`gates.DEFAULTS` + `.agent/gates.toml`），`seal_preconditions_error` 加该闸。
 - 测试 `test_process_audit.py`（完整+入库过 / 缺署名拒 / 未入库拒）＋ `test_gates` 预期更新。293 passed。
-- **未落（归 k3dit，k3ge 无事实源、显式不臆造）**：①审计线强时序（`provenance.baseline`==线头、`lens_version`==当前、审计在 `fix_base` 之后）；②"已修缺陷 RCA 回灌"检查（消费 k3che `record_rca`）。待 peer 落地后扩展。
+- **未落（归 k3dit，k3dge 无事实源、显式不臆造）**：①审计线强时序（`provenance.baseline`==线头、`lens_version`==当前、审计在 `fix_base` 之后）；②"已修缺陷 RCA 回灌"检查（消费 k3che `record_rca`）。待 peer 落地后扩展。
