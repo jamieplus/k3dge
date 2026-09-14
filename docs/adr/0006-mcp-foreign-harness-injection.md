@@ -20,8 +20,6 @@ Note: ① 就地修订（非 Amend/Supersede）2026-09-02，经 Core Maintainer 
 
 > **Related**: ADR-0005（本地自用 / 职责切分）、ADR-0010（rules 切片）、ADR-0009（吸收纪律）、ADR-0022（doc-audit 非阻断）
 >
-<!-- k3dit:fixed doc-6 验证：`docs/adr/0006-mcp-foreign-harness-injection.md:25-28` 已用「现行口径（Status: Accepted，Note ⑦）」替换 Draft 保留理由三条，理由①改入向 server 已在 mcp 2.x 复活（指 `docs/guides/mcp-bridge.md`），与 frontmatter `Status: Accepted`(:2) 自洽。若正文仍留与 Accepted 相抵的 Draft 理由，则没修对。 -->
-<!-- k3dit:fixed doc-3 验证：`docs/adr/0006-mcp-foreign-harness-injection.md:28` 与 `docs/adr/AUTHORING.md:71` 的机验候选指针已改指存在件 `docs/tasks/archive/M9/2026-09-13-M7-feat-check_gate_by_doc_status.done.md`（glob 命中）。若仍指不存在的 `docs/tasks/2026-09-02-M7-feat-check_gate_by_doc_status.md`，则没修对。 -->
 > **现行口径（`Status: Accepted`，Note ⑦ 2026-09-12）**：
 > - ① 入向 server 已在 mcp 2.x 复活（`docs/guides/mcp-bridge.md`「入向现状」）。
 > - ② §2.4 的降级报告有执笔与署名席位：合并审计模块各窗执笔、席位署名、Hall 收钉（`ADR-0025` §2.7 / `peer_contract §8`）。

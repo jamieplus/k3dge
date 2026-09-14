@@ -84,7 +84,6 @@ def get_changed_files(workspace: Path) -> List[str]:
             seen.add(path)
             files.append(path)
 
-# k3dit:fixed value-8 验证：`get_changed_files`(diff.py:74) 先归一 base(`K3DGE_BASE_SHA`→`resolve_base`，:88-90) 再单次跑 `git diff <base>...HEAD` + seen 去重(:91-97)，两分支重复循环已消。若再现第二处 `git diff <base>...HEAD` 解析/去重，则没修对。
     base = __import__("os").environ.get("K3DGE_BASE_SHA", "").strip()
     if not base:
         base = resolve_base(workspace)

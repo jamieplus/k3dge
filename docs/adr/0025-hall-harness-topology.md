@@ -309,5 +309,4 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
 - `docs/memo/archive/2026-09-05-industry-benchmark-vs-4-harness.md`（四缺项归属 §3.1–§3.2；观测 G8）
 - `docs/memo/archive/2026-09-05-graph-lens-for-audit-and-qa.md`（§6 窗路由表、§7 理论编排）
 - §2.7（判读席写面/窗工件合成）折叠自本 ADR 早期拟稿（未单列）；其触发的 `peer_contract §8` v2 钉语法随实现步落（本 ADR 定稿不提前改活契约）。
-<!-- k3dit:fixed doc-4 验证：`docs/adr/0025-hall-harness-topology.md:313` 已改指 `docs/tasks/archive/M8/2026-09-06-M8-feat-hall_G*.done.md`（glob 命中 G1/G2/G3/G3b/G4/G5/G6/G7/G8）并单列 `docs/tasks/archive/M9/2026-09-10-M8-feat-hall_harvest_repo_scope.md`（实测存在）。若通配仍落在无匹配的 `docs/tasks/2026-09-06-M8-feat-hall_*.md`，则没修对。 -->
 - 落地链（M8）：G3b CLI 探测 → G1 合并 → G2 内核 + G3 墙（Accepted 双门）→ G5 看门狗 + G7 测试（墙完整验收）→ G6 割接 → G8 观测（各见 `docs/tasks/archive/M8/2026-09-06-M8-feat-hall_G*.done.md`；另一票 `2026-09-10-M8-feat-hall_harvest_repo_scope.md` 在 `docs/tasks/archive/M9/`）

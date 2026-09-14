@@ -118,7 +118,6 @@ def _snippet_window(path: Path, line_no: int, context: int, cap: int = _MAX_CONT
         return ""
     lo = max(0, line_no - 1 - context)
     hi = min(len(lines), line_no + context)
-# k3dit:fixed code-5 验证：`_snippet_window`(search.py:113) 用 `lo=max(0,line_no-1-context)`(:119) 切片 `lines[lo:hi]`(:122)，匹配行前 context 行入窗；调用点 search.py:225 传同 cap，tests/unit/engine/test_search.py 覆盖。若窗口仍从 line_no-1 起、丢失前文，则没修对。
     window = lines[lo:hi]
     text = "\n".join(window)
     if len(text) > 240:
