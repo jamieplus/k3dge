@@ -393,14 +393,6 @@
       "tokens": "Domain Specification: templates"
     },
     {
-      "path": "docs/tasks/2026-09-13-M9-audit-audit_job_137ed128e134.md",
-      "type": "tasks",
-      "id": "2026-09-13-M9-audit-audit_job_137ed128e134",
-      "title": "audit job 137ed128e134: src,docs",
-      "status": "idea",
-      "tokens": "audit job 137ed128e134: src,docs"
-    },
-    {
       "path": "docs/tasks/2026-09-13-refactor-cc_debt_remaining.md",
       "type": "tasks",
       "id": "2026-09-13-refactor-cc_debt_remaining",
