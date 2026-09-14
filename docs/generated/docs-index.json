@@ -393,6 +393,22 @@
       "tokens": "Domain Specification: templates"
     },
     {
+      "path": "docs/tasks/2026-09-13-M10-fix-closure_note_stale.md",
+      "type": "tasks",
+      "id": "2026-09-13-M10-fix-closure_note_stale",
+      "title": "closure 收摊模板陈旧：写死「审计双腿闭环」+ 版本记 bump 前值（应与合并审计模块单份报告/终版一致）",
+      "status": "idea",
+      "tokens": "closure 收摊模板陈旧：写死「审计双腿闭环」+ 版本记 bump 前值（应与合并审计模块单份报告/终版一致）"
+    },
+    {
+      "path": "docs/tasks/2026-09-13-M10-fix-seal_scan_archive.md",
+      "type": "tasks",
+      "id": "2026-09-13-M10-fix-seal_scan_archive",
+      "title": "seal/align 任务扫描不含 archive/<M>/：提前归档的 done 里程碑任务致封板被拒（No tasks found）",
+      "status": "idea",
+      "tokens": "seal/align 任务扫描不含 archive/<M>/：提前归档的 done 里程碑任务致封板被拒（No tasks found）"
+    },
+    {
       "path": "docs/tasks/2026-09-13-refactor-cc_debt_remaining.md",
       "type": "tasks",
       "id": "2026-09-13-refactor-cc_debt_remaining",
