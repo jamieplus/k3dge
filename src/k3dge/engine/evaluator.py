@@ -539,6 +539,7 @@ class ConsistencyEngine:
         if name == "open" and node.args:
             target, mode = node.args[0], (node.args[1] if len(node.args) > 1 else None)
             wr = isinstance(mode, ast.Constant) and isinstance(mode.value, str) and any(c in mode.value for c in "wx")
+# k3dit:pending code-4 sev=中 prio=P1 type=缺陷 _logs_overwrite 把无 mode 的 open("logs/…")（Python 默认只读 'r'）当覆写报 AUDIT_TRAIL_APPEND_ONLY 硬红；下游只读日志即被误拦，应只在显式写模式（'w'/'x'/mode 关键字）时判
             if cls._logs_literal(target) and (mode is None or wr):
                 return "对 logs/ 的 open(...,'w') 覆写：审计痕迹只可追加（ADR-0008），改用 'a'。"
         return ""

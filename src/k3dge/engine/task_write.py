@@ -275,6 +275,7 @@ def _backfill_task_reviews(workspace: Path, target: Path) -> None:
             t_ms = mm.group(1).strip() if mm else ""
         _auto_backfill_reviews(workspace, target, t_title, t_ms)
     except Exception as exc:
+# k3dit:pending code-1 sev=中 prio=P2 type=缺陷 _backfill_task_reviews 的 except 引用了本模块未导入的 sys（仅 _auto_backfill_reviews/_append_task_changelog 局部 import），read_text 解码失败等异常在此改抛 NameError 逃逸 mark_task_done，违背 never-raises 约定
         print(f"[WARN] task done: 报告自动回填跳过（{target.name}: {exc}）；报告仍未回填，封板闸会兜底", file=sys.stderr)
 
 
