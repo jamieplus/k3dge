@@ -345,12 +345,12 @@
       "tokens": "封板收摊清单（上下文压缩）: M8"
     },
     {
-      "path": "docs/reviews/2026-09-13-M9-audit.md",
+      "path": "docs/reviews/2026-09-13-M9-closure.md",
       "type": "reviews",
-      "id": "2026-09-13-M9-audit",
-      "title": "审计：src,docs（milestone M9）",
+      "id": "2026-09-13-M9-closure",
+      "title": "封板收摊清单（上下文压缩）: M9",
       "status": "",
-      "tokens": "审计：src,docs（milestone M9）"
+      "tokens": "封板收摊清单（上下文压缩）: M9"
     },
     {
       "path": "docs/specs/_template/spec.md",

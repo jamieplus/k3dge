@@ -28,5 +28,5 @@ Denial reason and reopen condition live here only.
 | T-03 | Self-Hosting 嗅探：`Manifest self_hosting` 显式化待规模化再 ADR | 同上 |
 | SEAL-01 | `seal` 验 align-pass + 无 stub；报告格式由 `k3dit check-report` 在 `on_pre_seal` 卡 | 同上 |
 | AGENTS-SP-01 | `AGENTS.md` 稀疏寻址无已读断言：以 Gate 红灯逼回读 | 同上 |
-| value-7 | `run_milestone_alignment` CC16 职责混居：已登记进 `refactor-cc_debt_remaining` 待拆表（一 diff 一测试） | [2026-09-13-M9-audit.md](2026-09-13-M9-audit.md) |
+| value-7 | `run_milestone_alignment` CC16 职责混居：已登记进 `refactor-cc_debt_remaining` 待拆表（一 diff 一测试） | [2026-09-13-M9-audit.md](archive/M9/2026-09-13-M9-audit.md) |
 | value-9 | `.mcp.json` 读取 ≥6 份无单一访问器：跨 cli/engine/templates 三域（scaffold 孤岛，ADR-0001 §2），先定宿主再拆 | 同上 |
