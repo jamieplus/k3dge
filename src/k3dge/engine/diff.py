@@ -35,7 +35,7 @@ def _run(cmd: List[str], cwd: Path) -> str:
 
 def _is_shallow(workspace: Path) -> bool:
     result = _try_run(
-        ["git", "rev-parse", "--is-shallow-repository"], cwd=workspace, capture_output=True, text=True
+        ["git", "rev-parse", "--is-shallow-repository"], cwd=workspace
     )
     return result.stdout.strip() == "true"
 
@@ -44,7 +44,7 @@ def resolve_base(workspace: Path) -> str:
     """Return the base ref for branch-level diffing, falling back to HEAD."""
     for base in BASE_CANDIDATES:
         probe = _try_run(
-            ["git", "merge-base", base, "HEAD"], cwd=workspace, capture_output=True, text=True
+            ["git", "merge-base", base, "HEAD"], workspace
         )
         if probe.returncode == 0 and probe.stdout.strip():
             return base
