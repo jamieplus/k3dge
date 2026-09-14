@@ -76,6 +76,49 @@ def _package_prefix(manifest: Manifest, domain: str) -> str:
     return parts[-1]
 
 
+def _pkg_chain(workspace_root: Path, py: Path, pkg: str) -> List[str]:
+    """Directories between the shared package root and this file's own directory.
+
+    `src/k3dge/engine/sub/x.py` with pkg `k3dge` -> `["engine", "sub"]`; the first entry is
+    the domain, and the length tells a relative import how many levels stay inside a domain.
+    """
+    try:
+        parts = list(py.relative_to(workspace_root).parts[:-1])
+    except ValueError:
+        return []
+    if pkg in parts:
+        return parts[parts.index(pkg) + 1:]
+    return parts
+
+
+def _imported_domains(tree: "ast.AST", chain: List[str], pkg: str) -> List[str]:
+    """First module segment after `pkg` for every import in the tree (absolute + relative).
+
+    Replaces the line regex (code-3), which only saw `pkg.<name>` with `[a-z_]+` and so missed
+    `from pkg import <domain>`, multi-name imports and `from ..engine import x`.
+    """
+    targets: List[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                seg = alias.name.split(".")
+                if seg[0] == pkg and len(seg) > 1:
+                    targets.append(seg[1])
+        elif isinstance(node, ast.ImportFrom):
+            names = [a.name.split(".")[0] for a in node.names]
+            if node.level:
+                keep = len(chain) - (node.level - 1)
+                if keep < 0:
+                    continue  # escapes the package — no domain attributable
+                resolved = chain[:keep] + (node.module.split(".") if node.module else [])
+                targets.extend(resolved[:1] if resolved else names)
+            elif node.module:
+                seg = node.module.split(".")
+                if seg[0] == pkg:
+                    targets.extend(seg[1:2] if len(seg) > 1 else names)
+    return targets
+
+
 def _shape_change_documented(workspace: Path, domain: str, spec_content: str, sym_diff: dict) -> bool:
     """C gate (WARN only): a shape change (added/removed/changed symbols) must leave a human trace.
 
@@ -758,26 +801,23 @@ class ConsistencyEngine:
         pkg = _package_prefix(manifest, domain)
         if not pkg:
             return out
-# k3dit:pending code-3 sev=中 prio=P2 type=覆盖 反向 import 禁令只匹配 `from pkg.<name>`/`import pkg.<name>` 且子模块限 `[a-z_]+`；`from pkg import <domain>` 与相对 import（`from ..engine import x`）均漏检，跨域依赖可无声绕过 ADR-0001 决策 6。evidence=在 src/<domain>/x.py 写 `from k3dge import engine` 后 k3dge check 不报 DOMAIN_IMPORT_VIOLATION
-        import_re = re.compile(
-            rf"^\s*(?:from\s+{re.escape(pkg)}\.([a-z_]+)|import\s+{re.escape(pkg)}\.([a-z_]+))"
-        )
+# k3dit:fixnote code-3 改 AST 扫描（`_pkg_chain`/`_imported_domains`）：绝对/相对/多名 import 全覆盖，不再限于正则
         allowed = set(manifest.depends_on(domain))
         for py in sorted(src_dir.rglob("*.py")):
             if py.name == "__init__.py":
                 continue
             try:
                 text = py.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
+                tree = ast.parse(text)
+            except (OSError, SyntaxError, ValueError):
                 continue
-            for line in text.splitlines():
-                m = import_re.match(line)
-                if not m:
-                    continue
-                target = m.group(1) or m.group(2)
+            chain = _pkg_chain(self.workspace_root, py, pkg)
+            reported: Set[str] = set()
+            for target in _imported_domains(tree, chain, pkg):
                 if target == domain or target not in manifest.domains:
                     continue
-                if target not in allowed:
+                if target not in allowed and target not in reported:
+                    reported.add(target)
                     out.append(
                         Violation(
                             "DOMAIN_IMPORT_VIOLATION",

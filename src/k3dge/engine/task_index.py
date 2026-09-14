@@ -18,22 +18,32 @@ PRIORITY_RE = re.compile(r"-\s+\*\*Priority\*\*:\s*(\S+)", re.IGNORECASE)
 TITLE_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
 
 
+def _frontmatter_pairs(content: str) -> List[tuple]:
+    """唯一的 `---` frontmatter 解析：必须首行开、行内闭合；返回 `(原键, 值)` 列表。
+
+    value-11：`doc_catalog._frontmatter` 与 `parse_frontmatter` 共用本函数，只差键大小写。
+    未闭合块一律不算 frontmatter（防正文 `key: value` 被误当元数据）。
+    """
+    lines = content.splitlines()
+    if len(lines) < 2 or lines[0].strip() != "---":
+        return []
+    pairs: List[tuple] = []
+    for line in lines[1:]:
+        if line.strip() == "---":
+            return pairs
+        if ":" in line:
+            k, v = line.split(":", 1)
+            pairs.append((k.strip(), v.strip()))
+    return []
+
+
 def parse_frontmatter(content: str) -> dict[str, str]:
     """Strict frontmatter parser: only `---` block at start, YAML-like `key: value`.
 
     Avoids `Markdown as Database` anti-pattern where body text containing
     `- **Status**:` is mis-captured. Pure stdlib, no external dep.
     """
-    meta: dict[str, str] = {}
-    lines = content.splitlines()
-    if len(lines) >= 2 and lines[0].strip() == "---":
-        for line in lines[1:]:
-            if line.strip() == "---":
-                break
-            if ":" in line:
-                k, v = line.split(":", 1)
-                meta[k.strip().lower()] = v.strip()
-    return meta
+    return {k.lower(): v for k, v in _frontmatter_pairs(content)}
 
 
 @dataclass(frozen=True)

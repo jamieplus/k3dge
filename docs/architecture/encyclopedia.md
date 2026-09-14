@@ -70,8 +70,8 @@
 | **`[NEXT]` 提示** | 命令末尾只给合法下一步；优先级 `pending_findings > ratchet_open > seal_ready > audit_suggested`；唯一来源在 `engine/nextstep` + `engine/audit_trigger` | [`overview.md`](overview.md) §7 |
 | **审计闭环（封板界限）** | audit 单份 **12 列报告**到 `待修=0`；未审计调 seal → `audit_needed` | ADR-0017；[`overview.md`](overview.md) §6 |
 | **钉语法 markers** | `k3dit:<kind> <ID>[@scope] <一句话≤80字>`；kind ∈ `pending/leftover/disputed/fixnote/fixed`；scope ∈ `line/file/repo`；开放 = `pending+disputed+fixnote`（结项须清零；`leftover` 上主干当长期文献、`fixed` 待 Hall 拔，均非 open） | [`docs/protocols/peer_contract.md`](../protocols/peer_contract.md) §8；`engine/markers.py` |
-<!-- k3dit:pending doc-4 sev=中 prio=P2 type=冲突 本行「理由写报告不入正文」仍按旧「钉=只读指针」口径，与 ADR-0025 §2.7 及 peer_contract §8「判读四格写源=钉、报告=其投影」相抵 -->
-| **pending_findings** | `k3dit:pending` 钉计数（check/status 报 `pending=N`，最高优先）；处置以 12 列+tasks 为准，理由写报告不入正文 | AGENTS.md §12；`peer_contract §8` |
+<!-- k3dit:fixnote doc-4 本行改「钉＝写源、报告＝投影」口径；出处 docs/adr/0025:155 + docs/protocols/peer_contract.md:127 -->
+| **pending_findings** | `k3dit:pending` 钉计数（check/status 报 `pending=N`，最高优先）；**钉＝写源**（判读四格 sev/prio/type/desc 写在钉上），账本与 12 列报告＝钉的投影（每轮 harvest 重生成，非席手填）；处置由修席写 `fixnote` 钉承载，复核背书翻 `fixed`，拔钉归 Hall | AGENTS.md §12；`peer_contract §8`；ADR-0025 §2.7 |
 | **审计线 Audit Line** | gate 类唯一输入形式：一单一线（`k3dit/<单>` 分支 + worktree checkout），锁点 L 即 `baseline`；袋/独立库/打包器全部退役 | ADR-0025；`peer_contract §3` |
 | **棘轮 Ratchet** | 一工单 = 一快照，单内审↔修可多程；submit/collect 两态；`claim` 即续租；快照推进一律 `git update-ref` CAS | `peer_contract §1.4` |
 | **席位 seat** | 审计机构经 seat 连接组件上岗；`sign-report` 署名才算结案 | `peer_contract §1.4` / §2 |
@@ -83,8 +83,8 @@
 | 术语 | 一句话 | 出处 |
 | --- | --- | --- |
 | **Diátaxis 分类** | `guides`=教程 / `generated`=Reference 机器自动生成 / `architecture`=解释（本文+overview） | [`overview.md`](overview.md) 头部；`docs/generated/README.md` |
-| **`docs/<type>` 规约** | 每种类型锁 `README.md` + `AUTHORING.md`；结构硬闸 `docs/<type>/.schema.json`（有才闸，缺则下游安全） | ADR-0018/0019；`engine/doc_catalog.py` |
-<!-- k3dit:pending doc-1 sev=中 prio=P2 type=悬空指针 本行引 `ADR-0018/0019`，但 ADR-0019 已删除（并入 ADR-0018 §2.11，见 ADR-0018 Note ⑤），`docs/adr/` 无 0019 文件 evidence=ls docs/adr/0019-*.md -->
+| **`docs/<type>` 规约** | 每种类型锁 `README.md` + `AUTHORING.md`；结构硬闸 `docs/<type>/.schema.json`（有才闸，缺则下游安全） | ADR-0018 §2.2/§2.6；`engine/doc_catalog.py` |
+<!-- k3dit:fixnote doc-1 改指 ADR-0018 §2.2/§2.6；证据 ls docs/adr/0019-*.md 无匹配（0018 Note⑤：0019 已删并入 §2.11） -->
 | **doc catalog** | `list / where / grep`；`grep` 正文只回 `path(:line)`，不回 snippet | ADR-0018；`docs/generated/docs-index.json` |
 | **LEFTOVERS.md** | 有意留（活文档常驻表）唯一事实源 | [`overview.md`](overview.md) §8 |
 | **Memo** | spark inbox：三种"暂不成事"的念头（模糊/暂不可落地/弱相关）；成熟后晋升 tasks 并移 archive | `docs/guides/user_guide.md`；`docs/memo/README.md` |
@@ -124,9 +124,9 @@
 
 ## 5. 决策索引（ADR 全表）
 
-按主题分组（对应 `docs/adr/README.md` 的 Topics，0020/0025 补录于 Agent/harness 组）。**标题为序，深读请 `k3dge doc where <ADR-ID>`。**
+按主题分组（对应 `docs/adr/README.md` 的 Topics，0025 补录于 Agent/harness 组）。**标题为序，深读请 `k3dge doc where <ADR-ID>`。**
 
-<!-- k3dit:pending doc-2 sev=中 prio=P2 type=悬空指针 intro 称 `0020/0025` 补录于 Agent/harness 组，但 ADR-0020 已删除（并入 ADR-0005 §2.7，见 ADR-0005 Note ⑦），该组现仅 ADR-0025 evidence=ls docs/adr/0020-*.md -->
+<!-- k3dit:fixnote doc-2 intro 改「0025 补录于 Agent/harness 组」；证据 docs/adr/README.md:15 该组无 0020 -->
 ### 门禁与基线
 | ID | 主题（文件名） | 一句话 |
 | --- | --- | --- |
@@ -212,10 +212,10 @@ DRAFT →(milestone align: Full Matrix, 无人问)→ ALIGNED
 - 交换介质 = 审计线（分支+现场）+ 钉（§3.2/§3.4）；`sign-report` 署名才算结案；`collect` 幂等可重试，`EXPIRED/NOT_FOUND` ⇒ 锁新基线重送。
 - `on_seal_enter`（合并审计模块**一份**必做）与 `on_pre_seal`（该报告 verify）配置在 `.agent/pipeline.toml`；闭环验完 seal 才放行。
 - 外来审计源经 `k3dge milestone audit-submit`（MCP `k3dge_submit_audit_report`，`--kind quality` 同理）落盘即计入闭环。
-- 发现用 `k3dit:pending <ID>` 钉在位置（仅指针）；已修删钉，有意留改 `k3dit:leftover`。
+- 发现用 `k3dit:pending <ID>` 钉在位置（**钉＝写源**：判读四格写在钉上，账本/12 列报告＝其投影）；已修由修席翻 `fixnote`、复核背书翻 `fixed`、Hall 拔钉（席一律不删钉），有意留翻 `k3dit:leftover`。
 
 ## 8. 开放问题与活文档
-<!-- k3dit:pending doc-5 sev=中 prio=P2 type=冲突 「钉在位置（仅指针）」为旧口径，与 ADR-0025 §2.7 及 peer_contract §8 写源纪律（钉=写源、账本/报告=投影）相抵 -->
+<!-- k3dit:fixnote doc-5 「仅指针」→「钉＝写源、报告＝投影」；「已修删钉」→「席不删钉，Hall 拔」；据 0025:155＋peer_contract:127 -->
 
 | 哪类 | 在哪看 | 说明 |
 | --- | --- | --- |
@@ -226,16 +226,18 @@ DRAFT →(milestone align: Full Matrix, 无人问)→ ALIGNED
 | 事故 | `k3dge doc list --type incidents` | 持续偏离记录 |
 | 红闸勘误 | `docs/branches/` | `check` 红 ×2 时走：branches → stash |
 
-主 memo 一览（k3dge doc where，按 `docs/memo/`）：
+主 memo 一览（现行顶层 `docs/memo/`；归档件按 ADR-0023 §2.2 写含 `archive/` 的全路径）：
 
-- `2026-08-21-deferred-standards` — 未落地的对标项（6 类标准评估小结）
-- `2026-08-25-prompt-as-neural-net` — Prompt as Neural Net，稀疏门控解释框架
-- `2026-08-27-h8m2k-a1-harness-hard-isolation` — harness 环境级硬隔离 vs 认知级软隔离
-- `2026-09-02-peer-wiring-and-seat-options` — peer 接线与审计席位的选项账（研究用，不作决策）
-<!-- k3dit:pending doc-3 sev=中 prio=P2 type=悬空指针 本清单 5 条 memo 均只在 `docs/memo/archive/`（裸名不符 ADR-0023 §2.2 全路径要求＝悬空），且漏现行顶层 `2026-09-12-rust-k3dge-fit`、`2026-09-13-agent-dev-tools-absorption-eval` evidence=ls docs/memo/*.md -->
-- `2026-09-05-graph-lens-for-audit-and-qa` — 图论视角的审计/优化应用 + audit/QA 三段拆分（讨论底稿）
+- `docs/memo/2026-09-12-rust-k3dge-fit.md` — Rust × vibe coding 契合性：Rust 重写 k3dge 可行性（类型＝暂无法落地，需先 supersede ADR-0001）
+- `docs/memo/2026-09-13-agent-dev-tools-absorption-eval.md` — codegraph / open-code-review / worktrunk 吸收评估（判据＝能力增量，非扩基建）
+- `docs/memo/archive/2026-08-21-deferred-standards.md` — 未落地的对标项（6 类标准评估小结）
+- `docs/memo/archive/2026-08-25-prompt-as-neural-net.md` — Prompt as Neural Net，稀疏门控解释框架
+- `docs/memo/archive/2026-08-27-h8m2k-a1-harness-hard-isolation.md` — harness 环境级硬隔离 vs 认知级软隔离
+- `docs/memo/archive/2026-09-02-peer-wiring-and-seat-options.md` — peer 接线与审计席位的选项账（研究用，不作决策）
+<!-- k3dit:fixnote doc-3 5 条归档件改全路径 `docs/memo/archive/…`，补 2 篇现行顶层；证据 `ls docs/memo/*.md` -->
+- `docs/memo/archive/2026-09-05-graph-lens-for-audit-and-qa.md` — 图论视角的审计/优化应用 + audit/QA 三段拆分（讨论底稿）
 
-已归档：`2026-09-02-plugins-main-absorption-eval`（P1-P3 全账核清，结项记录在 `archive/`，落点以各 peer ADR/tests 为权威）。
+已归档：`docs/memo/archive/2026-09-02-plugins-main-absorption-eval.md`（P1-P3 全账核清，结项记录在 `archive/`，落点以各 peer ADR/tests 为权威）。
 
 ## 9. 相关入口速查
 

@@ -67,8 +67,12 @@ def _validate_domain(domain: str, cfg, domains: dict) -> None:
 
 class Manifest:
     def __init__(self, data: Dict[str, Any]) -> None:
+        # k3dit:fixnote code-4 `__init__` 先校验顶层 dict，非 dict 抛 ManifestError；MANIFEST_INVALID 兜底恢复不崩栈
+        if not isinstance(data, dict):
+            raise ManifestError(
+                f"{MANIFEST_PATH} must contain a JSON object, got {type(data).__name__}"
+            )
         self.data = data
-# k3dit:pending code-4 sev=低 prio=P2 type=缺陷 `Manifest.load` 只 catch JSONDecodeError/OSError，未校验顶层为 dict；manifest.json 内容为 `[]`/字符串时 `data.get` 抛 AttributeError（非 ManifestError），`evaluate`/`workspace_status` 的 MANIFEST_INVALID 兜底失效、直接崩栈。evidence=printf '[]\n' > .agent/manifest.json && k3dge check
         self.name: str = data.get("name", "project")
         if "self_hosting" in data and not isinstance(data["self_hosting"], bool):
             raise ManifestError("'self_hosting' must be a boolean")

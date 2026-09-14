@@ -195,6 +195,22 @@ def _run_landing_gate(workspace: Path) -> dict:
     return {"ok": True}
 
 
+def _ff_with_gate(workspace: Path, br: str, pre: str, mode: str) -> Optional[dict]:
+    """ff 主干 → 落点机械闸 → 闸红 `reset --hard` 回滚到 `pre`（单一回滚路径）。
+
+    返回 `None` 表示 ff 不成（调用方决定下一步走 rebase 还是报错）；否则返回合并结论。
+    先 ff / rebase 后 ff 两段共用本函数，回滚口径只有一处可漂（value-12）。
+    """
+    if _git(workspace, "merge", "--ff-only", br).returncode != 0:
+        return None
+    gate = _run_landing_gate(workspace)
+    if not gate.get("ok"):
+        _git(workspace, "reset", "--hard", pre)
+        return {"ok": False, "mode": "gate",
+                "message": f"落点机械闸红（{gate.get('step')}）：{gate.get('message', '')[:200]}"}
+    return {"ok": True, "mode": mode}
+
+
 def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
     """closure 回写主干（P1：默认自动；脏树/冲突/落点闸红 ⇒ 停并升级人工，§1.4）。
 
@@ -227,13 +243,11 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
     except RuntimeError as exc:
         return {"ok": False, "mode": "error", "message": f"去钉提版失败：{exc}"}
     pre = _git(workspace, "rev-parse", "HEAD").stdout.strip()
-    if _git(workspace, "merge", "--ff-only", br).returncode == 0:
-        gate = _run_landing_gate(workspace)
-        if not gate.get("ok"):
-            _git(workspace, "reset", "--hard", pre)
-            return {"ok": False, "mode": "gate",
-                    "message": f"落点机械闸红（{gate.get('step')}）：{gate.get('message', '')[:200]}"}
-        return {"ok": True, "mode": "ff", "stripped": strip}
+    ff = _ff_with_gate(workspace, br, pre, "ff")
+    if ff is not None:
+        if ff.get("ok"):
+            ff["stripped"] = strip
+        return ff
     main_head = _git(workspace, "rev-parse", "HEAD").stdout.strip()
     base = _git(workspace, "merge-base", "HEAD", br).stdout.strip()
     tip = _git(workspace, "rev-parse", br).stdout.strip()
@@ -251,14 +265,10 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
         return {"ok": False, "mode": "conflict",
                 "message": f"rebase 冲突（{(rb.stderr or rb.stdout).strip()[:120]}）→ 人工处理后重试（§1.4）"}
     pre2 = _git(workspace, "rev-parse", "HEAD").stdout.strip()
-# k3dit:pending value-12 sev=中 prio=P2 type=冗余 merge_back 的 ff→落点闸→红则 reset 回滚三段在 :230-236 与 :254-260 近乎逐字复制（先 ff / rebase 后各一份，仅 pre/pre2 与 mode 有别）；回滚路径漂移即静默放坏改动进主干。应抽单点 helper。evidence=sed -n '229,260p' src/k3dge/engine/worktree.py
-    if _git(workspace, "merge", "--ff-only", br).returncode == 0:
-        gate = _run_landing_gate(workspace)
-        if not gate.get("ok"):
-            _git(workspace, "reset", "--hard", pre2)
-            return {"ok": False, "mode": "gate",
-                    "message": f"落点机械闸红（{gate.get('step')}）：{gate.get('message', '')[:200]}"}
-        return {"ok": True, "mode": "rebase"}
+    # k3dit:fixnote value-12 两处 ff→闸→reset 逐字复制抽成 `_ff_with_gate`，回滚口径单点；两处各调一次，仅 mode 有别
+    rb_ff = _ff_with_gate(workspace, br, pre2, "rebase")
+    if rb_ff is not None:
+        return rb_ff
     return {"ok": False, "mode": "error", "message": "重演后仍无法 ff（异常态，交人工）"}
 
 

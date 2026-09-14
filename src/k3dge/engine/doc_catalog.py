@@ -30,7 +30,6 @@ AUX_NAMES = frozenset(
 )
 SKIP_TYPES = frozenset({"generated"})
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_FM_RE = re.compile(r"^---\n(.*?)\n---", re.DOTALL)
 _TITLE_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
 _SUMMARY_RE = re.compile(r"可检索摘要[：:]\s*(.+)")
 _HEADER_RE = re.compile(r"^-\s+\*\*([^*]+)\*\*:\s*(.+)$", re.MULTILINE)
@@ -81,17 +80,11 @@ def iter_managed_files(workspace: Path, typ: str, *, include_archive: bool = Fal
     return files
 
 
-# k3dit:pending value-11 sev=低 prio=P3 type=冗余 frontmatter 解析两套：本处 _frontmatter(_FM_RE) 与 task_index.parse_frontmatter(:21) 各解同一 --- 块，键大小写口径还不一致（此处保留原键、那边 .lower()）。单一格式宜单一解析器。evidence=grep -n "def parse_frontmatter\|def _frontmatter" src/k3dge/engine/task_index.py src/k3dge/engine/doc_catalog.py
+# k3dit:fixnote value-11 本函数改委托 `task_index._frontmatter_pairs`（单解析器，键仍保原大小写）；`_FM_RE` 随之删
 def _frontmatter(text: str) -> Dict[str, str]:
-    m = _FM_RE.match(text)
-    meta: Dict[str, str] = {}
-    if not m:
-        return meta
-    for line in m.group(1).splitlines():
-        if ":" in line:
-            k, v = line.split(":", 1)
-            meta[k.strip()] = v.strip()
-    return meta
+    from k3dge.engine.task_index import _frontmatter_pairs
+
+    return dict(_frontmatter_pairs(text))
 
 
 def _headers(text: str) -> Dict[str, str]:

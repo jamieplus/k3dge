@@ -8,17 +8,11 @@ import re
 from pathlib import Path
 
 from k3dge.engine.task_index import TITLE_RE
+from k3dge.engine.version import _CT_MAP
 
 _UNRELEASED = "## [Unreleased]"
-# k3dit:pending value-10 sev=低 prio=P3 type=冗余 变更类型→Keep a Changelog 段名映射两处维护：本表 _TYPE_SECTION 与 version.py:208 _CT_MAP 近同（本表缺 sec）；加类型/改段名须改两处易漂。宜单一表互引。evidence=grep -n "_TYPE_SECTION\|_CT_MAP" src/k3dge/engine/changelog.py src/k3dge/engine/version.py
-_TYPE_SECTION = {
-    "feat": "Added",
-    "fix": "Fixed",
-    "audit": "Fixed",
-    "docs": "Changed",
-    "chore": "Changed",
-    "refactor": "Changed",
-}
+# k3dit:fixnote value-10 本表删，改 `_TYPE_SECTION = _CT_MAP`（源 version.py:208）；sec 草稿段名 Fixed→Security
+_TYPE_SECTION = _CT_MAP
 _TYPE_RE = re.compile(r"docs/tasks/\d{4}-\d{2}-\d{2}-(?:M\d+-)?([a-z]+)-")
 
 

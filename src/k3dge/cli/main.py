@@ -890,8 +890,43 @@ def _attest_tree_hash(workspace: Path) -> str:
     ).stdout.strip()
 
 
+def _attest_utc_minute(when_iso: str) -> datetime | None:
+    """Parse an ISO committer/generator stamp into an aware UTC datetime (naive = UTC)."""
+    from datetime import datetime, timezone
+
+    ts = (when_iso or "").strip()
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00").replace("z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def _attest_window(when_iso: str) -> str:
-    return when_iso[:16]  # minute precision — binds the token to a time window
+    # code-1: `%cI` carries the committer's local offset while generation stamps UTC;
+    # cut the minute window *after* normalising to UTC or the two sides never agree.
+    dt = _attest_utc_minute(when_iso)
+    if dt is None:
+        return when_iso[:16]  # unparsable legacy stamp: keep the old slice
+    return dt.strftime("%Y-%m-%dT%H:%M")  # minute precision — binds the token to a time window
+
+
+def _attest_windows(when_iso: str) -> list:
+    """Candidate windows: the commit minute plus the minute before it.
+
+    The token is minted *before* `git commit` runs, so a stamp taken at HH:MM:59.9
+    can land in a commit dated HH:MM+1:00; accepting only the exact minute made that
+    boundary race fail verification.
+    """
+    from datetime import timedelta
+
+    dt = _attest_utc_minute(when_iso)
+    if dt is None:
+        return [when_iso[:16]]
+    base = dt.replace(second=0, microsecond=0)
+    return [base.strftime("%Y-%m-%dT%H:%M"), (base - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M")]
 
 
 def _attest_token(workspace: Path, when_iso: str) -> str:
@@ -1058,13 +1093,17 @@ def cmd_verify_attest(args: argparse.Namespace) -> int:
         return 1
     who, when, token = m.group(1), m.group(2), m.group(3)
     secret = _attest_secret()
-# k3dit:pending code-1 sev=中 prio=P1 type=正确性 生成端 `_attest_line` 取 UTC `now` 切窗口，校验端 `when` 取自 `git show %cI`（提交者本地时区）→ 非 UTC 提交者窗口恒异，token 必失配；同分钟边界亦有竞态。应把 `when` 归一到 UTC 再切。evidence=TZ=Asia/Shanghai k3dge commit -am 'feat: x' && k3dge verify-attest --commit HEAD
-    window = _attest_window(when)
-    digest = hashlib.sha256(f"{secret}|{window}|{tree}".encode()).hexdigest()
-    expected = _ATTEST_WORDLIST[int(digest, 16) % len(_ATTEST_WORDLIST)]
-    if expected != token:
+# k3dit:fixnote code-1 `_attest_window` 归一 UTC 再切分钟 + 校验端接前一分钟兜跨分竞态；非 UTC 提交者 token 恢复匹配
+    expected = [
+        _ATTEST_WORDLIST[
+            int(hashlib.sha256(f"{secret}|{w}|{tree}".encode()).hexdigest(), 16)
+            % len(_ATTEST_WORDLIST)
+        ]
+        for w in _attest_windows(when)
+    ]
+    if token not in expected:
         print(
-            f"[ATTEST] commit {h} token mismatch (got '{token}', expected '{expected}') "
+            f"[ATTEST] commit {h} token mismatch (got '{token}', expected '{expected[0]}') "
             f"-- attestation was not produced by the governed path",
             file=sys.stderr,
         )

@@ -13,16 +13,29 @@ class GitError(RuntimeError):
     pass
 
 
+def _try_run(cmd: List[str], cwd: Path) -> subprocess.CompletedProcess:
+    """Run git and hand back the result; a missing/unusable executable becomes GitError.
+
+    `subprocess.run` raises FileNotFoundError (an OSError) when the `git` binary is not
+    on PATH — callers upstream (`ConsistencyEngine.evaluate`) only catch GitError, so an
+    unconverted OSError crashed `k3dge check` instead of reporting GIT_UNAVAILABLE.
+    """
+    try:
+        return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    except OSError as exc:
+        raise GitError(f"{' '.join(cmd[:2])} could not be executed: {exc}") from exc
+
+
 def _run(cmd: List[str], cwd: Path) -> str:
-# k3dit:pending code-2 sev=中 prio=P2 type=缺陷 git 可执行缺席时 subprocess.run 抛 FileNotFoundError，`_run` 只转非零码、不转 GitError → `evaluate` 捕获的 GIT_UNAVAILABLE/NO_DOMAINS 分支成死码，`k3dge check` 直接崩栈（staged 路径有单独兜底，非 staged 无）。evidence=env PATH=/nonexistent k3dge check
-    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    # k3dit:fixnote code-2 新增 `_try_run`：subprocess OSError→GitError，diff 三处调用改走它；GIT_UNAVAILABLE 兜底复活
+    result = _try_run(cmd, cwd)
     if result.returncode != 0:
         raise GitError(f"git {' '.join(cmd)} failed: {result.stderr.strip()}")
     return result.stdout
 
 
 def _is_shallow(workspace: Path) -> bool:
-    result = subprocess.run(
+    result = _try_run(
         ["git", "rev-parse", "--is-shallow-repository"], cwd=workspace, capture_output=True, text=True
     )
     return result.stdout.strip() == "true"
@@ -31,7 +44,7 @@ def _is_shallow(workspace: Path) -> bool:
 def resolve_base(workspace: Path) -> str:
     """Return the base ref for branch-level diffing, falling back to HEAD."""
     for base in BASE_CANDIDATES:
-        probe = subprocess.run(
+        probe = _try_run(
             ["git", "merge-base", base, "HEAD"], cwd=workspace, capture_output=True, text=True
         )
         if probe.returncode == 0 and probe.stdout.strip():
