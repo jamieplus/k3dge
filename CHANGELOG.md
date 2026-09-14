@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - seal/align 任务扫描不含 archive/<M>/：提前归档的 done 里程碑任务致封板被拒（No tasks found）
 
 - closure 收摊模板陈旧：写死「审计双腿闭环」+ 版本记 bump 前值（应与合并审计模块单份报告/终版一致）
+- audit job 19d4564724ca: src,docs
 ## [0.1.11] - 2026-09-13
 
 ### Fixed

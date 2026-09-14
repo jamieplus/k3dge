@@ -353,6 +353,14 @@
       "tokens": "封板收摊清单（上下文压缩）: M9"
     },
     {
+      "path": "docs/reviews/2026-09-14-M10-audit.md",
+      "type": "reviews",
+      "id": "2026-09-14-M10-audit",
+      "title": "审计：src,docs（milestone M10）",
+      "status": "",
+      "tokens": "审计：src,docs（milestone M10）"
+    },
+    {
       "path": "docs/specs/_template/spec.md",
       "type": "specs",
       "id": "spec",
@@ -391,6 +399,14 @@
       "title": "Domain Specification: templates",
       "status": "Active",
       "tokens": "Domain Specification: templates"
+    },
+    {
+      "path": "docs/tasks/2026-09-13-M10-audit-audit_job_19d4564724ca.done.md",
+      "type": "tasks",
+      "id": "2026-09-13-M10-audit-audit_job_19d4564724ca.done",
+      "title": "audit job 19d4564724ca: src,docs",
+      "status": "done",
+      "tokens": "audit job 19d4564724ca: src,docs"
     },
     {
       "path": "docs/tasks/2026-09-13-M10-fix-closure_note_stale.done.md",
