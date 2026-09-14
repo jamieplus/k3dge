@@ -1058,6 +1058,7 @@ def cmd_verify_attest(args: argparse.Namespace) -> int:
         return 1
     who, when, token = m.group(1), m.group(2), m.group(3)
     secret = _attest_secret()
+# k3dit:pending code-1 sev=中 prio=P1 type=正确性 生成端 `_attest_line` 取 UTC `now` 切窗口，校验端 `when` 取自 `git show %cI`（提交者本地时区）→ 非 UTC 提交者窗口恒异，token 必失配；同分钟边界亦有竞态。应把 `when` 归一到 UTC 再切。evidence=TZ=Asia/Shanghai k3dge commit -am 'feat: x' && k3dge verify-attest --commit HEAD
     window = _attest_window(when)
     digest = hashlib.sha256(f"{secret}|{window}|{tree}".encode()).hexdigest()
     expected = _ATTEST_WORDLIST[int(digest, 16) % len(_ATTEST_WORDLIST)]

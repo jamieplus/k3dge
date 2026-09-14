@@ -758,6 +758,7 @@ class ConsistencyEngine:
         pkg = _package_prefix(manifest, domain)
         if not pkg:
             return out
+# k3dit:pending code-3 sev=中 prio=P2 type=覆盖 反向 import 禁令只匹配 `from pkg.<name>`/`import pkg.<name>` 且子模块限 `[a-z_]+`；`from pkg import <domain>` 与相对 import（`from ..engine import x`）均漏检，跨域依赖可无声绕过 ADR-0001 决策 6。evidence=在 src/<domain>/x.py 写 `from k3dge import engine` 后 k3dge check 不报 DOMAIN_IMPORT_VIOLATION
         import_re = re.compile(
             rf"^\s*(?:from\s+{re.escape(pkg)}\.([a-z_]+)|import\s+{re.escape(pkg)}\.([a-z_]+))"
         )

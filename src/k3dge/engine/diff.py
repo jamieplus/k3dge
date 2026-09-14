@@ -14,6 +14,7 @@ class GitError(RuntimeError):
 
 
 def _run(cmd: List[str], cwd: Path) -> str:
+# k3dit:pending code-2 sev=中 prio=P2 type=缺陷 git 可执行缺席时 subprocess.run 抛 FileNotFoundError，`_run` 只转非零码、不转 GitError → `evaluate` 捕获的 GIT_UNAVAILABLE/NO_DOMAINS 分支成死码，`k3dge check` 直接崩栈（staged 路径有单独兜底，非 staged 无）。evidence=env PATH=/nonexistent k3dge check
     result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
     if result.returncode != 0:
         raise GitError(f"git {' '.join(cmd)} failed: {result.stderr.strip()}")

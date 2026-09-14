@@ -570,6 +570,7 @@ def _is_doc_scope(target_scope: str) -> bool:
     s = (target_scope or "").strip().lower()
     if not s:
         return False
+# k3dit:pending code-5 sev=低 prio=P2 type=正确性 `_is_doc_scope` 对 scope 只做子串包含，裸 token（adr/tasks/memo/reviews…）会误判代码目标（如 src/k3dge/engine/adr_gate.py）为文档域 → k3dge_5pass_audit_prompt 路由到 Doc lens，Pass N 不执行。应按路径段判定。evidence=python -c "from k3dge.cli.mcp import _is_doc_scope; print(_is_doc_scope('src/k3dge/engine/adr_gate.py'))"
     return any(marker in s for marker in _DOC_SCOPE_MARKERS)
 
 
