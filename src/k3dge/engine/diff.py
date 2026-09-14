@@ -84,6 +84,7 @@ def get_changed_files(workspace: Path) -> List[str]:
             seen.add(path)
             files.append(path)
 
+# k3dit:pending value-8 sev=低 prio=P3 type=冗余 base_env 与 resolve_base 两分支各抄一遍 `git diff <base>...HEAD` 解析 + seen 去重循环（diff.py:89-95 与 99-104）；可先归一 base 再单次循环
     base_env = __import__("os").environ.get("K3DGE_BASE_SHA", "").strip()
     if base_env:
         committed = _run(["git", "diff", "--name-only", f"{base_env}...HEAD"], workspace).splitlines()
