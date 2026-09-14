@@ -1093,7 +1093,7 @@ def cmd_verify_attest(args: argparse.Namespace) -> int:
         return 1
     who, when, token = m.group(1), m.group(2), m.group(3)
     secret = _attest_secret()
-# k3dit:fixnote code-1 `_attest_window` 归一 UTC 再切分钟 + 校验端接前一分钟兜跨分竞态；非 UTC 提交者 token 恢复匹配
+# k3dit:fixed code-1 `_attest_utc_minute`(main.py:893) 把戳归一到 UTC，`_attest_windows`(main.py:916) 供 verify 循环(main.py:1097) 收提交分钟＋前一分钟；若非 UTC 戳仍失配或只留单窗口则未修对
     expected = [
         _ATTEST_WORDLIST[
             int(hashlib.sha256(f"{secret}|{w}|{tree}".encode()).hexdigest(), 16)

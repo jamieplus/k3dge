@@ -67,7 +67,7 @@ flowchart LR
 * `Contract Hash` 锚定公开签名；改 `src/<domain>/` 公开接口须 `k3dge sync` 回写哈希（双向绑定）—— ADR-0001
 * `TEMPLATE_DRIFT` 仅自举、不 import `templates/` —— ADR-0001（`pairs.py:1`）
 * spec 是契约、ADR 是决策事实源：操作层以指针引用 ADR 编号，不复写其正文 —— ADR-0001 / docs/adr/README.md
-<!-- k3dit:fixnote doc-6 行末改指 `ADR-0018 §2.2–§2.4`（合同/寻址/薄索引各一段，见 0018:33-42），去掉重复同号 -->
+<!-- k3dit:fixed doc-6 重复的第二个 ADR-0018 改为 `ADR-0018 §2.2–§2.4`，对应 `docs/adr/0018-doc-readme-anchor-governance.md:31`（软/硬合同）、`:36`（寻址公式）、`:40`（docs-index 投影）；若再出现 `ADR-0018 / ADR-0018` 连写则未修对 -->
 * 文档类型合同：`docs/<type>/AUTHORING.md`（软）+ `docs/<type>/.schema.json`（硬闸）；寻址公式在 `AGENTS.md`；薄索引 `docs/generated/docs-index.json` —— ADR-0018 §2.2–§2.4
 * 协议仅 audit 两层 fallback，配置在 `.agent/pipeline.toml`，由 `PIPELINE_PROTOCOL_NOT_FOUND` 校验 —— ADR-0018
 * MCP 为外部 harness 调用 engine 事实/工具的唯一面，禁止私有重实现门禁 —— ADR-0006

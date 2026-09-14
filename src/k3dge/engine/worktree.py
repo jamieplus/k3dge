@@ -265,7 +265,7 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
         return {"ok": False, "mode": "conflict",
                 "message": f"rebase 冲突（{(rb.stderr or rb.stdout).strip()[:120]}）→ 人工处理后重试（§1.4）"}
     pre2 = _git(workspace, "rev-parse", "HEAD").stdout.strip()
-    # k3dit:fixnote value-12 两处 ff→闸→reset 逐字复制抽成 `_ff_with_gate`，回滚口径单点；两处各调一次，仅 mode 有别
+    # k3dit:fixed value-12 ff→落点闸→`reset --hard` 回滚抽为 `_ff_with_gate`(worktree.py:198)，`merge_back` 两处调用(worktree.py:246, 269) 共用单点；若再出现重复回滚路径则未修对
     rb_ff = _ff_with_gate(workspace, br, pre2, "rebase")
     if rb_ff is not None:
         return rb_ff

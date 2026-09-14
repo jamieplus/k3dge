@@ -801,7 +801,7 @@ class ConsistencyEngine:
         pkg = _package_prefix(manifest, domain)
         if not pkg:
             return out
-# k3dit:fixnote code-3 改 AST 扫描（`_pkg_chain`/`_imported_domains`）：绝对/相对/多名 import 全覆盖，不再限于正则
+# k3dit:fixed code-3 `_imported_domains`(evaluator.py:94) 走 AST，覆盖 `from pkg import x` 与相对 `from ..engine import x`，接线于 `_check_domain_imports`(evaluator.py:816)；若 `from k3dge import engine` 仍不报 DOMAIN_IMPORT_VIOLATION 则未修对
         allowed = set(manifest.depends_on(domain))
         for py in sorted(src_dir.rglob("*.py")):
             if py.name == "__init__.py":

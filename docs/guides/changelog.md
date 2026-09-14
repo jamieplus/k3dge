@@ -5,7 +5,7 @@
 ## 版本单源与自动更新
 
 * **单源**：`pyproject.toml` 的 `project.version` 为唯一事实源（下游脚手架无 `pyproject.toml` 时回退至 `.agent/manifest.json`），`k3dge version bump` 自动镜像至 `.agent/manifest.json` 与 `src/k3dge/__init__.py`（存在时），三者不一致时门禁 `VERSION_MISMATCH` 阻断
-<!-- k3dit:fixnote doc-7 开 `**` 后空格去掉（`**bump 入口（本仓与下游通用）**`），CommonMark 可渲染粗体；`k3dge doc grep` 该行已无字面星号 -->
+<!-- k3dit:fixed doc-7 改为 `**bump 入口（本仓与下游通用）**`（`docs/guides/changelog.md:9`），`**` 后无空格成对、CommonMark 渲染为粗体；若仍见 `** bump` 字面星号则未修对 -->
 * **bump 入口（本仓与下游通用）**：
   ```bash
   k3dge version show                          # 查看当前版本（有 pyproject 读它，无则读 manifest）

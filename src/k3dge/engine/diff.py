@@ -27,7 +27,7 @@ def _try_run(cmd: List[str], cwd: Path) -> subprocess.CompletedProcess:
 
 
 def _run(cmd: List[str], cwd: Path) -> str:
-    # k3dit:fixnote code-2 新增 `_try_run`：subprocess OSError→GitError，diff 三处调用改走它；GIT_UNAVAILABLE 兜底复活
+    # k3dit:fixed code-2 `_try_run`(diff.py:16) 把 FileNotFoundError(OSError) 转 GitError，`evaluate`(evaluator.py:276) 捕获走 GIT_UNAVAILABLE/NO_DOMAINS；若 PATH 无 git 时仍崩栈则未修对
     result = _try_run(cmd, cwd)
     if result.returncode != 0:
         raise GitError(f"git {' '.join(cmd)} failed: {result.stderr.strip()}")
