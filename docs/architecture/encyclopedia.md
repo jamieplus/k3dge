@@ -69,6 +69,7 @@
 | **Milestone 状态机** | `DRAFT → ALIGNED → AUDIT_SUGGESTED → AUDITING → SEAL_READY → SEALED`（+`ESCALATED`） | [`overview.md`](overview.md) §6 |
 | **`[NEXT]` 提示** | 命令末尾只给合法下一步；优先级 `pending_findings > ratchet_open > seal_ready > audit_suggested`；唯一来源在 `engine/nextstep` + `engine/audit_trigger` | [`overview.md`](overview.md) §7 |
 | **审计闭环（封板界限）** | audit 单份 **12 列报告**到 `待修=0`；未审计调 seal → `audit_needed` | ADR-0017；[`overview.md`](overview.md) §6 |
+<!-- k3dit:pending doc-5 sev=低 prio=P3 type=覆盖 kind 枚举漏 `fixed`、且「开放=前三态」误含 `leftover`；与 peer_contract §8/§8:118 固定集合 pending|leftover|disputed|fixnote|fixed、open=pending+disputed+fixnote 不一致 -->
 | **钉语法 markers** | `k3dit:<kind> <ID>[@scope] <一句话≤80字>`；kind ∈ `pending/leftover/disputed/fixnote`；scope ∈ `line/file/repo`；开放=前三态，结项须清零 | [`docs/protocols/peer_contract.md`](../protocols/peer_contract.md) §8；`engine/markers.py` |
 | **pending_findings** | `k3dit:pending` 钉计数（check/status 报 `pending=N`，最高优先）；处置以 12 列+tasks 为准，理由写报告不入正文 | AGENTS.md §12；`peer_contract §8` |
 | **审计线 Audit Line** | gate 类唯一输入形式：一单一线（`k3dit/<单>` 分支 + worktree checkout），锁点 L 即 `baseline`；袋/独立库/打包器全部退役 | ADR-0025；`peer_contract §3` |
@@ -129,6 +130,7 @@
 | --- | --- | --- |
 | ADR-0001 | k3dge 架构设计与工程治理基线 | 四域布局 + L0/L1/L2 分层门禁 + 双向绑定 + 符号级 diff 留痕 |
 | ADR-0001 | template-drift-in-engine | 自举脚手架字节锁，engine 机检不 import templates |
+<!-- k3dit:pending doc-2 sev=中 prio=P2 type=悬空指针 §5 表「主题（文件名）」列多处是已合并物理删除的旧 ADR 文件名（template-drift-in-engine/tasks-backlog-merge/protocol-load-proof-abandoned/audit-evidence-exchange-topology/doc-audit-post-check-non-blocking/agent-dir-is-harness-config/harness-responsibility-split/version-and-changelog/downstream-first-domain-and-protocol-pack），文件均不存在，应改指宿主 ADR 及节号 -->
 
 ### 文档体系
 | ID | 主题（文件名） | 一句话 |

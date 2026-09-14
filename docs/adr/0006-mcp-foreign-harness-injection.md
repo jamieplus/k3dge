@@ -20,10 +20,12 @@ Note: ① 就地修订（非 Amend/Supersede）2026-09-02，经 Core Maintainer 
 
 > **Related**: ADR-0005（本地自用 / 职责切分）、ADR-0010（rules 切片）、ADR-0009（吸收纪律）、ADR-0022（doc-audit 非阻断）
 >
+<!-- k3dit:pending doc-6 sev=中 prio=P2 type=冲突 正文保留「Status: Draft 的保留理由」三条，与本文件 frontmatter `Status: Accepted`（Note ⑦ 2026-09-12 转 Accepted）自相抵；理由①亦被 mcp-bridge「server 已复活（2026-09-05）」否定 -->
 > **`Status: Draft` 的保留理由**：
 > - ① 入向（本仓 server）在 `mcp` 2.x 下起不来，先搁置（`docs/tasks/archive/M7/2026-09-02-M7-fix-k3dge_mcp2_resource_strict.done.md`）。
 > - ② §2.4 的"降级不可静默"只有规范，报告由谁执笔落盘尚未定席。
 > - ③ 未跑通的流程不顶 `Accepted`（闸按文档状态区分登记在 `docs/tasks/2026-09-02-M7-feat-check_gate_by_doc_status.md`）。
+<!-- k3dit:pending doc-3 sev=低 prio=P3 type=悬空指针 所引 `docs/tasks/2026-09-02-M7-feat-check_gate_by_doc_status.md` 不存在；实为 `docs/tasks/archive/M9/2026-09-13-M7-feat-check_gate_by_doc_status.done.md`（同错见 docs/adr/AUTHORING.md 同条） -->
 
 ## 1. 上下文 (Context)
 

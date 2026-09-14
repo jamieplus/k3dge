@@ -108,6 +108,7 @@ stateDiagram-v2
     SEALED --> [*]: 收摊=上下文压缩(closure.md → 设计文档 → 提交)
 ```
 
+<!-- k3dit:pending doc-1 sev=中 prio=P2 type=冲突 本行及 §6/§7 仍把封板界限与流程写成 audit+quality「两份 12 列报告/两腿」，与 ADR-0025 §2.4/§4、encyclopedia §3.2/§7（quality 已并入审计模块、单份 12 列、无独立 quality peer）相抵 -->
 > **两问拆开**：封板没有尺子（全 done/硬闸绿/零 task 都能说"可封"），界限是**审计环收口 = audit + quality 两份 12 列报告都到 待修=0**。自动触发只服务「要不要审」，「要不要封」只在闭环后出现一次。未审计调 `seal` → `audit_needed`。发现用 `k3dit:pending <ID>` 钉在 `位置` 处（仅指针，处置仍以报告+tasks 为准），`check`/`status` 报 `pending_findings`。外来审计源经 `k3dge milestone audit-submit`(或 MCP `k3dge_submit_audit_report`) 落盘即计入闭环。架构/`overview.md` 更新**不是钩子**，在 closure 里做。详见 ADR-0004 §2.1.4–§2.1.8。
 
 ## 7. 审计→封板时序（通用模板）
