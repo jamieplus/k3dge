@@ -11,14 +11,12 @@ C4Context
     title k3dge 在 Vibe Coding 链路中的位置
     Person(dev, "开发者/PM", "提自然语言需求")
     System(k3dge, "k3dge Harness", "一致性元门禁（自举）")
-    System_Ext(auditH, "audit harness", "五轮透镜")
-    System_Ext(qualityH, "quality harness", "复杂度/类型")
+    System_Ext(auditH, "audit harness（合并 audit+quality，ADR-0025）", "五轮透镜 + 复杂度/类型价值窗")
     System_Ext(cacheH, "cache harness", "命中率/检索")
     System_Ext(agent, "外部 Agent Harness<br/>DSH / Codex / Claude Code / OpenCode", "经 MCP 注入 k3dge，不私有重实现门禁")
     System_Ext(git, "Git", "pre-commit/CI 拦截点")
     Rel(dev, k3dge, "用 k3dge 开发并列 harness", "K3DGE_SOURCE")
     Rel(dev, auditH, "开发", "")
-    Rel(dev, qualityH, "开发", "")
     Rel(dev, cacheH, "开发", "")
     Rel(agent, k3dge, "MCP stdio：check/sync/spec", "零漂移委托")
     Rel(k3dge, git, "阻断或放行", "exit code")
@@ -80,13 +78,11 @@ C4Context
     title Harness 隔离（k3dge 编排 + agent 调用 + 并列外部 harness）
     System(agent, "Agent Harness (DSH/Codex/Claude/OpenCode)", "只调 k3dge：读 NEXT、改码、收摊")
     System_Ext(k3dge, "k3dge (sidecar MCP)", "唯一编排者 / 一致性门禁：调 peer、契约事实")
-    System_Ext(audit, "Audit Harness (k3dit)", "透镜（外部 MCP，不进 engine）")
+    System_Ext(audit, "Audit Harness (k3dit)", "透镜（外部 MCP，不进 engine）；quality 为模块内价值窗（ADR-0025）")
     System_Ext(cache, "Cache Harness", "记忆/检索（外部 MCP）")
-    System_Ext(quality, "Quality Harness", "度量/证伪（外部 MCP）")
     Rel(agent, k3dge, "MCP stdio", "check/sync/status/milestone — 零漂移委托")
-    Rel(k3dge, audit, "MCP", "k3dge 调 peer 跑审计；失败→WARN[DOWNGRADE]")
+    Rel(k3dge, audit, "MCP", "k3dge 调 peer 跑审计（含复核腿）；失败→WARN[DOWNGRADE]")
     Rel(k3dge, cache, "MCP", "Observer 异步")
-    Rel(k3dge, quality, "MCP", "verify")
     UpdateLayoutConfig($c4ShapeInRow="4", $c4BoundaryInRow="1")
 ```
 
@@ -99,17 +95,17 @@ stateDiagram-v2
     ALIGNED --> AUDIT_SUGGESTED: 量化触发(账齐/C2≥5/体积≥8)
     AUDIT_SUGGESTED --> DRAFT: 要不要审? N（继续干活；无倒计时）
     AUDIT_SUGGESTED --> AUDITING: k3dge milestone audit
-    AUDITING --> AUDITING: audit+quality 待修>0 + agent 修（倒计时默认修；重审各报告）
+    AUDITING --> AUDITING: 合并审计模块报告 待修>0 + agent 修（倒计时默认修；重审该报告）
     AUDITING --> AUDITING: 位置钉 k3dit:pending <ID>（check/status 报 pending=N）
     AUDITING --> ESCALATED: verify 连续 >3 次未闭环 → 转人工
-    AUDITING --> SEAL_READY: audit 与 quality 两腿工单均 collected（清零→席**署名**报告→collect 落盘+写回）；审计闭环=真界限
+    AUDITING --> SEAL_READY: 单份 12 列报告 collected（清零→席**署名**报告→collect 落盘+写回）；审计闭环=真界限
     SEAL_READY --> DRAFT: 要不要封? N（里程碑继续挂着）
     SEAL_READY --> SEALED: k3dge milestone seal（align→归档+版本+指针）
     SEALED --> [*]: 收摊=上下文压缩(closure.md → 设计文档 → 提交)
 ```
 
-<!-- k3dit:pending doc-1 sev=中 prio=P2 type=冲突 本行及 §6/§7 仍把封板界限与流程写成 audit+quality「两份 12 列报告/两腿」，与 ADR-0025 §2.4/§4、encyclopedia §3.2/§7（quality 已并入审计模块、单份 12 列、无独立 quality peer）相抵 -->
-> **两问拆开**：封板没有尺子（全 done/硬闸绿/零 task 都能说"可封"），界限是**审计环收口 = audit + quality 两份 12 列报告都到 待修=0**。自动触发只服务「要不要审」，「要不要封」只在闭环后出现一次。未审计调 `seal` → `audit_needed`。发现用 `k3dit:pending <ID>` 钉在 `位置` 处（仅指针，处置仍以报告+tasks 为准），`check`/`status` 报 `pending_findings`。外来审计源经 `k3dge milestone audit-submit`(或 MCP `k3dge_submit_audit_report`) 落盘即计入闭环。架构/`overview.md` 更新**不是钩子**，在 closure 里做。详见 ADR-0004 §2.1.4–§2.1.8。
+<!-- k3dit:fixnote doc-1 §0/§5/§6/§7 与「两问拆开」条统一为合并审计模块一份 12 列（quality＝模块内价值窗），删两腿/两份旧句 -->
+> **两问拆开**：封板没有尺子（全 done/硬闸绿/零 task 都能说"可封"），界限是**审计环收口 = 合并审计模块（ADR-0025）那一份 12 列报告到 待修=0**；quality 是模块内的价值窗，不是独立 peer、也不另出一份报告。自动触发只服务「要不要审」，「要不要封」只在闭环后出现一次。未审计调 `seal` → `audit_needed`。发现用 `k3dit:pending <ID>` 钉在 `位置` 处（钉＝写源，账本/报告＝其投影；处置仍以报告+tasks 为准），`check`/`status` 报 `pending_findings`。外来审计源经 `k3dge milestone audit-submit`(或 MCP `k3dge_submit_audit_report`) 落盘即计入闭环。架构/`overview.md` 更新**不是钩子**，在 closure 里做。详见 ADR-0004 §2.1.4–§2.1.8。
 
 ## 7. 审计→封板时序（通用模板）
 
@@ -118,22 +114,20 @@ sequenceDiagram
     participant Agent as Agent Harness (DSH/Codex/Claude/OpenCode)
     participant K3 as k3dge (sidecar MCP；唯一编排者)
     participant Audit as Audit Harness (k3dit, ext MCP)
-    participant Quality as Quality Harness (k3lity, ext MCP)
     Agent->>K3: read .agent/pipeline.toml (on_seal_enter / on_pre_seal)
     Agent->>K3: k3dge check / status（硬闸绿）
     K3-->>Agent: [NEXT] audit_suggested + reasons（量化触发；非建议封）
     Agent->>K3: milestone align（Full Matrix，无人问）
     K3-->>Agent: 问「要审吗？」(无倒计时；N=继续干活)
     Agent->>K3: milestone audit <id>
-    K3->>Audit: 调 peer：audit.submit 建单→席位 rounds→audit.collect 落签署件→写回主干
+    K3->>Audit: 调 peer：audit.submit 建单→席位 rounds（文档/代码/价值/复核各窗）→audit.collect 落签署件→写回主干
     Note over K3,Audit: 唯一编排者=k3dge（agent 不直连 peer）；交换物=审计线（分支+现场，ADR-0025）；sign-report 署名才算结案
-    K3->>Quality: 调 peer：k3lity.actions.quality（mcp→cli→manual；人填不造假分）
-    Audit-->>K3: 审计 12 列报告（含 待修/有意留/已修）+ 位置钉 k3dit:pending
-    Quality-->>K3: 质量 12 列报告（k3dge:kind: quality）
+    Note over K3,Audit: quality 是模块内价值窗（ADR-0025 §2.4）：各窗产出 join 成**一份** 12 列，无独立 quality peer/报告
+    Audit-->>K3: 12 列报告（含 待修/有意留/已修）+ 位置钉 k3dit:pending
     Note over K3,Audit: 外来审计源：人贴报告 → k3dge_submit_audit_report 落盘(--kind audit|quality)
-    K3-->>Agent: [NEXT] 待修>0 → 引导 agent 修（倒计时默认修）；重审各报告；>3 次 → escalated 转人工
+    K3-->>Agent: [NEXT] 待修>0 → 引导 agent 修（倒计时默认修）；重审该报告；>3 次 → escalated 转人工
     Agent->>Agent: 改码 + 回填报告（agent 侧唯一动作）
-    K3-->>Agent: [NEXT] seal_ready（两份报告 待修=0，唯一界限达成）
+    K3-->>Agent: [NEXT] seal_ready（那一份报告 待修=0，唯一界限达成）
     Agent->>K3: milestone seal <id>
     K3-->>Agent: 问「封板？」(无倒计时；否=不封，里程碑挂着)
     K3->>K3: align→归档+版本+指针；写 *-closure.md 收摊清单（上下文压缩+设计文档由人/agent 补齐）

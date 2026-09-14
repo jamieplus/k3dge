@@ -69,8 +69,8 @@
 | **Milestone 状态机** | `DRAFT → ALIGNED → AUDIT_SUGGESTED → AUDITING → SEAL_READY → SEALED`（+`ESCALATED`） | [`overview.md`](overview.md) §6 |
 | **`[NEXT]` 提示** | 命令末尾只给合法下一步；优先级 `pending_findings > ratchet_open > seal_ready > audit_suggested`；唯一来源在 `engine/nextstep` + `engine/audit_trigger` | [`overview.md`](overview.md) §7 |
 | **审计闭环（封板界限）** | audit 单份 **12 列报告**到 `待修=0`；未审计调 seal → `audit_needed` | ADR-0017；[`overview.md`](overview.md) §6 |
-<!-- k3dit:pending doc-5 sev=低 prio=P3 type=覆盖 kind 枚举漏 `fixed`、且「开放=前三态」误含 `leftover`；与 peer_contract §8/§8:118 固定集合 pending|leftover|disputed|fixnote|fixed、open=pending+disputed+fixnote 不一致 -->
-| **钉语法 markers** | `k3dit:<kind> <ID>[@scope] <一句话≤80字>`；kind ∈ `pending/leftover/disputed/fixnote`；scope ∈ `line/file/repo`；开放=前三态，结项须清零 | [`docs/protocols/peer_contract.md`](../protocols/peer_contract.md) §8；`engine/markers.py` |
+<!-- k3dit:fixnote doc-5 kind 补 `fixed`；开放态改 `pending+disputed+fixnote`（leftover/fixed 非 open），与 §8 对齐 -->
+| **钉语法 markers** | `k3dit:<kind> <ID>[@scope] <一句话≤80字>`；kind ∈ `pending/leftover/disputed/fixnote/fixed`；scope ∈ `line/file/repo`；开放 = `pending+disputed+fixnote`（结项须清零；`leftover` 上主干当长期文献、`fixed` 待 Hall 拔，均非 open） | [`docs/protocols/peer_contract.md`](../protocols/peer_contract.md) §8；`engine/markers.py` |
 | **pending_findings** | `k3dit:pending` 钉计数（check/status 报 `pending=N`，最高优先）；处置以 12 列+tasks 为准，理由写报告不入正文 | AGENTS.md §12；`peer_contract §8` |
 | **审计线 Audit Line** | gate 类唯一输入形式：一单一线（`k3dit/<单>` 分支 + worktree checkout），锁点 L 即 `baseline`；袋/独立库/打包器全部退役 | ADR-0025；`peer_contract §3` |
 | **棘轮 Ratchet** | 一工单 = 一快照，单内审↔修可多程；submit/collect 两态；`claim` 即续租；快照推进一律 `git update-ref` CAS | `peer_contract §1.4` |
@@ -129,24 +129,24 @@
 | ID | 主题（文件名） | 一句话 |
 | --- | --- | --- |
 | ADR-0001 | k3dge 架构设计与工程治理基线 | 四域布局 + L0/L1/L2 分层门禁 + 双向绑定 + 符号级 diff 留痕 |
-| ADR-0001 | template-drift-in-engine | 自举脚手架字节锁，engine 机检不 import templates |
-<!-- k3dit:pending doc-2 sev=中 prio=P2 type=悬空指针 §5 表「主题（文件名）」列多处是已合并物理删除的旧 ADR 文件名（template-drift-in-engine/tasks-backlog-merge/protocol-load-proof-abandoned/audit-evidence-exchange-topology/doc-audit-post-check-non-blocking/agent-dir-is-harness-config/harness-responsibility-split/version-and-changelog/downstream-first-domain-and-protocol-pack），文件均不存在，应改指宿主 ADR 及节号 -->
+| ADR-0001 | §2 第 7 条（TEMPLATE_DRIFT 登记表属 engine；原独立 ADR 并入） | 自举脚手架字节锁，engine 机检不 import templates |
+<!-- k3dit:fixnote doc-2 §5 九处已删旧 ADR 文件名改指宿主 ADR §节（0001/0004/0005/0010/0018/0022/0025） -->
 
 ### 文档体系
 | ID | 主题（文件名） | 一句话 |
 | --- | --- | --- |
-| ADR-0018 | tasks-backlog-merge | tasks 与 backlog 合并为单一日历状态容器 |
+| ADR-0018 | §2 第 12 条（tasks 单目录 + Status 成熟度；原独立 ADR 并入） | tasks 与 backlog 合并为单一日历状态容器 |
 | ADR-0018 | doc-readme-anchor-governance | 每种文档类型 README 锚点 + AUTHORING 寻址治理 |
-| ADR-0018 | protocol-load-proof-abandoned | 协议加载证明废弃；`PIPELINE_PROTOCOL_NOT_FOUND` 静态守卫 |
+| ADR-0018 | §2 第 11 条（不设装载证明；原独立 ADR 并入） | 协议加载证明废弃；`PIPELINE_PROTOCOL_NOT_FOUND` 静态守卫 |
 | ADR-0023 | low-authority-archive-tier | 低权威归档层（挪走不删） |
-| ADR-0025 | audit-evidence-exchange-topology | 送检包拓扑：git-tree oid 身份 + 单文件位置 + 棘轮交换 |
+| ADR-0025 | §2.9（审计线与证据交换拓扑；原独立 ADR 并入） | 送检包拓扑：git-tree oid 身份 + 单文件位置 + 棘轮交换 |
 
 ### 生命周期
 | ID | 主题（文件名） | 一句话 |
 | --- | --- | --- |
 | ADR-0004 | milestone-lifecycle-governance | 里程碑生命周期/封板状态机与执行口径 |
 | ADR-0008 | unsolicited-doc-triggers | 文档改动触发的非请求式审计触发器 |
-| ADR-0022 | doc-audit-post-check-non-blocking | `doc-audit` 在 check 之后、非阻断，建带 Milestone 的 task |
+| ADR-0022 | §2.2（doc-audit 后置、非阻断；原独立 ADR 并入） | `doc-audit` 在 check 之后、非阻断，建带 Milestone 的 task |
 | ADR-0022 | task-maps-to-audit-report | task 映射到审计报告条目 |
 
 ### Agent 与 harness
@@ -156,16 +156,16 @@
 | ADR-0006 | mcp-foreign-harness-injection | MCP 注入：外部 harness 调 k3dge 事实，禁私有重实现 |
 | ADR-0009 | purpose-reduce-agent-failure-modes | 目的：减少 Agent 失败模式（漂移/幻觉/修局部坏整体） |
 | ADR-0010 | agent-rules-are-protocol-slices | `.agent/rules/*` 是协议切片（ADR-0010 slice 化），AGENTS.md 为真 |
-| ADR-0010 | agent-dir-is-harness-config | `.agent/` 是进程配置，不是可浏览的发现面 |
+| ADR-0010 | §2.3（`.agent/` 三件套职责；原独立 ADR 并入） | `.agent/` 是进程配置，不是可浏览的发现面 |
 | ADR-0012 | assertion-evidence-chain | 证据链三环节：产物 + 消费者 + 到达 |
-| ADR-0005 | harness-responsibility-split | harness 职责切分（审计/质量/检索各管一块，k3dit/k3lity/k3che） |
+| ADR-0005 | §2.7 harness 职责边界（原独立 ADR 并入） | harness 职责切分（审计/质量/检索各管一块；quality 已并入审计模块，ADR-0025） |
 | ADR-0025 | hall-harness-topology | Hall/harness 拓扑：三窗（判读/修/复核）+ 钉＝写源 + 拔钉归 Hall |
 
 ### 自举与版本
 | ID | 主题（文件名） | 一句话 |
 | --- | --- | --- |
-| ADR-0004 | version-and-changelog | 版本三件套镜像 + CHANGELOG 自动维护 |
-| ADR-0005 | downstream-first-domain-and-protocol-pack | 下游至少一域 + 协议打包（init 幂等不覆盖） |
+| ADR-0004 | §2.3 版本与变更日志（原独立 ADR 并入） | 版本三件套镜像 + CHANGELOG 自动维护 |
+| ADR-0005 | §2.8 下游 init 被门禁咬住（原独立 ADR 并入） | 下游至少一域 + 协议打包（init 幂等不覆盖） |
 
 ### 审计报告
 | ID | 主题（文件名） | 一句话 |

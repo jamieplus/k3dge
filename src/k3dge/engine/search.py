@@ -118,9 +118,8 @@ def _snippet_window(path: Path, line_no: int, context: int, cap: int = _MAX_CONT
         return ""
     lo = max(0, line_no - 1 - context)
     hi = min(len(lines), line_no + context)
-    # Trim to max_snippet chars (≈5 lines @ 240) starting from the match line.
-# k3dit:pending code-5 sev=中 prio=P2 type=缺陷 _snippet_window 已算 lo（含匹配行前 context 行）却从 line_no-1 起切，lo 从未使用：--context 声明的「半宽」在匹配行前完全失效，实际窗口只含匹配行及其后行
-    window = lines[line_no - 1 : hi]
+# k3dit:fixnote code-5 窗口改从 lo 切（原 lo 未用，前置 context 全丢）；240 字符截断仍按窗口头
+    window = lines[lo:hi]
     text = "\n".join(window)
     if len(text) > 240:
         text = text[:240].rstrip() + "…"

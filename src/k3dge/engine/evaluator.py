@@ -537,10 +537,13 @@ class ConsistencyEngine:
         if name == "write_text" and cls._logs_literal(node):
             return "对 logs/ 的 write_text 覆写：审计痕迹只可追加（ADR-0008），改用追加写入。"
         if name == "open" and node.args:
-            target, mode = node.args[0], (node.args[1] if len(node.args) > 1 else None)
+            target = node.args[0]
+            mode = node.args[1] if len(node.args) > 1 else None
+            if mode is None:
+                mode = next((kw.value for kw in node.keywords if kw.arg == "mode"), None)
+# k3dit:fixnote code-4 删 `mode is None` 分支（默认 'r' 只读非覆写），并补 `mode=` 关键字识别
             wr = isinstance(mode, ast.Constant) and isinstance(mode.value, str) and any(c in mode.value for c in "wx")
-# k3dit:pending code-4 sev=中 prio=P1 type=缺陷 _logs_overwrite 把无 mode 的 open("logs/…")（Python 默认只读 'r'）当覆写报 AUDIT_TRAIL_APPEND_ONLY 硬红；下游只读日志即被误拦，应只在显式写模式（'w'/'x'/mode 关键字）时判
-            if cls._logs_literal(target) and (mode is None or wr):
+            if cls._logs_literal(target) and wr:
                 return "对 logs/ 的 open(...,'w') 覆写：审计痕迹只可追加（ADR-0008），改用 'a'。"
         return ""
 

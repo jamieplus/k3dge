@@ -59,9 +59,14 @@ def _new_archive_without_note(workspace: Path) -> List[str]:
     for ln in lines:
         if len(ln) < 4:
             continue
-# k3dit:pending code-3 sev=中 prio=P2 type=缺陷 _new_archive_without_note 未拆 porcelain 的 rename 箭头：R 项 ln[3:] 是 "old -> new"，path.split/read_text 必 OSError 被 continue，git mv 进 archive/ 正是 ADR-0023 §2.2 要查的主场景却被整类漏检（对照 diff._parse_porcelain 已拆 " -> "）
-        code, path = ln[:2].strip(), ln[3:].strip()
-        if code not in ("A", "R") or "archive" not in path.split("/") or not path.endswith(".md"):
+        code, raw = ln[:2].strip(), ln[3:].strip()
+        if code not in ("A", "R"):
+            continue
+# k3dit:fixnote code-3 R 项拆 " -> " 取新路径（同 diff._parse_porcelain 口径），git mv 进 archive/ 不再整类漏检
+        if "R" in code and " -> " in raw:
+            raw = raw.split(" -> ", 1)[1]
+        path = raw.strip()
+        if "archive" not in path.split("/") or not path.endswith(".md"):
             continue
         try:
             txt = (workspace / path).read_text(encoding="utf-8", errors="replace")
@@ -150,9 +155,11 @@ def _related_doc_hints(workspace: Path, docs: List[str], io=None) -> List[Tuple[
         env = json.loads(res.payload or "")
     except ValueError:
         return []
+# k3dit:fixnote code-2 补 isinstance(env, dict) 守卫：list/null 等合法 JSON 信封 ⇒ []（同 _similar_task_hints）
+    if not isinstance(env, dict):
+        return []
     out: List[Tuple[str, str]] = []
     for r in env.get("results") or []:
-# k3dit:pending code-2 sev=中 prio=P2 type=缺陷 _related_doc_hints 只挡非 JSON，未挡非 dict 信封：对端 payload 为 list/null 等合法 JSON 时 env.get 抛 AttributeError 逃逸 _attach_k3che_hints 崩掉 doc-audit，与 docstring「任何失败⇒[]」及 _similar_task_hints 的 isinstance 守卫不一致
         if isinstance(r, dict) and r.get("path"):
             out.append((str(r["path"]), str(r.get("title", ""))))
         if len(out) >= 3:

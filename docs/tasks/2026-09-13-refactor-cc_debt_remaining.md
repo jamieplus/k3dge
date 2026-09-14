@@ -37,6 +37,7 @@ date: 2026-09-13
 | Q-2 | `milestone_audit.py`(移入) | `_ratchet_audit_step` / `run_audit_flow` |
 | Q-1/Q-2 | `task_write.py`(移入) | `_auto_backfill_reviews` / `mark_task_done` / `_finalize_task_done` |
 | Q-1/Q-2 | `seal.py`(移入) | `seal_milestone` / `_seal_archive` / `_seal_review_gate` |
+| M9 value-7 | `align.py` | `run_milestone_alignment`（CC16：校验/门控/评审脚手架落盘/guide 桩四类职责混居） |
 
 ## 有意留（Q-3；审计已判，不拆、不刷指标）
 `cli/main.py` 的 `cmd_*`（argparse 派形状天然多分支）+ `_sync_peers_into_mcp` / `_cmd_mcp_probe`；`cli/mcp.py` 的 `_audit_protocol_with_fallback` / `k3dge_milestone_control`；`pipeline_runner.py` 的 `run_action` / `call_mcp_tool` / `resolve_action`；`cli/status.py` 的 `workspace_status`；`search.py` 的 `_python_search`；`nextstep.py`。**记录在册，不拆。**

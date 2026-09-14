@@ -68,7 +68,7 @@ Note: ① <操作：就地修订 / 物理删除授权> YYYY-MM-DD，经 <授权�
 
 **授权落地 = `Note:` 必须填**：凡动用"例外"列（就地修订 / 物理删除 / 改名），该文件 `Note:` 不得停留在 `-`。缺痕＝按静默重写处理（`ADR-0012`），无论口头说过几次"我授权"。历史授权不续期：换一次操作就在同一 `Note:` 内追加编号段（① ② ③ …），旧段保留，别擦。
   填法照抄上面那个格式块，末尾必带**可复跑证据**（例：`实测 [PEER-MANUAL] action 'k3dit.actions.audit' has no live lens`），只写"已授权"不算过。
-  本条目前**只有人读约束、无机验**（`check` 不看 `Note:` 内容）；机验候选登记在 `docs/tasks/2026-09-02-M7-feat-check_gate_by_doc_status.md`。
+  本条目前**只有人读约束、无机验**（`check` 不看 `Note:` 内容）；机验候选登记在 `docs/tasks/archive/M9/2026-09-13-M7-feat-check_gate_by_doc_status.done.md`（该票已裁决不做，理由见其「收尾」段）。
 
 就地修订另加两条：③ 被作废的旧句、授权与过闸痕迹写进 `Note:`（正文只留现行决策，不写「修正（date）/原稿/现稿」层）；既有 `ADR-NNNN §x` 指针靠**章节号不重排**仍可解析；④ 不为它扩 `Status` 枚举（`.schema.json` ⇒ `ADR_FRONTMATTER_MISSING`）。流程真跑通后回到 append-only，决策仍成立就用自己的 ADR 正式收编。
 

@@ -551,7 +551,7 @@ def _load_tomllib():
             return None
 
 
-# k3dit:pending value-9 sev=低 prio=P3 type=冗余 `.mcp.json` 读取+dict 校验在 `_mcp_servers`/`_sync_peers_into_mcp`/`scaffold.ensure_mcp_config`/`stub_peers`/`pipeline_schema._mcp_server_names`/`pipeline_runner.load_mcp_endpoints` 各写一遍（≥6 份），无单一访问器
+# k3dit:leftover value-9 跨 cli/engine/templates 三域：scaffold 现不 import engine（孤岛，ADR-0001 §2 第7条）⇒ 先定宿主再拆
 def _mcp_servers(workspace: Path) -> dict:
     """.mcp.json `mcpServers` map (read-only); {} when absent/broken."""
     import json as _json

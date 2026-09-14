@@ -20,7 +20,7 @@ def _align_pass_marker(milestone_id: str) -> str:
     return f"<!-- k3dge:align-pass:{milestone_id} -->"
 
 
-# k3dit:pending value-7 sev=中 prio=P2 type=复杂度 `run_milestone_alignment` CC16：里程碑/任务校验 + `[checks.align]` 门控执行 + align 评审脚手架落盘(docs/reviews) + guide 桩扫描四类职责混居，写盘副作用藏在“对齐”动词内
+# k3dit:leftover value-7 已登记进 refactor-cc_debt_remaining 待拆表（一 diff 一测试）；本窗无 tests 不可验行为
 def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]:
     from k3dge.engine.milestone import scan_unfilled_guides
 
