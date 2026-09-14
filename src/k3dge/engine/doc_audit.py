@@ -62,7 +62,7 @@ def _new_archive_without_note(workspace: Path) -> List[str]:
         code, raw = ln[:2].strip(), ln[3:].strip()
         if code not in ("A", "R"):
             continue
-# k3dit:fixnote code-3 R 项拆 " -> " 取新路径（同 diff._parse_porcelain 口径），git mv 进 archive/ 不再整类漏检
+# k3dit:fixed code-3 验证：`_new_archive_without_note`(doc_audit.py:45) 对 code 含 'R' 且 raw 含 ' -> ' 取 `raw.split(" -> ",1)[1]`(:66-67)，与 `diff._parse_porcelain`(diff.py:65-67) 同款拆箭头；git mv 进 archive/ 的路径现可 read_text 命中并判缺去向标记。若 `R  old -> new` 整串仍进 path 致 OSError 被 continue，则没修对。
         if "R" in code and " -> " in raw:
             raw = raw.split(" -> ", 1)[1]
         path = raw.strip()
@@ -155,7 +155,7 @@ def _related_doc_hints(workspace: Path, docs: List[str], io=None) -> List[Tuple[
         env = json.loads(res.payload or "")
     except ValueError:
         return []
-# k3dit:fixnote code-2 补 isinstance(env, dict) 守卫：list/null 等合法 JSON 信封 ⇒ []（同 _similar_task_hints）
+# k3dit:fixed code-2 验证：`_related_doc_hints`(doc_audit.py:141) 在 json.loads 后加 `if not isinstance(env, dict): return []`(:159-160)，结果循环对每 r 亦判 isinstance(dict)(:163)；对端 payload 为 list/null 等合法 JSON 时不再 AttributeError，符合 docstring「任何失败⇒[]」（对照 `_similar_task_hints` 守卫）。若非 dict 仍崩调用点 `_attach_k3che_hints`(:172)，则没修对。
     if not isinstance(env, dict):
         return []
     out: List[Tuple[str, str]] = []

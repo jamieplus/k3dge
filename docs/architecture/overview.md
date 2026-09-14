@@ -104,7 +104,7 @@ stateDiagram-v2
     SEALED --> [*]: 收摊=上下文压缩(closure.md → 设计文档 → 提交)
 ```
 
-<!-- k3dit:fixnote doc-1 §0/§5/§6/§7 与「两问拆开」条统一为合并审计模块一份 12 列（quality＝模块内价值窗），删两腿/两份旧句 -->
+<!-- k3dit:fixed doc-1 验证：`docs/architecture/overview.md:108` 及 §6 时序图(:98/:101) 与 §7(:123-:130) 已改「合并审计模块那一份 12 列报告到 待修=0」，quality 明确为模块内价值窗、无独立 peer/报告，与 ADR-0025 §2.4(`docs/adr/0025-hall-harness-topology.md:118`)、encyclopedia §3.2 一致。若正文/时序图任一处仍写「两份 12 列/两腿」，则没修对。 -->
 > **两问拆开**：封板没有尺子（全 done/硬闸绿/零 task 都能说"可封"），界限是**审计环收口 = 合并审计模块（ADR-0025）那一份 12 列报告到 待修=0**；quality 是模块内的价值窗，不是独立 peer、也不另出一份报告。自动触发只服务「要不要审」，「要不要封」只在闭环后出现一次。未审计调 `seal` → `audit_needed`。发现用 `k3dit:pending <ID>` 钉在 `位置` 处（钉＝写源，账本/报告＝其投影；处置仍以报告+tasks 为准），`check`/`status` 报 `pending_findings`。外来审计源经 `k3dge milestone audit-submit`(或 MCP `k3dge_submit_audit_report`) 落盘即计入闭环。架构/`overview.md` 更新**不是钩子**，在 closure 里做。详见 ADR-0004 §2.1.4–§2.1.8。
 
 ## 7. 审计→封板时序（通用模板）

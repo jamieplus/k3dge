@@ -277,7 +277,7 @@ def _backfill_task_reviews(workspace: Path, target: Path) -> None:
             t_ms = mm.group(1).strip() if mm else ""
         _auto_backfill_reviews(workspace, target, t_title, t_ms)
     except Exception as exc:
-# k3dit:fixnote code-1 函数顶部补 `import sys`（与本文件他处局部 import 同形），except 不再 NameError
+# k3dit:fixed code-1 验证：`_backfill_task_reviews`(task_write.py:265) 函数顶部已 `import sys`(:267)，except(:279-281) 用 sys.stderr 不再 NameError；调用链 `mark_task_done`→`_finalize_task_done`(:320) 不再逃逸。若 read_text 解码异常仍冒出 mark_task_done，则没修对。
         print(f"[WARN] task done: 报告自动回填跳过（{target.name}: {exc}）；报告仍未回填，封板闸会兜底", file=sys.stderr)
 
 

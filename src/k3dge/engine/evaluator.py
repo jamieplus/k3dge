@@ -541,7 +541,7 @@ class ConsistencyEngine:
             mode = node.args[1] if len(node.args) > 1 else None
             if mode is None:
                 mode = next((kw.value for kw in node.keywords if kw.arg == "mode"), None)
-# k3dit:fixnote code-4 删 `mode is None` 分支（默认 'r' 只读非覆写），并补 `mode=` 关键字识别
+# k3dit:fixed code-4 验证：`_logs_overwrite`(evaluator.py:534) 现只在 mode 常量串含 'w'/'x' 时报(:545-546)，无 mode(默认 'r')与 'a' 不报；tests/unit/engine/test_audit_trail.py(3 例) 覆盖。若 `open("logs/…")` 无 mode 仍报 AUDIT_TRAIL_APPEND_ONLY，或显式 'w'/'x' 漏报，则没修对。
             wr = isinstance(mode, ast.Constant) and isinstance(mode.value, str) and any(c in mode.value for c in "wx")
             if cls._logs_literal(target) and wr:
                 return "对 logs/ 的 open(...,'w') 覆写：审计痕迹只可追加（ADR-0008），改用 'a'。"
