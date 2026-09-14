@@ -215,7 +215,10 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
 
     tasks = scan_milestone_tasks(workspace, milestone_id)
     if not tasks:
-        return False, f"No tasks to seal for milestone '{milestone_id}'."
+        from k3dge.engine.task_index import premature_archive_hint
+
+        return False, (premature_archive_hint(workspace, milestone_id)
+                       or f"No tasks to seal for milestone '{milestone_id}'.")
 
     invalid = [t for t in tasks if t.status not in _ALLOWED_STATUS]
     if invalid:

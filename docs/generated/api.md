@@ -669,6 +669,10 @@ class TaskIndex
     priority: str
 list_tasks(workspace: Path, milestone_id: Optional[str]=None, status: Optional[str]=None) -> List[TaskIndex]
     # doc: Index living task files (not archive/, not README). Filters are exact matches.
+archived_milestone_tasks(workspace: Path, milestone_id: str) -> List[TaskIndex]
+    # doc: `docs/tasks/archive/<M>/` 里 frontmatter milestone==M 的任务（提前归档检测）。
+premature_archive_hint(workspace: Path, milestone_id: str) -> Optional[str]
+    # doc: 当前里程碑任务被提前归档时给出可操作提示；否则 None（对齐/封板被拒时用）。
 scan_milestone_tasks(workspace: Path, milestone_id: str) -> List[MilestoneTask]
 # task_write.py
 from __future__ import annotations

@@ -234,6 +234,45 @@ class TestSealFlow(TestCase):
         seal.assert_called_once()
 
 
+class TestPrematureArchive(TestCase):
+    """M9 实战：任务提前归档 ⇒ align/seal 顶扫不到；提示应可操作（batch archive at seal）。"""
+
+    def _archived_m1(self, ws):
+        arch = ws / "docs" / "tasks" / "archive" / "M1"
+        arch.mkdir(parents=True)
+        (arch / "2026-09-01-M1-feat-x.done.md").write_text(
+            "# X\n- **Status**: done\n- **Milestone**: M1\n", encoding="utf-8")
+
+    def test_align_hints_when_milestone_tasks_archived_early(self) -> None:
+        ws = _ws()
+        self._archived_m1(ws)
+        ok, msg, _ = ms.run_milestone_alignment(ws, "M1")
+        self.assertFalse(ok)
+        self.assertIn("提前归档", msg)
+        self.assertIn("batch archive", msg)
+
+    def test_hint_none_for_non_current_milestone(self) -> None:
+        from k3dge.engine.task_index import premature_archive_hint
+
+        ws = _ws()
+        self._archived_m1(ws)
+        self.assertIsNone(premature_archive_hint(ws, "M9"))  # 当前 = M1
+
+
+class TestClosureNote(TestCase):
+    def test_note_records_final_version_and_merged_wording(self) -> None:
+        from k3dge.engine import seal_flow
+
+        ws = _ws()
+        with mock.patch("k3dge.engine.version.get_version", return_value="0.1.10"), \
+             mock.patch("k3dge.engine.version._next_version", return_value="0.1.11"):
+            p = seal_flow._write_closure_note(ws, "M1")
+        text = p.read_text(encoding="utf-8")
+        self.assertIn("审计闭环", text)
+        self.assertNotIn("双腿", text)
+        self.assertIn("0.1.11", text)      # 终版（bump 后），非 bump 前值 0.1.10
+
+
 class TestAuditChecklist(TestCase):
     def test_build_snapshot_flags_suggestion(self) -> None:
         ws = _ws()

@@ -59,9 +59,12 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
     """
     today = datetime.date.today().isoformat()
     try:
-        from k3dge.engine.version import get_version
+        from k3dge.engine.version import _next_version, get_version
 
-        sealed_version = get_version(workspace) or "?"
+        cur = get_version(workspace) or "?"
+        # seal 成功后 cmd 层 auto-bump patch（`--no-version-bump` 例外）；此处记**终版**，
+        # 不记 bump 前值（否则收摊清单版本恒落后一拍）。
+        sealed_version = _next_version(cur, "patch", None) if cur != "?" else "?"
     except Exception:
         sealed_version = "?"
     audit_reports = ",".join(
@@ -95,7 +98,7 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
                 "",
                 "## 5. 决策轨迹（TSV：show-me-your-work 洁净室移植——ts/phase/decision/why/evidence/result，evidence=指针非散文）",
                 "ts\tphase\tdecision\twhy\tevidence\tresult",
-                f"{today}\tseal\tseal {milestone_id}\t审计双腿闭环\t{audit_reports}\t{sealed_version}",
+                f"{today}\tseal\tseal {milestone_id}\t审计闭环（合并审计模块单份 12 列，待修=0）\t{audit_reports}\t{sealed_version}",
                 "",
             ]
         ),

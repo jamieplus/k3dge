@@ -61,7 +61,40 @@ def list_tasks(
     status: Optional[str] = None,
 ) -> List[TaskIndex]:
     """Index living task files (not archive/, not README). Filters are exact matches."""
-    tasks_dir = workspace / "docs" / "tasks"
+    return _scan_task_dir(workspace / "docs" / "tasks", milestone_id, status)
+
+
+def archived_milestone_tasks(workspace: Path, milestone_id: str) -> List[TaskIndex]:
+    """`docs/tasks/archive/<M>/` 里 frontmatter milestone==M 的任务（提前归档检测）。
+
+    约定：里程碑任务留 `docs/tasks/` 顶层，由 `milestone seal` 封板时 batch archive；
+    提前手工归档会让 top-level 扫描器看不到任务，align/seal 现场被拒（见 M9 实战）。
+    """
+    return _scan_task_dir(workspace / "docs" / "tasks" / "archive" / milestone_id,
+                          milestone_id=milestone_id)
+
+
+def premature_archive_hint(workspace: Path, milestone_id: str) -> Optional[str]:
+    """当前里程碑任务被提前归档时给出可操作提示；否则 None（对齐/封板被拒时用）。"""
+    from k3dge.engine.milestone_pointer import get_current_milestone
+
+    if (get_current_milestone(workspace) or "").strip() != milestone_id:
+        return None
+    arch = archived_milestone_tasks(workspace, milestone_id)
+    if not arch:
+        return None
+    return (
+        f"里程碑 {milestone_id} 的任务已被提前归档到 docs/tasks/archive/{milestone_id}/（{len(arch)} 张）；"
+        f"约定＝**封板时 batch archive**（`milestone seal` 自动做）。"
+        f"请把它们的 .done.md 移回 docs/tasks/ 顶层后重试。"
+    )
+
+
+def _scan_task_dir(
+    tasks_dir: Path,
+    milestone_id: Optional[str] = None,
+    status: Optional[str] = None,
+) -> List[TaskIndex]:
     if not tasks_dir.exists():
         return []
     want_status = status.lower().strip() if status else None

@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:71e6988aabbe14d353d38d607ecd0df047f6076c114c9481a79965b9c6c5c653`
+- **Contract Hash**: `sha256:86b5ae0a01e4ca0b7f29a567e91ed6b97a6e8e3f785312dcfe5252aee49911e8`
 - **Last Updated**: 2026-09-13
 
 ## 1. Domain Boundary & Responsibilities
@@ -12,7 +12,7 @@
   - 校验 `spec.md` 的 L0 结构完整性（必需章节）。
   - 从域源码提取公开接口签名并计算归一化哈希（L1 契约）。
   - 判定 `src/<domain>` 与 `docs/specs/<domain>` 之间的一致性，生成 `GateReport`。
-  - 里程碑生命周期治理：扫描 `docs/tasks/` 的 `Status/Milestone`、全域回退检验（`regression`，旧合规被新闸误判的退化）、tasks 物理归档至 `docs/tasks/archive/<id>/`、本里程碑 reviews 归档至 `docs/reviews/archive/<id>/` 并改写 `docs/reviews/LEFTOVERS.md` 相对链接。
+  - 里程碑生命周期治理：扫描 `docs/tasks/` 的 `Status/Milestone`、全域回退检验（`regression`，旧合规被新闸误判的退化）、tasks 物理归档至 `docs/tasks/archive/<id>/`、本里程碑 reviews 归档至 `docs/reviews/archive/<id>/` 并改写 `docs/reviews/LEFTOVERS.md` 相对链接。**约定＝里程碑任务留 `docs/tasks/` 顶层，由 `milestone seal` 封板时 batch archive**；提前手工归档会让顶扫看不到任务，align/seal 经 `premature_archive_hint` 给可操作提示（不再只报 `No tasks found`）。closure 清单记 bump 后**终版**。
   - 版本三件套镜像（`VERSION_MISMATCH`）。canonical 全缺不阻断；无 `VERSION_MISSING`。
   - 自举仓脚手架字节锁（`TEMPLATE_DRIFT`）：`engine.pairs.PAIRS` 比对 `templates/assets`，不 import `k3dge.templates`（ADR-0001）。
   - 协议治理：`docs/protocols/*.md`（`audit_default.md` / `verify_default.md`）为 pipeline manual fallback；类型写法在各 `docs/<type>/AUTHORING.md`；结构闸是 `docs/<type>/.schema.json`。`engine.doc_catalog` 解析该 JSON、建薄索引、提供 `list_docs` / `where_doc` / `grep_docs`（正文只回 path/line）。`engine.protocol.write_incident` 把持续偏离写入 `docs/incidents/`。
@@ -472,6 +472,8 @@ class TaskIndex
     milestone: str
     priority: str
 list_tasks(workspace: Path, milestone_id: Optional[str]=None, status: Optional[str]=None) -> List[TaskIndex]
+archived_milestone_tasks(workspace: Path, milestone_id: str) -> List[TaskIndex]
+premature_archive_hint(workspace: Path, milestone_id: str) -> Optional[str]
 scan_milestone_tasks(workspace: Path, milestone_id: str) -> List[MilestoneTask]
 from __future__ import annotations
 from pathlib import Path

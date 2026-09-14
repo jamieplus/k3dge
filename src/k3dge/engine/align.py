@@ -30,7 +30,10 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
 
     tasks = scan_milestone_tasks(workspace, milestone_id)
     if not tasks:
-        return False, f"No tasks found for milestone '{milestone_id}' under docs/tasks/", []
+        from k3dge.engine.task_index import premature_archive_hint
+
+        return False, (premature_archive_hint(workspace, milestone_id)
+                       or f"No tasks found for milestone '{milestone_id}' under docs/tasks/"), []
 
     invalid = [t for t in tasks if t.status not in _ALLOWED_STATUS]
     if invalid:

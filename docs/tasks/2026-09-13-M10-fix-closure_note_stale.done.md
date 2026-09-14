@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M10
 priority: P3
 date: 2026-09-13
@@ -7,7 +7,7 @@ date: 2026-09-13
 
 # closure 收摊模板陈旧：写死「审计双腿闭环」+ 版本记 bump 前值（应与合并审计模块单份报告/终版一致）
 
-- **Status**: idea
+- **Status**: done
 - **Milestone**: M10
 - **Priority**: P3
 - **Date**: 2026-09-13
