@@ -67,7 +67,6 @@ def _validate_domain(domain: str, cfg, domains: dict) -> None:
 
 class Manifest:
     def __init__(self, data: Dict[str, Any]) -> None:
-        # k3dit:fixed code-4 `Manifest.__init__`(manifest.py:71) 非 dict 抛 ManifestError，`load` 经 `cls(data)` 触发；`evaluate`(evaluator.py:264) 与 `status`(status.py:89) 兜底 MANIFEST_INVALID；若 `[]` manifest 仍 AttributeError 崩栈则未修对
         if not isinstance(data, dict):
             raise ManifestError(
                 f"{MANIFEST_PATH} must contain a JSON object, got {type(data).__name__}"

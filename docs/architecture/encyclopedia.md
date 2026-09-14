@@ -70,7 +70,6 @@
 | **`[NEXT]` 提示** | 命令末尾只给合法下一步；优先级 `pending_findings > ratchet_open > seal_ready > audit_suggested`；唯一来源在 `engine/nextstep` + `engine/audit_trigger` | [`overview.md`](overview.md) §7 |
 | **审计闭环（封板界限）** | audit 单份 **12 列报告**到 `待修=0`；未审计调 seal → `audit_needed` | ADR-0017；[`overview.md`](overview.md) §6 |
 | **钉语法 markers** | `k3dit:<kind> <ID>[@scope] <一句话≤80字>`；kind ∈ `pending/leftover/disputed/fixnote/fixed`；scope ∈ `line/file/repo`；开放 = `pending+disputed+fixnote`（结项须清零；`leftover` 上主干当长期文献、`fixed` 待 Hall 拔，均非 open） | [`docs/protocols/peer_contract.md`](../protocols/peer_contract.md) §8；`engine/markers.py` |
-<!-- k3dit:fixed doc-4 "钉＝写源、账本/12列报告＝投影"与 `docs/adr/0025-hall-harness-topology.md:155` 及 `docs/protocols/peer_contract.md:127` 一致；若再出现"理由写报告不入正文"旧口径则未修对 -->
 | **pending_findings** | `k3dit:pending` 钉计数（check/status 报 `pending=N`，最高优先）；**钉＝写源**（判读四格 sev/prio/type/desc 写在钉上），账本与 12 列报告＝钉的投影（每轮 harvest 重生成，非席手填）；处置由修席写 `fixnote` 钉承载，复核背书翻 `fixed`，拔钉归 Hall | AGENTS.md §12；`peer_contract §8`；ADR-0025 §2.7 |
 | **审计线 Audit Line** | gate 类唯一输入形式：一单一线（`k3dit/<单>` 分支 + worktree checkout），锁点 L 即 `baseline`；袋/独立库/打包器全部退役 | ADR-0025；`peer_contract §3` |
 | **棘轮 Ratchet** | 一工单 = 一快照，单内审↔修可多程；submit/collect 两态；`claim` 即续租；快照推进一律 `git update-ref` CAS | `peer_contract §1.4` |
@@ -84,7 +83,6 @@
 | --- | --- | --- |
 | **Diátaxis 分类** | `guides`=教程 / `generated`=Reference 机器自动生成 / `architecture`=解释（本文+overview） | [`overview.md`](overview.md) 头部；`docs/generated/README.md` |
 | **`docs/<type>` 规约** | 每种类型锁 `README.md` + `AUTHORING.md`；结构硬闸 `docs/<type>/.schema.json`（有才闸，缺则下游安全） | ADR-0018 §2.2/§2.6；`engine/doc_catalog.py` |
-<!-- k3dit:fixed doc-1 改指 `ADR-0018 §2.2/§2.6`，对应 `docs/adr/0018-doc-readme-anchor-governance.md:31`（四件套含 .schema.json，缺则无闸）与 `:47`（pre-commit 强制 README+AUTHORING）；`docs/adr/` 无 0019 文件，若残留 ADR-0019 指针则未修对 -->
 | **doc catalog** | `list / where / grep`；`grep` 正文只回 `path(:line)`，不回 snippet | ADR-0018；`docs/generated/docs-index.json` |
 | **LEFTOVERS.md** | 有意留（活文档常驻表）唯一事实源 | [`overview.md`](overview.md) §8 |
 | **Memo** | spark inbox：三种"暂不成事"的念头（模糊/暂不可落地/弱相关）；成熟后晋升 tasks 并移 archive | `docs/guides/user_guide.md`；`docs/memo/README.md` |
@@ -126,7 +124,6 @@
 
 按主题分组（对应 `docs/adr/README.md` 的 Topics，0025 补录于 Agent/harness 组）。**标题为序，深读请 `k3dge doc where <ADR-ID>`。**
 
-<!-- k3dit:fixed doc-2 只留「0025 补录于 Agent/harness 组」，与 `docs/adr/README.md:15` Topics 一致且 `docs/adr/` 无 0020 文件；若再称 0020 补录则该指针悬空未修对 -->
 ### 门禁与基线
 | ID | 主题（文件名） | 一句话 |
 | --- | --- | --- |
@@ -215,7 +212,6 @@ DRAFT →(milestone align: Full Matrix, 无人问)→ ALIGNED
 - 发现用 `k3dit:pending <ID>` 钉在位置（**钉＝写源**：判读四格写在钉上，账本/12 列报告＝其投影）；已修由修席翻 `fixnote`、复核背书翻 `fixed`、Hall 拔钉（席一律不删钉），有意留翻 `k3dit:leftover`。
 
 ## 8. 开放问题与活文档
-<!-- k3dit:fixed doc-5 改为"钉＝写源：判读四格写在钉上、账本/12列报告＝投影；修席翻 fixnote、复核翻 fixed、Hall 拔钉"，对齐 `docs/adr/0025-hall-harness-topology.md:155` 与 `docs/protocols/peer_contract.md:128`；若仍写"仅指针"则未修对 -->
 
 | 哪类 | 在哪看 | 说明 |
 | --- | --- | --- |
@@ -234,7 +230,6 @@ DRAFT →(milestone align: Full Matrix, 无人问)→ ALIGNED
 - `docs/memo/archive/2026-08-25-prompt-as-neural-net.md` — Prompt as Neural Net，稀疏门控解释框架
 - `docs/memo/archive/2026-08-27-h8m2k-a1-harness-hard-isolation.md` — harness 环境级硬隔离 vs 认知级软隔离
 - `docs/memo/archive/2026-09-02-peer-wiring-and-seat-options.md` — peer 接线与审计席位的选项账（研究用，不作决策）
-<!-- k3dit:fixed doc-3 补齐顶层 `docs/memo/2026-09-12-rust-k3dge-fit.md`、`docs/memo/2026-09-13-agent-dev-tools-absorption-eval.md`，归档件改含 archive/ 全路径，符 `docs/adr/0023-low-authority-archive-tier.md:55` §2.2.2；实测各文件存在；若仍有裸名归档引则未修对 -->
 - `docs/memo/archive/2026-09-05-graph-lens-for-audit-and-qa.md` — 图论视角的审计/优化应用 + audit/QA 三段拆分（讨论底稿）
 
 已归档：`docs/memo/archive/2026-09-02-plugins-main-absorption-eval.md`（P1-P3 全账核清，结项记录在 `archive/`，落点以各 peer ADR/tests 为权威）。

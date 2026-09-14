@@ -80,7 +80,6 @@ def iter_managed_files(workspace: Path, typ: str, *, include_archive: bool = Fal
     return files
 
 
-# k3dit:fixed value-11 `_frontmatter` 委托 `task_index._frontmatter_pairs`(doc_catalog.py:84 ← task_index.py:21)，与 `parse_frontmatter`(task_index.py:46) 同源仅差 `.lower()`；若两处再各写解析器/键口径漂移则未修对
 def _frontmatter(text: str) -> Dict[str, str]:
     from k3dge.engine.task_index import _frontmatter_pairs
 

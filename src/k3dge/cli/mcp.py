@@ -585,7 +585,6 @@ def _is_doc_scope(target_scope: str) -> bool:
     segs = [seg for seg in s.split("/") if seg]
     if not segs:
         return False
-    # k3dit:fixed code-5 `_is_doc_scope`(mcp.py:576) 改按路径段判定(mcp.py:589)，`src/k3dge/engine/adr_gate.py` → segs[0]=src 不中 → False；若该路径仍路由 Doc lens 则未修对
     return "docs" in segs or segs[0] in _DOC_SCOPE_ROOTS
 
 

@@ -11,7 +11,6 @@ from k3dge.engine.task_index import TITLE_RE
 from k3dge.engine.version import _CT_MAP
 
 _UNRELEASED = "## [Unreleased]"
-# k3dit:fixed value-10 `_TYPE_SECTION` 直接别名 `_CT_MAP`(changelog.py:15 ← version.py:208)，含 sec→Security，映射单源互引；若两处再各维护一份映射或 sec 段名漂移则未修对
 _TYPE_SECTION = _CT_MAP
 _TYPE_RE = re.compile(r"docs/tasks/\d{4}-\d{2}-\d{2}-(?:M\d+-)?([a-z]+)-")
 
