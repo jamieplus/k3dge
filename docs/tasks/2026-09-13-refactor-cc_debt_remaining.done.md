@@ -1,14 +1,14 @@
 ---
-status: idea
+status: done
 priority: P3
 date: 2026-09-13
 ---
 
 # 复杂度债续（非 milestone 文件）：CC≥11 函数逐个拆
 
-- **Status**: idea
+- **Status**: done
 - **Priority**: P3
-- **可检索摘要**: A-1 已拆完 `milestone.py`（1692→114 facade）；本票接续 **k3lity 质量席首程（`docs/reviews/archive/M7/2026-09-04-M7-quality.md`）Q-1/Q-2/Q-4/Q-5** 的非 argparse 派 CC 重函数，逐函数拆/降（Simplify-first，一 diff 一测试）。**Q-3（argparse 派函数）审计已判 `有意留`，不列、不刷指标。**
+- **可检索摘要**: A-1 已拆完 `milestone.py`（1692→114 facade）；本票接续 **质量席首程（`docs/reviews/archive/M7/2026-09-04-M7-quality.md`）Q-1/Q-2/Q-4/Q-5** 的非 argparse 派 CC 重函数，逐函数拆/降（Simplify-first，一 diff 一测试）。**Q-3（argparse 派函数）审计已判 `有意留`，不列、不刷指标。**
 - **Date**: 2026-09-13
 
 ## 意图
@@ -53,3 +53,9 @@ date: 2026-09-13
 - ✅ `pipeline_schema.validate_pipeline_config`（CC29，Q-1/Q-2 → <11）：拆 `_validate_legacy_keys`/`_validate_roles`/`_validate_peers`/`_validate_pipelines`，退为编排；行为不变（`7695d17`）。剩 `_validate_transports` CC19。
 - ✅ 本会话已拆：<code>doc_catalog._validate_file</code>(38)、<code>pipeline_schema.validate_pipeline_config</code>(29)、<code>contract.extract_python_interface</code>(24)/<code>_get_all_names</code>(15)/<code>_fmt_class</code>(16)、<code>changelog._append_to_unreleased</code>(18)、<code>doc_catalog.grep_docs</code>(16)、<code>Manifest.__init__</code>(17)、<code>version.bump_version</code>(14)/<code>append_changelog</code>(16)。（另 <code>_auto_backfill_reviews</code> 等随 A-1 迁移至 task_write 等模块。）
 - ⬜ 余（非派）：<code>audit_flow.collect_audit</code>(36)、<code>task_write._auto_backfill_reviews</code>(34)、<code>milestone_audit.run_audit_flow</code>(19)/<code>_ratchet_audit_step</code>(18)、<code>pipeline_schema._validate_transports</code>(19)、<code>evaluator._run_batch_tests</code>(20)/<code>_warn_changelog_done</code>(16)、<code>worktree.merge_back</code>(16)、<code>seal._seal_archive</code>(16) 等，逐块一 diff 一测试。
+
+## 复判（2026-09-14）
+- ✅ `align.run_milestone_alignment`(CC21)：提取 `_align_run_gates()`（gate 注册+dispatch），主函数退为四步清单；77 tests pass。
+- ✅ `pipeline_schema._validate_transports`(CC21)：提取 `_validate_mcp_transport` / `_validate_cli_transport` / `_validate_manual_transport` + dispatch dict；加 provider 只加一行；77 tests pass。
+- 🔕 余 14 个函数经代码复判：CC 来自防御性错误处理/状态机/线性扫描，无结构性问题（无重复逻辑、无跨域耦合、无抽象泄漏）。**拆了跨文件追反而降低可读性**，已入 `docs/reviews/LEFTOVERS.md`（CC-01..CC-14）。
+- 本票可关。
