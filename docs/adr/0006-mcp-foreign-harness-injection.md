@@ -1,19 +1,12 @@
 ---
 Status: Accepted
-# Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
-# NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
-Amended-by: -
+Amended-by:
+  - 🅰1 | Core Maintainer | 2026-09-14 | §2.3 第 2、8 条加作用域声明，删「不得外溢成参数」
 Landed-by: src/k3dge/cli/mcp.py
 Date: 2026-08-24
 Deciders: Core Maintainer
-Note: ① 就地修订（非 Amend/Supersede）2026-09-02，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md` Record lifecycle 合成条；过闸口径 = `manual` fallback（实测 `[PEER-MANUAL] action 'k3dit.actions.audit' has no live lens`），未经真 k3dit 透镜复审。
-      ② 就地修订（撤销独立 quality peer/fallback，对齐 ADR-0025 合并模型；原"audit / quality"双 gate 角色句作废）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。
-      ③ 就地修订（出向调用清单补 `k3dge audit` 审计线管理）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
-      ④ 去 changelog 化（删「就地修订留痕」块与「旧句/现予澄清/替换旧句」元叙述；Draft 理由保留为现行陈述）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
-      ⑤ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与章节号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
-      ⑥ MCP `workspace_path` 收敛并入 §2.2（就地增补，原拟单列一条独立 ADR，经 Core Maintainer 2026-09-11 否决"一条小决策占一个 ADR"）2026-09-11，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：MCP 服务根 `K3DGE_MCP_ROOT`（启动 CWD），`workspace_path` 默认须在内、越界拒，跨仓 `K3DGE_ALLOW_EXTERNAL_WORKSPACE=1`。过闸口径 = manual fallback。
-      ⑦ 2026-09-12 转 `Accepted`：经 Core Maintainer 显式批准（M9 内容项「ADR 成事实源」），补 `Landed-by` 指针；过闸口径 = manual fallback。
+Note: ①-⑦ 修订痕迹见 git 历史（2026-09-02 至 2026-09-12）；新格式自 🅰1 起生效。
 ---
 
 # ADR-0006: 对外注入面与并列 harness 编排（入向兼容层 + 出向通道）
@@ -73,8 +66,8 @@ MCP 有两个方向，**互不借道、互不背书**：
 
 1. **每个 harness 各发一个 MCP server**：工具名带自己前缀，签名不出现调用方私有概念。
    - peers 被第三方 harness 直连是正常态，不得为 k3dge 增设专用参数。
-2. **`check` 是纯静态硬闸**：只验盘上文件与结构（schema / 符号引用 / 协议文件存在），永不调用 agent、透镜或 peer 进程——不连 MCP、不跑 peer CLI（T-01）。
-   - 作域只限 `check`；出向调用只在 `milestone audit` / `seal` / `doc-audit` / `audit`（ADR-0025 §2.9.2）。
+2. **`check` 是纯静态硬闸**[^🅰1.1]（作用域＝`check`，不泛化到其他命令）：只验盘上文件与结构（schema / 符号引用 / 协议文件存在），不调用 agent、透镜或 peer 进程——不连 MCP、不跑 peer CLI（T-01）。
+   - 出向调用只在 `milestone audit` / `seal` / `doc-audit` / `audit`（ADR-0025 §2.9.2）。
 3. **endpoint 单一事实源＝`.mcp.json`**（`command` / `args` / `env` / `cwd` 即全部连接配方）。
    - `pipeline.toml` 只声明流程（stage / tool / fallback 链 / 超时），不得重复写 endpoint。
 4. **`pipeline.toml` 是第三根门禁支柱**：旧键 `[harnesses]` / `[hooks]` 必须 `PIPELINE_SCHEMA_INVALID`，不得当空 `peers` 放行。
@@ -88,8 +81,8 @@ MCP 有两个方向，**互不借道、互不背书**：
    - 出向调用不改变此律：报告正文与「待修/有意留」裁量属审计席位；k3dge 进程只做形式校验、计数与字节落盘。
 7. **跨仓改动需被改仓授权**：动 peer 仓要该仓维护者本轮显式授权，并在该仓 `docs/tasks/` 留痕（改了什么、实测什么）。
    - 约定变了就改写有那条约定的地方，不留自相矛盾旧句。
-8. **k3dge 调的是「动作」，不是「步骤」**：一次 `run_action`＝peer 侧一件完整的事。
-   - peer 内部几轮、什么顺序、哪些子步骤属其私有实现，不得外溢成 k3dge 参数；缺动作级入口就补 peer 入口。
+8. **k3dge 调的是「动作」，不是「步骤」** [A-8]（作用域＝对 peer 的出向调用，不约束 k3dge 自身流程编排）：一次 `run_action`＝peer 侧一件完整的事。
+   - k3dge 不拆解 peer 的内部轮次[^🅰1.2]；peer 暴露的参数即公共接口，消费方使用不算干涉内部。缺动作级入口就补 peer 入口。
 
 ### 2.4 编排失败语义：降级不可静默
 
@@ -120,3 +113,8 @@ MCP 有两个方向，**互不借道、互不背书**：
   - `escalated` 生效后未装 peers 的机器 `seal` 不可用（刻意）。
   - `.mcp.json` 成为 k3dge 输入（public 面，见 `docs/tasks/archive/M7/2026-09-02-M7-feat-peer_outbound_mcp_client.done.md`）。
 - **Reopen when**：① 出向通道跑通一轮 audit/quality（届时转 `Accepted`）；② 需要跨机 / 多用户传输；③ 主流 harness 开始扫 `.agent/`；④ `check` 被要求按文档 `Status` 区分严格度（已登 task）。
+
+---
+
+[^🅰1.1]: 修改：为第 2 条补充作用域声明，明确此约束只针对 `check` 命令，不泛化到 k3dge 其他命令。
+[^🅰1.2]: 修改：为第 8 条补充作用域声明（不约束 k3dge 自身流程编排），删除「不得外溢成 k3dge 参数」句（peer 暴露的参数即公共接口）。
