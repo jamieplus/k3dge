@@ -12,7 +12,8 @@ from typing import Any, Dict
 
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.manifest import Manifest, ManifestError
-from k3dge.engine.milestone import _is_doc_aux, parse_frontmatter
+from k3dge.engine.milestone_files import _is_doc_aux
+from k3dge.engine.task_index import parse_frontmatter
 
 
 
@@ -51,7 +52,8 @@ def lifecycle_next(workspace: Path) -> Any:
     from k3dge.engine import nextstep
     from k3dge.engine.audit_flow import open_ratchet_jobs
     from k3dge.engine.audit_trigger import audit_closed, compute_audit_suggestion
-    from k3dge.engine.milestone import get_current_milestone, scan_pending_findings
+    from k3dge.engine.milestone_audit import scan_pending_findings
+    from k3dge.engine.milestone_pointer import get_current_milestone
 
     try:
         mid = get_current_milestone(workspace)

@@ -20,11 +20,9 @@ from pathlib import Path
 from typing import List, Tuple
 
 from k3dge.engine import gates
-from k3dge.engine.milestone import (
-    _find_audit_report,
-    get_current_milestone,
-    scan_milestone_tasks,
-)
+from k3dge.engine.audit_report import _find_audit_report
+from k3dge.engine.milestone_pointer import get_current_milestone
+from k3dge.engine.task_index import scan_milestone_tasks
 
 _CTRL_NODES = (
     ast.If, ast.For, ast.AsyncFor, ast.While, ast.Try, ast.With, ast.AsyncWith,
@@ -99,7 +97,7 @@ def audit_closed(workspace: Path, milestone_id: str) -> bool:
     One "audit pass" = the merged audit module (ADR-0025) produces ONE 12-col
     report; there is no independent quality peer/report any more.
     """
-    from k3dge.engine.milestone import _find_report, _parse_audit_stats
+    from k3dge.engine.audit_report import _find_report, _parse_audit_stats
 
     found = _find_report(workspace, milestone_id, "audit")
     if found is None:

@@ -4,6 +4,17 @@ import unittest
 from k3dge.engine.pipeline_schema import validate_pipeline_config
 
 
+def test_valid_providers_has_single_source():
+    """守卫：合法 provider 集只能有一处定义，执行层 import 校验层那份（同一对象）。
+
+    曾发生：`pipeline_runner` 与 `pipeline_schema` 各写一份相同的 frozenset，
+    加新 provider 时容易只改一处。
+    """
+    from k3dge.engine import pipeline_runner, pipeline_schema
+
+    assert pipeline_runner._VALID_PROVIDERS is pipeline_schema._VALID_PROVIDERS
+
+
 def _write(root: pathlib.Path, rel: str, text: str) -> None:
     p = root / rel
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -140,11 +151,11 @@ class TestPipelineSchema(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = pathlib.Path(d)
             self._mk(root,
-                     "[peers.k3lity.actions.quality]\n"
-                     "transports = [ { provider = \"mcp\", tool = \"k3lity_score\" } ]\n",
+                     "[peers.other.actions.score]\n"
+                     "transports = [ { provider = \"mcp\", tool = \"other_score\" } ]\n",
                      '{"mcpServers": {"k3dit": {"command": "python"}}}')
             errs = validate_pipeline_config(root)
-            self.assertTrue(any(c == "PIPELINE_PEER_UNWIRED" and "k3lity" in m for c, m in errs), errs)
+            self.assertTrue(any(c == "PIPELINE_PEER_UNWIRED" and "other" in m for c, m in errs), errs)
 
     def test_mcp_transport_may_not_leak_endpoint_facts(self):
         import tempfile

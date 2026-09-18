@@ -1,5 +1,5 @@
 """Task 索引/读取（frontmatter 解析 + `docs/tasks/*.md` 扫描），extracted from `engine/milestone.py`
-(A-1 第七块). `milestone` re-exports these names for back-compat.
+(A-1 第七块).
 """
 from __future__ import annotations
 

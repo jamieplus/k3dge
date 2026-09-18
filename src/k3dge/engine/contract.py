@@ -167,18 +167,94 @@ class PythonExtractor(ContractExtractor):
         return extract_python_interface(path.read_text(encoding="utf-8"), include_doc=include_doc)
 
 
-class TypeScriptExtractor(ContractExtractor):
-    def can_handle(self, path: Path) -> bool:
-        return path.suffix in (".ts", ".tsx", ".js") and not _IGNORED_DIRS.intersection(path.parts)
-
-    def extract(self, path: Path, include_doc: bool = False) -> str:
-        result = extract_typescript_interface(path)
-        if result is None:
-            raise ImportError("tree-sitter not available")
-        return result
+_EXTRACTORS: list[ContractExtractor] = []
 
 
-_EXTRACTORS: list[ContractExtractor] = [PythonExtractor(), TypeScriptExtractor()]
+def register_extractor(ext: ContractExtractor, *, override: bool = False) -> None:
+    """Register a language extractor (plugin interface).
+
+    Built-ins call this at import; downstream harnesses call it for their own
+    languages without touching core. First match wins in `collect_domain_interface`:
+    `override=True` inserts at front (takes precedence for overlapping suffixes).
+    Must be a `ContractExtractor` (`can_handle` + `extract`); otherwise TypeError.
+    Discovery (no command needed): declare modules in manifest `extractors`, or
+    drop a `.py` file calling this into `<workspace>/.agent/extractors/` —
+    in-process calls alone do not survive across `k3dge` invocations.
+    """
+    if not isinstance(ext, ContractExtractor):
+        raise TypeError(f"register_extractor expects ContractExtractor, got {type(ext).__name__}")
+    if override:
+        _EXTRACTORS.insert(0, ext)
+    else:
+        _EXTRACTORS.append(ext)
+
+
+def _load_plugin_extractors(manifest, workspace_root=None) -> None:
+    """Load third-party extractors from two sources (both feed `register_extractor`).
+
+    1. Manifest key: `extractors: ["mod" / "mod:attr", ...]` — explicit, for
+       out-of-repo modules and pip packages.
+    2. Convention directory: `<workspace>/.agent/extractors/*.py` — drop a file
+       that calls `register_extractor()` at import; no manifest edit, no command.
+       Files starting with `_` are skipped; each file is isolated (one bad file
+       warns and the rest still load).
+
+    Best-effort throughout: a broken plugin warns to stderr and is skipped —
+    a broken plugin must not red the gate (same policy as missing tree-sitter).
+    Idempotent per process: already-imported modules are not re-executed.
+    """
+    import importlib
+    import importlib.util
+    import sys
+
+    specs = (manifest.data.get("extractors") or []) if manifest is not None else []
+    if not isinstance(specs, list):
+        specs = []
+    for spec in specs:
+        if not isinstance(spec, str) or not spec.strip():
+            continue
+        mod_name, _, attr = spec.strip().partition(":")
+        try:
+            mod = importlib.import_module(mod_name)
+            if attr:
+                ext = getattr(mod, attr)
+                if isinstance(ext, ContractExtractor) and ext not in _EXTRACTORS:
+                    _EXTRACTORS.append(ext)
+        except Exception as exc:  # noqa: BLE001 — plugin must not break the gate
+            print(f"[WARN][EXTRACTOR] skipping '{spec}': {exc}", file=sys.stderr)
+
+    # Convention directory: drop-in plugins, no manifest edit needed.
+    root = workspace_root
+    if root is None and manifest is not None:
+        root = getattr(manifest, "workspace_root", None) or getattr(manifest, "workspace", None)
+    if root is None:
+        return
+    plug_dir = Path(root) / ".agent" / "extractors"
+    if not plug_dir.is_dir():
+        return
+    attempted = getattr(_load_plugin_extractors, "_attempted", None)
+    if attempted is None:
+        attempted = _load_plugin_extractors._attempted = set()  # type: ignore[attr-defined]
+    for plug_file in sorted(plug_dir.glob("*.py")):
+        if plug_file.name.startswith("_"):
+            continue
+        mod_name = f"k3dge_plugin_{plug_file.stem}"
+        if mod_name in sys.modules or str(plug_file) in attempted:
+            continue
+        attempted.add(str(plug_file))
+        try:
+            spec_obj = importlib.util.spec_from_file_location(mod_name, plug_file)
+            if spec_obj is None or spec_obj.loader is None:
+                continue
+            mod = importlib.util.module_from_spec(spec_obj)
+            sys.modules[mod_name] = mod
+            spec_obj.loader.exec_module(mod)
+        except Exception as exc:  # noqa: BLE001 — one bad file must not block the rest
+            sys.modules.pop(mod_name, None)
+            print(f"[WARN][EXTRACTOR] skipping '{plug_file.name}': {exc}", file=sys.stderr)
+
+
+register_extractor(PythonExtractor())
 
 
 def _str_elts(value: Optional[ast.AST]) -> set:
@@ -273,15 +349,6 @@ def extract_python_interface(source: str, include_doc: bool = False) -> str:
     return "\n".join(lines)
 
 
-def extract_typescript_interface(path: Path) -> Optional[str]:
-    """Extract TypeScript interface signatures via tree-sitter (optional dependency)."""
-    try:
-        from k3dge.engine._ts import extract_ts_interface
-    except ImportError:
-        return None
-    return extract_ts_interface(path)
-
-
 def normalize(interface: str) -> str:
     return "\n".join(
         " ".join(line.split()) for line in interface.splitlines() if line.strip()
@@ -305,6 +372,7 @@ def collect_domain_interface(
     """
     if not src_dir.exists():
         return ""
+    _load_plugin_extractors(manifest, workspace_root)
     chunks: List[str] = []
     try:
         src_resolved = src_dir.resolve()
@@ -373,7 +441,7 @@ def _symbol_name(line: str) -> Optional[str]:
         return None
     if s.startswith("class "):
         # drop bases and trailing ':' so the key is the class name (bases stay in the value)
-        return re.split(r"[(:]", s[len("class ") :], 1)[0].strip() or None
+        return re.split(r"[(:]", s[len("class ") :], maxsplit=1)[0].strip() or None
     if s.startswith("from ") and " import " in s:
         tail = s.split(" import ", 1)[1]
         return tail.split(",")[0].split(" as ")[-1].strip().split(".")[0] or None

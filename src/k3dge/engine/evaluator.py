@@ -259,15 +259,18 @@ class ConsistencyEngine:
 
 # k3dit:leftover value-1 283行/9门控重构无窗内测试保行为；M7-Q3同域已接受技术债，交独立refactor task
     def evaluate(self, run_tests: bool = False, force_full: bool = False, staged: bool = False) -> GateReport:
+        from k3dge.engine import events
         try:
             manifest = Manifest.load(self.workspace_root)
         except ManifestError as exc:
-            return GateReport(
+            report = GateReport(
                 passed=False,
                 changed_files=(),
                 modified_domains=(),
                 violations=(Violation("MANIFEST_INVALID", str(exc)),),
             )
+            events.emit(self.workspace_root, "gate_fail", violations=len(report.violations))
+            return report
         if staged:
             files = self._staged_files()
         else:
@@ -290,12 +293,14 @@ class ConsistencyEngine:
                                 "(src/spec/tests) so the gate can protect this repo",
                             ),
                         )
-                    return GateReport(
+                    report = GateReport(
                         passed=False,
                         changed_files=(),
                         modified_domains=(),
                         violations=tuple(git_vs),
                     )
+                    events.emit(self.workspace_root, "gate_fail", violations=len(report.violations))
+                    return report
                 files = ()
 
         violations: List[Violation] = []
@@ -333,12 +338,19 @@ class ConsistencyEngine:
 
         violations.extend(self._check_docs(files, force_full))
 
-        return GateReport(
+        report = GateReport(
             passed=not violations,
             changed_files=tuple(files),
             modified_domains=tuple(sorted(modified_domains)),
             violations=tuple(violations),
         )
+        events.emit(
+            self.workspace_root,
+            "gate_pass" if report.passed else "gate_fail",
+            violations=len(report.violations),
+            domains=list(report.modified_domains),
+        )
+        return report
 
     def _collect_modified_domains(self, files, manifest: Manifest):
         """按改动文件归域：返回 (modified_domains, specs_touched, violations)。
@@ -417,7 +429,7 @@ class ConsistencyEngine:
         import sys
 
         try:
-            from k3dge.engine.milestone import TITLE_RE as _MilestoneTitleRE, parse_frontmatter
+            from k3dge.engine.task_index import TITLE_RE as _MilestoneTitleRE, parse_frontmatter
 
             changelog_path = self.workspace_root / "CHANGELOG.md"
             if changelog_path.is_file():

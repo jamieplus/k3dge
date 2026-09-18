@@ -1,16 +1,15 @@
 ---
 Status: Draft
-# Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
-# NOT rewrite this decision's prose in place, and never reuse a number (see README).
+# Append-only after Accepted. Revise via Amended-by list in frontmatter;
+# supersede via Supersedes field (see AUTHORING.md).
+# Numbers are never reused.
 Supersedes: -
 Amended-by: -
 Date: YYYY-MM-DD
 Deciders: Core Maintainer
 Note: -
-# Note: default `-`. Exactly one `Note:` field per ADR. Record each authorized operation
-# as a numbered segment (① ② ③ …): who/when authorized and how it actually passed the
-# gate (real lens vs manual fallback). Append segments; do not erase old traces.
-# See docs/adr/AUTHORING.md.
+# Note: default `-`. Non-revision metadata only (e.g. gate verification notes).
+# Amendment history lives in Amended-by; see docs/adr/AUTHORING.md.
 ---
 
 # ADR-NNNN: <title>
@@ -18,8 +17,7 @@ Note: -
 <!--
 Section-number rule (hard-gated by `k3dge check`, code ADR_SECTION_ORDER):
 numbered sections must ascend in document order — ## 1, ## 2, ### 2.1, ### 2.1.1, …
-Never insert a new subsection out of order or reuse a number; appending a decision is
-its own ADR (Supersedes), not a renumbering of an Accepted one.
+Never insert a new subsection out of order or reuse a number.
 -->
 <!--
 Readability (soft; k3dit audits it — docs/adr/AUTHORING.md "人读优先"):

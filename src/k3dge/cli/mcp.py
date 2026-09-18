@@ -14,7 +14,7 @@ try:
     from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 except ImportError as _mcp_exc:  # pragma: no cover
     try:
-        from mcp.server import MCPServer as FastMCP  # mcp 2.x 移除 fastmcp 后的正主（k3dit/k3lity 先例同形）
+        from mcp.server import MCPServer as FastMCP  # mcp 2.x 移除 fastmcp 后的正主（并列 harness 先例同形）
     except ImportError:
         FastMCP = None  # type: ignore[assignment]
         _mcp_import_error = _mcp_exc
@@ -24,8 +24,14 @@ else:
     _mcp_import_error = None
 
 from k3dge.cli.main import _find_workspace, _to_json
-from k3dge.engine import contract, milestone
+from k3dge.engine import contract
+from k3dge.engine.align import run_milestone_alignment
 from k3dge.engine.contract import _ExtractError
+from k3dge.engine.doc_audit import _similar_task_hints
+from k3dge.engine.milestone_audit import persist_external_audit_report, run_audit_flow
+from k3dge.engine.seal_flow import run_seal_flow
+from k3dge.engine.task_index import list_tasks, scan_milestone_tasks
+from k3dge.engine.task_write import create_task, mark_task_done
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.manifest import Manifest
 from k3dge.engine.models import GateReport
@@ -254,7 +260,7 @@ def k3dge_task_create(
 ) -> str:
     """Create a living docs/tasks/ file. Same as CLI k3dge task create."""
     ws = _find_workspace(workspace_path=workspace_path)
-    ok, msg, path = milestone.create_task(
+    ok, msg, path = create_task(
         ws, title, typ=typ, slug=slug, milestone=milestone_id, priority=priority
     )
     rel = str(path.relative_to(ws)).replace("\\", "/") if path else None
@@ -262,7 +268,7 @@ def k3dge_task_create(
     if ok and path is not None:
         similar = [
             {"path": p, "title": ttl}
-            for p, ttl in milestone._similar_task_hints(ws, title, exclude=path)
+            for p, ttl in _similar_task_hints(ws, title, exclude=path)
         ]
     return json.dumps({"ok": ok, "message": msg, "path": rel, "similar": similar}, indent=2, ensure_ascii=False)
 
@@ -271,7 +277,7 @@ def k3dge_task_create(
 def k3dge_task_done(path: str, workspace_path: Optional[str] = None) -> str:
     """Mark one task done. Prefer the path from k3dge_task_list."""
     ws = _find_workspace(workspace_path=workspace_path)
-    ok, msg, done_path = milestone.mark_task_done(ws, path)
+    ok, msg, done_path = mark_task_done(ws, path)
     rel = str(done_path.relative_to(ws)).replace("\\", "/") if done_path else None
     return json.dumps({"ok": ok, "message": msg, "path": rel}, indent=2, ensure_ascii=False)
 
@@ -284,7 +290,7 @@ def k3dge_task_list(
 ) -> str:
     """Index living docs/tasks/*.md (not archive). Returns title/status/milestone/priority, not bodies."""
     ws = _find_workspace(workspace_path=workspace_path)
-    rows = milestone.list_tasks(ws, milestone_id=milestone_id, status=status)
+    rows = list_tasks(ws, milestone_id=milestone_id, status=status)
     from k3dge.cli.status import lifecycle_next
 
     ns = lifecycle_next(ws)
@@ -362,7 +368,7 @@ def k3dge_milestone_control(
     act = action.lower().strip()
 
     if act == "status":
-        tasks = milestone.scan_milestone_tasks(ws, milestone_id)
+        tasks = scan_milestone_tasks(ws, milestone_id)
         done_cnt = sum(1 for t in tasks if t.status == "done")
         return json.dumps(
             {
@@ -382,7 +388,7 @@ def k3dge_milestone_control(
         from k3dge.engine import nextstep
         from k3dge.engine.audit_trigger import audit_closed, compute_audit_suggestion
 
-        ok, msg, tasks = milestone.run_milestone_alignment(ws, milestone_id)
+        ok, msg, tasks = run_milestone_alignment(ws, milestone_id)
         if not ok:
             nxt = nextstep.next_for_rejection(milestone_id, msg)
         elif audit_closed(ws, milestone_id):
@@ -406,7 +412,7 @@ def k3dge_milestone_control(
         # Independent audit entry: mandatory loop, 待修==0 to close.
         from k3dge.engine import nextstep
 
-        status, msg = milestone.run_audit_flow(ws, milestone_id)
+        status, msg = run_audit_flow(ws, milestone_id)
         nxt_state = {"audited": "seal_ready", "escalated": "escalated"}.get(status)
         nxt = (
             nextstep.NextStep.from_state(nxt_state, milestone_id)
@@ -430,11 +436,11 @@ def k3dge_milestone_control(
         # `audit_needed` pointing back at the audit entry.
         from k3dge.engine import nextstep
 
-        status, msg = milestone.run_seal_flow(ws, milestone_id)
+        status, msg = run_seal_flow(ws, milestone_id)
         if status != "sealed":
             nxt = (
                 nextstep.NextStep.from_state(status, milestone_id)
-                if status in ("deferred", "escalated", "audit_needed")
+                if status in ("seal_declined", "escalated", "audit_needed")
                 else nextstep.next_for_rejection(milestone_id, msg)
             )
             return json.dumps(
@@ -499,9 +505,7 @@ def k3dge_submit_audit_report(
     it. Canonicalizes the 12-col header when missing; latest submission wins.
     """
     ws = _find_workspace(workspace_path=workspace_path)
-    from k3dge.engine import milestone
-
-    path = milestone.persist_external_audit_report(ws, milestone_id, content or "")
+    path = persist_external_audit_report(ws, milestone_id, content or "")
     return json.dumps(
         {"ok": True, "milestone_id": milestone_id, "path": str(path)},
         indent=2,
@@ -516,7 +520,7 @@ def _audit_protocol_with_fallback(workspace_path: Optional[str] = None) -> tuple
     Priority: ../k3dit/docs/guides/audit-method.md → docs/protocols/audit_default.md (local docs/guides/audit-method.md deprecated per Diátaxis)
     Also checks .mcp.json for k3dit harness availability (required for actual k3dit_run_audit call).
     """
-    import json
+    from k3dge.engine.mcp_json import load_mcp_endpoints
 
     ws = _find_workspace(workspace_path=workspace_path)
     candidates = [
@@ -542,14 +546,7 @@ def _audit_protocol_with_fallback(workspace_path: Optional[str] = None) -> tuple
                 break
     # Even if protocol file exists, check MCP harness availability for k3dit_run_audit
     if not fell_back and "k3dit" in proto:
-        mcp_path = ws / ".mcp.json"
-        has_k3dit = False
-        try:
-            if mcp_path.is_file():
-                data = json.loads(mcp_path.read_text(encoding="utf-8"))
-                has_k3dit = isinstance(data, dict) and isinstance(data.get("mcpServers"), dict) and "k3dit" in data["mcpServers"]
-        except Exception:
-            has_k3dit = False
+        has_k3dit = "k3dit" in load_mcp_endpoints(ws)
         if not has_k3dit:
             reason = ".mcp.json missing mcpServers.k3dit (harness not configured), k3dit_run_audit unavailable"
             fell_back = True

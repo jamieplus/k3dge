@@ -29,7 +29,7 @@ def _path(workspace: Path) -> Path:
 
 
 def _tasks_hash(workspace: Path, milestone_id: str) -> str:
-    from k3dge.engine.milestone import scan_milestone_tasks
+    from k3dge.engine.task_index import scan_milestone_tasks
 
     tasks = scan_milestone_tasks(workspace, milestone_id)
     h = hashlib.sha256()
@@ -40,7 +40,7 @@ def _tasks_hash(workspace: Path, milestone_id: str) -> str:
 
 def _snapshot(workspace: Path, milestone_id: str) -> dict:
     from k3dge.engine.audit_trigger import audit_closed, compute_audit_suggestion
-    from k3dge.engine.milestone import _find_report, _parse_audit_stats
+    from k3dge.engine.audit_report import _find_report, _parse_audit_stats
 
     suggested, reasons = compute_audit_suggestion(workspace)
     found = _find_report(workspace, milestone_id, "audit")
@@ -61,7 +61,7 @@ def _snapshot(workspace: Path, milestone_id: str) -> dict:
 def build_checklist(workspace: Path, milestone_id: Optional[str] = None) -> dict:
     """Recompute the audit-condition snapshot and persist it (keeps counters if the
     task set is unchanged)."""
-    from k3dge.engine.milestone import get_current_milestone
+    from k3dge.engine.milestone_pointer import get_current_milestone
 
     mid = milestone_id or get_current_milestone(workspace)
     h = _tasks_hash(workspace, mid)
@@ -70,7 +70,7 @@ def build_checklist(workspace: Path, milestone_id: Optional[str] = None) -> dict
     data = {
         "milestone_id": mid,
         "tasks_hash": h,
-        "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "generated_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
         "audit_started_at": (prev or {}).get("audit_started_at") if keep else None,
         "verify_attempts": (prev or {}).get("verify_attempts", 0) if keep else 0,
     }
@@ -102,12 +102,12 @@ def ensure_checklist(workspace: Path) -> dict:
 def reset_for_audit(workspace: Path, milestone_id: Optional[str] = None) -> dict:
     """Called when an audit pass is initiated (manual `milestone audit` or auto):
     fresh snapshot + verify budget reset + stamp started_at."""
-    from k3dge.engine.milestone import get_current_milestone
+    from k3dge.engine.milestone_pointer import get_current_milestone
 
     mid = milestone_id or get_current_milestone(workspace)
     data = build_checklist(workspace, mid)
     data["verify_attempts"] = 0
-    data["audit_started_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+    data["audit_started_at"] = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
     _write(workspace, data)
     return data
 

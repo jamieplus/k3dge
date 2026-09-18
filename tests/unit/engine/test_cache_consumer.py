@@ -7,7 +7,12 @@ import unittest
 from tempfile import TemporaryDirectory
 from unittest import mock
 
-from k3dge.engine import milestone as ms
+from k3dge.engine.doc_audit import (
+    _attach_k3che_hints,
+    _related_doc_hints,
+    _similar_task_hints,
+    run_doc_audit,
+)
 from k3dge.engine.pipeline_runner import TransportResult
 
 WS = pathlib.Path(__file__).resolve().parents[3]
@@ -31,7 +36,7 @@ class TestHints(unittest.TestCase):
             ws = pathlib.Path(d)
             ok = TransportResult(True, "mcp", "x", payload=HITS)
             with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=ok):
-                hints = ms._related_doc_hints(ws, ["docs/adr/0006.md"])
+                hints = _related_doc_hints(ws, ["docs/adr/0006.md"])
             self.assertEqual(len(hints), 2)
             self.assertEqual(hints[0][0], "docs/adr/0006-mcp-foreign-harness-injection.md")
 
@@ -40,10 +45,10 @@ class TestHints(unittest.TestCase):
             ws = pathlib.Path(d)
             skipped = TransportResult(True, "skip", "skipped", skipped=True)
             with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=skipped):
-                self.assertEqual(ms._related_doc_hints(ws, ["docs/x.md"]), [])
+                self.assertEqual(_related_doc_hints(ws, ["docs/x.md"]), [])
             broken = TransportResult(True, "mcp", "x", payload="not-json")
             with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=broken):
-                self.assertEqual(ms._related_doc_hints(ws, ["docs/x.md"]), [])
+                self.assertEqual(_related_doc_hints(ws, ["docs/x.md"]), [])
 
     def test_attach_writes_and_refreshes_block_idempotently(self):
         with TemporaryDirectory() as d:
@@ -51,8 +56,8 @@ class TestHints(unittest.TestCase):
             t = _ws_with_task(ws)
             ok = TransportResult(True, "mcp", "x", payload=HITS)
             with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=ok):
-                self.assertEqual(ms._attach_k3che_hints(ws, ["docs/adr/0006.md"]), 2)
-                self.assertEqual(ms._attach_k3che_hints(ws, ["docs/adr/0006.md"]), 2)  # 再跑一次不叠加
+                self.assertEqual(_attach_k3che_hints(ws, ["docs/adr/0006.md"]), 2)
+                self.assertEqual(_attach_k3che_hints(ws, ["docs/adr/0006.md"]), 2)  # 再跑一次不叠加
             body = t.read_text(encoding="utf-8")
             self.assertEqual(body.count("k3che · 服务性前路由"), 1)
             self.assertIn("docs/guides/mcp-bridge.md", body)
@@ -71,8 +76,8 @@ class TestHints(unittest.TestCase):
 
             with mock.patch("k3dge.engine.pipeline_runner.run_action", side_effect=fake_action), \
                  mock.patch("k3dge.engine.doc_audit._changed_docs", return_value=["docs/adr/0006.md"]), \
-                 mock.patch.object(ms, "get_current_milestone", return_value="M1"):
-                status, msg = ms.run_doc_audit(ws)
+                 mock.patch("k3dge.engine.milestone_pointer.get_current_milestone", return_value="M1"):
+                status, msg = run_doc_audit(ws)
             self.assertEqual(status, "reported")
             tasks = [p for p in (ws / "docs" / "tasks").glob("*.md") if "doc_audit" in p.name or "doc-audit" in p.name]
             self.assertEqual(len(tasks), 1)
@@ -139,12 +144,12 @@ class TestDupCheck(unittest.TestCase):
             hit = TransportResult(True, "mcp", "x", payload=self._env())
             ex = ws / "docs" / "tasks" / "new.md"
             with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=hit):
-                hints = ms._similar_task_hints(ws, "whatever", exclude=None)
+                hints = _similar_task_hints(ws, "whatever", exclude=None)
             self.assertEqual(len(hints), 3)
             hit2 = TransportResult(True, "mcp", "x", payload=json.dumps({"ok": True, "results": [
                 {"path": "docs/tasks/new.md", "title": "self"}, {"path": "docs/x.md", "title": "keep"}]}))
             with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=hit2):
-                hints2 = ms._similar_task_hints(ws, "whatever", exclude=ex)
+                hints2 = _similar_task_hints(ws, "whatever", exclude=ex)
             self.assertEqual([h[0] for h in hints2], ["docs/x.md"])
 
     def test_engine_helper_degrades_silently(self):
@@ -152,10 +157,10 @@ class TestDupCheck(unittest.TestCase):
             ws = pathlib.Path(d)
             skipped = TransportResult(True, "skip", "skipped", skipped=True)
             with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=skipped):
-                self.assertEqual(ms._similar_task_hints(ws, "t"), [])
+                self.assertEqual(_similar_task_hints(ws, "t"), [])
             bad = TransportResult(True, "mcp", "x", payload="nope")
             with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=bad):
-                self.assertEqual(ms._similar_task_hints(ws, "t"), [])
+                self.assertEqual(_similar_task_hints(ws, "t"), [])
 
     def test_cli_create_shows_dup_check_and_never_blocks(self):
         import io as _io

@@ -13,6 +13,12 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from k3dge.engine.models import Violation
+from k3dge.engine.pure_schema import check_content as _pure_check_content
+from k3dge.engine.pure_schema import check_filename as _pure_check_filename
+from k3dge.engine.pure_schema import check_index_ref as _pure_check_index_ref
+from k3dge.engine.pure_schema import check_section_order  # noqa: F401 — re-export for tests/callers
+from k3dge.engine.pure_schema import parse_doc_schema  # single source (was duplicated here)
+from k3dge.engine.task_index import _frontmatter_pairs
 
 SCHEMA_FILE = ".schema.json"
 INDEX_REL = "docs/generated/docs-index.json"
@@ -29,22 +35,10 @@ AUX_NAMES = frozenset(
     }
 )
 SKIP_TYPES = frozenset({"generated"})
-_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
 _TITLE_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
 _SUMMARY_RE = re.compile(r"可检索摘要[：:]\s*(.+)")
 _HEADER_RE = re.compile(r"^-\s+\*\*([^*]+)\*\*:\s*(.+)$", re.MULTILINE)
-
-
-def parse_doc_schema(text: str) -> Optional[dict]:
-    """Parse a ``.schema.json`` body. Empty → None; invalid JSON → ``_invalid``."""
-    blob = (text or "").strip()
-    if not blob:
-        return None
-    try:
-        data = json.loads(blob)
-    except json.JSONDecodeError:
-        return {"_invalid": True, "_raw": blob}
-    return data if isinstance(data, dict) else {"_invalid": True}
 
 
 def _type_dir(workspace: Path, typ: str) -> Path:
@@ -80,12 +74,6 @@ def iter_managed_files(workspace: Path, typ: str, *, include_archive: bool = Fal
     return files
 
 
-def _frontmatter(text: str) -> Dict[str, str]:
-    from k3dge.engine.task_index import _frontmatter_pairs
-
-    return dict(_frontmatter_pairs(text))
-
-
 def _headers(text: str) -> Dict[str, str]:
     return {k.strip(): v.strip() for k, v in _HEADER_RE.findall(text)}
 
@@ -116,7 +104,7 @@ def build_card(workspace: Path, typ: str, path: Path) -> dict:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return {"path": rel, "type": typ, "id": path.stem, "title": path.stem, "status": "", "tokens": ""}
-    fm = _frontmatter(text)
+    fm = dict(_frontmatter_pairs(text))
     headers = _headers(text)
     tm = _TITLE_RE.search(text)
     title = (tm.group(1).strip() if tm else path.stem)[:200]
@@ -262,41 +250,7 @@ def _code(schema: dict, key: str, default: str = "DOC_SCHEMA_INVALID") -> str:
     return str(codes.get(key) or default)
 
 
-_SECTION_NUM_RE = re.compile(r"^#{1,6}\s+(\d+(?:\.\d+)*)\b")
 
-
-def check_section_order(text: str) -> Optional[Tuple[str, str]]:
-    """Return (prev_number, this_number) for the first out-of-order/duplicate heading.
-
-    A valid outline's dotted section numbers (`## 1`, `### 2.1`, `#### 2.1.1`) are
-    strictly increasing in document order when compared as integer tuples: parents
-    precede children, siblings ascend, and it never steps back. Inserting a new
-    subsection out of position (or reusing a number) breaks this. Returns None if ok
-    or if the doc has no numbered sections.
-    """
-    numbers: List[Tuple[int, ...]] = []
-    for line in text.splitlines():
-        m = _SECTION_NUM_RE.match(line)
-        if m:
-            numbers.append(tuple(int(x) for x in m.group(1).split(".")))
-    prev: Optional[Tuple[int, ...]] = None
-    for cur in numbers:
-        if prev is not None and cur <= prev:
-            return (".".join(map(str, prev)), ".".join(map(str, cur)))
-        prev = cur
-    return None
-
-
-def _status_ok(value: str, allowed: Iterable[str]) -> bool:
-    v = value.strip()
-    for item in allowed:
-        try:
-            if re.fullmatch(item, v):
-                return True
-        except re.error:
-            if item == v:
-                return True
-    return False
 
 
 def _schema_rel(typ: str) -> str:
@@ -328,138 +282,40 @@ def _load_schema(workspace: Path, typ: str) -> Tuple[Optional[dict], Optional[Vi
     return schema, None
 
 
-# k3dit:leftover Q-3 CC40 _validate_file 拆校验分支为子函数
-def _validate_filename(typ, schema, path, rel, seen):
-    pat = schema.get("filename")
-    ident = path.stem
-    if pat:
-        try:
-            rgx = re.compile(pat)
-        except re.error as exc:
-            return [Violation("DOC_SCHEMA_INVALID",
-                              f"{_schema_rel(typ)} filename regex invalid: {exc}",
-                              file_path=_schema_rel(typ))], ident, False
-        m = rgx.match(path.name)
-        if not m:
-            return [Violation(_code(schema, "filename"),
-                              f"filename does not match {pat}: {path.name}", file_path=rel)], ident, False
-        if m.lastindex:
-            ident = m.group(1)
-            seen.setdefault(ident, []).append(path.name)
-    return [], ident, True
-
-
-def _validate_h1(schema, text, path, rel, ident):
-    out: List[Violation] = []
-    h1_pat = schema.get("h1")
-    if h1_pat:
-        filled = h1_pat.replace("{id}", re.escape(ident))
-        if not re.search(filled, text, re.MULTILINE | re.IGNORECASE):
-            out.append(Violation(_code(schema, "h1"),
-                                f"H1 does not match `{h1_pat}` (id={ident}): {path.name}", file_path=rel))
-    return out
-
-
-def _validate_sections_when(schema, path, text, rel):
-    out: List[Violation] = []
-    for frag, secs in (schema.get("sections_when") or {}).items():
-        if frag and frag in path.name:
-            for sec in secs or []:
-                if sec not in text:
-                    out.append(Violation(_code(schema, "sections_when"),
-                                        f"required section '{sec}' missing in {path.name} (matched '{frag}')",
-                                        file_path=rel))
-    return out
-
-
-def _validate_sections(schema, path, text, rel):
-    out: List[Violation] = []
-    for heading in schema.get("sections") or []:
-        if heading not in text:
-            try:
-                ok = bool(re.search(heading, text, re.MULTILINE))
-            except re.error:
-                ok = False
-            if not ok:
-                out.append(Violation(_code(schema, "sections"),
-                                    f"missing section `{heading}`: {path.name}", file_path=rel))
-    return out
-
-
-def _validate_section_order(schema, path, text, rel):
-    if schema.get("section_order"):
-        bad = check_section_order(text)
-        if bad:
-            return [Violation(_code(schema, "section_order", "DOC_SECTION_ORDER"),
-                              f"section number out of order (must ascend): {bad[0]} before {bad[1]}: {path.name}",
-                              file_path=rel)]
-    return []
-
-
-def _validate_frontmatter(schema, path, text, rel):
-    fm_spec = schema.get("frontmatter") or {}
-    if not fm_spec:
-        return []
-    out: List[Violation] = []
-    fm = _frontmatter(text)
-    for key, rule in fm_spec.items():
-        val = fm.get(key, "")
-        if rule == "date":
-            if not _DATE_RE.match(val):
-                out.append(Violation(_code(schema, "frontmatter"),
-                                    f"{key} missing or not YYYY-MM-DD: {path.name}", file_path=rel))
-        elif isinstance(rule, list):
-            if not _status_ok(val, rule):
-                out.append(Violation(_code(schema, "frontmatter"),
-                                    f"{key}={val!r} not in {rule}: {path.name}", file_path=rel))
-    return out
-
-
-def _validate_headers(schema, path, text, rel):
-    hdr_spec = schema.get("headers") or {}
-    if not hdr_spec:
-        return []
-    out: List[Violation] = []
-    hdrs = _headers(text)
-    fm = _frontmatter(text)
-    for key, rule in hdr_spec.items():
-        val = hdrs.get(key) or fm.get(key.lower()) or fm.get(key) or ""
-        if isinstance(rule, list) and not _status_ok(val, [str(x) for x in rule]):
-            out.append(Violation(_code(schema, "headers"),
-                                f"{key}={val!r} not in {rule}: {path.name}", file_path=rel))
-    return out
-
-
-def _validate_index(workspace, typ, schema, path, rel, ident):
-    index_rel = schema.get("index")
-    if not index_rel:
-        return []
-    idx_path = _type_dir(workspace, typ) / index_rel
-    idx_text = idx_path.read_text(encoding="utf-8") if idx_path.is_file() else ""
-    token = ident
-    if not re.search(rf"^\|\s*{re.escape(token)}\s*\|", idx_text, re.MULTILINE) and token not in idx_text:
-        return [Violation(_code(schema, "index"),
-                          f"{index_rel} has no row for `{token}`: {path.name}", file_path=rel)]
-    return []
-
-
 def _validate_file(workspace: Path, typ: str, path: Path, schema: dict, seen: dict) -> List[Violation]:
+    """Structure gate via `pure_schema` (single implementation) + workspace-owned checks.
+
+    File-local checks (filename/h1/sections/order/frontmatter/headers) delegate
+    to `pure_schema.check_file`; ident-uniqueness bookkeeping and the index-file
+    read stay here (cross-file I/O owned by the engine).
+    """
     rel = str(path.relative_to(workspace)).replace("\\", "/")
-    out, ident, ok = _validate_filename(typ, schema, path, rel, seen)
-    if not ok:
+    codes = schema.get("codes") or {}
+    schema_rel = _schema_rel(typ)
+    out: List[Violation] = []
+    pure_violations, ident, filename_ok = _pure_check_filename(
+        schema.get("filename"), codes, schema_rel, path.name)
+    for code, msg, scope in pure_violations:
+        out.append(Violation(code, msg, file_path=(schema_rel if scope == "schema" else rel)))
+    if not filename_ok:
         return out
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
-        out.append(Violation(_code(schema, "filename"), f"cannot read: {exc}", file_path=rel))
-        return out
-    out += _validate_h1(schema, text, path, rel, ident)
-    out += _validate_sections_when(schema, path, text, rel)
-    out += _validate_sections(schema, path, text, rel)
-    out += _validate_section_order(schema, path, text, rel)
-    out += _validate_frontmatter(schema, path, text, rel)
-    out += _validate_headers(schema, path, text, rel)
-    out += _validate_index(workspace, typ, schema, path, rel, ident)
+        return [Violation(
+            _code(schema, "filename"),
+            f"cannot read: {exc}",
+            file_path=rel,
+        )]
+    for code, msg, scope in _pure_check_content(schema, path.name, text, ident):
+        out.append(Violation(code, msg, file_path=(schema_rel if scope == "schema" else rel)))
+    seen.setdefault(ident, []).append(path.name)
+    index_rel = schema.get("index")
+    if index_rel:
+        idx_path = _type_dir(workspace, typ) / index_rel
+        idx_text = idx_path.read_text(encoding="utf-8") if idx_path.is_file() else ""
+        for code, msg, _scope in _pure_check_index_ref(idx_text, ident, codes, index_rel, path.name):
+            out.append(Violation(code, msg, file_path=rel))
     return out
 
 def validate_docs(workspace: Path, types: Optional[Iterable[str]] = None) -> List[Violation]:

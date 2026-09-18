@@ -241,7 +241,7 @@ def test_collect_role_naming_and_kind_guard(tmp_path):
     (tmp_path / "docs" / "reviews").mkdir(parents=True)
     today = datetime.date.today().isoformat()
     draft = tmp_path / "docs" / "reviews" / f"{today}-M9-quality.md"
-    draft.write_text("# k3lity 质量报告（94 条草稿，无 kind 标记）\n", encoding="utf-8")
+    draft.write_text("# 质量报告（94 条草稿，无 kind 标记）\n", encoding="utf-8")
     hdr = (
         "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")

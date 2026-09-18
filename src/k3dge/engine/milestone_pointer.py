@@ -1,8 +1,4 @@
-"""Milestone cursor + id validation (extracted from `engine/milestone.py`, A-1 第二块).
-
-`milestone` re-exports these names so existing `from k3dge.engine.milestone import ...`
-callers keep working unchanged.
-"""
+"""Milestone cursor + id validation."""
 from __future__ import annotations
 
 import re

@@ -78,21 +78,21 @@ class PeerIsolation(unittest.TestCase):
             ws = _ws(Path(d), {"mcpServers": {"k3dit": {"command": sys.executable, "args": ["-m", "k3dit.mcp"]}}}, PIPE_MCP_MANUAL)
             buf = io.StringIO()
             with mock.patch.object(pr, "call_mcp_tool") as fake:
-                res = pr.run_action(ws, "k3lity.actions.quality", io=buf)  # not even declared -> not found
+                res = pr.run_action(ws, "other.actions.score", io=buf)  # not even declared -> not found
             self.assertFalse(res.ok)
             fake.assert_not_called()
 
-    def test_k3lity_transport_targets_k3lity_endpoint(self) -> None:
+    def test_peer_transport_targets_own_endpoint(self) -> None:
         cfg = {
             "mcpServers": {
                 "k3dit": {"command": "/usr/bin/false", "args": ["-m", "k3dit.mcp"]},
-                "k3lity": {"command": "/usr/bin/false", "args": ["-m", "k3lity.mcp"]},
+                "other": {"command": "/usr/bin/false", "args": ["-m", "other.mcp"]},
             }
         }
         pipe = """
-[peers.k3lity]
-[peers.k3lity.actions.quality]
-transports = [ { provider = "mcp", tool = "k3lity_score", timeout = 5 } ]
+[peers.other]
+[peers.other.actions.score]
+transports = [ { provider = "mcp", tool = "other_score", timeout = 5 } ]
 """
         with TemporaryDirectory() as d:
             ws = _ws(Path(d), cfg, pipe)
@@ -102,15 +102,15 @@ transports = [ { provider = "mcp", tool = "k3lity_score", timeout = 5 } ]
                 seen["command"] = params["command"]
                 seen["args"] = params["args"]
                 seen["tool"] = tool
-                return True, '{"ok": true}', ["k3lity_score"], ""
+                return True, '{"ok": true}', ["other_score"], ""
 
             with mock.patch.object(pr, "call_mcp_tool", side_effect=fake), mock.patch.object(
                 pr, "resolve_endpoint_command", return_value=("/interp/python", "/interp/python")
             ):
-                res = pr.run_action(ws, "k3lity.actions.quality", io=io.StringIO())
+                res = pr.run_action(ws, "other.actions.score", io=io.StringIO())
             self.assertTrue(res.ok, res.detail)
-            self.assertEqual(seen["args"], ["-m", "k3lity.mcp"])  # NOT k3dit.mcp
-            self.assertEqual(seen["tool"], "k3lity_score")
+            self.assertEqual(seen["args"], ["-m", "other.mcp"])  # NOT k3dit.mcp
+            self.assertEqual(seen["tool"], "other_score")
             self.assertEqual(res.provider, "mcp")
 
 

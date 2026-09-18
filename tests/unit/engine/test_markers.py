@@ -6,7 +6,7 @@ import tempfile
 from tempfile import TemporaryDirectory
 
 from k3dge.engine import markers as K
-from k3dge.engine.milestone import scan_pending_findings
+from k3dge.engine.milestone_audit import scan_pending_findings
 
 def _ws(files: dict) -> pathlib.Path:
     root = pathlib.Path(tempfile.mkdtemp())

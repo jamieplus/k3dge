@@ -7,7 +7,7 @@ Copy `_template.md`. Soft rules (k3dit may judge text quality; k3dge does not):
 - Consequences: upside, downside, reopen criterion.
 - Wrong: "Twenty minutes later we decided…" / "the agent found…". Right: name the constraint and the choice.
 
-Do not judge whether the decision is a *good* idea (k3lity, soft). k3dit may flag two Accepted Decision sections that directly negate each other.
+Do not judge whether the decision is a *good* idea (soft; value window of the audit module). The audit role may flag two Accepted Decision sections that directly negate each other.
 
 ## 先并入，后新建 (merge-before-new)
 
@@ -51,29 +51,96 @@ Do not judge whether the decision is a *good* idea (k3lity, soft). k3dit may fla
 
 ## Record lifecycle (from `README.md`; enforce where a machine can)
 
-**没有任何 ADR 操作是无条件的。** 下表每行的"例外"列一旦动用，都必须由**人类在本轮显式授权**，并把痕迹写进该 ADR 的 `Note:` 字段——agent 不得自行选用例外路径，历史授权也不构成常备许可（`ADR-0010` / `ADR-0012`）。
+### 修订制度
 
-| 操作 | 默认路径（无条件可用） | 需显式人工授权的例外 | 机验码 |
-| --- | --- | --- | --- |
-| 新建 | **先查同类 ADR 并入**（见「先并入，后新建」）；确无同类才 copy `_template.md`，`Status: Proposed` → 由人/k3dit 判 `Accepted` | — | `ADR_SECTIONS_MISSING`, `ADR_NUMBER_COLLISION`, `ADR_FRONTMATTER_MISSING` |
-| 改正文（已 `Accepted`） | 新开一条：`Supersedes: ADR-NNNN` + 旧文 `Status: Superseded by ADR-NNNN`；非冲突增补用 `Amended by ADR-NNNN` | **就地修订（in-place revision）**：流程尚未跑通时其 `Accepted` 本就是过早的，允许直接替换决策正文，免得一次性 supersession 把 ADR 集撑成废料堆 | 同上 + `ADR_SECTION_ORDER` |
-| 删除 / 改名 / 复用编号 | 一律不允许；**Numbers are never reused** | **物理删除**（含改名腾号） | `ADR_FILENAME_MISMATCH` |
+已 Accepted 的 ADR 有两种修订操作：
 
-`Note:` 字段（默认 `-`）只装"这条记录本身是怎么来的"，不装决策正文；`Deciders:` 只记席位。**只有一个 `Note:` 字段**：每次操作的陈述段用 ①②③ 编号续写，不并列多行 `Note:`。痕迹格式：
+| 操作 | 场景 | 做法 |
+| --- | --- | --- |
+| **Supersede** | 决策被推翻；选了完全不同的方案；两条 ADR 合并后冗余的那条 | 新 ADR frontmatter 写 `Supersedes: ADR-旧号`；旧 ADR 被自动标记 `Status: Superseded` + `superseded_by: ADR-新号` 并移入 `obsolete/`（闸统一处理，见下方归档闸表格） |
+| **Amend** | 适用范围扩大/缩小；措辞歧义澄清；新增不变量；术语统一 | 就地改正文 + `Amended-by` 列表留痕 + Markdown footnote 标记 |
 
+**判断口诀**：原来的选择还是对的吗？是 → Amend；不是 → Supersede。
+
+### Supersede 判定标准
+
+以下任一成立即 Supersede：
+
+1. 决策本身被推翻（选了相反方案）
+2. 不变量被反转
+3. 选了完全不同的技术方案
+4. 两条 ADR 合并，冗余的那条（原 ADR 的决策仍然成立，但已并入另一条）
+
+### Frontmatter 格式
+
+```yaml
+---
+Status: Accepted
+Supersedes: -                    # 仅新 ADR 填写：替换了哪条；旧的不写 Superseded-by
+Amended-by:                      # 修订记录列表，无则 `-`
+  - 1 | Core Maintainer | 2026-09-14 | §2.3 第 2、8 条加作用域声明
+Landed-by: src/k3dge/cli/mcp.py
+Date: 2026-08-24
+Deciders: Core Maintainer
+Note: -                          # 非修订类元信息（过闸口径、历史痕迹摘要等）
+---
 ```
-Note: ① <操作：就地修订 / 物理删除授权> YYYY-MM-DD，经 <授权席位> 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = real lens | manual fallback（<可复跑证据，如 `[PEER-MANUAL] … no live lens`>）。
-      ② <下一次操作> YYYY-MM-DD，经 <授权席位> 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
+
+- **`Supersedes`**：仅新 ADR 填写。旧 ADR 被 seal 闸自动修复为 `Status: Superseded` + `superseded_by`。
+- **`Amended-by`**：列表格式 `- 🅰<修订序号> | <授权席位> | <日期> | <简述>`。无修订则 `-`。
+- **`Note`**：非修订类元信息。修订痕迹全部进 `Amended-by`。
+
+### `obsolete/` 归档闸
+
+seal 时 `adr_gate.reconcile_supersedes` 统一处理不再活跃的 ADR：
+
+| Status | 含义 | 去向 |
+| --- | --- | --- |
+| `Superseded` | 被新 ADR 替换 | 自动改 frontmatter + 移入 `obsolete/` |
+| `Rejected` | 提议后被否决，从未生效 | 直接移入 `obsolete/` |
+| `Deprecated` | 仍然有效但不推荐 | **留在** `docs/adr/`（“别这么做”的信号，需被看到） |
+| `Accepted` | 生效中 | 留在 `docs/adr/` |
+| `Draft` / `Proposed` | 未完成 | 留在 `docs/adr/`（阻断 seal） |
+
+`obsolete/` 不在门禁扫描范围内（`glob("*.md")` 不递归），自动跳过。
+
+### 内联修订标记（footnote）
+
+Amend 时在正文被修改处紧跟 Markdown footnote：
+
+```markdown
+2. **`check` 是纯静态硬闸**[^🅰1.1]：只验盘上文件与结构…
+
+8. **k3dge 调的是「动作」，不是「步骤」**：一次 `run_action`＝peer 侧一件完整的事。
+   - k3dge 不拆解 peer 的内部轮次[^🅰1.2]；peer 暴露的参数即公共接口…
 ```
 
-**授权落地 = `Note:` 必须填**：凡动用"例外"列（就地修订 / 物理删除 / 改名），该文件 `Note:` 不得停留在 `-`。缺痕＝按静默重写处理（`ADR-0012`），无论口头说过几次"我授权"。历史授权不续期：换一次操作就在同一 `Note:` 内追加编号段（① ② ③ …），旧段保留，别擦。
-  填法照抄上面那个格式块，末尾必带**可复跑证据**（例：`实测 [PEER-MANUAL] action 'k3dit.actions.audit' has no live lens`），只写"已授权"不算过。
-  本条目前**只有人读约束、无机验**（`check` 不看 `Note:` 内容）；机验候选登记在 `docs/tasks/archive/M9/2026-09-13-M7-feat-check_gate_by_doc_status.done.md`（该票已裁决不做，理由见其「收尾」段）。
+文末挂载详情：
 
-就地修订另加两条：③ 被作废的旧句、授权与过闸痕迹写进 `Note:`（正文只留现行决策，不写「修正（date）/原稿/现稿」层）；既有 `ADR-NNNN §x` 指针靠**章节号不重排**仍可解析；④ 不为它扩 `Status` 枚举（`.schema.json` ⇒ `ADR_FRONTMATTER_MISSING`）。流程真跑通后回到 append-only，决策仍成立就用自己的 ADR 正式收编。
+```markdown
+---
 
-- **Section numbers must ascend** in document order (`## 1` → `## 2` → `### 2.1` → `### 2.1.1` …). This one is machine-gated: `k3dge check` fails it with `ADR_SECTION_ORDER`, because appending a decision out of order (or reusing a number) is exactly how the prose gets silently rewritten.
+[^🅰1.1]: 修改：为第 2 条补充作用域声明，明确此约束只针对 `check` 命令。
+[^🅰1.2]: 修改：为第 8 条补充作用域声明，删除「不得外溢成 k3dge 参数」句。
+```
+
+- 编号规则：`<修订序号>.<本次改动序号>`，如 `🅰1.1`、`🅰1.2`
+- **修订序号是该 ADR 自己的序**——它在本条 `Amended-by` 列表里的第几条，第 1 次修订即 `🅰1`；`Amended-by` 与 footnote 两处同用一个号
+- 不用删除线（agent 无法可靠区分“已删”与“有效”，误读为正文）
+- 删除或覆盖的内容不用显式标识，交给 git
+
+### 新建
+
+**先查同类 ADR 并入**（见「先并入，后新建」）；确无同类才 copy `_template.md`，`Status: Proposed` → 由人/k3dit 判 `Accepted`。机验码：`ADR_SECTIONS_MISSING`, `ADR_NUMBER_COLLISION`, `ADR_FRONTMATTER_MISSING`。
+
+### 删除 / 改名 / 复用编号
+
+一律不允许；**Numbers are never reused**。需显式人工授权：**物理删除**（含改名腾号）。机验码：`ADR_FILENAME_MISMATCH`。
+
+### 杂项
+
+- **Section numbers must ascend** in document order (`## 1` → `## 2` → `### 2.1` → `### 2.1.1` …). Machine-gated: `k3dge check` fails it with `ADR_SECTION_ORDER`.
 - A durable design change = its own ADR, judged by k3dit/human — the same seat must not both write and ratify (ADR-0006). An agent editing an ADR without a human/k3dit pass is **not** a decision record yet.
-- **本文件是这些特权的唯一投递点**：`README.md` 只写默认路径与指针，不复述例外；两者冲突以本文件为准——特权越少被复述，越不容易被顺手用。
+- **本文件是这些特权的唯一投递点**：`README.md` 只写默认路径与指针，不复述例外；两者冲突以本文件为准。
 
 Structure gate is `.schema.json` (`k3dge check`).

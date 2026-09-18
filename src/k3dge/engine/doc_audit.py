@@ -1,6 +1,6 @@
 """Doc-audit（非阻断、在硬闸之后）：改动文档前路由 k3dit 透镜 + 里程碑 task 兜底。
 
-Extracted from `engine/milestone.py` (A-1 第五块); `milestone` re-exports for back-compat.
+Extracted from `engine/milestone.py` (A-1 第五块).
 Milestone internals (`create_task`/`scan_milestone_tasks`/`get_current_milestone`/`_find_report`)
 are imported lazily to avoid an import cycle.
 """
@@ -85,7 +85,8 @@ def _ensure_doc_audit_task(workspace: Path, milestone_id: str, docs: List[str], 
     if nobody acts on it at commit time. Returns the new task path, or None if an
     open one already exists.
     """
-    from k3dge.engine.milestone import create_task, scan_milestone_tasks
+    from k3dge.engine.task_index import scan_milestone_tasks
+    from k3dge.engine.task_write import create_task
 
     for t in scan_milestone_tasks(workspace, milestone_id):
         # create_task 把标题折成下划线文件名（doc_audit_*）——只匹配 "doc-audit" 会漏检，
@@ -96,7 +97,14 @@ def _ensure_doc_audit_task(workspace: Path, milestone_id: str, docs: List[str], 
     scopes = sorted({d.split("/")[1] for d in docs if len(d.split("/")) > 1})
     hint = ", ".join(scopes[:3]) or "docs"
     title = f"doc-audit: 文档作者合规审计（{hint} 等 {len(docs)} 处）"
-    ok, _msg, path = create_task(workspace, title, typ="audit", milestone=milestone_id, priority="P3", report=report)
+    # 具体文件清单必须入体：只有标题的票无法执行（实例：2026-09-14 空壳票只能当过期关掉）。
+    context = (
+        f"本次触发 doc-audit 的受管文档（{len(docs)} 份），逐份对照 "
+        f"`docs/<type>/AUTHORING.md` 检查作者合规：\n\n"
+        + "\n".join(f"- `{d}`" for d in sorted(docs))
+    )
+    ok, _msg, path = create_task(workspace, title, typ="audit", milestone=milestone_id,
+                                 priority="P3", report=report, context=context)
     return path if ok else None
 
 
@@ -207,7 +215,8 @@ def run_doc_audit(workspace: Path, *, io=None) -> Tuple[str, str]:
     """
     import sys
 
-    from k3dge.engine.milestone import _find_report, get_current_milestone
+    from k3dge.engine.audit_report import _find_report
+    from k3dge.engine.milestone_pointer import get_current_milestone
     from k3dge.engine.pipeline_runner import run_action
 
     io = io or sys.stderr

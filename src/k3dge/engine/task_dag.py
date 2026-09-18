@@ -15,7 +15,8 @@ _SPLIT = re.compile(r"[,\s]+")
 
 def blocking_graph(workspace: Path) -> Dict[str, List[str]]:
     """task → 其 `blocking` 依赖（只连仓内已知 task stem）。"""
-    from k3dge.engine.milestone import _is_doc_aux, parse_frontmatter
+    from k3dge.engine.milestone_files import _is_doc_aux
+    from k3dge.engine.task_index import parse_frontmatter
 
     d = Path(workspace) / "docs" / "tasks"
     g: Dict[str, List[str]] = {}

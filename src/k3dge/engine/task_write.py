@@ -1,7 +1,6 @@
 """Task 写入核心：创建 / 关闭（含报告闸、回填、CHANGELOG）。
 
-Extracted from `engine/milestone.py` (A-1 第九块); `milestone` re-exports `create_task` /
-`mark_task_done` / `_auto_backfill_reviews` for back-compat. All deps come from leaf modules
+Extracted from `engine/milestone.py` (A-1 第九块). All deps come from leaf modules
 (task_index / audit_report / changelog / milestone_pointer / milestone_files) — no cycle.
 """
 from __future__ import annotations
@@ -129,12 +128,17 @@ def create_task(
     milestone: Optional[str] = None,
     priority: str = "P2",
     report: Optional[str] = None,
+    context: Optional[str] = None,
 ) -> Tuple[bool, str, Optional[Path]]:
     """Write a living task file. Returns (ok, message, path).
 
     `report` (ADR-0022): a `docs/reviews/<file>.md` pointer binding this task to an
     audit report — 1 report = 1 task. When set, `mark_task_done` requires the report
     to reach 待修==0 before the task can close.
+
+    `context`: body for `## 上下文/切入点`. Callers that already know the concrete
+    scope (e.g. which files triggered a doc-audit) must pass it — omitting it makes
+    all three body sections repeat the title, producing a ticket nobody can execute.
     """
     if typ not in _TASK_TYPES:
         return False, f"invalid type '{typ}'", None
@@ -183,7 +187,7 @@ def create_task(
         f"\n"
         f"## 已确认意图\n{title}\n\n"
         f"## 可检索摘要\n{title}\n\n"
-        f"## 上下文/切入点\n{title}\n"
+        f"## 上下文/切入点\n{context or title}\n"
     )
     target.write_text(content, encoding="utf-8")
     return True, f"created {target.relative_to(workspace)}", target
@@ -317,6 +321,8 @@ def _finalize_task_done(workspace: Path, target: Path, content: str, fm: dict) -
     target = _rename_task_done(target)
     _append_task_changelog(workspace, target)
     _backfill_task_reviews(workspace, target)
+    from k3dge.engine import events
+    events.emit(workspace, "task_done", task=target.name)
     return True, f"marked done: {target.name}", target
 
 

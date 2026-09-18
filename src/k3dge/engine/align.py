@@ -1,12 +1,12 @@
 """里程碑对齐（`milestone align`）：读 `[checks.align]` 契约跑 Full Matrix + 生成对齐报告。
 
-Extracted from `engine/milestone.py` (A-1 第十块); `milestone` re-exports for back-compat.
+Extracted from `engine/milestone.py` (A-1 第十块).
 """
 from __future__ import annotations
 
 import datetime
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from k3dge.engine import gates
 from k3dge.engine.evaluator import ConsistencyEngine
@@ -20,9 +20,47 @@ def _align_pass_marker(milestone_id: str) -> str:
     return f"<!-- k3dge:align-pass:{milestone_id} -->"
 
 
-# k3dit:leftover value-7 已登记进 refactor-cc_debt_remaining 待拆表（一 diff 一测试）；本窗无 tests 不可验行为
+def _align_run_gates(
+    workspace: Path,
+    milestone_id: str,
+    tasks: List[MilestoneTask],
+    pending: List[MilestoneTask],
+) -> Optional[str]:
+    """Dispatch `[checks.align]` gates and actions. Returns error message or None."""
+
+    def _tasks_all_done():
+        if pending:
+            return f"Cannot align milestone '{milestone_id}'. {len(pending)} pending tasks:\n" + "\n".join(
+                f"  - {t.path.name} (status: {t.status})" for t in pending
+            )
+        return None
+
+    def _full_matrix():
+        report = ConsistencyEngine(workspace).evaluate(run_tests=True, force_full=True)
+        if not report.passed:
+            return f"Regression tests failed during milestone alignment:\n{report.render()}"
+        return None
+
+    _reg = {"tasks_all_done": _tasks_all_done, "full_matrix": _full_matrix}
+    for _gid in gates.preconditions(workspace, "align"):
+        _fn = _reg.get(_gid)
+        if _fn is None:
+            return f"[ALIGN REJECTED] gate contract references unknown gate id: '{_gid}'"
+        _err = _fn()
+        if _err:
+            return _err
+    for _aid in gates.actions(workspace, "align"):
+        _fn = _reg.get(_aid)
+        if _fn is None:
+            return f"[ALIGN REJECTED] gate contract references unknown action id: '{_aid}'"
+        _err = _fn()
+        if _err:
+            return _err
+    return None
+
+
 def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]:
-    from k3dge.engine.milestone import scan_unfilled_guides
+    from k3dge.engine.seal import scan_unfilled_guides
 
     id_err = _validate_milestone_id(milestone_id)
     if id_err:
@@ -42,37 +80,11 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
 
     # 前置闸/动作：读「硬闸契约」`[checks.align]`（ADR-0001 §2 第 8 条）。
     pending = [t for t in tasks if t.status != "done"]
+    gate_err = _align_run_gates(workspace, milestone_id, tasks, pending)
+    if gate_err:
+        return False, gate_err, tasks
 
-    def _tasks_all_done():
-        if pending:
-            return f"Cannot align milestone '{milestone_id}'. {len(pending)} pending tasks:\n" + "\n".join(
-                f"  - {t.path.name} (status: {t.status})" for t in pending
-            )
-        return None
-
-    def _full_matrix():
-        report = ConsistencyEngine(workspace).evaluate(run_tests=True, force_full=True)
-        if not report.passed:
-            return f"Regression tests failed during milestone alignment:\n{report.render()}"
-        return None
-
-    _reg = {"tasks_all_done": _tasks_all_done, "full_matrix": _full_matrix}
-    for _gid in gates.preconditions(workspace, "align"):
-        _fn = _reg.get(_gid)
-        if _fn is None:
-            return False, f"[ALIGN REJECTED] gate contract references unknown gate id: '{_gid}'", tasks
-        _err = _fn()
-        if _err:
-            return False, _err, tasks
-    for _aid in gates.actions(workspace, "align"):
-        _fn = _reg.get(_aid)
-        if _fn is None:
-            return False, f"[ALIGN REJECTED] gate contract references unknown action id: '{_aid}'", tasks
-        _err = _fn()
-        if _err:
-            return False, _err, tasks
-
-    # 2. 生成极简对齐评审报告
+    # 生成极简对齐评审报告
     today = datetime.date.today().isoformat()
     review_file = workspace / "docs" / "reviews" / f"{today}-{milestone_id}-align.md"
     if not review_file.exists():
@@ -106,7 +118,7 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
         ])
         review_file.write_text("\n".join(lines), encoding="utf-8")
 
-    # 3. 指南完成度扫描（预警非阻断）：docs/guides/ 残留的 TODO 桩在 seal 时会被硬拦
+    # 指南完成度扫描（预警非阻断）：docs/guides/ 残留的 TODO 桩在 seal 时会被硬拦
     unfilled = scan_unfilled_guides(workspace)
     note = ""
     if unfilled:

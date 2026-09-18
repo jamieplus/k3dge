@@ -44,3 +44,76 @@ def test_missing_or_bad_pointer_blocks():
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d, {"0001-a.md": "---\nStatus: Accepted\nLanded-by: docs/nope.md\n---\n# ADR-0001\n"})
         assert "指针不可解析" in (adr_gate.adr_landed(ws) or "")
+
+
+def test_reconcile_supersedes_auto_marks_old():
+    """ADR-0002 Supersedes: ADR-0001 → 自动将 0001 标记为 Superseded 并移入 obsolete/。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {
+            "0001-old.md": "---\nStatus: Accepted\nSupersedes: -\n---\n# ADR-0001\n",
+            "0002-new.md": "---\nStatus: Accepted\nSupersedes: ADR-0001\nLanded-by: docs/specs/x/spec.md\n---\n# ADR-0002\n",
+        })
+        result = adr_gate.reconcile_supersedes(ws)
+        assert result is not None
+        assert "ADR RECONCILED" in result
+        # 旧 ADR 已移入 obsolete/
+        assert not (ws / "docs" / "adr" / "0001-old.md").exists()
+        old_text = (ws / "docs" / "adr" / "obsolete" / "0001-old.md").read_text(encoding="utf-8")
+        assert "Status: Superseded" in old_text
+        assert "superseded_by: ADR-0002" in old_text
+        # adrs_all_accepted 应该跳过（obsolete/ 不在扫描范围）
+        assert adr_gate.adrs_all_accepted(ws) is None
+
+
+def test_reconcile_supersedes_idempotent():
+    """已标记 Superseded 且在 obsolete/ 的不再修复。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {
+            "0002-new.md": "---\nStatus: Accepted\nSupersedes: ADR-0001\nLanded-by: docs/specs/x/spec.md\n---\n# ADR-0002\n",
+        })
+        # 手动把旧 ADR 放进 obsolete/（模拟已完成）
+        obs = ws / "docs" / "adr" / "obsolete"
+        obs.mkdir(parents=True)
+        (obs / "0001-old.md").write_text(
+            "---\nStatus: Superseded\nSupersedes: -\nsuperseded_by: ADR-0002\n---\n# ADR-0001\n",
+            encoding="utf-8",
+        )
+        assert adr_gate.reconcile_supersedes(ws) is None
+
+
+def test_reconcile_supersedes_missing_target():
+    """Supersedes 指向不存在的 ADR → 报错。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {
+            "0002-new.md": "---\nStatus: Accepted\nSupersedes: ADR-0099\nLanded-by: docs/specs/x/spec.md\n---\n# ADR-0002\n",
+        })
+        result = adr_gate.reconcile_supersedes(ws)
+        assert result is not None
+        assert "SEAL REJECTED" in result
+        assert "ADR-0099" in result
+
+
+def test_rejected_auto_archived():
+    """Status: Rejected 自动移入 obsolete/。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {
+            "0003-bad-idea.md": "---\nStatus: Rejected\n---\n# ADR-0003\n",
+        })
+        result = adr_gate.reconcile_supersedes(ws)
+        assert result is not None
+        assert "ADR RECONCILED" in result
+        assert "Rejected" in result
+        assert not (ws / "docs" / "adr" / "0003-bad-idea.md").exists()
+        assert (ws / "docs" / "adr" / "obsolete" / "0003-bad-idea.md").is_file()
+        # Rejected 移走后不再阻断
+        assert adr_gate.adrs_all_accepted(ws) is None
+
+
+def test_rejected_idempotent():
+    """已在 obsolete/ 的 Rejected 不再重复移。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {})
+        obs = ws / "docs" / "adr" / "obsolete"
+        obs.mkdir(parents=True)
+        (obs / "0003-bad.md").write_text("---\nStatus: Rejected\n---\n# ADR-0003\n", encoding="utf-8")
+        assert adr_gate.reconcile_supersedes(ws) is None

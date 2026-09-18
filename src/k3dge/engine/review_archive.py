@@ -1,6 +1,6 @@
 """Review/archive 机械（reviews 归档选择 + 安全归档目录），extracted from `engine/milestone.py` (A-1 第六块).
 
-纯文件机械、无判定；`milestone` re-exports for back-compat.
+纯文件机械、无判定。
 """
 from __future__ import annotations
 

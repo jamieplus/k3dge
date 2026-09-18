@@ -1,6 +1,6 @@
 """Milestone file-name / review-file helpers (extracted from `engine/milestone.py`, A-1 第三块).
 
-Pure, low-coupling predicates/regexes. `milestone` re-exports these names for back-compat.
+Pure, low-coupling predicates/regexes.
 """
 from __future__ import annotations
 

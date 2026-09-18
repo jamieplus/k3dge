@@ -19,6 +19,9 @@ contract = [
     "tree-sitter>=0.21",
     "tree-sitter-python>=0.21",
     "tree-sitter-typescript>=0.21",
+    "tree-sitter-go>=0.21",
+    "tree-sitter-rust>=0.21",
+    "tree-sitter-c>=0.21",
 ]
 mcp = ["mcp>=1.0,<3", "tomli>=2; python_version < '3.11'"]
 dev = ["pytest>=8", "pre-commit>=3", "mcp>=1.0,<3", "tomli>=2; python_version < '3.11'"]

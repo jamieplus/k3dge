@@ -180,6 +180,29 @@ def render_manual_docs(
 
 def sync_all(workspace: Path, domains: Optional[Sequence[str]] = None) -> Tuple[List[str], bool]:
     manifest = Manifest.load(workspace)
+    # Extractor plugins first: generated .py files must exist before interfaces
+    # are collected below. Opt-in: only when the repo has extractors.toml or
+    # the extractors/ dir (no surprise files for repos without config).
+    if (workspace / ".agent" / "extractors.toml").is_file() or (workspace / ".agent" / "extractors").is_dir():
+        from k3dge.engine import extractor_gen
+
+        try:
+            extractor_gen.sync_extractors(workspace)
+        except extractor_gen.ExtractorConfigError as exc:
+            print(f"[SYNC] extractor config error: {exc}")
+    # ADR 归档：从 `Supersedes:` 声明重建 docs/adr/ 的归档状态。
+    # 放在这里而非 seal：它的触发源是文件里的声明（作者/提交时事件），产出是派生状态——
+    # 与 contract hash / docs-index / extractor 插件同性质；且 sync 本就写文件，
+    # 不会像 seal 的只读判定通道那样把「修复报告」误当拒绝理由。
+    from k3dge.engine import adr_gate
+
+    try:
+        adr_report = adr_gate.reconcile_supersedes(workspace)
+    except Exception as exc:  # 归档失败不得阻断其余同步
+        adr_report = None
+        print(f"[SYNC] ADR reconcile failed: {exc}")
+    if adr_report:
+        print(f"[SYNC] {adr_report}")
     # Pre-collect once per domain: clean interfaces for the contract hash (spec),
     # doc-included for display (api.md). Docstring churn must NOT touch the hash.
     iface_cache: dict[str, str] = {}

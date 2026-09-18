@@ -10,6 +10,9 @@ Not in PAIRS (intentional, do not "complete" the list):
 - mcp-bridge.md.template / gitignore.template — downstream-only init files.
 - architecture-style splits only; docs/guides/downstream.md is paired (upgrade protocol).
 - runtime state and empty skeletons — .agent/milestone, logs/ (P4-08).
+- customizable drop-in plugins — .agent/extractors/*.py except README.md:
+  downstream may edit their copy (different languages/suffixes); byte-compare
+  would freeze customization. README.md stays paired as the convention doc.
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ PAIRS: list[tuple[str, str]] = [
     ("generate-docs.ps1", "scripts/generate-docs.ps1"),
     ("agents.md", "AGENTS.md"),
     ("agent-readme.md", ".agent/README.md"),
+    ("extractors-readme.md", ".agent/extractors/README.md"),
     ("rules/00-core-discipline.md", ".agent/rules/00-core-discipline.md"),
     ("rules/01-docs-structure.md", ".agent/rules/01-docs-structure.md"),
     ("rules/02-simplification.md", ".agent/rules/02-simplification.md"),
@@ -38,6 +42,8 @@ PAIRS: list[tuple[str, str]] = [
     ("rules/08-design-discipline.md", ".agent/rules/08-design-discipline.md"),
     ("rules/09-absorption.md", ".agent/rules/09-absorption.md"),
     ("rules/10-structure-over-prose.md", ".agent/rules/10-structure-over-prose.md"),
+    ("rules/11-next-sidecar.md", ".agent/rules/11-next-sidecar.md"),
+    ("rules/12-introduction-discipline.md", ".agent/rules/12-introduction-discipline.md"),
     ("docs.toml.template", ".agent/docs.toml"),
     ("pipeline.toml.template", ".agent/pipeline.toml"),
     ("spec.md.template", "docs/specs/_template/spec.md"),

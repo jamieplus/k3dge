@@ -1,6 +1,6 @@
 """封版闸 + 纯归档动作：`seal_preconditions_error`（策略层）+ `seal_milestone`（归档动作）。
 
-Extracted from `engine/milestone.py` (A-1 第十一块); `milestone` re-exports for back-compat.
+Extracted from `engine/milestone.py` (A-1 第十一块).
 `audit_closed` imported lazily (audit_trigger imports milestone → avoid cycle).
 """
 from __future__ import annotations

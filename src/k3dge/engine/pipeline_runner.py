@@ -14,8 +14,8 @@ Chain order per ADR-0006 §2.3: `mcp -> cli -> manual`; `skip` records only.
 
 Identity rule (ADR-0006 §2.2): a transport of peer X may only reach X's own server
 or X's own CLI. The pre-2026-09-02 code resolved every peer's `mcp` transport through
-`shutil.which("k3dit")` and ran `k3dit <tool>`, so `k3lity_score` / `k3che_search`
-would have been answered by k3dit — that path is gone and must not come back.
+`shutil.which` of one bind and ran that CLI for every tool, so another peer's tools
+would have been answered by the wrong server — that path is gone and must not come back.
 
 Downgrade rule (ADR-0006 §2.4): moving off `mcp` because it failed is never silent —
 each hop emits `WARN[DOWNGRADE] action=… from=… to=… reason=…` on stderr and into
@@ -24,7 +24,7 @@ each hop emits `WARN[DOWNGRADE] action=… from=… to=… reason=…` on stderr
 
 k3dge never audits or scores — it only *invokes* the peer and gates on the
 returned artifact. This keeps the sidecar boundary (ADR-0006): the work agent
-fixes, the k3dit lens audits, k3dge only routes + gates.
+fixes, the audit-role lens audits, k3dge only routes + gates.
 """
 
 from __future__ import annotations
@@ -37,6 +37,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from k3dge.engine.mcp_json import load_mcp_endpoints
+from k3dge.engine.pipeline_schema import _VALID_PROVIDERS  # 单源："什么 provider 合法" 归结构校验层
+
 try:
     import tomllib  # py3.11+
 except ModuleNotFoundError:  # pragma: no cover
@@ -47,7 +50,6 @@ except ModuleNotFoundError:  # pragma: no cover
 
 _PIPELINE_REL = ".agent/pipeline.toml"
 _MCP_CONFIG_REL = ".mcp.json"
-_VALID_PROVIDERS = frozenset({"mcp", "cli", "manual", "skip"})
 _LOG_REL = "logs/k3dge.log"
 # Interpreter declared in .mcp.json that we land on this machine's venv when missing.
 _FALLBACK_INTERPRETERS = ("python", "python3")
@@ -146,27 +148,17 @@ def _emit_downgrade(workspace: Path, action_ref: str, frm: str, to: str, reason:
     """ADR-0006 §2.4: every hop off a stronger transport is announced and persisted."""
     note = f"action={action_ref} {frm}->{to} reason={reason}"
     print(f"WARN[DOWNGRADE] {note}", file=io, flush=True)
-    ts = datetime.datetime.now().isoformat(timespec="seconds")
+    ts = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
     _append_log(workspace, f"[{ts}] WARN[DOWNGRADE] {note}")
+    from k3dge.engine import events
+    events.emit(workspace, "downgrade", action=action_ref, frm=frm, to=to, reason=reason)
     return note
 
 
 # ---------------------------------------------------------------------------
-# Outbound MCP client (ADR-0006 §2.3): `.mcp.json` is the only endpoint source.
+# Outbound MCP client (ADR-0006 §2.3): `.mcp.json` is the only endpoint source
+# (parse in mcp_json; spawn stays here).
 # ---------------------------------------------------------------------------
-
-
-def load_mcp_endpoints(workspace: Path) -> Dict[str, Any]:
-    """Read `.mcp.json` -> {server_name: {command,args,env,cwd}}; {} when absent/broken."""
-    p = workspace / _MCP_CONFIG_REL
-    if not p.is_file():
-        return {}
-    try:
-        data = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    servers = data.get("mcpServers") if isinstance(data, dict) else None
-    return servers if isinstance(servers, dict) else {}
 
 
 def resolve_endpoint_command(workspace: Path, endpoint: dict) -> Tuple[Optional[str], str]:
@@ -421,7 +413,7 @@ def run_action(
         timeout = int(t.get("timeout", timeout_default))
         nxt = next((x.get("provider") for x in transports[idx + 1 :] if isinstance(x, dict)), None)
         if prov == "skip":
-            _append_log(workspace, f"[{datetime.datetime.now().isoformat(timespec='seconds')}] HARNESS_SKIP: action '{action_ref}' resolved to skip transport")
+            _append_log(workspace, f"[{datetime.datetime.now().astimezone().isoformat(timespec='seconds')}] HARNESS_SKIP: action '{action_ref}' resolved to skip transport")
             return TransportResult(True, "skip", "skipped", skipped=True, downgrades=downgrades)
         if prov == "mcp":
             merged = dict(t.get("args") or {})

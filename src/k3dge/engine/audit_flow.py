@@ -67,7 +67,7 @@ def _count_status(report_md: str) -> Dict[str, int]:
     len != 表头 的截断行），与封板闸 `audit_trigger.audit_closed` 同源——不再固定
     cells[7] 取状态（code-13：同一报告两口径待修数会分歧，截断行可误判闭环）。
     """
-    from k3dge.engine.milestone import _parse_audit_stats
+    from k3dge.engine.audit_report import _parse_audit_stats
 
     stats = _parse_audit_stats(report_md)
     return {"待修": stats["待修"], "有意留": stats["有意留"], "已修": stats["已修"]}
@@ -89,7 +89,7 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
     from k3dge.engine import worktree as _wt
 
     job = milestone_id or "adhoc"
-    from k3dge.engine.milestone import _validate_milestone_id
+    from k3dge.engine.milestone_pointer import _validate_milestone_id
 
     id_err = _validate_milestone_id(job)
     if id_err:
@@ -129,7 +129,7 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
         }
     job_id = (env.get("payload") or {}).get("job_id", "")
     # 裁决 a：工单由 k3dge 派 ⇒ 消费侧对应物是 task（封板"全 done"闸兜底，跑不丢）
-    from k3dge.engine.milestone import create_task
+    from k3dge.engine.task_write import create_task
 
     ok_t, _m, task_path = create_task(
         workspace,
@@ -149,13 +149,15 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
         "baseline": baseline,
         "branch": branch,
         "state": "awaiting",
-        "submitted_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "submitted_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
     })
     _save_state(workspace, state)
     try:  # P0：首程存底（无钉则空单，也建底）；推送失败不否决建单
         push = push_present(workspace, job_id)
     except Exception:
         push = {}
+    from k3dge.engine import events
+    events.emit(workspace, "audit_submit", job_id=job_id, milestone=milestone_id, baseline=baseline)
     return {"ok": True, "state": "awaiting_audit", "job_id": job_id,
             "baseline": baseline, "branch": branch,
             "present_pushed": push.get("markers") if push.get("ok") else None}
@@ -176,7 +178,7 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
         return {"state": "awaiting_audit", "detail": "no awaiting audit job; submit first"}
     role = job.get("role", "audit")
     # milestone_id 拼进落盘文件名（下方 report_path），必须先过安全校验；空值回落 adhoc（submit 同口径）
-    from k3dge.engine.milestone import _validate_milestone_id
+    from k3dge.engine.milestone_pointer import _validate_milestone_id
 
     safe_ms = milestone_id or job.get("milestone_id") or "adhoc"
     id_err = _validate_milestone_id(safe_ms)
@@ -269,7 +271,7 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
         except Exception as exc:  # pragma: no cover
             merged = {"ok": False, "mode": "error", "message": str(exc)[:120]}
     job["state"] = "collected"
-    job["collected_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+    job["collected_at"] = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
     job["report"] = report_path.relative_to(workspace).as_posix()
     job["counts"] = counts
     # merge 没闭 ⇒ collected 但 merge_ok=False：棘轮步进器拿着它幂等重试（冲突后的人工重试面）
@@ -283,6 +285,11 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
         except Exception:
             pinned = False
     _save_state(workspace, state)
+    from k3dge.engine import events
+    events.emit(
+        workspace, "audit_collect", job_id=job["job_id"], milestone=milestone_id,
+        state=outcome, pending=counts["待修"], report=job["report"],
+    )
     return {
         "ok": True,
         "merge": merged,
@@ -349,7 +356,7 @@ def advance_line(workspace: Path, job_key: str, by: str = "manual", io=None) -> 
                 and job_key in (j.get("job_id"), j.get("milestone_id")):
             j["baseline"] = commit
             j.setdefault("advances", []).append({
-                "at": datetime.datetime.now().isoformat(timespec="seconds"),
+                "at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
                 "by": by, "commit": commit})
             repinned.append(j["job_id"])
     _save_state(workspace, state)

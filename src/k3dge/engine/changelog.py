@@ -1,6 +1,6 @@
 """CHANGELOG `## [Unreleased]` 追加 + 草稿路径（task done 时）。
 
-Extracted from `engine/milestone.py` (A-1 第八块)；`milestone` re-exports for back-compat.
+Extracted from `engine/milestone.py` (A-1 第八块).
 """
 from __future__ import annotations
 

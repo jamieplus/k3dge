@@ -13,7 +13,8 @@
       "Draft",
       "Proposed",
       "Deprecated",
-      "Rejected"
+      "Rejected",
+      "Superseded"
     ],
     "Date": "date"
   },

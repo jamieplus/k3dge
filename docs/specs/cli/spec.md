@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/cli`
-- **Contract Hash**: `sha256:76ecb0b3efe1f4911d29cfd801700eaf6dd45677f8fd5c010a187214914a5240`
-- **Last Updated**: 2026-09-11
+- **Contract Hash**: `sha256:8b8164240003ead4be75966b43478d6d4a6d6ecc91f7b28736d84cd5edfc9bdc`
+- **Last Updated**: 2026-09-16
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -28,9 +28,12 @@ from typing import Optional
 from typing import Sequence
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.models import GateReport
+from k3dge.cli.mcp_peers import cmd_mcp_probe
+from k3dge.cli.mcp_peers import cmd_mcp_sync
 cmd_doc_audit(args: argparse.Namespace) -> int
 cmd_check(args: argparse.Namespace) -> int
 cmd_sync(args: argparse.Namespace) -> int
+cmd_extractor(args: argparse.Namespace) -> int
 cmd_version(args: argparse.Namespace) -> int
 cmd_doc(args: argparse.Namespace) -> int
 cmd_task(args: argparse.Namespace) -> int
@@ -54,7 +57,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 from k3dge.engine import contract
-from k3dge.engine import milestone
+from k3dge.engine.align import run_milestone_alignment
+from k3dge.engine.milestone_audit import persist_external_audit_report
+from k3dge.engine.milestone_audit import run_audit_flow
+from k3dge.engine.seal_flow import run_seal_flow
+from k3dge.engine.task_index import list_tasks
+from k3dge.engine.task_index import scan_milestone_tasks
+from k3dge.engine.task_write import create_task
+from k3dge.engine.task_write import mark_task_done
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.manifest import Manifest
 from k3dge.engine.models import GateReport
@@ -79,12 +89,17 @@ k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: s
 k3dge_adr_index(workspace_path: Optional[str]=None) -> str
 from __future__ import annotations
 from pathlib import Path
+from typing import Optional
+cmd_mcp_sync(workspace: Path) -> int
+cmd_mcp_probe(args, workspace: Path) -> int
+from __future__ import annotations
+from pathlib import Path
 from typing import Any
 from typing import Dict
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.manifest import Manifest
 from k3dge.engine.manifest import ManifestError
-from k3dge.engine.milestone import parse_frontmatter
+from k3dge.engine.task_index import parse_frontmatter
 cache_observability(workspace: Path) -> Optional[Dict[str, Any]]
 lifecycle_next(workspace: Path) -> Any
 workspace_status(workspace: Path) -> Dict[str, Any]

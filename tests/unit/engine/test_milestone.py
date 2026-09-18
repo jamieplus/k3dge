@@ -2,18 +2,14 @@ import pathlib
 import tempfile
 import unittest
 
-from k3dge.engine.milestone import (
-    MilestoneTask,
-    create_task,
-    list_tasks,
-    mark_task_done,
-    scan_milestone_tasks,
-    run_milestone_alignment,
-    seal_milestone,
-    seal_preconditions_error,
+from k3dge.engine.align import (
     _ALIGN_STUB_MARKER,
     _align_pass_marker,
+    run_milestone_alignment,
 )
+from k3dge.engine.seal import seal_milestone, seal_preconditions_error
+from k3dge.engine.task_index import MilestoneTask, list_tasks, scan_milestone_tasks
+from k3dge.engine.task_write import create_task, mark_task_done
 
 
 def _write_task(path: pathlib.Path, status: str, milestone: str) -> None:
@@ -391,11 +387,11 @@ if __name__ == "__main__":
 
 def test_closure_has_tsv_trail(tmp_path):
     """show-me-your-work 吸收回归：封板清单带 TSV 决策轨迹（证据=指针）。"""
-    from k3dge.engine import milestone as _m
+    from k3dge.engine.seal_flow import _write_closure_note
 
     (tmp_path / "docs" / "reviews").mkdir(parents=True)
     (tmp_path / "docs" / "reviews" / "2026-09-04-M9-audit.md").write_text("x", encoding="utf-8")
-    p = _m._write_closure_note(tmp_path, "M9")
+    p = _write_closure_note(tmp_path, "M9")
     txt = p.read_text(encoding="utf-8")
     assert "ts\tphase\tdecision\twhy\tevidence\tresult" in txt
     assert "2026-09-04-M9-audit.md" in txt

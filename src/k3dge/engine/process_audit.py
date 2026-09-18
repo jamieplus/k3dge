@@ -25,7 +25,7 @@ def _field(text: str, key: str) -> str:
 
 def evidence_chain_error(workspace: Path, milestone_id: str) -> Optional[str]:
     """证据链（完整性 + 可追溯）不满足 ⇒ 返回拒因；满足 ⇒ None。"""
-    from k3dge.engine.milestone import _find_report
+    from k3dge.engine.audit_report import _find_report
 
     found = _find_report(workspace, milestone_id, "audit")
     if found is None:

@@ -19,6 +19,16 @@ def _asset(*parts: str) -> str:
 
 AGENTS_TEMPLATE = _asset("agents.md")
 
+# 协议文本里的裸 `ADR-NNNN` → 自限定为 `k3dge ADR-NNNN`。
+# 这些文本会原样进入下游仓；裸引在那里会指向下游【自己的】同名 ADR（错靶）
+# 或不存在（悬空）。例外：`where ADR-NNNN` 是「如何访问本仓 ADR」的示例，不限定。
+_QUALIFY_ADR_RE = re.compile(r"(?<!k3dge )(?<!where )ADR([ -])(\d{4})")
+
+
+def _qualify_adr_refs(text: str) -> str:
+    """把协议文本里的裸 ADR 引用自限定为 k3dge 的（下游不自带 k3dge 的 ADR）。"""
+    return _QUALIFY_ADR_RE.sub(lambda m: f"k3dge ADR{m.group(1)}{m.group(2)}", text)
+
 SPEC_TEMPLATE = _asset("spec.md.template")
 
 GATE_SH_TEMPLATE = _asset("gate.sh")
@@ -78,6 +88,8 @@ RULE_ASSETS = (
     "08-design-discipline.md",
     "09-absorption.md",
     "10-structure-over-prose.md",
+    "11-next-sidecar.md",
+    "12-introduction-discipline.md",
 )
 
 def _slug(raw: str) -> str:
@@ -122,6 +134,9 @@ def ensure_mcp_config(target: Path) -> bool:
 
     Returns True if config is valid/merged, False if existing file is corrupted (with stderr warning).
     Public API for cli.mcp sync; templates spec contracts this symbol.
+
+    Write-side parse stays here: templates ↛ engine (ADR-0001). Read-side host is
+    `k3dge.engine.mcp_json` (cli + engine).
     """
     import sys
 
@@ -255,14 +270,21 @@ def scaffold(target: Path, name: str | None = None) -> None:
     today = datetime.date.today().isoformat()
     slug = _slug(name or target.name)
 
-    _write_if_missing(target / "AGENTS.md", AGENTS_TEMPLATE)
+    _write_if_missing(target / "AGENTS.md", _qualify_adr_refs(AGENTS_TEMPLATE))
     _ensure_first_domain(target, slug, today)
     for rule_file in RULE_ASSETS:
         _write_if_missing(
             target / ".agent" / "rules" / rule_file,
-            _asset("rules", rule_file),
+            _qualify_adr_refs(_asset("rules", rule_file)),
         )
-    _write_if_missing(target / ".agent" / "README.md", _asset("agent-readme.md"))
+    _write_if_missing(target / ".agent" / "README.md", _qualify_adr_refs(_asset("agent-readme.md")))
+    _write_if_missing(target / ".agent" / "extractors" / "README.md", _asset("extractors-readme.md"))
+    _write_if_missing(
+        target / ".agent" / "extractors.toml",
+        "# Extractor plugins: enabled languages (builtin table in engine/extractor_gen.py).\n"
+        "# Custom languages: add [languages.<name>] table (see .agent/extractors/README.md).\n"
+        'enable = ["typescript"]\n',
+    )
     _write_if_missing(target / ".agent" / "milestone", "M0\n")
     _write_if_missing(
         target / "docs" / "specs" / "_template" / "spec.md",
@@ -289,6 +311,7 @@ def scaffold(target: Path, name: str | None = None) -> None:
     _write_if_missing(target / "docs" / "memo" / "_template.md", _asset("memo/_template.md"))
     _write_if_missing(target / "docs" / "branches" / "_template.md", _asset("branches/_template.md"))
     _write_if_missing(target / "docs" / "adr" / "_template.md", _asset("adr/_template.md"))
+    (target / "docs" / "adr" / "obsolete").mkdir(parents=True, exist_ok=True)
     (target / "docs" / "guides").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "guides" / "mcp-bridge.md", MCP_BRIDGE_TEMPLATE)
     _write_if_missing(target / "docs" / "guides" / "downstream.md", DOWNSTREAM_GUIDE_TEMPLATE)

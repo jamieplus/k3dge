@@ -1,6 +1,6 @@
 """审计入口：外部报告落盘、有意留登记、审计腿（ratchet 步进 / loop）。
 
-Extracted from `engine/milestone.py` (A-1 第十二块); `milestone` re-exports for back-compat.
+Extracted from `engine/milestone.py` (A-1 第十二块).
 """
 from __future__ import annotations
 
@@ -98,7 +98,11 @@ def _ensure_leftovers(workspace: Path, text: str, report_path: Path) -> None:
 
 
 def _audit_mode(workspace: Path, role: str = "audit") -> str:
-    """审计腿形状：`[roles.audit] mode="ratchet"`＝工单模式（ADR-0025）；缺省 scaffold（旧形）。"""
+    """审计腿形状：`[roles.audit] mode="ratchet"`＝工单模式（ADR-0025）；缺省 oneshot（旧一次性形）。
+
+    名称纪律：不得叫 `scaffold`——该词已指 `templates/scaffold.py` 的脚手架生成工具
+    （`k3dge init` 调用），一词两义违反 `docs/adr/AUTHORING.md` 术语规则。
+    """
     try:
         try:
             import tomllib
@@ -106,9 +110,9 @@ def _audit_mode(workspace: Path, role: str = "audit") -> str:
             import tomli as tomllib  # type: ignore
 
         data = tomllib.loads((workspace / ".agent" / "pipeline.toml").read_text(encoding="utf-8"))
-        return str((data.get("roles") or {}).get(role, {}).get("mode", "scaffold")).lower()
+        return str((data.get("roles") or {}).get(role, {}).get("mode", "oneshot")).lower()
     except Exception:
-        return "scaffold"
+        return "oneshot"
 
 
 def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str = "audit") -> Tuple[str, str]:
@@ -207,7 +211,9 @@ def run_audit_flow(
         attempts = ac.get_verify_attempts(workspace)
         if attempts >= max_verify_attempts:
             msg = f"verify 已超过 {max_verify_attempts} 次仍未闭环，停止自动 loop，转人工干预。"
-            return "escalated", msg + "\n" + nextstep.NextStep.from_state("escalated", milestone_id).render_cli()
+            _ns = nextstep.NextStep.from_state("escalated", milestone_id)
+            nextstep.persist(workspace, _ns)
+            return "escalated", msg + "\n" + _ns.render_cli()
         ac.bump_verify_attempt(workspace)
 
         # produce phase: run every stream, then collect its report.
@@ -242,7 +248,9 @@ def run_audit_flow(
                     + ("" if not produced.downgrades else
                        f" [本轮降级：{'; '.join(produced.downgrades)}]")
                 )
-                return "rejected", msg + "\n" + nextstep.next_for_rejection(milestone_id, msg).render_cli()
+                _ns = nextstep.next_for_rejection(milestone_id, msg)
+                nextstep.persist(workspace, _ns)
+                return "rejected", msg + "\n" + _ns.render_cli()
             report_path, report_text = found
             stats = _parse_audit_stats(report_text)
             _ensure_leftovers(workspace, report_text, report_path)
@@ -260,9 +268,11 @@ def run_audit_flow(
             default_yes=True,
         ):
             msg = f"Audit open: {pending_total} 项待修未修复且 agent 拒绝修复。"
-            return "rejected", msg + "\n" + nextstep.NextStep(
+            _ns = nextstep.NextStep(
                 state="rejected", milestone=milestone_id, note="stop / 转人工干预（待修未修复且 agent 拒绝修复）"
-            ).render_cli()
+            )
+            nextstep.persist(workspace, _ns)
+            return "rejected", msg + "\n" + _ns.render_cli()
         # agent fixes externally -> loop re-runs the audit report
         continue
 
@@ -280,4 +290,6 @@ def run_audit_flow(
             pass
     ac.reset_verify_attempts(workspace)
     msg = f"Milestone {milestone_id}: 审计闭环（合并审计模块 12 列报告 待修=0），可以谈封板。"
-    return "audited", msg + "\n" + nextstep.NextStep.from_state("seal_ready", milestone_id).render_cli()
+    _ns = nextstep.NextStep.from_state("seal_ready", milestone_id)
+    nextstep.persist(workspace, _ns)
+    return "audited", msg + "\n" + _ns.render_cli()

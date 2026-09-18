@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/templates`
-- **Contract Hash**: `sha256:584f6c364304dbea8d562d169a01acea21cce5031a4b562d906ef545e10bd760`
-- **Last Updated**: 2026-09-11
+- **Contract Hash**: `sha256:fd46b8cc447040ba2c489c34a3f746d18122b5998704030eedab7f93ac9b7b3a`
+- **Last Updated**: 2026-09-18
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -52,7 +52,7 @@ VERIFY_PROTOCOL_TEMPLATE = _asset('protocols/verify_default.md')
 TASKS_README_TEMPLATE = _asset('tasks-readme.md')
 BRANCHES_README_TEMPLATE = _asset('branches-readme.md')
 MEMO_README_TEMPLATE = _asset('memo-readme.md')
-RULE_ASSETS = ('00-core-discipline.md', '01-docs-structure.md', '02-simplification.md', '03-self-contained.md', '04-milestone.md', '05-branches.md', '06-memo.md', '07-audit.md', '08-design-discipline.md', '09-absorption.md', '10-structure-over-prose.md')
+RULE_ASSETS = ('00-core-discipline.md', '01-docs-structure.md', '02-simplification.md', '03-self-contained.md', '04-milestone.md', '05-branches.md', '06-memo.md', '07-audit.md', '08-design-discipline.md', '09-absorption.md', '10-structure-over-prose.md', '11-next-sidecar.md', '12-introduction-discipline.md')
 ensure_mcp_config(target: Path) -> bool
 scaffold(target: Path, name: str | None=None) -> None
 main(argv: Optional[Sequence[str]]=None) -> int

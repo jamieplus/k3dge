@@ -1,6 +1,6 @@
 """12 列审计报告的**查找/归类/计数**（report finding；表格解析在 `report_table`）。
 
-Extracted from `engine/milestone.py` (A-1 第四块); `milestone` re-exports for back-compat.
+Extracted from `engine/milestone.py` (A-1 第四块).
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ _QUALITY_MARKER_RE = re.compile(r"k3dge:kind:\s*quality", re.IGNORECASE)
 
 
 def _report_kind(name: str, text: str) -> str:
-    """Classify a 12-col report as 'quality' (k3lity) or 'audit' (k3dit)."""
+    """Classify a 12-col report as 'quality' (legacy kind marker / filename) or 'audit'."""
     if _QUALITY_MARKER_RE.search(text) or "-quality" in name.lower():
         return "quality"
     return "audit"
