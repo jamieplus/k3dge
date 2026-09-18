@@ -609,6 +609,14 @@
       "tokens": "判定点单源化：prompt 文案源出 STATE_OPTIONS"
     },
     {
+      "path": "docs/tasks/2026-09-18-M10-audit-doc_audit_adr_architecture_guides_11.md",
+      "type": "tasks",
+      "id": "2026-09-18-M10-audit-doc_audit_adr_architecture_guides_11",
+      "title": "doc-audit: 文档作者合规审计（adr, architecture, guides 等 11 处）",
+      "status": "idea",
+      "tokens": "doc-audit: 文档作者合规审计（adr, architecture, guides 等 11 处）"
+    },
+    {
       "path": "docs/tasks/2026-09-18-M10-fix-doc_audit_changeset_blind.done.md",
       "type": "tasks",
       "id": "2026-09-18-M10-fix-doc_audit_changeset_blind.done",
