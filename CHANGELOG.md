@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 业务逻辑闸：task 元数据 frontmatter ↔ body 分歧检测
 - 补测试：4 个零覆盖/浅覆盖的关键 engine 模块
 - 引用便携：k3dge 的 ADR 引用在下游仓指错靶
+- doc-audit 改动集只看未提交：先提交即集体失明（并回单一源 diff.get_changed_files）
 ## [0.1.11] - 2026-09-13
 
 ### Fixed

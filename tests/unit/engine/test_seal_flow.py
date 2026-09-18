@@ -11,7 +11,7 @@ from unittest import TestCase, mock
 from k3dge.engine import audit_checklist as ac
 from k3dge.engine.align import run_milestone_alignment
 from k3dge.engine.audit_report import _find_audit_report, _parse_audit_stats
-from k3dge.engine.doc_audit import run_doc_audit
+from k3dge.engine.doc_audit import _changed_docs, run_doc_audit
 from k3dge.engine.milestone_audit import (
     _audit_mode,
     _ensure_leftovers,
@@ -437,6 +437,41 @@ class TestDocAudit(TestCase):
         # 「上下文/切入点」不得与标题同文
         ctx = body.split("## 上下文/切入点", 1)[1].strip()
         self.assertNotEqual(ctx.splitlines()[0].strip(), body.split("# ", 1)[1].splitlines()[0].strip())
+
+    def test_change_set_includes_committed_docs(self) -> None:
+        """回归守卫：**先提交再跑 doc-audit 不得集体失明**。
+
+        旧实现自跑 `git status --porcelain`（只看未提交）⇒ 分批提交后返回
+        "no managed docs changed"（M10 实测）。改动集的唯一源是
+        `diff.get_changed_files`：未提交 ∪ `K3DGE_BASE_SHA...HEAD`。
+        """
+        import os
+        import subprocess
+
+        ws = Path(tempfile.mkdtemp())
+
+        def git(*a):
+            subprocess.run(["git", *a], cwd=ws, check=True, capture_output=True, text=True)
+
+        git("init", "-q")
+        git("config", "user.email", "t@t")
+        git("config", "user.name", "t")
+        (ws / "docs" / "guides").mkdir(parents=True)
+        (ws / "docs" / "guides" / "a.md").write_text("# a\n", encoding="utf-8")
+        git("add", "-A")
+        git("commit", "-qm", "base")
+        base = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True, text=True
+        ).stdout.strip()
+
+        (ws / "docs" / "guides" / "a.md").write_text("# a2\n", encoding="utf-8")
+        (ws / "docs" / "tasks").mkdir(parents=True)
+        (ws / "docs" / "tasks" / "2026-09-19-M1-fix-x.done.md").write_text("# x\n", encoding="utf-8")
+        git("add", "-A")
+        git("commit", "-qm", "round")   # 已提交 ⇒ 旧实现看不见
+
+        with mock.patch.dict(os.environ, {"K3DGE_BASE_SHA": base}):
+            self.assertEqual(_changed_docs(ws), ["docs/guides/a.md"])  # tasks/ 属进程产物，排除
 
     def test_creates_one_milestone_task(self) -> None:
         ws = _ws()

@@ -20,15 +20,16 @@ _AUDIT_EXCLUDE_DOCS = ("docs/reviews/", "docs/tasks/", "docs/generated/")
 def _changed_docs(workspace: Path) -> List[str]:
     """Managed docs in the current change set that warrant an authoring audit.
 
+    改动集的**唯一源**是 `diff.get_changed_files`（未提交 ∪ 基线以来已提交）。
+    旧版本自跑 `git status --porcelain`，只看未提交——一旦先提交再跑 doc-audit
+    就集体失明（实测：M10 分批提交后返回“no managed docs changed”）。
+
     Excludes process artifacts (reviews/tasks/generated) and archives.
     """
-    import subprocess
+    from k3dge.engine.diff import get_changed_files
 
     try:
-        out = subprocess.run(
-            ["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True
-        )
-        files = [ln[3:].strip() for ln in out.stdout.splitlines() if ln.strip()]
+        files = get_changed_files(workspace)
     except Exception:
         return []
     docs: List[str] = []
@@ -38,33 +39,26 @@ def _changed_docs(workspace: Path) -> List[str]:
         parts = set(f.split("/"))
         if "archive" in parts or any(f.startswith(p) for p in _AUDIT_EXCLUDE_DOCS):
             continue
+        if _is_doc_aux(Path(f).name):
+            continue
         docs.append(f)
-    return docs
+    return sorted(docs)
 
 
 def _new_archive_without_note(workspace: Path) -> List[str]:
-    """本轮 diff **新进** `docs/**/archive/` 且缺去向标记（`Superseded-by`/`Legacy note`）的文档。
+    """本轮改动集里落在 `docs/**/archive/` 且缺去向标记（`Superseded-by`/`Legacy note`）的文档。
 
-    ADR-0023 §2.2 归档三条件；**只对增量生效**（存量不批量灌噪声），非阻断。
+    ADR-0023 §2.2 归档三条件；**只对本轮增量生效**（存量不批量灌噪声），非阻断。
+    增量口径同 `_changed_docs`：走 `diff.get_changed_files` 单一源。
     """
-    import subprocess
+    from k3dge.engine.diff import get_changed_files
 
     try:
-        out = subprocess.run(["git", "status", "--porcelain"], cwd=workspace,
-                             capture_output=True, text=True)
-        lines = out.stdout.splitlines()
+        files = get_changed_files(workspace)
     except Exception:
         return []
     res: List[str] = []
-    for ln in lines:
-        if len(ln) < 4:
-            continue
-        code, raw = ln[:2].strip(), ln[3:].strip()
-        if code not in ("A", "R"):
-            continue
-        if "R" in code and " -> " in raw:
-            raw = raw.split(" -> ", 1)[1]
-        path = raw.strip()
+    for path in files:
         if "archive" not in path.split("/") or not path.endswith(".md"):
             continue
         try:

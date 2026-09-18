@@ -609,6 +609,14 @@
       "tokens": "判定点单源化：prompt 文案源出 STATE_OPTIONS"
     },
     {
+      "path": "docs/tasks/2026-09-18-M10-fix-doc_audit_changeset_blind.done.md",
+      "type": "tasks",
+      "id": "2026-09-18-M10-fix-doc_audit_changeset_blind.done",
+      "title": "doc-audit 改动集只看未提交：先提交即集体失明（并回单一源 diff.get_changed_files）",
+      "status": "done",
+      "tokens": "doc-audit 改动集只看未提交：先提交即集体失明（并回单一源 diff.get_changed_files）"
+    },
+    {
       "path": "docs/tasks/2026-09-18-M10-refactor-gate_action_dispatch.done.md",
       "type": "tasks",
       "id": "2026-09-18-M10-refactor-gate_action_dispatch.done",
