@@ -7,11 +7,7 @@ date: 2026-09-16
 
 # 路线残留清理：frontmatter 三头 + doc_catalog 死代码 + parse_doc_schema 去重
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P1
 - **可检索摘要**: 本轮做 pure_schema 抽取后 doc_catalog 瘦身不彻底，遗留三类路线残留：(1) frontmatter 解析存在三个入口（task_index / doc_catalog 代理层 / pure_schema 复制品）；(2) doc_catalog 中 check_section_order + _SECTION_NUM_RE 与 pure_schema 重复定义且无人调用；(3) parse_doc_schema 在 doc_catalog 和 pure_schema 各有一份逐字复制。合并为单一实现，~50 行改动。
-- **Date**: 2026-09-16
 
 ## 意图
 

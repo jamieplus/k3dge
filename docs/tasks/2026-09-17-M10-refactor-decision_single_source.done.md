@@ -7,11 +7,7 @@ date: 2026-09-17
 
 # 判定点单源化：prompt 文案源出 STATE_OPTIONS
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P3
 - **可检索摘要**: 同一判定点的文案在两处各写一遍且已漂移——`STATE_OPTIONS["seal_ready"].ask`（`审计已闭环（待修=0），封板？`）vs `seal_flow.py` 的 `prompt.ask("里程碑 {id} 审计已闭环，封板？")`。`audit_open` 同形（`agent 修？` vs `审计/质量共发现 {n} 项待修。是否由 agent 修复？`）。修法待定形：一个判定声明 + 两投影（`[NEXT]` / `prompt`）。
-- **Date**: 2026-09-17
 
 ## 意图
 

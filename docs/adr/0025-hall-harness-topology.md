@@ -35,10 +35,9 @@ Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）�
       ㉖ verify 解耦（Proposed 段，覆盖 ⑭ 的"结案前 verify 硬门"与 ⑰ 的"verify 红回退打回"）2026-09-11，经 Core Maintainer 授权，依 `docs/adr/AUTHORING.md`：真跑坐实 Hall 侧 mechanical verify **越位**——审计线 worktree 缺 `.venv`/收据 ⇒ 环境假红；all-or-nothing 回退连坐已复核的 `fixed`；打回让席重做做过的事。改定：**审计侧不执行任何被审仓代码**——删结案前 `_verify_line`（仓级 verify + 逐条 evidence 执行）与 `_verify_failed` 打回；`fixed`＝**修主张(fixnote∧真码差) ∧ 复核正向背书 ∧ Hall 拔** 三合，语义＝**复核背书**（非"机械验证通过"）。机械闸归**消费侧落点**：k3dge 既有 pre-commit `check` + CI `k3dge check --with-tests`/`pytest`（环境正确、时机在落地）。`audit_closed`（审计完备）与机械绿（代码能跑）分家，`seal` 两者都要。钉尾 `evidence=<命令>` 退为**证据主张**（进报告、审计侧不执行，由消费侧 CI/落地统一跑）；`k3dit_audit_submit` 不再带 `verify`。过闸口径 = manual fallback（Core Maintainer 会话授权，agent 代改字）。
       ㉗ **合并原 ADR「审计证据交换拓扑」入本条 §2.9**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：审计线与 Hall 同属“审计模块拓扑”一决策；被并者 0024 删除，全仓指针改指本条（原 §2.1–§2.5 → §2.9.1–§2.9.5）。过闸口径 = manual fallback。
       ㉘ W1 第三方实证 + Reopen 反向条件 + PURPOSE 回指惯例 2026-09-13，经 Core Maintainer 授权，依 `docs/adr/AUTHORING.md`：① 引 WikiSkill（arXiv:2608.27454 Table 3）ablation——给执行席开放累积知识使准确率 63.7%→60.9%——为 W1（执行席只读当轮材料）的第三方依据；② §3 Reopen 补「若放开 W1 隔离（执行席可读累积知识/账本历史），须先复现并推翻该 ablation」；③ 立 **PURPOSE 回指**惯例＝重大透镜修订在 ADR Decision 写驱动它的 pattern（并入既有 ADR 惯例，不新增机制）。过闸口径 = manual fallback。
-# Note: default `-`. Exactly one `Note:` field per ADR. Record each authorized operation
-# as a numbered segment (① ② ③ …): who/when authorized and how it actually passed the
-# gate (real lens vs manual fallback). Append segments; do not erase old traces.
-# See docs/adr/AUTHORING.md.
+# Note: 非修订类元信息（过闸口径、历史痕迹摘要）。修订痕迹一律进 `Amended-by`
+# （格式 `- 🅰<序号> | <授权席位> | <日期> | <简述>`）——见 docs/adr/AUTHORING.md。
+# 本条上方 ①-㉘ 为旧格式存量（新格式自 ADR-0006 🅰1 起），迁移待专票，不就地改写。
       (40) 2026-09-12 转 `Accepted`：经 Core Maintainer 显式批准（M9 内容项「ADR 成事实源」），补 `Landed-by` 指针；过闸口径 = manual fallback。
 ---
 

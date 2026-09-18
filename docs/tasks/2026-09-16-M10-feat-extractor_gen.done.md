@@ -7,11 +7,7 @@ date: 2026-09-16
 
 # 提取器生成器：`.agent/extractors.toml` + `k3dge extractor sync`
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P2
 - **可检索摘要**: 为 `.agent/extractors/` 插件目录配生成器：`.agent/extractors.toml` 声明启用的语言（内置表给默认行，`[languages.*]` 自定义覆盖），`k3dge extractor sync` 渲染生成插件 `.py`（幂等、可剪枝），`k3dge sync` 顺带执行。TS 插件改为生成式（core 不再内置注册），新语言加一行配置即可。
-- **Date**: 2026-09-16
 
 ## 意图
 

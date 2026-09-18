@@ -1,6 +1,6 @@
 {
-  "headers": {
-    "Status": [
+  "frontmatter": {
+    "status": [
       "idea",
       "deferred",
       "in-progress",
@@ -13,7 +13,7 @@
     ]
   },
   "codes": {
-    "headers": "TASK_STATUS_INVALID",
+    "frontmatter": "TASK_STATUS_INVALID",
     "sections_when": "TASK_SECTION_MISSING"
   }
 }

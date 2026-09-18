@@ -7,11 +7,7 @@ date: 2026-09-18
 
 # pipelines.on_seal_enter/on_pre_seal 无执行者：AGENTS.md §12 声称的 seal hook 机制不存在（接通或废声明，只留一套声明面）
 
-- **Status**: idea
-- **Milestone**: M10
-- **Priority**: P1
 - **可检索摘要**: `.agent/pipeline.toml` 声明 `[pipelines.on_seal_enter] stages=["k3dit.actions.audit"]` 与 `[pipelines.on_pre_seal] stages=["k3dit.actions.verify"]`，`AGENTS.md` §12「`seal` hook」行明写它们驱动必做审计与 verify；实测全仓只有 `engine/pipeline_schema.py:95 _validate_pipelines` **校验其形状**，无任何执行器读取——真正的调用是硬编码 action ref（`engine/milestone_audit.py:213 streams = {"audit": ("k3dit.actions.audit","k3dit.actions.verify")}`）。即文档声称的机制缺「到达」环（AGENTS.md §13），且仓内并存两套声明式编排版（活的 `gates.py DEFAULTS["checks"]` vs 死的 `pipelines.*`），新增编排会撞上第三套。
-- **Date**: 2026-09-18
 
 ## Intent
 

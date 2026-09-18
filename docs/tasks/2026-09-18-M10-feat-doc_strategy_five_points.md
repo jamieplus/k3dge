@@ -8,11 +8,7 @@ blocking: 2026-09-18-M10-docs-adr_doc_normalize_strategy 2026-09-18-M10-fix-pipe
 
 # doc 策略五点落地：格式硬闸 / 新建重复覆盖确认（并入优先）/ seal 轮规约化（外部优先，降级 k3dge）/ 用现成 checks 编排
 
-- **Status**: idea
-- **Milestone**: M10
-- **Priority**: P2
 - **可检索摘要**: 用户裁定的 doc 策略五点：① 受管 doc 新建/修改过格式硬闸（**现状已有**：pre-commit 三层 + `docs/<type>/.schema.json`，触发条件＝有 staged docs）② 新建须确认与集存 doc 覆盖/重复，有则并入不新建（**机制存在但只接在 task 上**：`cache.search`→`[DUP-CHECK]` 仅 `cli/main.py:425`/`mcp.py:271`；docs 侧 `_related_doc_hints` 只装饰 doc-audit 票尾；「先并入后新建」在 ADR/AGENTS 里纯散文无闸）③ 规约化改写不每次提交做、放 seal 轮、外部 audit 优先、**降级才由 k3dge 按规约直接改**（现状：`manual` fallback 只打印协议指针给人，k3dge 不动手）④ ①② 归 k3dge，不涉外部 audit 模块（②的候选源 k3che 是 `kind="service"`，失败即 skip、永不进放行链）⑤ 用现成编排机制挂上，不新造流程（同构先例：`adr_gate.reconcile_supersedes` 挂 `sync/generator.py:200`、`task done`）。
-- **Date**: 2026-09-18
 
 ## Intent
 

@@ -7,11 +7,7 @@ date: 2026-09-18
 
 # doc-audit 改动集只看未提交：先提交即集体失明（并回单一源 diff.get_changed_files）
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P1
 - **可检索摘要**: `doc_audit._changed_docs` / `_new_archive_without_note` 各自跑 `git status --porcelain`，只看**未提交**改动；`diff.get_changed_files` 才是本仓「本轮改动集」的单一源（未提交 ∪ `K3DGE_BASE_SHA...HEAD`）。后果：分批提交后再跑 `k3dge doc-audit` 返回 `no managed docs changed`，`[NEXT] doc_audit` 提示也不再出现——**提交顺序决定了非阻断审计跑不跑**，作者合规检查可被无声跳过。
-- **Date**: 2026-09-18
 
 ## Intent
 

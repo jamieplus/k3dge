@@ -8,12 +8,6 @@ report: docs/reviews/2026-09-14-M10-audit.md
 
 # doc-audit: 文档作者合规审计（adr, guides, memo 等 4 处）
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P3
-- **Date**: 2026-09-14
-- **Report**: `docs/reviews/2026-09-14-M10-audit.md`
-
 ## 关闭理由
 
 过期空壳：触发时的 4 个文件未记录（建票时只写标题），当前 `k3dge doc-audit` 绿灯（no managed docs changed），无可执行内容。

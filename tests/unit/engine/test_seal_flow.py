@@ -356,7 +356,9 @@ class TestReportTask(TestCase):
         self.assertTrue(ok)
         text = path.read_text(encoding="utf-8")
         self.assertIn("report: docs/reviews/x.md", text)
-        self.assertIn("- **Report**:", text)
+        # 唯一源：正文不得复写 frontmatter 元数据（TASK_BODY_META_REDUNDANT）
+        self.assertNotIn("- **Report**:", text)
+        self.assertNotIn("- **Status**:", text)
 
     def test_done_blocked_when_report_open(self) -> None:
         ws = _ws()

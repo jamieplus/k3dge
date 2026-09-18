@@ -114,7 +114,7 @@ class TestTaskConsistency(unittest.TestCase):
         self.assertEqual(pure_refs.check_task_consistency("docs/guides/x.md", "---\nstatus: done\n---\n"), [])
 
 
-class TestTaskMetaAgreement(unittest.TestCase):
+class TestTaskBodyMetaRedundant(unittest.TestCase):
     """双源对照：frontmatter ↔ body（权威源 vs 人类可读副本）。"""
 
     REL = "docs/tasks/2026-09-16-M10-fix-x.done.md"
@@ -124,51 +124,49 @@ class TestTaskMetaAgreement(unittest.TestCase):
         body = "\n".join(f"- **{k}**: {v}" for k, v in body_lines)
         return f"{fm}\n# 标题\n\n{body}\n"
 
-    def test_agreed_passes(self):
+    def test_frontmatter_only_passes(self):
+        """唯一源形状：只有 frontmatter，正文零复写 ⇒ 绿。"""
         text = self._task(
-            ["status: done", "milestone: M10", "priority: P2", "date: 2026-09-16"],
-            [("Status", "done"), ("Milestone", "M10"), ("Priority", "P2"), ("Date", "2026-09-16")],
-        )
-        self.assertEqual(pure_refs.check_task_meta_agreement(self.REL, text), [])
+            ["status: done", "milestone: M10", "priority: P2", "date: 2026-09-16"], [])
+        self.assertEqual(pure_refs.check_task_body_meta_redundant(self.REL, text), [])
 
-    def test_status_divergence_detected(self):
-        text = self._task(["status: done"], [("Status", "idea")])
-        out = pure_refs.check_task_meta_agreement(self.REL, text)
+    def test_body_copy_detected_even_when_agreed(self):
+        """关键语义变化：**一致也报**——副本本身就是病（只能漂移），不是比对新旧值。"""
+        text = self._task(
+            ["status: done", "priority: P2", "date: 2026-09-16"],
+            [("Status", "done"), ("Priority", "P2"), ("Date", "2026-09-16")],
+        )
+        out = pure_refs.check_task_body_meta_redundant(self.REL, text)
         self.assertEqual(len(out), 1)
-        self.assertEqual(out[0][0], "TASK_META_DIVERGENCE")
-        self.assertIn("Status", out[0][1])
+        self.assertEqual(out[0][0], "TASK_BODY_META_REDUNDANT")
+        for k in ("Status", "Priority", "Date"):
+            self.assertIn(k, out[0][1])
 
-    def test_milestone_divergence_detected(self):
-        text = self._task(["milestone: M10"], [("Milestone", "M99")])
-        self.assertTrue(any("Milestone" in m for _c, m in pure_refs.check_task_meta_agreement(self.REL, text)))
+    def test_divergent_copy_still_detected(self):
+        text = self._task(["status: done"], [("Status", "idea")])
+        out = pure_refs.check_task_body_meta_redundant(self.REL, text)
+        self.assertEqual(out[0][0], "TASK_BODY_META_REDUNDANT")
 
-    def test_report_backtick_normalized(self):
-        """body 的 Report 带反引号，对照前须归一，否则恒报假阳。"""
-        text = self._task(["report: docs/reviews/x.md"], [("Report", "`docs/reviews/x.md`")])
-        self.assertEqual(pure_refs.check_task_meta_agreement(self.REL, text), [])
-
-    def test_single_side_missing_not_reported(self):
-        """写入端不保证全字段（milestone/report 可缺）⇒ 单侧缺失不得报。"""
-        text = self._task(
-            ["status: idea", "priority: P2", "date: 2026-09-16"],
-            [("Status", "idea"), ("Priority", "P2"), ("Date", "2026-09-16")],
-        )
-        self.assertEqual(pure_refs.check_task_meta_agreement(self.REL, text), [])
+    def test_summary_bullet_is_not_metadata(self):
+        """`- **可检索摘要**:` 无 frontmatter 对应字段 ⇒ 不是复写，不得误伤。"""
+        text = self._task(["status: idea"], [("可检索摘要", "一句话")])
+        self.assertEqual(pure_refs.check_task_body_meta_redundant(self.REL, text), [])
 
     def test_legacy_without_frontmatter_skipped(self):
-        """无 frontmatter 的遗留任务：body 即唯一源，无从对照，不得误伤。"""
+        """无 frontmatter 的遗留票：body 即唯一源，不得误伤。"""
         text = "# 遗留\n\n- **Status**: idea\n- **Milestone**: M10\n"
-        self.assertEqual(pure_refs.check_task_meta_agreement(self.REL, text), [])
+        self.assertEqual(pure_refs.check_task_body_meta_redundant(self.REL, text), [])
 
     def test_non_task_skipped(self):
         self.assertEqual(
-            pure_refs.check_task_meta_agreement("docs/guides/x.md", "---\nstatus: done\n---\n"), [])
+            pure_refs.check_task_body_meta_redundant(
+                "docs/guides/x.md", "---\nstatus: done\n---\n\n- **Status**: done\n"), [])
 
     def test_wired_into_check_task_consistency(self):
-        """接线：check_task_consistency 必须包含双源对照（否则 pre-commit 不会跑）。"""
+        """接线：check_task_consistency 必须含冗余检出（否则 pre-commit 不会跑）。"""
         text = self._task(["status: done"], [("Status", "idea")])
         codes = [c for c, _ in pure_refs.check_task_consistency(self.REL, text)]
-        self.assertIn("TASK_META_DIVERGENCE", codes)
+        self.assertIn("TASK_BODY_META_REDUNDANT", codes)
 
 
 class TestAdrConsistency(unittest.TestCase):
@@ -312,3 +310,25 @@ class TestReportPointer(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRepoTaskSingleSource(unittest.TestCase):
+    """自举：本仓顶层票一律不得复写 frontmatter 元数据（存量已迁移，防回潮）。
+
+    schema gate 只看 staged 文件，存量漂移它看不见 ⇒ 用自举测试兜住全仓。
+    """
+
+    def test_no_body_meta_in_repo_tasks(self):
+        root = REPO / "docs" / "tasks"
+        if not root.is_dir():
+            self.skipTest("no tasks dir")
+        offenders = []
+        for p in sorted(root.glob("*.md")):
+            if p.name in ("README.md", "AUTHORING.md", "_template.md"):
+                continue
+            rel = f"docs/tasks/{p.name}"
+            for code, msg in pure_refs.check_task_body_meta_redundant(
+                    rel, p.read_text(encoding="utf-8")):
+                if code == "TASK_BODY_META_REDUNDANT":
+                    offenders.append(msg)
+        self.assertEqual(offenders, [])

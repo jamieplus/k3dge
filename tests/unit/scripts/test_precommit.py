@@ -23,9 +23,10 @@ def _load_hook():
 
 hook = _load_hook()
 
+# 唯一源形状：元数据只在 frontmatter，正文不复写（TASK_BODY_META_REDUNDANT）
 TASK_GOOD = (
     "---\nstatus: idea\npriority: P2\ndate: 2026-09-16\n---\n\n"
-    "# t\n\n- **Status**: idea\n- **Priority**: P2\n- **Date**: 2026-09-16\n"
+    "# t\n\n- **可检索摘要**: 一句话\n"
 )
 
 

@@ -7,11 +7,7 @@ date: 2026-09-18
 
 # 判定到动作的结构化派发：gate_id 到 action（替掉散文子串匹配）
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P2
 - **可检索摘要**: 闸拒绝后，`nextstep.next_for_rejection` 靠在错误**文案里搜关键词**（`"no 12-col audit report" in msg`、`"未审计" in msg`）决定下一步提示；文案一改分支静默失效。改为拒绝携带闭集 `gate_id`（`Rejection`，str 子类，向后兼容），派发表在 `GATE_NEXT`：id → (state, note)。源：`docs/memo/archive/2026-09-16-orchestration-form-exploration.md` §S7 对偶表（投影给**进程**的判定必须是闭集 bool/enum，禁散文）。
-- **Date**: 2026-09-18
 
 ## Intent
 

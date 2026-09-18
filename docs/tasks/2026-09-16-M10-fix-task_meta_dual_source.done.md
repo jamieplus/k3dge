@@ -7,11 +7,7 @@ date: 2026-09-16
 
 # 业务逻辑闸：task 元数据 frontmatter ↔ body 分歧检测
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P1
 - **可检索摘要**: task 的 5 个元数据字段（status/milestone/priority/date/report）在 frontmatter 与 body 各存一份。frontmatter 是权威（`_scan_task_dir` 优先读），body 是「人类可读副本」，但副本可漂移且**无任何闸发现**（E19 实测）。后果：人读 body 见 `idea`、工具读 frontmatter 见 `done`，同一任务两种事实。扩展 `pure_refs` 加双源对照闸。
-- **Date**: 2026-09-16
 
 ## 意图
 

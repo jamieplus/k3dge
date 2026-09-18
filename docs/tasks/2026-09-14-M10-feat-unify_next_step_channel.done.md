@@ -7,11 +7,7 @@ date: 2026-09-14
 
 # 统一 [NEXT] 通道：stdout + sidecar 双投递
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P2
 - **可检索摘要**: 所有产生 `NextStep` 的命令（CLI 14 处 + MCP 8 处）统一在产出时落盘 `.k3dge/next.json`，agent 读 sidecar 即可知下一步，不再依赖 stdout 或主动调 status。
-- **Date**: 2026-09-14
 
 ## 意图
 

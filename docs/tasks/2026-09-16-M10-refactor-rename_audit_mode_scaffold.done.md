@@ -7,11 +7,7 @@ date: 2026-09-16
 
 # 术语撞名：审计腿 mode "scaffold" → "oneshot"
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P1
 - **可检索摘要**: `scaffold` 一词在 k3dge 内有两个不相干含义——(A) `templates/scaffold.py::scaffold()` 是 `k3dge init` 的脚手架生成工具；(B) `[roles.audit] mode` 的缺省值指审计腿的旧一次性形状。违反 `docs/adr/AUTHORING.md:36`「同一概念只用一个词」。把 (B) 改名为 `oneshot`（沿用 pipeline.toml 原注释「旧一次性形」）。
-- **Date**: 2026-09-16
 
 ## 意图
 

@@ -5,6 +5,9 @@ Status: Draft
 # Numbers are never reused.
 Supersedes: -
 Amended-by: -
+# Landed-by: 落地指针（Accepted 前必填；seal 闸 adr_landed 要求其可解析）。
+# 写代码路径（src/... 或 scripts/...）或文档锚点；多个以空格分隔，闸只验首个。
+Landed-by: src/k3dge/engine/<module>.py
 Date: YYYY-MM-DD
 Deciders: Core Maintainer
 Note: -

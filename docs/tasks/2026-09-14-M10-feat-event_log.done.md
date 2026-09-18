@@ -8,12 +8,8 @@ blocking: 2026-09-14-M10-feat-unify_next_step_channel
 
 # Event Log：`.k3dge/events.jsonl` 操作事实日志
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P3
 - **blocking**: 2026-09-14-M10-feat-unify_next_step_channel
 - **可检索摘要**: 新增 `engine/events.py`，append-only JSONL 记录所有状态变迁（gate/audit/seal/task/next），为 debug 和未来 dashboard 提供操作历史。不替换现有通道，只旁路 append。
-- **Date**: 2026-09-14
 
 ## 意图
 

@@ -7,11 +7,7 @@ date: 2026-09-14
 
 # engine 解耦：门面不再当总线 + 闸核禁依赖生命周期 + mcp.json 单读取器
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P2
 - **可检索摘要**: engine 内部直 import 叶子；闸核不得 import 生命周期；`.mcp.json` 读取归 `mcp_json`
-- **Date**: 2026-09-14
 
 ## 已确认意图
 按导入图三刀：① `milestone.py` 只给 CLI/测试做兼容门面，engine 内部走叶子；② 闸核 `evaluate` 及其检查不得 import 写盘/出向路径；③ `.mcp.json` 读取进无 MCP 客户端的 `engine/mcp_json.py`（templates 孤岛仍自解析，ADR-0001）。

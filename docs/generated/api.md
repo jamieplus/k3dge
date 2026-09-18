@@ -579,9 +579,9 @@ check_report_pointer(workspace: Path, rel: str, text: str) -> List[Ref]
 check_footnotes(rel: str, text: str) -> List[Ref]
     # doc: Every `[^X]` reference must have a `[^X]:` definition.
 check_task_consistency(rel: str, text: str) -> List[Ref]
-    # doc: `status: done` ⇔ `.done.md` 后缀；文件名 milestone ⇔ frontmatter；frontmatter ⇔ body。
-check_task_meta_agreement(rel: str, text: str) -> List[Ref]
-    # doc: frontmatter ↔ body 双源对照（tasks only）。
+    # doc: `status: done` ⇔ `.done.md` 后缀；文件名 milestone ⇔ frontmatter；正文不得复写元数据。
+check_task_body_meta_redundant(rel: str, text: str) -> List[Ref]
+    # doc: 正文不得复写 frontmatter 已有的任务元数据（tasks only）。
 check_supersede_unreconciled(workspace: Path, rel: str, text: str) -> List[Ref]
     # doc: ADR 声明 `Supersedes: ADR-Y` ⇒ Y 必须已标 Superseded 且移入 `obsolete/`。
 check_adr_consistency(rel: str, text: str) -> List[Ref]

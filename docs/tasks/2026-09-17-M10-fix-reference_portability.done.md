@@ -7,11 +7,7 @@ date: 2026-09-17
 
 # 引用便携：k3dge 的 ADR 引用在下游仓指错靶
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P1
 - **可检索摘要**: k3dge 的 `[NEXT]` 与模板 `AGENTS.md` 硬编码了 k3dge 自家的 ADR 编号，下游仓按编号解析会指到**自己的同名 ADR**（错靶）或不存在的文件（悬空）。实测：k3dit/k3che 的 AGENTS.md 各有 4 处悬空引用；`[NEXT]` 引的 ADR-0004/0005 在 k3dit 里存在（指另一件事），ADR-0022/0025 不存在。修法：引用必须便携（自限定或经 `K3DGE_SOURCE` 解析），并加校验 + 便携性测试。
-- **Date**: 2026-09-17
 
 ## 意图
 

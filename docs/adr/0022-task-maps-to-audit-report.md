@@ -4,15 +4,11 @@ Status: Accepted
 # NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
-Landed-by: src/k3dge/engine/milestone.py
+Landed-by: src/k3dge/engine/task_write.py
 Date: 2026-09-02
 Deciders: Core Maintainer (待 k3dit/人 复核后转 Accepted)
-Note: ① 就地修订（钉=写源、报告=投影，对齐 ADR-0025 §2.7；原"报告是唯一明细事实源"句作废）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。
-      ② 正交去重（钉收钉细节改指 ADR-0025 §2.7）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
-      ③ 正交收尾（seal 全 done 闸复述改指 ADR-0004 §2.1.3）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
-      ④ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
-      ⑤ **合并原 ADR「doc-audit 后置、非阻断」入本条 §2.2**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：doc-audit 与 report-task 同属"审计报告如何收口"一决策；被并者 0021 删除，全仓指针改指本条。过闸口径 = manual fallback。
-      ⑥ 2026-09-12 转 `Accepted`：经 Core Maintainer 显式批准（M9 内容项「ADR 成事实源」），补 `Landed-by` 指针；过闸口径 = manual fallback。
+Note: ①-⑥ 修订痕迹见 git 历史（2026-09-10 至 2026-09-12：钉=写源/报告=投影对齐 ADR-0025 §2.7、正交去重/收尾、人读化改写、合并原 0021「doc-audit 后置非阻断」入 §2.2、转 Accepted）；新格式自 🅰1 起生效（`Amended-by`），迁移口径同 ADR-0006。
+      `Landed-by` 指针 2026-09-19 由已删的 `engine/milestone.py`（兼容门面）改指叶子 `engine/task_write.py`（`mark_task_done`：report-task 闭环闸）——引用面修正，决策未变，故不进 `Amended-by`。
 ---
 
 # ADR-0022: 审计报告的收口（1 report = 1 task；doc-audit 后置非阻断）

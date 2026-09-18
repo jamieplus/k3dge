@@ -8,12 +8,6 @@ report: docs/reviews/2026-09-14-M10-audit.md
 
 # doc-audit: 文档作者合规审计（adr, architecture, guides 等 11 处）
 
-- **Status**: idea
-- **Milestone**: M10
-- **Priority**: P3
-- **Date**: 2026-09-18
-- **Report**: `docs/reviews/2026-09-14-M10-audit.md`
-
 ## 已确认意图
 doc-audit: 文档作者合规审计（adr, architecture, guides 等 11 处）
 

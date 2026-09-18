@@ -119,7 +119,7 @@ def _fm_value(text: str, key: str) -> str:
 
 
 def check_task_consistency(rel: str, text: str) -> List[Ref]:
-    """`status: done` ⇔ `.done.md` 后缀；文件名 milestone ⇔ frontmatter；frontmatter ⇔ body。"""
+    """`status: done` ⇔ `.done.md` 后缀；文件名 milestone ⇔ frontmatter；正文不得复写元数据。"""
     if not rel.startswith("docs/tasks/"):
         return []
     out: List[Ref] = []
@@ -136,11 +136,11 @@ def check_task_consistency(rel: str, text: str) -> List[Ref]:
     ms = _fm_value(text, "milestone")
     if ms and ms not in base:
         out.append(("TASK_MILESTONE_MISMATCH", f"{rel}: frontmatter milestone '{ms}' not in filename"))
-    out.extend(check_task_meta_agreement(rel, text))
+    out.extend(check_task_body_meta_redundant(rel, text))
     return out
 
 
-# frontmatter 键 → body 粗体标签（两源的字段名不同）
+# frontmatter 键 → 正文粗体标签（旧双源时代的字段名）
 _BODY_FIELD_MAP = {
     "status": "Status",
     "milestone": "Milestone",
@@ -150,15 +150,16 @@ _BODY_FIELD_MAP = {
 }
 
 
-def check_task_meta_agreement(rel: str, text: str) -> List[Ref]:
-    """frontmatter ↔ body 双源对照（tasks only）。
+def check_task_body_meta_redundant(rel: str, text: str) -> List[Ref]:
+    """正文不得复写 frontmatter 已有的任务元数据（tasks only）。
 
-    frontmatter 是权威源（`task_index._scan_task_dir` 优先读它），body 的
-    `- **Key**:` 是刻意保留的**人类可读副本**。副本可漂移且此前无闸发现 ⇒
-    人读 body 见 `idea`、工具读 frontmatter 见 `done`，同一任务两种事实。
+    frontmatter 是**唯一源**（`docs/tasks/AUTHORING.md`）；所有消费者读它
+    （`task_index._scan_task_dir` / `milestone status` / seal 闸 / schema 闸）。
+    正文的 `- **Status**: …` 是旧双源时代的副本，只能漂移（人读 body 见 idea、
+    工具读 frontmatter 见 done）。
 
-    单侧缺失不报（写入端不保证全字段，`milestone`/`report` 可缺）；
-    无 frontmatter 的遗留任务跳过（body 即唯一源，无从对照）。
+    本检查是**确定性可修**的：删掉冗余正文行即可（无需判断）。
+    无 frontmatter 的遗留票跳过（body 即唯一源）。
     """
     if not rel.startswith("docs/tasks/"):
         return []
@@ -168,18 +169,14 @@ def check_task_meta_agreement(rel: str, text: str) -> List[Ref]:
     if not fm:
         return []
     hdr = parse_headers(text)
-    out: List[Ref] = []
-    for fm_key, body_key in _BODY_FIELD_MAP.items():
-        fv = fm.get(fm_key, "").strip()
-        bv = (hdr.get(body_key) or "").strip().strip("`").strip()
-        if not fv or not bv:
-            continue
-        if fv != bv:
-            out.append((
-                "TASK_META_DIVERGENCE",
-                f"{rel}: {body_key} 双源不一致：frontmatter={fv!r} body={bv!r}",
-            ))
-    return out
+    dup = sorted({k for k in _BODY_FIELD_MAP.values() if k in hdr})
+    if not dup:
+        return []
+    return [(
+        "TASK_BODY_META_REDUNDANT",
+        f"{rel}: 正文复写 frontmatter 元数据（唯一源＝frontmatter）：{', '.join(dup)}"
+        "；删掉这些正文行即可（确定性可修）",
+    )]
 
 
 _SUPERSEDES_RE = re.compile(r"^Supersedes:\s*ADR-(\d{4})\s*$", re.MULTILINE)

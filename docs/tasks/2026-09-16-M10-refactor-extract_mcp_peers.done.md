@@ -7,11 +7,7 @@ date: 2026-09-16
 
 # 重构：提取 MCP peer 管理出 cli/main.py
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P2
 - **可检索摘要**: `cli/main.py` 1439 行混合 CLI 分派、MCP peer 管理、workspace 辅助、attest 逻辑。提取 11 个 MCP peer 函数到新模块 `cli/mcp_peers.py`，main.py 降至 1240 行（-199），职责分离。
-- **Date**: 2026-09-16
 
 ## 意图
 

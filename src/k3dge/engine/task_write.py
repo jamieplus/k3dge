@@ -164,7 +164,8 @@ def create_task(
     if target.exists():
         return False, f"already exists: {target.relative_to(workspace)}", target
     target.parent.mkdir(parents=True, exist_ok=True)
-    # Frontmatter (strict) + human-readable body (backward compat)
+    # Frontmatter 是任务元数据的**唯一源**（docs/tasks/AUTHORING.md）：正文不复写
+    # status/milestone/priority/date/report——第二源只能漂移（机检码 TASK_BODY_META_REDUNDANT）。
     fm_lines = ["---", f"status: idea"]
     if milestone:
         fm_lines.append(f"milestone: {milestone}")
@@ -174,16 +175,9 @@ def create_task(
         fm_lines.append(f"report: {report}")
     fm_lines.append("---")
     fm_block = "\n".join(fm_lines)
-    milestone_line = f"- **Milestone**: {milestone}\n" if milestone else ""
-    report_line = f"- **Report**: `{report}`\n" if report else ""
     content = (
         f"{fm_block}\n\n"
         f"# {title}\n\n"
-        f"- **Status**: idea\n"
-        f"{milestone_line}"
-        f"- **Priority**: {priority}\n"
-        f"- **Date**: {date}\n"
-        f"{report_line}"
         f"\n"
         f"## 已确认意图\n{title}\n\n"
         f"## 可检索摘要\n{title}\n\n"
@@ -301,17 +295,15 @@ def _finalize_task_done(workspace: Path, target: Path, content: str, fm: dict) -
                 f"（特别大的单条可在 `处置` 写 `转 sub-task <id>` 例外拆出）。"
             ), target
     if fm and "status" in fm:
-        # Strict frontmatter path
+        # Strict frontmatter path（唯一源；正文不再有 Status 副本可同步）
         if fm.get("status", "").lower() == "done":
             return True, f"already done: {target.name}", target
-        # Replace frontmatter status: done
         new_content = re.sub(r"(?m)^status:\s*.*$", "status: done", content, count=1)
-        # Also keep body sync for human readability
-        new_content = re.sub(r"-\s+\*\*Status\*\*:\s*[\w-]+", "- **Status**: done", new_content, count=1)
         if new_content == content:
             return False, f"no Status field in {target.name}", target
         target.write_text(new_content, encoding="utf-8")
     else:
+        # 遗留票（无 frontmatter）：body 即唯一源，仍按旧路改正文
         if re.search(r"-\s+\*\*Status\*\*:\s*done\b", content, re.IGNORECASE):
             return True, f"already done: {target.name}", target
         new_content = re.sub(r"-\s+\*\*Status\*\*:\s*[\w-]+", "- **Status**: done", content, count=1)

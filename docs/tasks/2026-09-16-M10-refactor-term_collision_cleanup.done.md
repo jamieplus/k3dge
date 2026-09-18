@@ -7,11 +7,7 @@ date: 2026-09-16
 
 # 术语清理：deferred 值级碰撞 + 两处重复常量
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P2
 - **可检索摘要**: 三项证据确凿的术语/事实源问题：(1) `deferred` 在同一仓内跨「里程碑域」与「任务域」两义混用（值级碰撞，两处均为用户可见）；(2) `_VALID_PROVIDERS` 在 `pipeline_runner` 与 `pipeline_schema` 各定义一份；(3) `adr_gate._SKIP` 与 `milestone_files._DOC_AUX_NAMES` 实测完全相同却不共用。
-- **Date**: 2026-09-16
 
 ## 证据链
 

@@ -4,7 +4,7 @@ Status: Accepted
 # NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
-Landed-by: src/k3dge/engine/milestone.py
+Landed-by: src/k3dge/engine/seal_flow.py
 Date: 2026-08-23
 Deciders: Core Maintainer
 Note: ① 就地修订（钉=写源/单份 12 列报告、封板资格归 `audit_closed`、审计模块合并）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。
@@ -13,6 +13,7 @@ Note: ① 就地修订（钉=写源/单份 12 列报告、封板资格归 `audit
       ④ 去 changelog 化（正文只留现行决策：删「修正（date）」层与「原稿/旧句/现稿」元叙述；章节号不重排）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
       ⑤ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
       ⑥ **合并原 ADR「自动版本与变更日志」入本条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：版本递增是 `seal` 生命周期的一环（§2.3）；被并者 0013 删除，全仓指针改指本条。过闸口径 = manual fallback。
+      `Landed-by` 指针 2026-09-19 由已删的 `engine/milestone.py`（兼容门面）改指叶子 `engine/seal_flow.py`（`run_seal_flow` 生命周期状态机）——引用面修正，决策未变，故不进 `Amended-by`。
 ---
 
 # ADR-0004: 里程碑生命周期治理（Milestone Lifecycle Governance）

@@ -7,11 +7,7 @@ date: 2026-09-16
 
 # 补测试：4 个零覆盖/浅覆盖的关键 engine 模块
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P2
 - **可检索摘要**: 用函数级引用分析（非文件名猜测）找出 tests/ 中从未被调用的关键函数，为 4 个高风险模块补 78 个单元测试：`milestone_files`（零覆盖）、`milestone_pointer`（安全函数 `_validate_milestone_id` 防路径穿越）、`markers`（审计钉写源 + code-11 行号口径回归守卫）、`changelog`（Unreleased 越界写入不变量）。395 → 473 passed。
-- **Date**: 2026-09-16
 
 ## 意图
 

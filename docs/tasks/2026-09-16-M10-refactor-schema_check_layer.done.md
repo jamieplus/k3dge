@@ -7,11 +7,7 @@ date: 2026-09-16
 
 # 抽取零依赖 schema 校验层：`scripts/lib/schema_check.py`
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P2
 - **可检索摘要**: engine 的结构校验与 pre-commit 的存在性检查是不同 agent 各自补的坑，路线杂糅。抽取零依赖纯函数层 `scripts/lib/schema_check.py`（stdlib only），pre-commit 与 engine 共用；并新增 4 类 stdlib 新闸（悬空引用/文件名一致性/markdown 完整性/孤儿文件），补 engine 现有盲区。
-- **Date**: 2026-09-16
 
 ## 意图
 

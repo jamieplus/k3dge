@@ -7,11 +7,7 @@ date: 2026-09-14
 
 # 删除 engine.milestone 兼容门面，调用方直连叶子
 
-- **Status**: done
-- **Milestone**: M10
-- **Priority**: P2
 - **可检索摘要**: 删除 `engine/milestone.py` re-export 桶；cli/tests 改直 import 叶子
-- **Date**: 2026-09-14
 
 ## 已确认意图
 门面无实现、engine 内部已不走它。删文件，CLI 与测试改直连叶子。归档 ADR/incident 里的旧路径不动。

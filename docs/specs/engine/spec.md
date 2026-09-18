@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:96851a39c9679de728e92c9118d72607ffb44fd670a7da0b547598de607be399`
+- **Contract Hash**: `sha256:427b228336d6e91eaf85fe41e5a851f4c95fb9989a1b47413431c85cbf4367b9`
 - **Last Updated**: 2026-09-18
 
 ## 1. Domain Boundary & Responsibilities
@@ -375,7 +375,7 @@ check_dangling_adr(workspace: Path, rel: str, text: str) -> List[Ref]
 check_report_pointer(workspace: Path, rel: str, text: str) -> List[Ref]
 check_footnotes(rel: str, text: str) -> List[Ref]
 check_task_consistency(rel: str, text: str) -> List[Ref]
-check_task_meta_agreement(rel: str, text: str) -> List[Ref]
+check_task_body_meta_redundant(rel: str, text: str) -> List[Ref]
 check_supersede_unreconciled(workspace: Path, rel: str, text: str) -> List[Ref]
 check_adr_consistency(rel: str, text: str) -> List[Ref]
 check_markdown_bytes(raw: bytes, rel: str) -> List[Ref]
