@@ -1,0 +1,45 @@
+---
+status: idea
+milestone: M10
+priority: P1
+date: 2026-09-18
+---
+
+# ADR 修正案：doc 规约化策略重划（C1-C5：0022 §2.2 时机/产物、0005 §2.7 同形同路、耐久改闸、先并入后新建配闸）
+
+- **Status**: idea
+- **Milestone**: M10
+- **Priority**: P1
+- **可检索摘要**: 用户裁定的新 doc 策略（① 受管 doc 新建/修改过格式硬闸 ② 新建须确认与集存 doc 覆盖/重复，有则并入不新建 ③ 规约化改写不每次提交做、放 seal 轮、外部 audit 优先、降级才由 k3dge 自己按规约直接改 ④ ①② 归 k3dge 不涉外部 audit ⑤ 用现成编排机制挂上，不新造流程）与现行 ADR 有 5 处冲突：ADR-0022 §2.2（每次变更 + 报告 + 里程碑票 + 耐久靠票）、ADR-0005 §2.7:73（代码/文档审计同形同路、无独立 doc 路径）、ADR-0005 §2.7:74-75 与 ADR-0001:69（k3dge 只验形式 never merit）、耐久机制缺口、「先并入后新建」纯散文无闸。修法：`Amended-by` 追加（Accepted 不得就地改写），并显式划出「可判定形式规约 → k3dge 直接改；需语义判断 → 外部透镜」这条新线。
+- **Date**: 2026-09-18
+
+## Intent
+
+策略以用户观点为准；ADR 是事实源，冲突必须落成修正案而不是留在对话里（AGENTS.md §13：chat memory 不是证据）。
+
+## 冲突清单（逐条带原文位置）
+
+| ID | 位置 | 原文要点 | 冲突 | 修法 |
+|---|---|---|---|---|
+| C1 | `docs/adr/0022-task-maps-to-audit-report.md` §2.2（Accepted） | doc-audit 在 check 之后、**每次文档变更**、非阻断；只出两样＝报告 + 里程碑 task；**耐久 = task 归里程碑** | 新策略：**seal 轮**做**规约化改写**，不以审计/报告/票形式出现 | `Amended-by` 追加：时机改 seal 轮；产物改「确定性规约化动作」；不可机检的语义项留里程碑审计 |
+| C2 | `docs/adr/0005-local-first-and-layer-cuts.md` §2.7:73（原 0020 harness 职责划分，已物理删除并入本条） | 「代码审计与文档审计**同形同路**…**无独立 doc-audit prompt/transport**」 | doc 规约化拆成 k3dge 内部动作＝承认 doc 有独立路径 | 同条 `Amended-by`：划新线（形式规约 vs 语义判断） |
+| C3 | ADR-0005 §2.7:74-75 + `docs/adr/0001-k3dge-architecture-baseline.md:69` | 「doc review ≠ idea scoring：k3dge **只验『报告存在』，不判优劣**」；「`.schema.json` 结构 only，**never merit**」；「只验结构事实，不判决策内容（归 k3dit）」 | k3dge 自己动手改文档内容，表面越过「不判优劣」 | 修正案必须论证：**闭集命名规则 + 幂等 + 每条一测的规约化＝形式层，非 merit**；merit 仍归外部。这条线不写清，C3 是真违规 |
+| C4 | ADR-0022 §2.2「耐久 = task 归里程碑」 | 票卡 seal 是唯一耐久机制 | 不再开票 ⇒ 耐久无着落 | 换成**闸**：`[checks.seal].preconditions` 加 `docs_normalized`（detector 零偏差才过）。比票更强——票能被无意义关掉，实证：`docs/tasks/2026-09-14-M10-audit-doc_audit_adr_guides_memo_4.done.md` 绑到待修=0 的代码审计报告 `2026-09-14-M10-audit.md`，其「关闭理由」自述为**过期空壳** |
+| C5 | `AGENTS.md` §12 + `docs/adr/AUTHORING.md` | 「先并同类 ADR（先并入，后新建）」 | **纯散文、无机检**；而 §12 末行（2026-09-18 新增）要求「新增可机检规则 → 同轮配闸」 | 配 detector：新建受管 doc 时无重复确认痕迹 ⇒ 提示/拒绝（细则归 `2026-09-18-M10-feat-doc_strategy_five_points`） |
+
+## 不必改的支持性裁定
+
+- **ADR-0008 §2**（`Landed-by: src/k3dge/engine/nextstep.py`）：「触发式维护 + 渐进披露：`[NEXT]` 只推最小下一步 + 指针」——新策略要的「硬闸之后的 [NEXT] 主动动作」正是此形状，无需修正。
+- **ADR-0006 sidecar**：work 与 check 不可同席。确定性规约化**不是判定**（闭集规则、幂等、可复跑），不触发该约束；但修正案里要写明这句，否则「k3dge 自己改自己审」会被读成粘合。
+
+## 边界与拆分（规则 08）
+
+- 事实归属：**策略边界（谁改/谁判/何时）归 ADR**；规则表与 detector 归 `src/`（另一票）；触发文案归 `nextstep.STATE_OPTIONS`（单一源，本轮已落）。
+- 边界检查：修正案只划归属，不写实现步骤数/内部状态（不让 ADR 知道模块内部）。
+- 桩子先行：先落 ADR 修正案（契约冻结），再按 `doc_strategy_five_points` 票实现；实现票 `blocking:` 指本票。
+
+## Notes
+
+- Accepted ADR **append-only**：只能 `Amended by` / `Superseded by`，就地修订须在 frontmatter `Note:` 记「经 Core Maintainer 显式授权 + 过闸口径」（仓内既有惯例，见 0008/0022 的 Note 段）。
+- 相关但独立：`2026-09-18-M10-fix-pipelines_stages_dead_config`（C6：AGENTS.md §12 声称的 `pipelines.on_seal_enter/on_pre_seal` 无执行者）——那是编排声明面的问题，不属本票的策略边界。
+- 现行 doc-audit 实现（`engine/doc_audit.py`）在本策略下的去留由实现票裁定；本票只改 ADR。
