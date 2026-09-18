@@ -7,11 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Event Log：`.k3dge/events.jsonl` 操作事实日志
+
+- 统一 [NEXT] 通道：stdout + sidecar 双投递
+- 提取器生成器：`.agent/extractors.toml` + `k3dge extractor sync`
+### Changed
+- 归档 Rust memo（ADR-0001 §2.9 已否决重写）；gap-trap proven-red 进审计协议 Pass 4；可检规则配闸进 `AGENTS.md` §12
+- 删除 `engine.milestone` 兼容门面；CLI/测试直连叶子模块
+- engine 内部不再经 `milestone` 门面 import；闸核禁依赖生命周期；`.mcp.json` 读取归 `engine/mcp_json`
+- 清活协议面：去掉 k3lity 点名与 4-peers 枚举，改按 pipeline.toml 角色路由
+
+- engine 解耦：门面不再当总线 + 闸核禁依赖生命周期 + mcp.json 单读取器
+- 删除 engine.milestone 兼容门面，调用方直连叶子
+- 归档 Rust memo；gap-trap ① 进审计协议、⑤ 进 §12 触发
+- 复杂度债续（非 milestone 文件）：CC≥11 函数逐个拆
+- P2: 7 处时间戳加时区偏移
+- 重构：提取 MCP peer 管理出 cli/main.py
+- 流程精简：审计腿模式显式化 + 修 doc-audit 空壳票
+- 术语撞名：审计腿 mode "scaffold" → "oneshot"
+- 路线残留清理：frontmatter 三头 + doc_catalog 死代码 + parse_doc_schema 去重
+- 抽取零依赖 schema 校验层：`scripts/lib/schema_check.py`
+- 术语清理：deferred 值级碰撞 + 两处重复常量
+- ADR 归档移出封板（seal → sync）+ 删冗余 gates.toml
+- 落 ADR：投影三维契约（目标 × 语法 × 范围）
 ### Fixed
 - seal/align 任务扫描不含 archive/<M>/：提前归档的 done 里程碑任务致封板被拒（No tasks found）
 
 - closure 收摊模板陈旧：写死「审计双腿闭环」+ 版本记 bump 前值（应与合并审计模块单份报告/终版一致）
 - audit job 19d4564724ca: src,docs
+- doc-audit: 文档作者合规审计（adr, guides, memo 等 4 处）
+- 业务逻辑闸：task 元数据 frontmatter ↔ body 分歧检测
+- 补测试：4 个零覆盖/浅覆盖的关键 engine 模块
+- 引用便携：k3dge 的 ADR 引用在下游仓指错靶
 ## [0.1.11] - 2026-09-13
 
 ### Fixed

@@ -14,7 +14,8 @@
 ## 1. codegraph（MIT；TS + Rust kernel）
 tree-sitter 解析 20+ 语言 → 本地 SQLite 知识图（symbols/edges/files + FTS5）；MCP 单工具 `codegraph_explore`；CLI `affected`/`impact`/`callers`/`callees`；监听自动增量同步。
 
-- **能力增量**: 依赖/影响从**近似 → 可用**（真代码图 / 调用链 / blast radius）+ **changed→affected tests**。我们现只有 `import_graph` 近似。
+- **能力增量**: 依赖/影响从**近似 → 可用**（真代码图 / 调用链 / blast radius）+ **changed→affected tests**。
+  - **现状（2026-09-14）**：`check --with-tests` 已按 **域** 选测（触及域的 `tests/` + 公开哈希变时带上 `depends_on` 该域的消费方）。**不是**文件级 import 图，也不是「改了 A.py 只跑测到 A 的测试」。memo 里的 `feat-affected_tests` 指后一种。
 - **落法（借技术不背平台）**: stdlib 把 `import_graph`/`blast_radius` 升到"边更全 + **模块→测试映射**"，喂既有 `check --with-tests`；**不引 Node/Rust/SQLite 平台**。
 - **不做的（基建）**: 换 SQLite+FTS 存储（换存储不产生新能力；某闸确需图边时，把**最小图边**并入该能力即可——本 memo 已并入 `affected_tests`）。作 service peer / 拉平台 = 基建，需 ADR 且非本方针首选。
 

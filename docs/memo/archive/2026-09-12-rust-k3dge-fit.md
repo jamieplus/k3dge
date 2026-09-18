@@ -1,5 +1,8 @@
 # Memo: Rust × vibe coding 契合性——Rust k3dge 可行性
 
+> **Legacy note（补记 2026-09-17）**: 否决已并入 `ADR-0001` §2 第 9 条「实现语言基线（Rust 重写否决）」；
+> §5 分发建议的 #3 落成 `docs/tasks/archive/M9/2026-09-13-M9-feat-dist_singlefile.done.md`。判定以 ADR-0001 为准。
+
 - **类型**: 暂无法落地（需先 supersede `ADR-0001` 的「Python 标准库」实现约束；建议先做尖刀实验）
 - **念头**: 用 Rust 重写 k3dge 的价值不在"快"，而在**语言本身即护栏**：enum + 穷尽 `match`、`Result`、所有权/借用、类型化契约，把"漏分支/吞错/别名/形状错"变成**编译期错误**——对人是啰嗦限制，对 agent 是**规则明确、抽象得当、少自由裁量**，恰好贴 k3dge「Hard Gate / 防漂移」的原意；兼性能与内存管理。
 - **触发场景**: 2026-09-12 会话，维护者问「开发 rust k3dge 的可行性/优缺点」，并明确关注"与 vibe coding 的契合性"。

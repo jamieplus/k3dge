@@ -61,7 +61,7 @@
 | endpoint（`command`/`args`/`env`/`cwd`）只写在 `.mcp.json` | `.mcp.json` 的 `mcpServers.<peer>` | `engine/pipeline_runner.load_mcp_endpoints` |
 | 流程（哪个 stage、调哪个 `tool`、`args`、fallback 链、超时）只写在 `pipeline.toml` | `.agent/pipeline.toml` 的 `[peers.*.actions.*]` | `engine/pipeline_runner.run_action` |
 
-- **身份不借道**：`action_ref` 的第一段就是 peer 名，也是 `.mcp.json` 的键。`k3lity.*` 只会连 k3lity 的 server；早期那版「用 `shutil.which("k3dit")` 冒充所有 peer 的 mcp 传输」已删除，单测 `PeerIsolation` 守住它。
+- **身份不借道**：`action_ref` 的第一段就是 peer 名，也是 `.mcp.json` 的键。名为 X 的动作只会连 X 的 server；早期那版「用 `shutil.which` 把某一个 bind 冒充所有 peer 的 mcp 传输」已删除，单测 `PeerIsolation` 守住它。
 - **解释器落地会出声**：`.mcp.json` 里写 `"command": "python"`，而本机 PATH 无 `python` 时，客户端回退到 `<workspace>/.venv/bin/python` 并把这件事打在同一条消息里（`resolve_endpoint_command` 的 `(fallback: ...)` 注记），不改写你的配置文件。要把真相写进配置：`command` 用绝对解释器路径 + 显式 `cwd`。
 - **`cwd` 默认 = 消费仓**，所以 `env.PYTHONPATH` 的相对值（如 `../k3che/src`）与外部 harness 读同一份文件时解析一致。
 - **降级不可静默**（§2.4）：从 `mcp` 掉到 `cli`/`manual` 必打 `WARN[DOWNGRADE] action=… from=… to=… reason=…`，reason 带 peer 自己的报错与 stderr 尾行，并追加进 `logs/k3dge.log`；落到 `manual` 时提示语里明写「不是独立审计」。`manual` 不需要事先申请，但你必须在总结里高亮它。

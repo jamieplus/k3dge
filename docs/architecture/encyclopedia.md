@@ -224,8 +224,8 @@ DRAFT →(milestone align: Full Matrix, 无人问)→ ALIGNED
 
 主 memo 一览（现行顶层 `docs/memo/`；归档件按 ADR-0023 §2.2 写含 `archive/` 的全路径）：
 
-- `docs/memo/2026-09-12-rust-k3dge-fit.md` — Rust × vibe coding 契合性：Rust 重写 k3dge 可行性（类型＝暂无法落地，需先 supersede ADR-0001）
 - `docs/memo/2026-09-13-agent-dev-tools-absorption-eval.md` — codegraph / open-code-review / worktrunk 吸收评估（判据＝能力增量，非扩基建）
+- `docs/memo/archive/2026-09-12-rust-k3dge-fit.md` — Rust 重写否决已并入 ADR-0001 §2.9；尖刀实验结项
 - `docs/memo/archive/2026-08-21-deferred-standards.md` — 未落地的对标项（6 类标准评估小结）
 - `docs/memo/archive/2026-08-25-prompt-as-neural-net.md` — Prompt as Neural Net，稀疏门控解释框架
 - `docs/memo/archive/2026-08-27-h8m2k-a1-harness-hard-isolation.md` — harness 环境级硬隔离 vs 认知级软隔离

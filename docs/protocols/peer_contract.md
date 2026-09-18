@@ -1,6 +1,6 @@
 # Peer Contract — k3dge ↔ 外部 harness 接口协议 (v0.6)
 
-> **事实源**: k3dge 与 peers（audit / cache）之间的编排接口机器契约。k3dge 只验信封与形式，不验内容。本页改动＝契约变更：`k3dge sync` + 下游四仓跟随。相关决策：`ADR-0006` §2.3（方向/角色/动作级）、`ADR-0017`（12 列报告）、`ADR-0005`（本地优先）。
+> **事实源**: k3dge 与 peers（audit / cache）之间的编排接口机器契约。k3dge 只验信封与形式，不验内容。本页改动＝契约变更：`k3dge sync` + 下游 peer 仓跟随。相关决策：`ADR-0006` §2.3（方向/角色/动作级）、`ADR-0017`（12 列报告）、`ADR-0005`（本地优先）。
 
 ## 0. 定位与角色模型
 
@@ -90,7 +90,7 @@ k3dge 对通过信封的字节**机械落盘**（`docs/reviews/`，记 hash，�
 ## 5. 兼容与桩
 
 - 骨架期：`bind = "dummy"`（`tests/fixtures/dummy_peer.py`，同契约、canned 工件：一份 `待修=2`、一份 `待修=0`）。真 peer 在各自仓内替换，**k3dge 一行不改**。
-- 过渡：legacy `k3dit.actions.*` 调用名映射到 `audit.*`；`k3lity.actions.*` 随合并退役（无 quality 角色）。
+- 过渡：legacy 直名（`<bind>.actions.*`）映射到角色名（`audit.*`）；无 quality 角色，勿再声明独立 quality 动作。
 
 ## 6. 违反契约时
 
