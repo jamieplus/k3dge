@@ -29,3 +29,5 @@ k3dge-audit/
 .agent/audit_jobs.json
 # 弹壳区：一次性施工脚本，seal 即清
 /tmp/
+# understand 技能产物（知识图谱 + 批次中间件，6MB 级派生物，永不入库）
+.ua/
