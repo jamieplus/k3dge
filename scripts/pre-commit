@@ -1,28 +1,37 @@
 #!/usr/bin/env python3
 """k3dge doc-gate (managed git pre-commit hook).
 
-STRUCTURE-ONLY gate. Every top-level docs/ type directory must carry README.md
-and AUTHORING.md. For each staged managed document the hook checks
-docs/<type>/ of the first path segment:
-  - no README.md      -> commit blocked
-  - no AUTHORING.md   -> commit blocked
-  - both present      -> pass
+Three layers, cheapest first:
+1. doc-gate: every top-level docs/ type directory must carry README.md
+   and AUTHORING.md (stdlib only, zero imports).
+2. schema gate: staged managed docs are validated against their type's
+   `.schema.json` + new stdlib gates (dangling refs, name/content
+   consistency, markdown integrity) via `k3dge.engine.pure_schema` and
+   `k3dge.engine.pure_refs` (stdlib only, loaded from `src/` — no venv).
+   Orphan findings (B4) are WARN-only until the false-positive rate is known.
+3. consistency gate (`k3dge check`): only when code/spec/agent changed.
 
-Nested dirs (docs/specs/<domain>/, docs/*/archive/, ...) use the type-level
-files. Soft-rule text is not parsed (k3dit). Structure JSON is `.schema.json`
-(`k3dge check`).
+If the pure modules cannot be imported, layer 2 degrades to a WARN and the
+legacy gates still run — a broken tool must never block all commits.
 
 Activate:  git config core.hooksPath scripts
 Self-test: python3 scripts/pre-commit --scan
 """
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
 
 WS = Path(__file__).resolve().parent.parent
 AUTHORING = "AUTHORING.md"
+
+# Fallback aux set when pure modules are unavailable (kept in sync by test).
+_AUX_FALLBACK = frozenset({
+    "README.md", "_template.md", "AUTHORING.md", "summary.md",
+    "SUMMARY.md", "LEFTOVERS.md", "leftovers.md",
+})
 
 
 def staged_files() -> list[str]:
@@ -56,6 +65,141 @@ def check_one(rel: str) -> list[str]:
     if not am.exists():
         errs.append(f"{am.relative_to(WS)}: missing — every docs subdir must have AUTHORING.md")
     return errs
+
+
+def _load_pure():
+    """Import zero-dependency check modules from the `src/` tree (no venv).
+
+    Returns (pure_schema, pure_refs) or (None, None) with a WARN — the hook
+    must never block commits just because its own tooling failed to load.
+    """
+    try:
+        sys.path.insert(0, str(WS / "src"))
+        from k3dge.engine import pure_refs, pure_schema
+        return pure_schema, pure_refs
+    except Exception as exc:
+        print(f"[k3dge schema] WARN: pure checks unavailable ({exc}); legacy gate only")
+        return None, None
+
+
+def _staged_bytes(rel: str) -> bytes | None:
+    """Staged blob content (what will actually commit), not the worktree."""
+    out = subprocess.run(["git", "show", f":{rel}"], cwd=WS, capture_output=True)
+    return out.stdout if out.returncode == 0 else None
+
+
+def _type_of(rel: str) -> str:
+    parts = Path(rel).parts
+    return parts[1] if len(parts) > 1 else ""
+
+
+def _is_aux(name: str, aux: frozenset) -> bool:
+    return name in aux
+
+
+def run_schema_gate(files: list[str], pure_schema, pure_refs) -> tuple[list[str], list[str]]:
+    """Returns (blocking_errors, warnings). Staged content only."""
+    errs: list[str] = []
+    warns: list[str] = []
+    aux = getattr(pure_schema, "AUX_NAMES", _AUX_FALLBACK)
+    doc_files = [
+        f for f in files
+        if f.startswith("docs/") and f.endswith(".md")
+        and not _is_aux(Path(f).name, aux)
+        and "archive" not in Path(f).parts
+    ]
+    if not doc_files:
+        return errs, warns
+    schemas: dict[str, object] = {}
+    for rel in doc_files:
+        typ = _type_of(rel)
+        if typ not in schemas:
+            schemas[typ] = _load_type_schema(typ, pure_schema)
+        schema, schema_err = schemas[typ]
+        raw = _staged_bytes(rel)
+        if raw is None:
+            continue
+        # B3 bytes first: undecodable files cannot be text-checked
+        for code, msg in pure_refs.check_markdown_bytes(raw, rel):
+            errs.append(f"{rel}: [{code}] {msg.split(': ', 1)[-1]}")
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        if schema_err:
+            errs.append(f"{schema_err}")
+            continue
+        if schema is not None:
+            # A-part: file-local structure
+            violations, ident, ok = pure_schema.check_file(
+                schema, Path(rel).name, text, schema_rel=f"docs/{typ}/.schema.json")
+            for code, msg, scope in violations:
+                loc = f"docs/{typ}/.schema.json" if scope == "schema" else rel
+                errs.append(f"{loc}: [{code}] {msg}")
+            if ok and schema.get("index"):
+                idx_path = WS / "docs" / typ / schema["index"]
+                idx_text = idx_path.read_text(encoding="utf-8") if idx_path.is_file() else ""
+                for code, msg, _s in pure_schema.check_index_ref(
+                        idx_text, ident, schema.get("codes") or {}, schema["index"], Path(rel).name):
+                    errs.append(f"{rel}: [{code}] {msg}")
+        # B1 dangling refs (block)
+        for code, msg in pure_refs.check_dangling_adr(WS, rel, text):
+            errs.append(f"[{code}] {msg}")
+        for code, msg in pure_refs.check_report_pointer(WS, rel, text):
+            errs.append(f"[{code}] {msg}")
+        for code, msg in pure_refs.check_footnotes(rel, text):
+            errs.append(f"[{code}] {msg}")
+        # B2 name/content consistency (block)
+        for code, msg in pure_refs.check_task_consistency(rel, text):
+            errs.append(f"[{code}] {msg}")
+        for code, msg in pure_refs.check_adr_consistency(rel, text):
+            errs.append(f"[{code}] {msg}")
+        for code, msg in pure_refs.check_supersede_unreconciled(WS, rel, text):
+            errs.append(f"[{code}] {msg}")
+        # B3 text markdown (block)
+        for code, msg in pure_refs.check_markdown_text(text, rel):
+            errs.append(f"[{code}] {msg}")
+    # B4 orphans: workspace-wide, WARN-only
+    if any(f.startswith(("docs/", "tests/")) or f == ".agent/manifest.json" for f in files):
+        warns.extend(_orphan_warnings(pure_refs))
+    return errs, warns
+
+
+def _load_type_schema(typ: str, pure_schema):
+    """Returns (schema_dict|None, error_str|None). None schema = no gate (downstream-safe)."""
+    sp = WS / "docs" / typ / ".schema.json"
+    if not sp.is_file():
+        return None, None
+    try:
+        schema = pure_schema.parse_doc_schema(sp.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError) as exc:
+        return None, f"docs/{typ}/.schema.json: cannot read ({exc})"
+    if schema is None:
+        return None, None
+    if schema.get("_invalid"):
+        return None, f"docs/{typ}/.schema.json: not a JSON object"
+    return schema, None
+
+
+def _orphan_warnings(pure_refs) -> list[str]:
+    warns: list[str] = []
+    try:
+        mp = WS / ".agent" / "manifest.json"
+        spec_paths: list[str] = []
+        if mp.is_file():
+            data = json.loads(mp.read_text(encoding="utf-8"))
+            for cfg in (data.get("domains") or {}).values():
+                if isinstance(cfg, dict) and cfg.get("spec"):
+                    spec_paths.append(str(cfg["spec"]))
+        for code, msg in pure_refs.find_orphan_specs(WS, spec_paths):
+            warns.append(f"[{code}] {msg}")
+        for code, msg in pure_refs.find_orphan_tests(WS):
+            warns.append(f"[{code}] {msg}")
+        for code, msg in pure_refs.find_orphan_adrs(WS):
+            warns.append(f"[{code}] {msg}")
+    except Exception as exc:
+        warns.append(f"[ORPHAN_SCAN] skipped ({exc})")
+    return warns
 
 
 def main() -> int:
@@ -94,6 +238,21 @@ def main() -> int:
             print(f"[k3dge doc-gate] PASS: {len(doc_files)} managed doc(s) — README + AUTHORING.md present")
     else:
         print("[k3dge doc-gate] skipped (no docs changed in this commit)")
+
+    # schema gate (stdlib-only pure checks): staged docs content
+    if doc_files:
+        pure_schema, pure_refs = _load_pure()
+        if pure_schema is not None and pure_refs is not None:
+            schema_errs, schema_warns = run_schema_gate(files, pure_schema, pure_refs)
+            for w in schema_warns:
+                print(f"[k3dge schema] WARN (non-blocking): {w}")
+            if schema_errs:
+                print("[k3dge schema] FAIL: staged docs violate structure -> commit blocked")
+                for e in schema_errs:
+                    print(f"  - {e}")
+                rc = 1
+            else:
+                print(f"[k3dge schema] PASS: {len(doc_files)} staged doc(s) structurally clean")
 
     # consistency gate (k3dge check): only when code/spec/agent changed
     if relevant_for_check(files):
