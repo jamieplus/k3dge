@@ -12,10 +12,14 @@ from typing import Optional
 from typing import Sequence
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.models import GateReport
+from k3dge.cli.mcp_peers import cmd_mcp_probe
+from k3dge.cli.mcp_peers import cmd_mcp_sync
 cmd_doc_audit(args: argparse.Namespace) -> int
     # doc: Non-blocking post-check doc authoring audit: report (k3dit) + milestone task.
 cmd_check(args: argparse.Namespace) -> int
 cmd_sync(args: argparse.Namespace) -> int
+cmd_extractor(args: argparse.Namespace) -> int
+    # doc: Generate (`sync`) or inspect (`list`) `.agent/extractors/` language plugins.
 cmd_version(args: argparse.Namespace) -> int
 cmd_doc(args: argparse.Namespace) -> int
 cmd_task(args: argparse.Namespace) -> int
@@ -45,7 +49,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 from k3dge.engine import contract
-from k3dge.engine import milestone
+from k3dge.engine.align import run_milestone_alignment
+from k3dge.engine.milestone_audit import persist_external_audit_report
+from k3dge.engine.milestone_audit import run_audit_flow
+from k3dge.engine.seal_flow import run_seal_flow
+from k3dge.engine.task_index import list_tasks
+from k3dge.engine.task_index import scan_milestone_tasks
+from k3dge.engine.task_write import create_task
+from k3dge.engine.task_write import mark_task_done
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.manifest import Manifest
 from k3dge.engine.models import GateReport
@@ -87,6 +98,12 @@ k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: s
     # doc: Pointer to the independent audit harness (k3dit). Lenses do not live in k3dge.
 k3dge_adr_index(workspace_path: Optional[str]=None) -> str
     # doc: Fact tool: ADR set self-consistency (coverage/conflict facts). Non-judgmental; k3dit decides.
+# mcp_peers.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+cmd_mcp_sync(workspace: Path) -> int
+cmd_mcp_probe(args, workspace: Path) -> int
 # status.py
 from __future__ import annotations
 from pathlib import Path
@@ -95,7 +112,7 @@ from typing import Dict
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.manifest import Manifest
 from k3dge.engine.manifest import ManifestError
-from k3dge.engine.milestone import parse_frontmatter
+from k3dge.engine.task_index import parse_frontmatter
 cache_observability(workspace: Path) -> Optional[Dict[str, Any]]
     # doc: service 角色遥测，**只供展示**（peer contract §0：永不进判定链）。
 lifecycle_next(workspace: Path) -> Any
@@ -107,25 +124,22 @@ workspace_status(workspace: Path) -> Dict[str, Any]
 ## engine — `src/k3dge/engine`
 
 ```python
-# _ts.py
-from __future__ import annotations
-from pathlib import Path
-from typing import List
-from typing import Optional
-extract_ts_interface(path: Path) -> str
 # adr_gate.py
 from __future__ import annotations
 from pathlib import Path
 from typing import List
 from typing import Optional
 adrs_all_accepted(workspace: Path) -> Optional[str]
-    # doc: 未 Accepted 的 ADR 汇总；全 Accepted（或无 ADR）⇒ None。
+    # doc: 未 Accepted 的 ADR 汇总；全 Accepted/Superseded（或无 ADR）⇒ None。
 adr_landed(workspace: Path) -> Optional[str]
     # doc: Accepted ADR 须带可解析 `Landed-by:`；否则汇总；全满足 ⇒ None。
+reconcile_supersedes(workspace: Path) -> Optional[str]
+    # doc: 归档不再活跃的 ADR 到 `obsolete/`。
 # align.py
 from __future__ import annotations
 from pathlib import Path
 from typing import List
+from typing import Optional
 from typing import Tuple
 from k3dge.engine import gates
 from k3dge.engine.evaluator import ConsistencyEngine
@@ -182,8 +196,8 @@ from pathlib import Path
 from typing import List
 from typing import Tuple
 from k3dge.engine import gates
-from k3dge.engine.milestone import get_current_milestone
-from k3dge.engine.milestone import scan_milestone_tasks
+from k3dge.engine.milestone_pointer import get_current_milestone
+from k3dge.engine.task_index import scan_milestone_tasks
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
     # doc: Return (suggested, reasons). Only fires on a quantitative event.
 audit_closed(workspace: Path, milestone_id: str) -> bool
@@ -207,13 +221,10 @@ class ContractExtractor
 class PythonExtractor(ContractExtractor)
     can_handle(self, path: Path) -> bool
     extract(self, path: Path, include_doc: bool=False) -> str
-class TypeScriptExtractor(ContractExtractor)
-    can_handle(self, path: Path) -> bool
-    extract(self, path: Path, include_doc: bool=False) -> str
+register_extractor(ext: ContractExtractor, *, override: bool=False) -> None
+    # doc: Register a language extractor (plugin interface).
 extract_python_interface(source: str, include_doc: bool=False) -> str
     # doc: Extract normalized public interface signatures from Python source.
-extract_typescript_interface(path: Path) -> Optional[str]
-    # doc: Extract TypeScript interface signatures via tree-sitter (optional dependency).
 normalize(interface: str) -> str
 compute_hash(interface: str) -> str
 collect_domain_interface(src_dir: Path, manifest=None, workspace_root: Path | None=None, include_doc: bool=False) -> str
@@ -250,13 +261,13 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 from k3dge.engine.models import Violation
+from k3dge.engine.pure_schema import check_section_order
+from k3dge.engine.pure_schema import parse_doc_schema
 SCHEMA_FILE = '.schema.json'
 INDEX_REL = 'docs/generated/docs-index.json'
 AUTHORING_FILE = 'AUTHORING.md'
 AUX_NAMES = frozenset({'README.md', '_template.md', 'AUTHORING.md', 'summary.md', 'SUMMARY.md', 'LEFTOVERS.md', 'leftovers.md'})
 SKIP_TYPES = frozenset({'generated'})
-parse_doc_schema(text: str) -> Optional[dict]
-    # doc: Parse a ``.schema.json`` body. Empty → None; invalid JSON → ``_invalid``.
 iter_doc_types(workspace: Path) -> List[str]
 iter_managed_files(workspace: Path, typ: str, *, include_archive: bool=False) -> List[Path]
 build_card(workspace: Path, typ: str, path: Path) -> dict
@@ -268,8 +279,6 @@ GREP_MAX_FILES = 20
 GREP_MAX_LINES_PER_FILE = 8
 grep_docs(workspace: Path, query: str, *, typ: Optional[str]=None, line: bool=False, include_archive: bool=False, max_files: int=GREP_MAX_FILES, ignore_case: bool=True) -> List[dict]
     # doc: Scan managed doc bodies; return ``path`` or ``path``+``line`` only.
-check_section_order(text: str) -> Optional[Tuple[str, str]]
-    # doc: Return (prev_number, this_number) for the first out-of-order/duplicate heading.
 validate_docs(workspace: Path, types: Optional[Iterable[str]]=None) -> List[Violation]
     # doc: Structure-only gate. Types without ``.schema.json`` are skipped.
 validate_docs_index(workspace: Path) -> List[Violation]
@@ -293,6 +302,36 @@ from k3dge.engine.models import Violation
 from k3dge.engine.pairs import PAIRS
 class ConsistencyEngine
     evaluate(self, run_tests: bool=False, force_full: bool=False, staged: bool=False) -> GateReport
+# events.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+emit(workspace: Path, evt: str, **data: Any) -> None
+    # doc: Append one event line. Never raises.
+read_events(workspace: Path, last: int=20) -> list[dict[str, Any]]
+    # doc: Read the last N events (newest last). Returns [] on any error.
+# extractor_gen.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+CONFIG_REL = '.agent/extractors.toml'
+PLUGDIR_REL = '.agent/extractors'
+MARKER = '# GENERATED by `k3dge extractor sync`'
+DEFAULT_LANGS: Dict[str, Dict[str, Any]] = {'typescript': {'grammar': 'tree_sitter_typescript', 'package': 'tree-sitter-typescript', 'lang_func': 'language_typescript', 'lang_name': 'typescript', 'suffixes': ['.ts', '.tsx', '.js'], 'wrapper': ['export_statement'], 'wrapper_kw': 'export', 'fn': ['function_declaration', 'method_definition'], 'container': ['class_declaration'], 'body': ['class_body'], 'member': ['method_definition', 'public_field_definition', 'field_definition'], 'type': ['interface_declaration', 'type_alias_declaration', 'enum_declaration'], 'lexical_nodes': ['lexical_declaration'], 'lexical_markers': ['=>', 'function'], 'lexical': True}, 'go': {'grammar': 'tree_sitter_go', 'package': 'tree-sitter-go', 'lang_func': 'language', 'lang_name': 'go', 'suffixes': ['.go'], 'wrapper': [], 'wrapper_kw': '', 'fn': ['function_declaration', 'method_declaration'], 'container': [], 'body': [], 'member': [], 'type': ['type_declaration', 'const_declaration'], 'lexical_nodes': [], 'lexical_markers': [], 'lexical': False}, 'rust': {'grammar': 'tree_sitter_rust', 'package': 'tree-sitter-rust', 'lang_func': 'language', 'lang_name': 'rust', 'suffixes': ['.rs'], 'wrapper': [], 'wrapper_kw': '', 'fn': ['function_item'], 'container': ['impl_item', 'trait_item'], 'body': ['declaration_list'], 'member': ['function_item', 'function_signature_item', 'const_item', 'type_item', 'associated_type'], 'type': ['struct_item', 'enum_item', 'const_item', 'type_item'], 'lexical_nodes': [], 'lexical_markers': [], 'lexical': False}, 'c': {'grammar': 'tree_sitter_c', 'package': 'tree-sitter-c', 'lang_func': 'language', 'lang_name': 'c', 'suffixes': ['.c', '.h'], 'wrapper': [], 'wrapper_kw': '', 'fn': ['function_definition'], 'container': [], 'body': [], 'member': [], 'type': ['type_definition', 'struct_specifier', 'enum_specifier', 'preproc_def'], 'lexical_nodes': [], 'lexical_markers': [], 'lexical': False}}
+class ExtractorConfigError(ValueError)
+# doc: Misconfigured `.agent/extractors.toml` — loud, never silent.
+resolve_languages(workspace: Path) -> Dict[str, Dict[str, Any]]
+    # doc: Merge builtin table with `.agent/extractors.toml`.
+render_plugin(name: str, row: Dict[str, Any]) -> str
+    # doc: Render a self-contained plugin module. Deterministic: same row -> same bytes.
+sync_extractors(workspace: Path) -> Dict[str, Any]
+    # doc: Render all resolved languages into `.agent/extractors/`. Idempotent.
+describe_extractors(workspace: Path) -> List[str]
+    # doc: Human-readable lines for `k3dge extractor list`.
 # gates.py
 from __future__ import annotations
 from pathlib import Path
@@ -364,27 +403,19 @@ counts(markers: Iterable[Marker]) -> dict
 open_samples(markers: Sequence[Marker]) -> List[str]
 closure_ok(markers: Sequence[Marker]) -> Tuple[bool, dict]
     # doc: 结项判据（规则 5 入内）：fixnote/disputed 不许活过结项；pending 清零才可关单。
-# milestone.py
-from k3dge.engine.align import run_milestone_alignment
-from k3dge.engine.doc_audit import run_doc_audit
-from k3dge.engine.milestone_audit import persist_external_audit_report
-from k3dge.engine.milestone_audit import run_audit_flow
-from k3dge.engine.milestone_audit import scan_pending_findings
-from k3dge.engine.milestone_pointer import bump_milestone
-from k3dge.engine.milestone_pointer import get_current_milestone
-from k3dge.engine.milestone_pointer import set_current_milestone
-from k3dge.engine.seal import seal_milestone
-from k3dge.engine.seal import seal_preconditions_error
-from k3dge.engine.seal import scan_unfilled_guides
-from k3dge.engine.seal_flow import run_seal_flow
-from k3dge.engine.task_index import MilestoneTask
-from k3dge.engine.task_index import TaskIndex
-from k3dge.engine.task_index import list_tasks
-from k3dge.engine.task_index import parse_frontmatter
-from k3dge.engine.task_index import scan_milestone_tasks
-from k3dge.engine.task_write import create_task
-from k3dge.engine.task_write import mark_task_done
-__all__ = ['MilestoneTask', 'TaskIndex', 'bump_milestone', 'create_task', 'get_current_milestone', 'list_tasks', 'mark_task_done', 'parse_frontmatter', 'persist_external_audit_report', 'run_audit_flow', 'run_doc_audit', 'run_milestone_alignment', 'run_seal_flow', 'scan_milestone_tasks', 'scan_pending_findings', 'scan_unfilled_guides', 'seal_milestone', 'seal_preconditions_error', 'set_current_milestone']
+# mcp_json.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Dict
+from typing import Optional
+from typing import Set
+load_mcp_document(workspace: Path) -> Optional[Dict[str, Any]]
+    # doc: Full `.mcp.json` object, or None if missing / unreadable / not a dict.
+load_mcp_endpoints(workspace: Path) -> Dict[str, Any]
+    # doc: `mcpServers` map; `{}` when absent or broken.
+mcp_server_names(workspace: Path) -> Optional[Set[str]]
+    # doc: Declared server names. None if the file is absent or unreadable (schema skip).
 # milestone_audit.py
 from __future__ import annotations
 from pathlib import Path
@@ -429,8 +460,10 @@ class GateReport
 # nextstep.py
 from __future__ import annotations
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
-STATE_OPTIONS: dict = {'normal': {'note': '常规提交门禁通过', 'pointers': ['AGENTS.md §12']}, 'pending_findings': {'ask': '有 findings 钉在代码/文档里；继续处理这些 pending？', 'if_y': '修完删 `k3dit:pending <ID>` 标记；有意留改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）', 'if_n': 'stop', 'pointers': ['peer_contract §8', 'k3dge doc where ADR-0025']}, 'ratchet_open': {'note': '有在办棘轮工单（ADR-0025）：进程不等人，但账必须可见', 'if_y': 'k3dge audit status <job> 查对端；席位侧一圈见契约 §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）', 'pointers': ['k3dge audit status <id>', 'peer_contract §1.4', 'ADR-0025 §2.7']}, 'doc_audit': {'note': 'docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断——`k3dge doc-audit` 出报告(k3dit)+建里程碑 task（本轮不改，封板轮也得闭环）', 'pointers': ['ADR-0022 §2.2', 'k3dge doc-audit']}, 'audit_suggested': {'ask': '要审吗？(y/N，无倒计时)', 'if_y': 'k3dge milestone audit <id>（必审，待修=0 才谈封板）', 'if_n': 'stop（继续干活）', 'pointers': ['ADR-0004 §2.1.5', 'k3dge milestone audit <id>']}, 'seal_ready': {'ask': '审计已闭环（待修=0），封板？(y/N，无倒计时)', 'if_y': 'k3dge milestone seal <id>（align→归档+版本+指针）', 'if_n': 'stop（里程碑继续挂着，不封）', 'pointers': ['ADR-0004 §2.1.4', 'docs/reviews/']}, 'audit_needed': {'note': '未审计不可封板（封=归档+版本+指针，非界限）：先 k3dge milestone audit <id>', 'pointers': ['ADR-0004 §2.1.6', 'k3dge milestone audit <id>']}, 'audit_open': {'ask': 'agent 修？(倒计时默认修)', 'if_y': '修完重跑 k3dge milestone audit <id>（重审）', 'if_n': 'stop / 转人工干预', 'pointers': ['ADR-0022', 'k3dge milestone audit <id>']}, 'escalated': {'note': 'verify 连续 >3 次未闭环，转人工干预：k3dge milestone audit-submit <id> 或人工复核', 'pointers': ['k3dge milestone audit-submit <id>', 'docs/incidents/']}, 'sealed': {'note': '已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑', 'pointers': ['docs/reviews/*-closure.md', 'ADR-0004 §2.1.4']}, 'deferred': {'note': '已放弃封板（当普通提交结束）', 'pointers': ['AGENTS.md §12']}, 'new_domain': {'ask': '新建 src/ 域未在 manifest 注册？', 'if_y': '补 manifest + spec + tests，再 k3dge sync 回写契约', 'if_n': 'stop', 'pointers': ['ADR-0005 §2.8', 'k3dge sync']}}
+from typing import TextIO
+STATE_OPTIONS: dict = {'normal': {'note': '常规提交门禁通过', 'pointers': ['AGENTS.md §12']}, 'pending_findings': {'ask': '有 findings 钉在代码/文档里；继续处理这些 pending？', 'if_y': '修完删 `k3dit:pending <ID>` 标记；有意留改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）', 'if_n': 'stop', 'pointers': ['peer_contract §8', 'k3dge ADR-0025']}, 'ratchet_open': {'note': '有在办棘轮工单（k3dge ADR-0025）：进程不等人，但账必须可见', 'if_y': 'k3dge audit status <job> 查对端；席位侧一圈见契约 §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）', 'pointers': ['k3dge audit status <id>', 'peer_contract §1.4', 'k3dge ADR-0025 §2.7']}, 'doc_audit': {'note': 'docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断——`k3dge doc-audit` 出报告(k3dit)+建里程碑 task（本轮不改，封板轮也得闭环）', 'pointers': ['k3dge ADR-0022 §2.2', 'k3dge doc-audit']}, 'audit_suggested': {'ask': '要审吗？', 'if_y': 'k3dge milestone audit <id>（必审，待修=0 才谈封板）', 'if_n': 'stop（继续干活）', 'pointers': ['k3dge ADR-0004 §2.1.5', 'k3dge milestone audit <id>']}, 'seal_ready': {'ask': '审计已闭环（待修=0），封板？', 'if_y': 'k3dge milestone seal <id>（align→归档+版本+指针）', 'if_n': 'stop（里程碑继续挂着，不封）', 'pointers': ['k3dge ADR-0004 §2.1.4', 'docs/reviews/']}, 'audit_needed': {'note': '未审计不可封板（封=归档+版本+指针，非界限）：先 k3dge milestone audit <id>', 'pointers': ['k3dge ADR-0004 §2.1.6', 'k3dge milestone audit <id>']}, 'audit_open': {'ask': 'agent 修？', 'if_y': '修完重跑 k3dge milestone audit <id>（重审）', 'if_n': 'stop / 转人工干预', 'pointers': ['k3dge ADR-0022', 'k3dge milestone audit <id>']}, 'escalated': {'note': 'verify 连续 >3 次未闭环，转人工干预：k3dge milestone audit-submit <id> 或人工复核', 'pointers': ['k3dge milestone audit-submit <id>', 'docs/incidents/']}, 'sealed': {'note': '已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑', 'pointers': ['docs/reviews/*-closure.md', 'k3dge ADR-0004 §2.1.4']}, 'seal_declined': {'note': '已放弃封板（当普通提交结束）', 'pointers': ['AGENTS.md §12']}, 'new_domain': {'ask': '新建 src/ 域未在 manifest 注册？', 'if_y': '补 manifest + spec + tests，再 k3dge sync 回写契约', 'if_n': 'stop', 'pointers': ['k3dge ADR-0005 §2.8', 'k3dge sync']}}
 class NextStep
     state: str
     milestone: str
@@ -445,11 +478,15 @@ class NextStep
     from_state(cls, state: str, milestone: str, *, pending: Optional[int]=None, reasons: Optional[list]=None) -> 'NextStep'
     render_cli(self) -> str
     render_mcp(self) -> dict
+persist(workspace: Path, ns: NextStep) -> None
+    # doc: Write next-step sidecar to `.k3dge/next.json`. Fire-and-forget; never raises.
+emit(workspace: Path, ns: NextStep, *, stream: Optional[TextIO]=None) -> str
+    # doc: Persist sidecar + render CLI text + optionally print. Returns the CLI text.
 next_for_rejection(milestone: str, message: str) -> NextStep
     # doc: Failure -> action. Pick the corrective command from the rejection reason.
 # pairs.py
 from __future__ import annotations
-PAIRS: list[tuple[str, str]] = [('gate.py', 'scripts/gate.py'), ('gate.sh', 'scripts/gate.sh'), ('gate.ps1', 'scripts/gate.ps1'), ('init.sh', 'scripts/init.sh'), ('init.ps1', 'scripts/init.ps1'), ('k3dge-init-wrapper.sh', 'k3dge-init.sh'), ('k3dge-init-wrapper.ps1', 'k3dge-init.ps1'), ('generate-docs.sh', 'scripts/generate-docs.sh'), ('generate-docs.ps1', 'scripts/generate-docs.ps1'), ('agents.md', 'AGENTS.md'), ('agent-readme.md', '.agent/README.md'), ('rules/00-core-discipline.md', '.agent/rules/00-core-discipline.md'), ('rules/01-docs-structure.md', '.agent/rules/01-docs-structure.md'), ('rules/02-simplification.md', '.agent/rules/02-simplification.md'), ('rules/03-self-contained.md', '.agent/rules/03-self-contained.md'), ('rules/04-milestone.md', '.agent/rules/04-milestone.md'), ('rules/05-branches.md', '.agent/rules/05-branches.md'), ('rules/06-memo.md', '.agent/rules/06-memo.md'), ('rules/07-audit.md', '.agent/rules/07-audit.md'), ('rules/08-design-discipline.md', '.agent/rules/08-design-discipline.md'), ('rules/09-absorption.md', '.agent/rules/09-absorption.md'), ('rules/10-structure-over-prose.md', '.agent/rules/10-structure-over-prose.md'), ('docs.toml.template', '.agent/docs.toml'), ('pipeline.toml.template', '.agent/pipeline.toml'), ('spec.md.template', 'docs/specs/_template/spec.md'), ('tasks-readme.md', 'docs/tasks/README.md'), ('reviews-readme.md', 'docs/reviews/README.md'), ('tasks/_template.md', 'docs/tasks/_template.md'), ('memo/_template.md', 'docs/memo/_template.md'), ('branches/_template.md', 'docs/branches/_template.md'), ('adr/_template.md', 'docs/adr/_template.md'), ('adr/AUTHORING.md', 'docs/adr/AUTHORING.md'), ('adr/.schema.json', 'docs/adr/.schema.json'), ('tasks/AUTHORING.md', 'docs/tasks/AUTHORING.md'), ('memo/AUTHORING.md', 'docs/memo/AUTHORING.md'), ('branches/AUTHORING.md', 'docs/branches/AUTHORING.md'), ('incidents/AUTHORING.md', 'docs/incidents/AUTHORING.md'), ('tasks/.schema.json', 'docs/tasks/.schema.json'), ('memo/.schema.json', 'docs/memo/.schema.json'), ('branches/.schema.json', 'docs/branches/.schema.json'), ('incidents/.schema.json', 'docs/incidents/.schema.json'), ('pre-commit.yaml.template', '.pre-commit-config.yaml'), ('branches-readme.md', 'docs/branches/README.md'), ('memo-readme.md', 'docs/memo/README.md'), ('downstream.md', 'docs/guides/downstream.md'), ('protocols/audit_default.md', 'docs/protocols/audit_default.md'), ('protocols/verify_default.md', 'docs/protocols/verify_default.md')]
+PAIRS: list[tuple[str, str]] = [('gate.py', 'scripts/gate.py'), ('gate.sh', 'scripts/gate.sh'), ('gate.ps1', 'scripts/gate.ps1'), ('init.sh', 'scripts/init.sh'), ('init.ps1', 'scripts/init.ps1'), ('k3dge-init-wrapper.sh', 'k3dge-init.sh'), ('k3dge-init-wrapper.ps1', 'k3dge-init.ps1'), ('generate-docs.sh', 'scripts/generate-docs.sh'), ('generate-docs.ps1', 'scripts/generate-docs.ps1'), ('agents.md', 'AGENTS.md'), ('agent-readme.md', '.agent/README.md'), ('extractors-readme.md', '.agent/extractors/README.md'), ('rules/00-core-discipline.md', '.agent/rules/00-core-discipline.md'), ('rules/01-docs-structure.md', '.agent/rules/01-docs-structure.md'), ('rules/02-simplification.md', '.agent/rules/02-simplification.md'), ('rules/03-self-contained.md', '.agent/rules/03-self-contained.md'), ('rules/04-milestone.md', '.agent/rules/04-milestone.md'), ('rules/05-branches.md', '.agent/rules/05-branches.md'), ('rules/06-memo.md', '.agent/rules/06-memo.md'), ('rules/07-audit.md', '.agent/rules/07-audit.md'), ('rules/08-design-discipline.md', '.agent/rules/08-design-discipline.md'), ('rules/09-absorption.md', '.agent/rules/09-absorption.md'), ('rules/10-structure-over-prose.md', '.agent/rules/10-structure-over-prose.md'), ('rules/11-next-sidecar.md', '.agent/rules/11-next-sidecar.md'), ('rules/12-introduction-discipline.md', '.agent/rules/12-introduction-discipline.md'), ('docs.toml.template', '.agent/docs.toml'), ('pipeline.toml.template', '.agent/pipeline.toml'), ('spec.md.template', 'docs/specs/_template/spec.md'), ('tasks-readme.md', 'docs/tasks/README.md'), ('reviews-readme.md', 'docs/reviews/README.md'), ('tasks/_template.md', 'docs/tasks/_template.md'), ('memo/_template.md', 'docs/memo/_template.md'), ('branches/_template.md', 'docs/branches/_template.md'), ('adr/_template.md', 'docs/adr/_template.md'), ('adr/AUTHORING.md', 'docs/adr/AUTHORING.md'), ('adr/.schema.json', 'docs/adr/.schema.json'), ('tasks/AUTHORING.md', 'docs/tasks/AUTHORING.md'), ('memo/AUTHORING.md', 'docs/memo/AUTHORING.md'), ('branches/AUTHORING.md', 'docs/branches/AUTHORING.md'), ('incidents/AUTHORING.md', 'docs/incidents/AUTHORING.md'), ('tasks/.schema.json', 'docs/tasks/.schema.json'), ('memo/.schema.json', 'docs/memo/.schema.json'), ('branches/.schema.json', 'docs/branches/.schema.json'), ('incidents/.schema.json', 'docs/incidents/.schema.json'), ('pre-commit.yaml.template', '.pre-commit-config.yaml'), ('branches-readme.md', 'docs/branches/README.md'), ('memo-readme.md', 'docs/memo/README.md'), ('downstream.md', 'docs/guides/downstream.md'), ('protocols/audit_default.md', 'docs/protocols/audit_default.md'), ('protocols/verify_default.md', 'docs/protocols/verify_default.md')]
 # pipeline_runner.py
 from __future__ import annotations
 from dataclasses import dataclass
@@ -460,6 +497,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
+from k3dge.engine.mcp_json import load_mcp_endpoints
 class TransportResult
     ok: bool
     provider: Optional[str]
@@ -473,8 +511,6 @@ resolve_role(pipeline: dict, name: str) -> str
     # doc: `[roles.<name>] bind = "<server>"` → 具体 server 名；无绑定返回原名。
 resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]
     # doc: Resolve `role.actions.name` / `peer.actions.name` (or 2-part alias) to transports.
-load_mcp_endpoints(workspace: Path) -> Dict[str, Any]
-    # doc: Read `.mcp.json` -> {server_name: {command,args,env,cwd}}; {} when absent/broken.
 resolve_endpoint_command(workspace: Path, endpoint: dict) -> Tuple[Optional[str], str]
     # doc: Land a declared interpreter on this machine, noisily.
 build_server_params(workspace: Path, endpoint: dict, command: str) -> dict
@@ -512,6 +548,74 @@ from __future__ import annotations
 from pathlib import Path
 write_incident(workspace: Path, target: str | None, task_type: str | None, task_id: str, detail: str) -> Path
     # doc: Escalate a persistent protocol deviation to a human-visible incident note.
+# pure_refs.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Tuple
+from k3dge.engine.pure_schema import parse_frontmatter_pairs
+Ref = Tuple[str, str]
+strip_fences(text: str) -> str
+    # doc: Remove fenced code blocks (example refs inside them are not real refs).
+strip_code_spans(text: str) -> str
+    # doc: Remove inline `code` spans.
+check_dangling_adr(workspace: Path, rel: str, text: str) -> List[Ref]
+    # doc: Every `ADR-XXXX` must resolve to `docs/adr/XXXX-*.md` (or `obsolete/`).
+check_report_pointer(workspace: Path, rel: str, text: str) -> List[Ref]
+    # doc: A task's `report:` pointer must resolve (tasks only; others skipped).
+check_footnotes(rel: str, text: str) -> List[Ref]
+    # doc: Every `[^X]` reference must have a `[^X]:` definition.
+check_task_consistency(rel: str, text: str) -> List[Ref]
+    # doc: `status: done` ⇔ `.done.md` 后缀；文件名 milestone ⇔ frontmatter；frontmatter ⇔ body。
+check_task_meta_agreement(rel: str, text: str) -> List[Ref]
+    # doc: frontmatter ↔ body 双源对照（tasks only）。
+check_supersede_unreconciled(workspace: Path, rel: str, text: str) -> List[Ref]
+    # doc: ADR 声明 `Supersedes: ADR-Y` ⇒ Y 必须已标 Superseded 且移入 `obsolete/`。
+check_adr_consistency(rel: str, text: str) -> List[Ref]
+    # doc: ADR filename number vs `# ADR-NNNN` heading (checked only when both present).
+check_markdown_bytes(raw: bytes, rel: str) -> List[Ref]
+    # doc: Encoding-level checks on raw bytes. Returns [] when undecodable (caller reports).
+check_markdown_text(text: str, rel: str) -> List[Ref]
+    # doc: Unclosed fences, conflict markers, trailing whitespace, missing final newline.
+find_orphan_specs(workspace: Path, manifest_spec_paths: List[str]) -> List[Ref]
+    # doc: `docs/specs/**/spec.md` files no manifest domain points at (warn-tier).
+find_orphan_tests(workspace: Path) -> List[Ref]
+    # doc: `tests/**/*.py` files no Verification Matrix references (warn-tier).
+find_orphan_adrs(workspace: Path) -> List[Ref]
+    # doc: `docs/adr/NNNN-*.md` numbers missing from README Topics (warn-tier).
+# pure_schema.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Dict
+from typing import Iterable
+from typing import List
+from typing import Optional
+from typing import Tuple
+AUX_NAMES = frozenset({'README.md', '_template.md', 'AUTHORING.md', 'summary.md', 'SUMMARY.md', 'LEFTOVERS.md', 'leftovers.md'})
+Check = Tuple[str, str, str]
+parse_doc_schema(text: str) -> Optional[dict]
+    # doc: Parse a ``.schema.json`` body. Empty → None; invalid JSON → ``_invalid``.
+parse_frontmatter_pairs(content: str) -> List[tuple]
+    # doc: Verbatim copy of `task_index._frontmatter_pairs` (kept duplicate-free by test).
+parse_headers(text: str) -> Dict[str, str]
+check_section_order(text: str) -> Optional[Tuple[str, str]]
+    # doc: First out-of-order/duplicate dotted heading, or None if the outline ascends.
+code_for(codes: Dict[str, Any], key: str, default: str) -> str
+check_filename(filename_pat: Optional[str], codes: Dict[str, Any], schema_rel: str, filename: str) -> Tuple[List[Check], str, bool]
+    # doc: Returns (violations, ident, ok). `ok` False stops further checks (fatal).
+check_h1(h1_pat: Optional[str], codes: Dict[str, Any], text: str, filename: str, ident: str) -> List[Check]
+check_sections_when(sections_when: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
+check_sections(sections: Optional[List[str]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
+check_section_ordering(enabled: Any, codes: Dict[str, Any], filename: str, text: str) -> List[Check]
+check_frontmatter(fm_spec: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
+check_headers(hdr_spec: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
+check_index_ref(index_text: str, token: str, codes: Dict[str, Any], index_rel: str, filename: str) -> List[Check]
+check_content(schema: Dict[str, Any], filename: str, text: str, ident: str) -> List[Check]
+    # doc: Content checks (need text + ident; caller must pass the filename gate first).
+check_file(schema: Dict[str, Any], filename: str, text: str, *, schema_rel: str='.schema.json') -> Tuple[List[Check], str, bool]
+    # doc: File-local structure checks. Returns (violations, ident, filename_ok).
 # report_table.py
 from __future__ import annotations
 from typing import Dict
@@ -685,7 +789,7 @@ from k3dge.engine.milestone_pointer import get_current_milestone
 from k3dge.engine.task_index import MILESTONE_RE
 from k3dge.engine.task_index import TITLE_RE
 from k3dge.engine.task_index import parse_frontmatter
-create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=None, milestone: Optional[str]=None, priority: str='P2', report: Optional[str]=None) -> Tuple[bool, str, Optional[Path]]
+create_task(workspace: Path, title: str, *, typ: str='fix', slug: Optional[str]=None, milestone: Optional[str]=None, priority: str='P2', report: Optional[str]=None, context: Optional[str]=None) -> Tuple[bool, str, Optional[Path]]
     # doc: Write a living task file. Returns (ok, message, path).
 mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]
     # doc: Mark one living task done. Prefer exact path from list_tasks; else unique filename substring.
@@ -802,7 +906,7 @@ VERIFY_PROTOCOL_TEMPLATE = _asset('protocols/verify_default.md')
 TASKS_README_TEMPLATE = _asset('tasks-readme.md')
 BRANCHES_README_TEMPLATE = _asset('branches-readme.md')
 MEMO_README_TEMPLATE = _asset('memo-readme.md')
-RULE_ASSETS = ('00-core-discipline.md', '01-docs-structure.md', '02-simplification.md', '03-self-contained.md', '04-milestone.md', '05-branches.md', '06-memo.md', '07-audit.md', '08-design-discipline.md', '09-absorption.md', '10-structure-over-prose.md')
+RULE_ASSETS = ('00-core-discipline.md', '01-docs-structure.md', '02-simplification.md', '03-self-contained.md', '04-milestone.md', '05-branches.md', '06-memo.md', '07-audit.md', '08-design-discipline.md', '09-absorption.md', '10-structure-over-prose.md', '11-next-sidecar.md', '12-introduction-discipline.md')
 ensure_mcp_config(target: Path) -> bool
     # doc: Idempotently merge k3dge (and pipeline-enabled peers) into .mcp.json.
 scaffold(target: Path, name: str | None=None) -> None

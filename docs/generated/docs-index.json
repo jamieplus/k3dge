@@ -28,9 +28,9 @@
       "path": "docs/adr/0006-mcp-foreign-harness-injection.md",
       "type": "adr",
       "id": "ADR-0006",
-      "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
+      "title": "ADR-0006: 对外注入面与并列 harness 编排（入向兼容层 + 出向通道）",
       "status": "Accepted",
-      "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
+      "tokens": "ADR-0006: 对外注入面与并列 harness 编排（入向兼容层 + 出向通道）"
     },
     {
       "path": "docs/adr/0008-unsolicited-doc-triggers.md",
@@ -103,6 +103,14 @@
       "title": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do",
       "status": "Accepted",
       "tokens": "Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do"
+    },
+    {
+      "path": "docs/adr/0026-projection-contract.md",
+      "type": "adr",
+      "id": "ADR-0026",
+      "title": "ADR-0026: 投影契约（对 agent 的三维投影与三层拓扑）",
+      "status": "Proposed",
+      "tokens": "ADR-0026: 投影契约（对 agent 的三维投影与三层拓扑）"
     },
     {
       "path": "docs/architecture/encyclopedia.md",
@@ -273,20 +281,20 @@
       "tokens": "Incident: 合并审计模块/postmortem 落地后设计文档滞后于已决行为"
     },
     {
-      "path": "docs/memo/2026-09-12-rust-k3dge-fit.md",
-      "type": "memo",
-      "id": "2026-09-12-rust-k3dge-fit",
-      "title": "Memo: Rust × vibe coding 契合性——Rust k3dge 可行性",
-      "status": "",
-      "tokens": "Memo: Rust × vibe coding 契合性——Rust k3dge 可行性"
-    },
-    {
       "path": "docs/memo/2026-09-13-agent-dev-tools-absorption-eval.md",
       "type": "memo",
       "id": "2026-09-13-agent-dev-tools-absorption-eval",
       "title": "Memo: Agent 开发工具吸收评估——codegraph / open-code-review / worktrunk",
       "status": "",
       "tokens": "Memo: Agent 开发工具吸收评估——codegraph / open-code-review / worktrunk"
+    },
+    {
+      "path": "docs/memo/2026-09-14-gap-trap-absorption.md",
+      "type": "memo",
+      "id": "2026-09-14-gap-trap-absorption",
+      "title": "Memo: gap-trap 吸收评估（proven-red / PR-body / 多语 gate / \"无闸规则即缺陷\"）",
+      "status": "",
+      "tokens": "Memo: gap-trap 吸收评估（proven-red / PR-body / 多语 gate / \"无闸规则即缺陷\"）"
     },
     {
       "path": "docs/protocols/audit_default.md",
@@ -425,12 +433,188 @@
       "tokens": "seal/align 任务扫描不含 archive/<M>/：提前归档的 done 里程碑任务致封板被拒（No tasks found）"
     },
     {
-      "path": "docs/tasks/2026-09-13-refactor-cc_debt_remaining.md",
+      "path": "docs/tasks/2026-09-13-refactor-cc_debt_remaining.done.md",
       "type": "tasks",
-      "id": "2026-09-13-refactor-cc_debt_remaining",
+      "id": "2026-09-13-refactor-cc_debt_remaining.done",
       "title": "复杂度债续（非 milestone 文件）：CC≥11 函数逐个拆",
-      "status": "idea",
+      "status": "done",
       "tokens": "复杂度债续（非 milestone 文件）：CC≥11 函数逐个拆"
+    },
+    {
+      "path": "docs/tasks/2026-09-14-M10-audit-doc_audit_adr_guides_memo_4.done.md",
+      "type": "tasks",
+      "id": "2026-09-14-M10-audit-doc_audit_adr_guides_memo_4.done",
+      "title": "doc-audit: 文档作者合规审计（adr, guides, memo 等 4 处）",
+      "status": "done",
+      "tokens": "doc-audit: 文档作者合规审计（adr, guides, memo 等 4 处）"
+    },
+    {
+      "path": "docs/tasks/2026-09-14-M10-docs-k3lity_peer_enum.done.md",
+      "type": "tasks",
+      "id": "2026-09-14-M10-docs-k3lity_peer_enum.done",
+      "title": "清活协议面：去掉 k3lity 点名与 4-peers 枚举，改按 pipeline.toml 角色路由",
+      "status": "done",
+      "tokens": "清活协议面：去掉 k3lity 点名与 4-peers 枚举，改按 pipeline.toml 角色路由"
+    },
+    {
+      "path": "docs/tasks/2026-09-14-M10-docs-memo_gaptrap_land.done.md",
+      "type": "tasks",
+      "id": "2026-09-14-M10-docs-memo_gaptrap_land.done",
+      "title": "归档 Rust memo；gap-trap ① 进审计协议、⑤ 进 §12 触发",
+      "status": "done",
+      "tokens": "归档 Rust memo；gap-trap ① 进审计协议、⑤ 进 §12 触发"
+    },
+    {
+      "path": "docs/tasks/2026-09-14-M10-feat-event_log.done.md",
+      "type": "tasks",
+      "id": "2026-09-14-M10-feat-event_log.done",
+      "title": "Event Log：`.k3dge/events.jsonl` 操作事实日志",
+      "status": "done",
+      "tokens": "Event Log：`.k3dge/events.jsonl` 操作事实日志"
+    },
+    {
+      "path": "docs/tasks/2026-09-14-M10-feat-unify_next_step_channel.done.md",
+      "type": "tasks",
+      "id": "2026-09-14-M10-feat-unify_next_step_channel.done",
+      "title": "统一 [NEXT] 通道：stdout + sidecar 双投递",
+      "status": "done",
+      "tokens": "统一 [NEXT] 通道：stdout + sidecar 双投递"
+    },
+    {
+      "path": "docs/tasks/2026-09-14-M10-refactor-drop_milestone_facade.done.md",
+      "type": "tasks",
+      "id": "2026-09-14-M10-refactor-drop_milestone_facade.done",
+      "title": "删除 engine.milestone 兼容门面，调用方直连叶子",
+      "status": "done",
+      "tokens": "删除 engine.milestone 兼容门面，调用方直连叶子"
+    },
+    {
+      "path": "docs/tasks/2026-09-14-M10-refactor-engine_decouple_imports.done.md",
+      "type": "tasks",
+      "id": "2026-09-14-M10-refactor-engine_decouple_imports.done",
+      "title": "engine 解耦：门面不再当总线 + 闸核禁依赖生命周期 + mcp.json 单读取器",
+      "status": "done",
+      "tokens": "engine 解耦：门面不再当总线 + 闸核禁依赖生命周期 + mcp.json 单读取器"
+    },
+    {
+      "path": "docs/tasks/2026-09-16-M10-chore-timestamp_tz_offset.done.md",
+      "type": "tasks",
+      "id": "2026-09-16-M10-chore-timestamp_tz_offset.done",
+      "title": "P2: 7 处时间戳加时区偏移",
+      "status": "done",
+      "tokens": "P2: 7 处时间戳加时区偏移"
+    },
+    {
+      "path": "docs/tasks/2026-09-16-M10-feat-extractor_gen.done.md",
+      "type": "tasks",
+      "id": "2026-09-16-M10-feat-extractor_gen.done",
+      "title": "提取器生成器：`.agent/extractors.toml` + `k3dge extractor sync`",
+      "status": "done",
+      "tokens": "提取器生成器：`.agent/extractors.toml` + `k3dge extractor sync`"
+    },
+    {
+      "path": "docs/tasks/2026-09-16-M10-fix-task_meta_dual_source.done.md",
+      "type": "tasks",
+      "id": "2026-09-16-M10-fix-task_meta_dual_source.done",
+      "title": "业务逻辑闸：task 元数据 frontmatter ↔ body 分歧检测",
+      "status": "done",
+      "tokens": "业务逻辑闸：task 元数据 frontmatter ↔ body 分歧检测"
+    },
+    {
+      "path": "docs/tasks/2026-09-16-M10-refactor-extract_mcp_peers.done.md",
+      "type": "tasks",
+      "id": "2026-09-16-M10-refactor-extract_mcp_peers.done",
+      "title": "重构：提取 MCP peer 管理出 cli/main.py",
+      "status": "done",
+      "tokens": "重构：提取 MCP peer 管理出 cli/main.py"
+    },
+    {
+      "path": "docs/tasks/2026-09-16-M10-refactor-flow_simplification.done.md",
+      "type": "tasks",
+      "id": "2026-09-16-M10-refactor-flow_simplification.done",
+      "title": "流程精简：审计腿模式显式化 + 修 doc-audit 空壳票",
+      "status": "done",
+      "tokens": "流程精简：审计腿模式显式化 + 修 doc-audit 空壳票"
+    },
+    {
+      "path": "docs/tasks/2026-09-16-M10-refactor-rename_audit_mode_scaffold.done.md",
+      "type": "tasks",
+      "id": "2026-09-16-M10-refactor-rename_audit_mode_scaffold.done",
+      "title": "术语撞名：审计腿 mode \"scaffold\" → \"oneshot\"",
+      "status": "done",
+      "tokens": "术语撞名：审计腿 mode \"scaffold\" → \"oneshot\""
+    },
+    {
+      "path": "docs/tasks/2026-09-16-M10-refactor-route_residue_cleanup.done.md",
+      "type": "tasks",
+      "id": "2026-09-16-M10-refactor-route_residue_cleanup.done",
+      "title": "路线残留清理：frontmatter 三头 + doc_catalog 死代码 + parse_doc_schema 去重",
+      "status": "done",
+      "tokens": "路线残留清理：frontmatter 三头 + doc_catalog 死代码 + parse_doc_schema 去重"
+    },
+    {
+      "path": "docs/tasks/2026-09-16-M10-refactor-schema_check_layer.done.md",
+      "type": "tasks",
+      "id": "2026-09-16-M10-refactor-schema_check_layer.done",
+      "title": "抽取零依赖 schema 校验层：`scripts/lib/schema_check.py`",
+      "status": "done",
+      "tokens": "抽取零依赖 schema 校验层：`scripts/lib/schema_check.py`"
+    },
+    {
+      "path": "docs/tasks/2026-09-16-M10-refactor-term_collision_cleanup.done.md",
+      "type": "tasks",
+      "id": "2026-09-16-M10-refactor-term_collision_cleanup.done",
+      "title": "术语清理：deferred 值级碰撞 + 两处重复常量",
+      "status": "done",
+      "tokens": "术语清理：deferred 值级碰撞 + 两处重复常量"
+    },
+    {
+      "path": "docs/tasks/2026-09-16-M10-test-cover_key_engine_modules.done.md",
+      "type": "tasks",
+      "id": "2026-09-16-M10-test-cover_key_engine_modules.done",
+      "title": "补测试：4 个零覆盖/浅覆盖的关键 engine 模块",
+      "status": "done",
+      "tokens": "补测试：4 个零覆盖/浅覆盖的关键 engine 模块"
+    },
+    {
+      "path": "docs/tasks/2026-09-17-M10-docs-adr_projection_contract.done.md",
+      "type": "tasks",
+      "id": "2026-09-17-M10-docs-adr_projection_contract.done",
+      "title": "落 ADR：投影三维契约（目标 × 语法 × 范围）",
+      "status": "done",
+      "tokens": "落 ADR：投影三维契约（目标 × 语法 × 范围）"
+    },
+    {
+      "path": "docs/tasks/2026-09-17-M10-fix-reference_portability.done.md",
+      "type": "tasks",
+      "id": "2026-09-17-M10-fix-reference_portability.done",
+      "title": "引用便携：k3dge 的 ADR 引用在下游仓指错靶",
+      "status": "done",
+      "tokens": "引用便携：k3dge 的 ADR 引用在下游仓指错靶"
+    },
+    {
+      "path": "docs/tasks/2026-09-17-M10-refactor-adr_archive_to_sync.done.md",
+      "type": "tasks",
+      "id": "2026-09-17-M10-refactor-adr_archive_to_sync.done",
+      "title": "ADR 归档移出封板（seal → sync）+ 删冗余 gates.toml",
+      "status": "done",
+      "tokens": "ADR 归档移出封板（seal → sync）+ 删冗余 gates.toml"
+    },
+    {
+      "path": "docs/tasks/2026-09-17-M10-refactor-decision_single_source.md",
+      "type": "tasks",
+      "id": "2026-09-17-M10-refactor-decision_single_source",
+      "title": "判定点单源化：prompt 文案源出 STATE_OPTIONS",
+      "status": "idea",
+      "tokens": "判定点单源化：prompt 文案源出 STATE_OPTIONS"
+    },
+    {
+      "path": "docs/tasks/2026-09-18-M10-refactor-gate_action_dispatch.md",
+      "type": "tasks",
+      "id": "2026-09-18-M10-refactor-gate_action_dispatch",
+      "title": "判定到动作的结构化派发：gate_id 到 action（替掉散文子串匹配）",
+      "status": "idea",
+      "tokens": "判定到动作的结构化派发：gate_id 到 action（替掉散文子串匹配）"
     }
   ]
 }

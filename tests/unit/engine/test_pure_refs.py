@@ -66,6 +66,20 @@ class TestFootnotes(unittest.TestCase):
         out = pure_refs.check_footnotes("f.md", "see [^A1]\n\n[^A1]: detail\n")
         self.assertEqual(out, [])
 
+    def test_literal_in_code_span_is_not_a_reference(self):
+        """文档描述该模式（表格里的 `[^X]`）不是活引用——否则闸自己造假红。"""
+        out = pure_refs.check_footnotes(
+            "f.md", "| footnote `[^X]` 有引用必须有定义 | `re` 配对 |\n")
+        self.assertEqual(out, [])
+
+    def test_adr_ref_in_code_span_still_checked(self):
+        """反向守卫：ADR 指针常写在反引号里，不得因 code-span 处理而漏检。"""
+        with tempfile.TemporaryDirectory() as td:
+            ws = Path(td)
+            (ws / "docs" / "adr").mkdir(parents=True)
+            out = pure_refs.check_dangling_adr(ws, "docs/x.md", "见 `ADR-0099` 与 `docs/adr/0099-y.md`\n")
+            self.assertEqual([c for c, _ in out], ["DANGLING_ADR_REF"])
+
     def test_real_adr_footnotes_pair(self):
         text = (REPO / "docs" / "adr" / "0006-mcp-foreign-harness-injection.md").read_text(encoding="utf-8")
         out = pure_refs.check_footnotes("docs/adr/0006-mcp-foreign-harness-injection.md", text)

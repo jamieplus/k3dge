@@ -35,6 +35,7 @@ _ADR_H1_RE = re.compile(r"^#\s+ADR-(\d{4})\b", re.MULTILINE)
 _MATRIX_REF_RE = re.compile(r"`(tests/[^\s`]+)`")
 _CONFLICT_START = "<<<<<<<"
 _CONFLICT_END = ">>>>>>>"
+_CODE_SPAN_RE = re.compile(r"`[^`\n]*`")
 
 
 def strip_fences(text: str) -> str:
@@ -53,6 +54,17 @@ def strip_fences(text: str) -> str:
         if in_fence is None:
             out.append(line)
     return "\n".join(out)
+
+
+def strip_code_spans(text: str) -> str:
+    """Remove inline `code` spans.
+
+    Footnote-only: a doc that *describes* the pattern (`` `[^X]` `` in a table
+    cell) is not a live reference. Deliberately NOT applied to the ADR check —
+    real pointers are often written in backticks (`ADR-0025`), and stripping
+    them there would weaken B1.
+    """
+    return _CODE_SPAN_RE.sub("", text)
 
 
 def check_dangling_adr(workspace: Path, rel: str, text: str) -> List[Ref]:
@@ -94,7 +106,7 @@ def check_footnotes(rel: str, text: str) -> List[Ref]:
     defs = set(_FOOTNOTE_DEF_RE.findall(text))
     # definition lines also contain `[^X]` textually — exclude them before scanning refs
     nodef_lines = [ln for ln in text.splitlines() if not _FOOTNOTE_DEF_RE.match(ln)]
-    live_refs = set(_FOOTNOTE_REF_RE.findall(strip_fences("\n".join(nodef_lines))))
+    live_refs = set(_FOOTNOTE_REF_RE.findall(strip_code_spans(strip_fences("\n".join(nodef_lines)))))
     missing = sorted(live_refs - defs)
     return [("DANGLING_FOOTNOTE", f"{rel}: footnote [^{m}] referenced but never defined") for m in missing]
 
