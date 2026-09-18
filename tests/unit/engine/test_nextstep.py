@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from unittest import TestCase, mock
 
-from k3dge.engine import audit_trigger, nextstep
+from k3dge.engine import audit_trigger, gates, nextstep
 
 
 class TestNextStepRender(TestCase):
@@ -31,7 +31,8 @@ class TestNextStepRender(TestCase):
     def test_audit_open_includes_pending(self) -> None:
         cli = nextstep.NextStep.from_state("audit_open", "M7", pending=3).render_cli()
         self.assertIn("pending=3", cli)
-        self.assertIn("ask: agent 修？", cli)
+        self.assertIn("ask: 里程碑 M7：发现 3 项待修，agent 修？", cli)
+        self.assertNotIn("<n>", cli)   # 占位符已填
         self.assertNotIn("倒计时", cli)   # [NEXT] 无倒计时在跑
 
     def test_seal_declined_is_note_only(self) -> None:
@@ -46,10 +47,108 @@ class TestNextStepRender(TestCase):
         self.assertIn("k3dge milestone seal M7", d["if_y"])
 
     def test_rejection_maps_to_action(self) -> None:
-        n = nextstep.next_for_rejection("M7", "no 12-col audit report found")
+        """闭集派发：gate_id → state/note（不看文案）。"""
+        n = nextstep.next_for_rejection(
+            "M7", gates.Rejection("audit_report_missing", "no 12-col audit report found"))
         self.assertIn("k3dge milestone audit-submit M7", n.note)
-        n2 = nextstep.next_for_rejection("M7", "未审计不可封板")
+        n2 = nextstep.next_for_rejection(
+            "M7", gates.Rejection("audit_closed", "audit not closed"))
         self.assertEqual(n2.state, "audit_needed")
+        self.assertIn("k3dge milestone audit M7", n2.note)
+
+    def test_rejection_without_gate_id_does_not_guess(self) -> None:
+        """裸 str（无 gate_id）即使写满「未审计」也只能兑底为 rejected。
+
+        锁死旧病：改前靠 `"未审计" in msg` 子串匹配，文案一改分支静默失效（A-01 同形）。
+        """
+        for prose in ("未审计不可封板", "no 12-col audit report", "audit_needed", "audit-submit"):
+            n = nextstep.next_for_rejection("M7", prose)
+            self.assertEqual(n.state, "rejected", prose)
+            self.assertIn(prose, n.note)   # 原文照登，不丢信息
+
+    def test_explicit_gate_id_kwarg_wins(self) -> None:
+        n = nextstep.next_for_rejection("M7", "任意文案", gate_id="tasks_all_done")
+        self.assertEqual(n.state, "rejected")
+        self.assertIn("票据未全 done", n.note)
+
+    def test_unknown_gate_id_falls_back(self) -> None:
+        n = nextstep.next_for_rejection("M7", gates.Rejection("some_future_gate", "boom"))
+        self.assertEqual(n.state, "rejected")
+        self.assertIn("boom", n.note)
+
+    def test_gate_next_vocabulary_is_closed(self) -> None:
+        """派发表的 key 必须是已声明的闸/动作 id 或内部 id——不得长出野生词汇。"""
+        declared = set()
+        for kind in gates.DEFAULTS["checks"]:
+            declared.update(gates.DEFAULTS["checks"][kind]["preconditions"])
+            declared.update(gates.DEFAULTS["checks"][kind]["actions"])
+        declared.update(gates.INTERNAL_GATE_IDS)
+        self.assertEqual(set(nextstep.GATE_NEXT) - declared, set())
+        for _gid, (state, note_key) in nextstep.GATE_NEXT.items():
+            self.assertIn(state, nextstep.STATE_OPTIONS)
+            if note_key:
+                self.assertIn(note_key, nextstep.REJECTION_NOTES)
+
+
+class TestDecisionSingleSource(TestCase):
+    """判定文案单源：prompt 与 [NEXT] 共用 STATE_OPTIONS（票 decision_single_source）。"""
+
+    def test_ask_text_fills_placeholders(self) -> None:
+        self.assertEqual(
+            nextstep.ask_text("seal_ready", "M7"),
+            "里程碑 M7：审计已闭环（待修=0），封板？",
+        )
+        self.assertEqual(
+            nextstep.ask_text("audit_open", "M7", n=3),
+            "里程碑 M7：发现 3 项待修，agent 修？",
+        )
+
+    def test_prompt_and_next_channel_agree(self) -> None:
+        """两个投影同一句：[NEXT] 的 ask == prompt 用的 ask_text。"""
+        ns = nextstep.NextStep.from_state("seal_ready", "M7")
+        self.assertIn(nextstep.ask_text("seal_ready", "M7"), ns.render_cli())
+        ns2 = nextstep.NextStep.from_state("audit_open", "M7", pending=5)
+        self.assertIn(nextstep.ask_text("audit_open", "M7", n=5), ns2.render_cli())
+
+    def test_ask_text_falls_back_to_note(self) -> None:
+        self.assertIn("未审计不可封板", nextstep.ask_text("audit_needed", "M7"))
+        self.assertEqual(nextstep.ask_text("no_such_state", "M7"), "")
+
+    def test_no_hardcoded_ask_literals_in_src(self) -> None:
+        """结构守卫：`prompt.ask(...)` 的首参不得是硬编码字面量（否则又长出第二源）。"""
+        import ast
+
+        root = Path(__file__).resolve().parents[3] / "src" / "k3dge"
+        offenders = []
+        for py in sorted(root.rglob("*.py")):
+            tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fn = node.func
+                name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+                if name != "ask" or not node.args:
+                    continue
+                if isinstance(node.args[0], (ast.Constant, ast.JoinedStr, ast.BinOp)):
+                    offenders.append(f"{py.relative_to(root)}:{node.lineno}")
+        self.assertEqual(offenders, [])
+
+
+class TestPersistedProjection(TestCase):
+    def test_roundtrip(self) -> None:
+        ws = Path(tempfile.mkdtemp())
+        nextstep.persist(ws, nextstep.NextStep.from_state("audit_needed", "M7"))
+        self.assertEqual(nextstep.load_persisted(ws)["state"], "audit_needed")
+
+    def test_missing_or_corrupt_is_none(self) -> None:
+        ws = Path(tempfile.mkdtemp())
+        self.assertIsNone(nextstep.load_persisted(ws))
+        p = ws / ".k3dge" / "next.json"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("{not json", encoding="utf-8")
+        self.assertIsNone(nextstep.load_persisted(ws))
+        p.write_text('{"milestone": "M7"}', encoding="utf-8")   # 无 state ⇒ 不可投影
+        self.assertIsNone(nextstep.load_persisted(ws))
 
     def test_overview_stale_removed_as_hook(self) -> None:
         # Architecture-update hook was removed (handled inside milestone closure).

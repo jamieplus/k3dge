@@ -413,19 +413,22 @@ def k3dge_milestone_control(
         from k3dge.engine import nextstep
 
         status, msg = run_audit_flow(ws, milestone_id)
-        nxt_state = {"audited": "seal_ready", "escalated": "escalated"}.get(status)
-        nxt = (
-            nextstep.NextStep.from_state(nxt_state, milestone_id)
-            if nxt_state
-            else nextstep.next_for_rejection(milestone_id, msg)
-        )
+        # 流程已自己判定并 persist 了下一步：直接投影同一个判定，不拿散文消息重猜。
+        nxt = nextstep.load_persisted(ws)
+        if nxt is None:
+            nxt_state = {"audited": "seal_ready", "escalated": "escalated"}.get(status)
+            nxt = (
+                nextstep.NextStep.from_state(nxt_state, milestone_id).render_mcp()
+                if nxt_state
+                else nextstep.next_for_rejection(milestone_id, msg).render_mcp()
+            )
         return json.dumps(
             {
                 "milestone_id": milestone_id,
                 "status": status,
                 "audited": status == "audited",
                 "message": msg,
-                "next": nxt.render_mcp(),
+                "next": nxt,
             },
             indent=2,
             ensure_ascii=False,
@@ -438,18 +441,20 @@ def k3dge_milestone_control(
 
         status, msg = run_seal_flow(ws, milestone_id)
         if status != "sealed":
-            nxt = (
-                nextstep.NextStep.from_state(status, milestone_id)
-                if status in ("seal_declined", "escalated", "audit_needed")
-                else nextstep.next_for_rejection(milestone_id, msg)
-            )
+            nxt = nextstep.load_persisted(ws)
+            if nxt is None:
+                nxt = (
+                    nextstep.NextStep.from_state(status, milestone_id).render_mcp()
+                    if status in nextstep.STATE_OPTIONS
+                    else nextstep.next_for_rejection(milestone_id, msg).render_mcp()
+                )
             return json.dumps(
                 {
                     "milestone_id": milestone_id,
                     "sealed": False,
                     "status": status,
                     "message": msg,
-                    "next": nxt.render_mcp(),
+                    "next": nxt,
                 },
                 indent=2,
                 ensure_ascii=False,

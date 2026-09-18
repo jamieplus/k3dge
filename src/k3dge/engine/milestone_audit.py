@@ -8,6 +8,7 @@ import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from k3dge.engine import gates
 from k3dge.engine.audit_report import (
     _AUDIT_HEADER,
     _QUALITY_MARKER_RE,
@@ -248,7 +249,9 @@ def run_audit_flow(
                     + ("" if not produced.downgrades else
                        f" [本轮降级：{'; '.join(produced.downgrades)}]")
                 )
-                _ns = nextstep.next_for_rejection(milestone_id, msg)
+                _ns = nextstep.next_for_rejection(
+                    milestone_id, gates.Rejection("audit_report_missing", msg)
+                )
                 nextstep.persist(workspace, _ns)
                 return "rejected", msg + "\n" + _ns.render_cli()
             report_path, report_text = found
@@ -262,14 +265,16 @@ def run_audit_flow(
         prompt._write(
             nextstep.NextStep.from_state("audit_open", milestone_id, pending=pending_total).render_cli() + "\n"
         )
+        # 文案单源：STATE_OPTIONS["audit_open"].ask（与 [NEXT] 同一句）；
+        # countdown/default_yes 是**通道行为**，留在调用点。
         if not prompt.ask(
-            f"审计/质量共发现 {pending_total} 项待修。是否由 agent 修复？（超时默认修复）",
+            nextstep.ask_text("audit_open", milestone_id, n=pending_total),
             countdown=60,
             default_yes=True,
         ):
             msg = f"Audit open: {pending_total} 项待修未修复且 agent 拒绝修复。"
-            _ns = nextstep.NextStep(
-                state="rejected", milestone=milestone_id, note="stop / 转人工干预（待修未修复且 agent 拒绝修复）"
+            _ns = nextstep.next_for_rejection(
+                milestone_id, gates.Rejection("audit_open_declined", msg)
             )
             nextstep.persist(workspace, _ns)
             return "rejected", msg + "\n" + _ns.render_cli()

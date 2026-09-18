@@ -5,9 +5,15 @@ Commands therefore end with a fixed-shape `[NEXT]` line (CLI) / `next` field
 (MCP) so the operator knows the legal next action without re-deriving SOP.
 
 Single source: every option string lives ONLY in `STATE_OPTIONS` (and the
-rejection mapping). Commands never hand-write their own playbook — they call
-`NextStep.from_state(...)` / `next_for_rejection(...)`, which derive from the
-same state machine as `pipeline.toml` / `AGENTS.md`.
+rejection routing table `GATE_NEXT`). Commands never hand-write their own
+playbook — they call `NextStep.from_state(...)` / `ask_text(...)` /
+`next_for_rejection(...)`, which derive from the same state machine as
+`pipeline.toml` / `AGENTS.md`.
+
+Rejection routing is **closed-set**: a rejection carries a `gate_id`
+(`gates.Rejection`, a str subclass) and `GATE_NEXT` maps id → (state, note).
+No prose substring matching — wording changes must not be able to silently
+break the branch (memo §S7: 投影给进程的判定必须是闭集；参见 A-01 前科).
 
 Shape (CLI):
     [NEXT] state=<state> milestone=<id>[ pending=<n>]
@@ -55,7 +61,7 @@ STATE_OPTIONS: dict = {
         "pointers": ["k3dge ADR-0004 §2.1.5", "k3dge milestone audit <id>"],
     },
     "seal_ready": {
-        "ask": "审计已闭环（待修=0），封板？",
+        "ask": "里程碑 <id>：审计已闭环（待修=0），封板？",
         "if_y": "k3dge milestone seal <id>（align→归档+版本+指针）",
         "if_n": "stop（里程碑继续挂着，不封）",
         "pointers": ["k3dge ADR-0004 §2.1.4", "docs/reviews/"],
@@ -65,7 +71,7 @@ STATE_OPTIONS: dict = {
         "pointers": ["k3dge ADR-0004 §2.1.6", "k3dge milestone audit <id>"],
     },
     "audit_open": {
-        "ask": "agent 修？",
+        "ask": "里程碑 <id>：发现 <n> 项待修，agent 修？",
         "if_y": "修完重跑 k3dge milestone audit <id>（重审）",
         "if_n": "stop / 转人工干预",
         "pointers": ["k3dge ADR-0022", "k3dge milestone audit <id>"],
@@ -76,6 +82,8 @@ STATE_OPTIONS: dict = {
     },
     "sealed": {"note": "已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑", "pointers": ["docs/reviews/*-closure.md", "k3dge ADR-0004 §2.1.4"]},
     "seal_declined": {"note": "已放弃封板（当普通提交结束）", "pointers": ["AGENTS.md §12"]},
+    # 兑底态：闸/动作拒绝且其 gate_id 不在 `GATE_NEXT` 路由表内。原文照登，不猜。
+    "rejected": {"note": "操作被拒（原因见上）", "pointers": ["AGENTS.md §12", "k3dge milestone status <id>"]},
     # `new_domain` is a cross-cutting trigger the hard gate does not turn red on
     # but has a file-level signal. Architecture/overview updates are intentionally
     # NOT a hook — they are done inside the milestone closure note (ADR-0004).
@@ -85,6 +93,24 @@ STATE_OPTIONS: dict = {
         "if_n": "stop",
         "pointers": ["k3dge ADR-0005 §2.8", "k3dge sync"],
     },
+}
+
+#: 拒绝派发闭集（唯一源）：`gate_id` → (state, note_key)。
+#: **不在表里的 id 兜底为 `rejected` + 原文**（不猜）。id 词表：`pipeline.toml`
+#: `[checks.*].preconditions/actions` + `gates.INTERNAL_GATE_IDS`。
+GATE_NEXT: dict = {
+    # 封板前置闸：未审计 ⇒ 回审计入口
+    "audit_closed": ("audit_needed", ""),
+    "audit_report_missing": ("rejected", "audit_missing"),
+    "audit_open_declined": ("rejected", "audit_open_declined"),
+    "tasks_all_done": ("rejected", "tasks_pending"),
+}
+
+#: 拒绝备注文案（仅当 state 自带的 note 不够用时；`<id>` 占位）。
+REJECTION_NOTES: dict = {
+    "audit_missing": "审计缺失：先落盘报告（k3dge milestone audit-submit <id>）或 k3dge milestone audit <id>",
+    "audit_open_declined": "stop / 转人工干预（待修未修复且 agent 拒绝修复）",
+    "tasks_pending": "票据未全 done：先干活或改挂里程碑，再谈 align/seal",
 }
 
 
@@ -118,7 +144,10 @@ class NextStep:
     def _fill(self, text: Optional[str]) -> Optional[str]:
         if not text:
             return None
-        return text.replace("<id>", self.milestone)
+        out = text.replace("<id>", self.milestone)
+        if self.pending is not None:
+            out = out.replace("<n>", str(self.pending))
+        return out
 
     def render_cli(self) -> str:
         head = f"[NEXT] state={self.state} milestone={self.milestone}"
@@ -189,19 +218,52 @@ def emit(workspace: Path, ns: NextStep, *, stream: Optional[TextIO] = None) -> s
     return text
 
 
-def next_for_rejection(milestone: str, message: str) -> NextStep:
-    """Failure -> action. Pick the corrective command from the rejection reason."""
-    msg = (message or "").lower()
-    if "no 12-col audit report" in msg or "audit-submit" in msg:
-        return NextStep(
-            state="rejected",
-            milestone=milestone,
-            note="审计缺失：先落盘报告（k3dge milestone audit-submit <id>）或 k3dge milestone audit <id>".replace("<id>", milestone),
-        )
-    if "audit_needed" in msg or "未审计" in msg or "not audit" in msg:
-        return NextStep(
-            state="audit_needed",
-            milestone=milestone,
-            note=STATE_OPTIONS["audit_needed"]["note"].replace("<id>", milestone),
-        )
-    return NextStep(state="rejected", milestone=milestone, note=f"操作被拒：{message}")
+def load_persisted(workspace: Path) -> Optional[dict]:
+    """读回 `.k3dge/next.json`（MCP 投影形状）。不存在/坏 JSON ⇒ None，永不抛。
+
+    用途：流程（`run_seal_flow` / `run_audit_flow`）已自己判定并 `persist` 过下一步；
+    MCP 层直接投影**同一个判定**，而不是拿返回的散文消息重新猜一遍。
+    """
+    try:
+        raw = (Path(workspace) / _SIDECAR_REL).read_text(encoding="utf-8")
+    except OSError:
+        return None
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) and data.get("state") else None
+
+
+def next_for_rejection(milestone: str, message, gate_id: Optional[str] = None) -> NextStep:
+    """Failure -> action. **闭集派发**：`gate_id` → `GATE_NEXT` → state/note。
+
+    `message` 可为 `gates.Rejection`（自带 gate_id）或裸 str。裸 str（无 id）一律
+    兜底为 `rejected` + 原文——**不从文案里猜**（猜错＝静默给错下一步）。
+    """
+    gid = gate_id or getattr(message, "gate_id", None)
+    text = "" if message is None else str(message)
+    route = GATE_NEXT.get(gid) if gid else None
+    if route is None:
+        return NextStep(state="rejected", milestone=milestone, note=f"操作被拒：{text}")
+    state, note_key = route
+    note = REJECTION_NOTES.get(note_key or "", "").replace("<id>", milestone)
+    if not note:
+        note = STATE_OPTIONS.get(state, {}).get("note", "").replace("<id>", milestone)
+    if text and text not in note:
+        note = f"{text}\n  {note}" if note else text
+    return NextStep(state=state, milestone=milestone, note=note)
+
+
+def ask_text(state: str, milestone: str, *, n: Optional[int] = None) -> str:
+    """判定文案单源投影：交互式 `prompt.ask` 与 `[NEXT]` 共用 `STATE_OPTIONS[state]`。
+
+    通道行为（`default_yes` / `countdown`）留在调用点——那是**怎么问**，不是**问什么**。
+    占位符：`<id>` = 里程碑，`<n>` = 待修计数。
+    """
+    opt = STATE_OPTIONS.get(state, {})
+    text = opt.get("ask") or opt.get("note") or ""
+    out = text.replace("<id>", milestone)
+    if n is not None:
+        out = out.replace("<n>", str(n))
+    return out

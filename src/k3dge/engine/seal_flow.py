@@ -132,8 +132,9 @@ def run_seal_flow(
         return "audit_needed", msg + "\n" + _ns.render_cli()
 
     # enter-seal prompt — NO countdown; N = keep milestone open. Skipped with --yes.
+    # 文案单源：STATE_OPTIONS["seal_ready"].ask（与 [NEXT] 同一句）；通道行为（default_yes）留在此处。
     if not skip_enter_prompt and not prompt.ask(
-        f"里程碑 {milestone_id} 审计已闭环，封板？", default_yes=False
+        nextstep.ask_text("seal_ready", milestone_id), default_yes=False
     ):
         msg = f"Milestone {milestone_id}: seal declined — 不封，里程碑继续挂着。"
         _ns = nextstep.NextStep.from_state("seal_declined", milestone_id)
@@ -176,16 +177,21 @@ def run_seal_flow(
     for aid in gates.actions(workspace, "seal"):
         fn = registry.get(aid)
         if fn is None:
-            msg = f"[SEAL REJECTED] gate contract references unknown action id: '{aid}'"
-            _ns = nextstep.next_for_rejection(milestone_id, msg)
+            rej = gates.Rejection(
+                "unknown_action_id",
+                f"[SEAL REJECTED] gate contract references unknown action id: '{aid}'",
+            )
+            _ns = nextstep.next_for_rejection(milestone_id, rej)
             nextstep.persist(workspace, _ns)
-            return "rejected", msg + "\n" + _ns.render_cli()
+            return "rejected", str(rej) + "\n" + _ns.render_cli()
         ok, out = fn()
         if not ok:
-            _ns = nextstep.next_for_rejection(milestone_id, out)
+            # 动作失败：产出方已给 gate_id 则透传，否则用动作 id 兑底（闭集，不猜文案）
+            rej = gates.rejection(out, aid)
+            _ns = nextstep.next_for_rejection(milestone_id, rej)
             nextstep.persist(workspace, _ns)
-            return "rejected", out + "\n" + _ns.render_cli()
-        msg += out
+            return "rejected", str(rej) + "\n" + _ns.render_cli()
+        msg += str(out)
     from k3dge.engine import events
     events.emit(workspace, "sealed", milestone=milestone_id)
     _ns = nextstep.NextStep.from_state("sealed", milestone_id)

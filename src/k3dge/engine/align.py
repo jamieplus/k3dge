@@ -25,8 +25,12 @@ def _align_run_gates(
     milestone_id: str,
     tasks: List[MilestoneTask],
     pending: List[MilestoneTask],
-) -> Optional[str]:
-    """Dispatch `[checks.align]` gates and actions. Returns error message or None."""
+) -> Optional[gates.Rejection]:
+    """Dispatch `[checks.align]` gates and actions.
+
+    Returns `gates.Rejection`（str 子类，携带闭集 gate_id）or None。id 在产出点就已知，
+    消费方（`nextstep.GATE_NEXT`）表驱动派发，不再从文案里搜关键词。
+    """
 
     def _tasks_all_done():
         if pending:
@@ -45,17 +49,23 @@ def _align_run_gates(
     for _gid in gates.preconditions(workspace, "align"):
         _fn = _reg.get(_gid)
         if _fn is None:
-            return f"[ALIGN REJECTED] gate contract references unknown gate id: '{_gid}'"
+            return gates.Rejection(
+                "unknown_gate_id",
+                f"[ALIGN REJECTED] gate contract references unknown gate id: '{_gid}'",
+            )
         _err = _fn()
         if _err:
-            return _err
+            return gates.Rejection(_gid, str(_err))
     for _aid in gates.actions(workspace, "align"):
         _fn = _reg.get(_aid)
         if _fn is None:
-            return f"[ALIGN REJECTED] gate contract references unknown action id: '{_aid}'"
+            return gates.Rejection(
+                "unknown_action_id",
+                f"[ALIGN REJECTED] gate contract references unknown action id: '{_aid}'",
+            )
         _err = _fn()
         if _err:
-            return _err
+            return gates.Rejection(_aid, str(_err))
     return None
 
 
@@ -64,19 +74,25 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
 
     id_err = _validate_milestone_id(milestone_id)
     if id_err:
-        return False, id_err, []
+        return False, gates.Rejection("milestone_id_invalid", id_err), []
 
     tasks = scan_milestone_tasks(workspace, milestone_id)
     if not tasks:
         from k3dge.engine.task_index import premature_archive_hint
 
-        return False, (premature_archive_hint(workspace, milestone_id)
-                       or f"No tasks found for milestone '{milestone_id}' under docs/tasks/"), []
+        return False, gates.Rejection(
+            "no_tasks",
+            premature_archive_hint(workspace, milestone_id)
+            or f"No tasks found for milestone '{milestone_id}' under docs/tasks/",
+        ), []
 
     invalid = [t for t in tasks if t.status not in _ALLOWED_STATUS]
     if invalid:
         listing = "\n".join(f"  - {t.path.name} (status: {t.status})" for t in invalid)
-        return False, f"Invalid Status (not idea|deferred|in-progress|done):\n{listing}", tasks
+        return False, gates.Rejection(
+            "invalid_task_status",
+            f"Invalid Status (not idea|deferred|in-progress|done):\n{listing}",
+        ), tasks
 
     # 前置闸/动作：读「硬闸契约」`[checks.align]`（ADR-0001 §2 第 8 条）。
     pending = [t for t in tasks if t.status != "done"]

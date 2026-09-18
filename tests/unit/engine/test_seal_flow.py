@@ -19,6 +19,7 @@ from k3dge.engine.milestone_audit import (
     persist_external_audit_report,
     run_audit_flow,
 )
+from k3dge.engine import gates
 from k3dge.engine.prompt import Prompt as _Prompt
 from k3dge.engine.seal_flow import run_seal_flow
 from k3dge.engine.task_write import create_task, mark_task_done
@@ -638,3 +639,85 @@ class TestSingleAuditReport(TestCase):
              mock.patch("k3dge.engine.audit_flow.run_action", side_effect=fake):
             r = audit_flow.push_present(ws, "M1")
         assert r["ok"] and {c[0] for c in calls} == {"audit.present"}
+
+
+class TestGateIdDispatch(TestCase):
+    """拒绝携带闭集 gate_id → `nextstep.GATE_NEXT` 表驱动派发（票 gate_action_dispatch）。
+
+    锁死的旧病：消费点靠 `"未审计" in msg` 之类的**文案子串**决定下一步，改措辞即静默失效
+    （同形前科：A-01 子里程碑 id 误放行）。
+    """
+
+    def _sidecar(self, ws) -> dict:
+        return json.loads((ws / ".k3dge" / "next.json").read_text(encoding="utf-8"))
+
+    def test_audit_flow_rejection_routes_by_gate_id(self) -> None:
+        ws = _ws_oneshot()  # 无 12 列报告 ⇒ gate_id=audit_report_missing
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+            status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
+        self.assertEqual(status, "rejected")
+        self.assertIn("k3dge milestone audit-submit M1", self._sidecar(ws)["note"])
+
+    def test_declined_fix_routes_by_gate_id(self) -> None:
+        ws = _ws_oneshot()
+        _open_report(ws)
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+            status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["n"]))
+        self.assertEqual(status, "rejected")
+        self.assertIn("转人工干预", self._sidecar(ws)["note"])
+
+    def test_seal_preconditions_rejection_carries_declared_gate_id(self) -> None:
+        from k3dge.engine import gates
+        from k3dge.engine.seal import seal_preconditions_error
+
+        ws = _ws()
+        _mk_task(ws)
+        (ws / ".agent" / "gates.toml").write_text(
+            '[checks.seal]\npreconditions = ["audit_closed"]\n', encoding="utf-8")
+        err = seal_preconditions_error(ws, "M1")
+        self.assertIsInstance(err, gates.Rejection)
+        self.assertEqual(err.gate_id, "audit_closed")   # id == 契约里声明的那个
+        self.assertIn("audit not closed", str(err))     # 仍是 str：既有断言/print 不破
+
+    def test_seal_flow_rejection_is_table_driven(self) -> None:
+        ws = _ws()
+        _mk_task(ws)
+        _clean_report(ws)
+        with mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
+            with mock.patch(
+                "k3dge.engine.seal_flow.seal_preconditions_error",
+                return_value=gates.Rejection("tasks_all_done", "票没干完"),
+            ):
+                with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed")):
+                    status, msg = run_seal_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
+        self.assertEqual(status, "rejected")
+        self.assertIn("票没干完", msg)                    # 原文照登
+        self.assertIn("票据未全 done", self._sidecar(ws)["note"])
+
+    def test_seal_prompt_wording_is_single_sourced(self) -> None:
+        """封板那一问的两个投影同一句（票 decision_single_source）。"""
+        from k3dge.engine import nextstep
+
+        ws = _ws()
+        _mk_task(ws)
+        _clean_report(ws)
+        out = io.StringIO()
+        with mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
+            with mock.patch("k3dge.engine.seal_flow.seal_preconditions_error", return_value=None):
+                with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed")):
+                    status, _ = run_seal_flow(
+                        ws, "M1", prompter=_Prompt(out_stream=out, answers=["n"]))
+        self.assertEqual(status, "seal_declined")
+        self.assertIn(nextstep.ask_text("seal_ready", "M1"), out.getvalue())
+
+    def test_audit_open_prompt_wording_is_single_sourced(self) -> None:
+        from k3dge.engine import nextstep
+
+        ws = _ws_oneshot()
+        _open_report(ws)
+        out = io.StringIO()
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+            run_audit_flow(ws, "M1", prompter=_Prompt(out_stream=out, answers=["n"]))
+        text = out.getvalue()
+        self.assertIn("发现 1 项待修", text)
+        self.assertIn(nextstep.ask_text("audit_open", "M1", n=1), text)

@@ -337,7 +337,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 from typing import Dict
+class Rejection(str)
+# doc: 结构化拒绝：消息文本（str 兼容）+ 闭集 `gate_id`（机器分支用）。
+rejection(message: Any, fallback_gate_id: str) -> Rejection
+    # doc: 把动作/闸的失败返回值正规化为 `Rejection`（已是 Rejection 则原样透传）。
 REL = '.agent/gates.toml'
+INTERNAL_GATE_IDS: tuple = ('unknown_gate_id', 'unknown_action_id', 'audit_report_missing', 'audit_open_declined', 'milestone_id_invalid', 'no_tasks', 'invalid_task_status', 'align_failed', 'archive_failed')
 DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}}}
 load(workspace: Path) -> Dict[str, Any]
     # doc: 缺省 ∪ `.agent/gates.toml`（段内覆盖；`checks.<kind>` 逐键覆盖）；文件缺失/坏 ⇒ 缺省。
@@ -422,6 +427,7 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from typing import Tuple
+from k3dge.engine import gates
 scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
     # doc: 未决 findings（语法 v1：pending/disputed/fixnote 计 open）。
 persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
@@ -463,7 +469,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 from typing import TextIO
-STATE_OPTIONS: dict = {'normal': {'note': '常规提交门禁通过', 'pointers': ['AGENTS.md §12']}, 'pending_findings': {'ask': '有 findings 钉在代码/文档里；继续处理这些 pending？', 'if_y': '修完删 `k3dit:pending <ID>` 标记；有意留改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）', 'if_n': 'stop', 'pointers': ['peer_contract §8', 'k3dge ADR-0025']}, 'ratchet_open': {'note': '有在办棘轮工单（k3dge ADR-0025）：进程不等人，但账必须可见', 'if_y': 'k3dge audit status <job> 查对端；席位侧一圈见契约 §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）', 'pointers': ['k3dge audit status <id>', 'peer_contract §1.4', 'k3dge ADR-0025 §2.7']}, 'doc_audit': {'note': 'docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断——`k3dge doc-audit` 出报告(k3dit)+建里程碑 task（本轮不改，封板轮也得闭环）', 'pointers': ['k3dge ADR-0022 §2.2', 'k3dge doc-audit']}, 'audit_suggested': {'ask': '要审吗？', 'if_y': 'k3dge milestone audit <id>（必审，待修=0 才谈封板）', 'if_n': 'stop（继续干活）', 'pointers': ['k3dge ADR-0004 §2.1.5', 'k3dge milestone audit <id>']}, 'seal_ready': {'ask': '审计已闭环（待修=0），封板？', 'if_y': 'k3dge milestone seal <id>（align→归档+版本+指针）', 'if_n': 'stop（里程碑继续挂着，不封）', 'pointers': ['k3dge ADR-0004 §2.1.4', 'docs/reviews/']}, 'audit_needed': {'note': '未审计不可封板（封=归档+版本+指针，非界限）：先 k3dge milestone audit <id>', 'pointers': ['k3dge ADR-0004 §2.1.6', 'k3dge milestone audit <id>']}, 'audit_open': {'ask': 'agent 修？', 'if_y': '修完重跑 k3dge milestone audit <id>（重审）', 'if_n': 'stop / 转人工干预', 'pointers': ['k3dge ADR-0022', 'k3dge milestone audit <id>']}, 'escalated': {'note': 'verify 连续 >3 次未闭环，转人工干预：k3dge milestone audit-submit <id> 或人工复核', 'pointers': ['k3dge milestone audit-submit <id>', 'docs/incidents/']}, 'sealed': {'note': '已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑', 'pointers': ['docs/reviews/*-closure.md', 'k3dge ADR-0004 §2.1.4']}, 'seal_declined': {'note': '已放弃封板（当普通提交结束）', 'pointers': ['AGENTS.md §12']}, 'new_domain': {'ask': '新建 src/ 域未在 manifest 注册？', 'if_y': '补 manifest + spec + tests，再 k3dge sync 回写契约', 'if_n': 'stop', 'pointers': ['k3dge ADR-0005 §2.8', 'k3dge sync']}}
+STATE_OPTIONS: dict = {'normal': {'note': '常规提交门禁通过', 'pointers': ['AGENTS.md §12']}, 'pending_findings': {'ask': '有 findings 钉在代码/文档里；继续处理这些 pending？', 'if_y': '修完删 `k3dit:pending <ID>` 标记；有意留改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）', 'if_n': 'stop', 'pointers': ['peer_contract §8', 'k3dge ADR-0025']}, 'ratchet_open': {'note': '有在办棘轮工单（k3dge ADR-0025）：进程不等人，但账必须可见', 'if_y': 'k3dge audit status <job> 查对端；席位侧一圈见契约 §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）', 'pointers': ['k3dge audit status <id>', 'peer_contract §1.4', 'k3dge ADR-0025 §2.7']}, 'doc_audit': {'note': 'docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断——`k3dge doc-audit` 出报告(k3dit)+建里程碑 task（本轮不改，封板轮也得闭环）', 'pointers': ['k3dge ADR-0022 §2.2', 'k3dge doc-audit']}, 'audit_suggested': {'ask': '要审吗？', 'if_y': 'k3dge milestone audit <id>（必审，待修=0 才谈封板）', 'if_n': 'stop（继续干活）', 'pointers': ['k3dge ADR-0004 §2.1.5', 'k3dge milestone audit <id>']}, 'seal_ready': {'ask': '里程碑 <id>：审计已闭环（待修=0），封板？', 'if_y': 'k3dge milestone seal <id>（align→归档+版本+指针）', 'if_n': 'stop（里程碑继续挂着，不封）', 'pointers': ['k3dge ADR-0004 §2.1.4', 'docs/reviews/']}, 'audit_needed': {'note': '未审计不可封板（封=归档+版本+指针，非界限）：先 k3dge milestone audit <id>', 'pointers': ['k3dge ADR-0004 §2.1.6', 'k3dge milestone audit <id>']}, 'audit_open': {'ask': '里程碑 <id>：发现 <n> 项待修，agent 修？', 'if_y': '修完重跑 k3dge milestone audit <id>（重审）', 'if_n': 'stop / 转人工干预', 'pointers': ['k3dge ADR-0022', 'k3dge milestone audit <id>']}, 'escalated': {'note': 'verify 连续 >3 次未闭环，转人工干预：k3dge milestone audit-submit <id> 或人工复核', 'pointers': ['k3dge milestone audit-submit <id>', 'docs/incidents/']}, 'sealed': {'note': '已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑', 'pointers': ['docs/reviews/*-closure.md', 'k3dge ADR-0004 §2.1.4']}, 'seal_declined': {'note': '已放弃封板（当普通提交结束）', 'pointers': ['AGENTS.md §12']}, 'rejected': {'note': '操作被拒（原因见上）', 'pointers': ['AGENTS.md §12', 'k3dge milestone status <id>']}, 'new_domain': {'ask': '新建 src/ 域未在 manifest 注册？', 'if_y': '补 manifest + spec + tests，再 k3dge sync 回写契约', 'if_n': 'stop', 'pointers': ['k3dge ADR-0005 §2.8', 'k3dge sync']}}
+GATE_NEXT: dict = {'audit_closed': ('audit_needed', ''), 'audit_report_missing': ('rejected', 'audit_missing'), 'audit_open_declined': ('rejected', 'audit_open_declined'), 'tasks_all_done': ('rejected', 'tasks_pending')}
+REJECTION_NOTES: dict = {'audit_missing': '审计缺失：先落盘报告（k3dge milestone audit-submit <id>）或 k3dge milestone audit <id>', 'audit_open_declined': 'stop / 转人工干预（待修未修复且 agent 拒绝修复）', 'tasks_pending': '票据未全 done：先干活或改挂里程碑，再谈 align/seal'}
 class NextStep
     state: str
     milestone: str
@@ -482,8 +490,12 @@ persist(workspace: Path, ns: NextStep) -> None
     # doc: Write next-step sidecar to `.k3dge/next.json`. Fire-and-forget; never raises.
 emit(workspace: Path, ns: NextStep, *, stream: Optional[TextIO]=None) -> str
     # doc: Persist sidecar + render CLI text + optionally print. Returns the CLI text.
-next_for_rejection(milestone: str, message: str) -> NextStep
-    # doc: Failure -> action. Pick the corrective command from the rejection reason.
+load_persisted(workspace: Path) -> Optional[dict]
+    # doc: 读回 `.k3dge/next.json`（MCP 投影形状）。不存在/坏 JSON ⇒ None，永不抛。
+next_for_rejection(milestone: str, message, gate_id: Optional[str]=None) -> NextStep
+    # doc: Failure -> action. **闭集派发**：`gate_id` → `GATE_NEXT` → state/note。
+ask_text(state: str, milestone: str, *, n: Optional[int]=None) -> str
+    # doc: 判定文案单源投影：交互式 `prompt.ask` 与 `[NEXT]` 共用 `STATE_OPTIONS[state]`。
 # pairs.py
 from __future__ import annotations
 PAIRS: list[tuple[str, str]] = [('gate.py', 'scripts/gate.py'), ('gate.sh', 'scripts/gate.sh'), ('gate.ps1', 'scripts/gate.ps1'), ('init.sh', 'scripts/init.sh'), ('init.ps1', 'scripts/init.ps1'), ('k3dge-init-wrapper.sh', 'k3dge-init.sh'), ('k3dge-init-wrapper.ps1', 'k3dge-init.ps1'), ('generate-docs.sh', 'scripts/generate-docs.sh'), ('generate-docs.ps1', 'scripts/generate-docs.ps1'), ('agents.md', 'AGENTS.md'), ('agent-readme.md', '.agent/README.md'), ('extractors-readme.md', '.agent/extractors/README.md'), ('rules/00-core-discipline.md', '.agent/rules/00-core-discipline.md'), ('rules/01-docs-structure.md', '.agent/rules/01-docs-structure.md'), ('rules/02-simplification.md', '.agent/rules/02-simplification.md'), ('rules/03-self-contained.md', '.agent/rules/03-self-contained.md'), ('rules/04-milestone.md', '.agent/rules/04-milestone.md'), ('rules/05-branches.md', '.agent/rules/05-branches.md'), ('rules/06-memo.md', '.agent/rules/06-memo.md'), ('rules/07-audit.md', '.agent/rules/07-audit.md'), ('rules/08-design-discipline.md', '.agent/rules/08-design-discipline.md'), ('rules/09-absorption.md', '.agent/rules/09-absorption.md'), ('rules/10-structure-over-prose.md', '.agent/rules/10-structure-over-prose.md'), ('rules/11-next-sidecar.md', '.agent/rules/11-next-sidecar.md'), ('rules/12-introduction-discipline.md', '.agent/rules/12-introduction-discipline.md'), ('docs.toml.template', '.agent/docs.toml'), ('pipeline.toml.template', '.agent/pipeline.toml'), ('spec.md.template', 'docs/specs/_template/spec.md'), ('tasks-readme.md', 'docs/tasks/README.md'), ('reviews-readme.md', 'docs/reviews/README.md'), ('tasks/_template.md', 'docs/tasks/_template.md'), ('memo/_template.md', 'docs/memo/_template.md'), ('branches/_template.md', 'docs/branches/_template.md'), ('adr/_template.md', 'docs/adr/_template.md'), ('adr/AUTHORING.md', 'docs/adr/AUTHORING.md'), ('adr/.schema.json', 'docs/adr/.schema.json'), ('tasks/AUTHORING.md', 'docs/tasks/AUTHORING.md'), ('memo/AUTHORING.md', 'docs/memo/AUTHORING.md'), ('branches/AUTHORING.md', 'docs/branches/AUTHORING.md'), ('incidents/AUTHORING.md', 'docs/incidents/AUTHORING.md'), ('tasks/.schema.json', 'docs/tasks/.schema.json'), ('memo/.schema.json', 'docs/memo/.schema.json'), ('branches/.schema.json', 'docs/branches/.schema.json'), ('incidents/.schema.json', 'docs/incidents/.schema.json'), ('pre-commit.yaml.template', '.pre-commit-config.yaml'), ('branches-readme.md', 'docs/branches/README.md'), ('memo-readme.md', 'docs/memo/README.md'), ('downstream.md', 'docs/guides/downstream.md'), ('protocols/audit_default.md', 'docs/protocols/audit_default.md'), ('protocols/verify_default.md', 'docs/protocols/verify_default.md')]
@@ -653,8 +665,8 @@ from k3dge.engine.task_index import scan_milestone_tasks
 GUIDE_STUB_RE = re.compile('<!--\\s*k3dge:guide-stub\\s*-->', re.IGNORECASE)
 scan_unfilled_guides(workspace: Path) -> List[str]
     # doc: Names of guide stubs in docs/guides/ still carrying `<!-- k3dge:guide-stub -->`.
-seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]
-    # doc: 策略层：按「硬闸契约」`[checks.seal].preconditions` 求值全部前置闸，返回首个错误（None=全绿）。
+seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gates.Rejection]
+    # doc: 策略层：按「硬闸契约」`[checks.seal].preconditions` 求值全部前置闸，返回首个拒绝（None=全绿）。
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
     # doc: 纯归档动作：id 合法 + 有任务 + 状态合法 → `_seal_archive`。策略闸在 `seal_preconditions_error`。
 # seal_flow.py

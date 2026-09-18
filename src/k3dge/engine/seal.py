@@ -168,8 +168,11 @@ def _seal_archive(workspace: Path, milestone_id: str, tasks: List[MilestoneTask]
         return True, f"{sealed} (milestone bump failed)"
 
 
-def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str]:
-    """策略层：按「硬闸契约」`[checks.seal].preconditions` 求值全部前置闸，返回首个错误（None=全绿）。
+def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gates.Rejection]:
+    """策略层：按「硬闸契约」`[checks.seal].preconditions` 求值全部前置闸，返回首个拒绝（None=全绿）。
+
+    返回 `gates.Rejection`（str 子类）：消息文本不变，额外携带闭集 `gate_id`（＝契约里
+    声明的闸 id），供 `nextstep.GATE_NEXT` 表驱动派发——消费方不再从文案里搜关键词。
 
     与 `seal_milestone`（纯归档动作）分离：**何时可封＝策略（本函数）**，封板归档＝动作。
     未实现的 id 视为配置错（拒绝，不让声明空转）。
@@ -200,10 +203,14 @@ def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[str
     for gid in gates.preconditions(workspace, "seal"):
         fn = gate_fns.get(gid)
         if fn is None:
-            return f"[SEAL REJECTED] gate contract references unknown gate id: '{gid}'"
+            return gates.Rejection(
+                "unknown_gate_id",
+                f"[SEAL REJECTED] gate contract references unknown gate id: '{gid}'",
+            )
         err = fn()
         if err:
-            return err
+            # gate id 就是契约里声明的那个——产出点已知，不得在消费点靠文案还原
+            return gates.Rejection(gid, str(err))
     return None
 
 
@@ -211,20 +218,27 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
     """纯归档动作：id 合法 + 有任务 + 状态合法 → `_seal_archive`。策略闸在 `seal_preconditions_error`。"""
     id_err = _validate_milestone_id(milestone_id)
     if id_err:
-        return False, id_err
+        return False, gates.Rejection("milestone_id_invalid", id_err)
 
     tasks = scan_milestone_tasks(workspace, milestone_id)
     if not tasks:
         from k3dge.engine.task_index import premature_archive_hint
 
-        return False, (premature_archive_hint(workspace, milestone_id)
-                       or f"No tasks to seal for milestone '{milestone_id}'.")
+        return False, gates.Rejection(
+            "no_tasks",
+            premature_archive_hint(workspace, milestone_id)
+            or f"No tasks to seal for milestone '{milestone_id}'.",
+        )
 
     invalid = [t for t in tasks if t.status not in _ALLOWED_STATUS]
     if invalid:
-        return False, (
+        return False, gates.Rejection(
+            "invalid_task_status",
             f"Cannot seal milestone '{milestone_id}'. Invalid Status: "
-            f"{[t.path.name for t in invalid]}"
+            f"{[t.path.name for t in invalid]}",
         )
 
-    return _seal_archive(workspace, milestone_id, tasks)
+    ok, out = _seal_archive(workspace, milestone_id, tasks)
+    if ok:
+        return True, out
+    return False, gates.rejection(out, "archive_failed")

@@ -601,19 +601,19 @@
       "tokens": "ADR 归档移出封板（seal → sync）+ 删冗余 gates.toml"
     },
     {
-      "path": "docs/tasks/2026-09-17-M10-refactor-decision_single_source.md",
+      "path": "docs/tasks/2026-09-17-M10-refactor-decision_single_source.done.md",
       "type": "tasks",
-      "id": "2026-09-17-M10-refactor-decision_single_source",
+      "id": "2026-09-17-M10-refactor-decision_single_source.done",
       "title": "判定点单源化：prompt 文案源出 STATE_OPTIONS",
-      "status": "idea",
+      "status": "done",
       "tokens": "判定点单源化：prompt 文案源出 STATE_OPTIONS"
     },
     {
-      "path": "docs/tasks/2026-09-18-M10-refactor-gate_action_dispatch.md",
+      "path": "docs/tasks/2026-09-18-M10-refactor-gate_action_dispatch.done.md",
       "type": "tasks",
-      "id": "2026-09-18-M10-refactor-gate_action_dispatch",
+      "id": "2026-09-18-M10-refactor-gate_action_dispatch.done",
       "title": "判定到动作的结构化派发：gate_id 到 action（替掉散文子串匹配）",
-      "status": "idea",
+      "status": "done",
       "tokens": "判定到动作的结构化派发：gate_id 到 action（替掉散文子串匹配）"
     }
   ]

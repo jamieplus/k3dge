@@ -9,12 +9,55 @@ import copy
 from pathlib import Path
 from typing import Any, Dict
 
+
+class Rejection(str):
+    """结构化拒绝：消息文本（str 兼容）+ 闭集 `gate_id`（机器分支用）。
+
+    为何是 str 子类：拒绝消息已经流经 `(ok, msg)` / `print(msg)` / 测试断言；
+    携带 id 不必改任何返回元数（规则 02）。消费方（`nextstep.next_for_rejection`）
+    读 `gate_id` 查表派发；**不得**再从消息文本里搜关键词（memo §S7：投影给进程的
+    判定必须是闭集，散文无法机械分支）。
+
+    不在 `gate_id` 词表里的 id 由消费方兜底为 `rejected`（原文照登，不猜）。
+    """
+
+    __slots__ = ("gate_id",)
+
+    def __new__(cls, gate_id: str, message: str) -> "Rejection":
+        self = super().__new__(cls, message)
+        self.gate_id = gate_id
+        return self
+
+    def __repr__(self) -> str:  # pragma: no cover - 调试可读性
+        return f"Rejection({self.gate_id!r}, {str.__str__(self)!r})"
+
+
+def rejection(message: Any, fallback_gate_id: str) -> Rejection:
+    """把动作/闸的失败返回值正规化为 `Rejection`（已是 Rejection 则原样透传）。"""
+    if isinstance(message, Rejection):
+        return message
+    gid = getattr(message, "gate_id", None) or fallback_gate_id
+    return Rejection(gid, "" if message is None else str(message))
+
 try:
     import tomllib
 except ModuleNotFoundError:  # Python 3.10
     import tomli as tomllib  # type: ignore[no-redef]
 
 REL = ".agent/gates.toml"
+
+#: 内部拒绝 id（不由 pipeline.toml 声明，但同样进 `nextstep.GATE_NEXT` 闭集）。
+INTERNAL_GATE_IDS: tuple = (
+    "unknown_gate_id",       # 契约引用了未实现的闸 id（配置错）
+    "unknown_action_id",     # 契约引用了未实现的动作 id（配置错）
+    "audit_report_missing",  # 无 12 列报告（审计腿未落盘）
+    "audit_open_declined",   # 待修>0 且 agent 拒绝修复
+    "milestone_id_invalid",
+    "no_tasks",
+    "invalid_task_status",
+    "align_failed",
+    "archive_failed",
+)
 
 #: 各闸的缺省阈值/开关（唯一源）。仓内 `.agent/gates.toml` 可覆盖。
 DEFAULTS: Dict[str, Any] = {

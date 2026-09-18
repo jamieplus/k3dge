@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 术语清理：deferred 值级碰撞 + 两处重复常量
 - ADR 归档移出封板（seal → sync）+ 删冗余 gates.toml
 - 落 ADR：投影三维契约（目标 × 语法 × 范围）
+- 判定到动作的结构化派发：gate_id 到 action（替掉散文子串匹配）
+- 判定点单源化：prompt 文案源出 STATE_OPTIONS
 ### Fixed
 - seal/align 任务扫描不含 archive/<M>/：提前归档的 done 里程碑任务致封板被拒（No tasks found）
 
