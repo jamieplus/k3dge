@@ -270,7 +270,20 @@ def k3dge_task_create(
             {"path": p, "title": ttl}
             for p, ttl in _similar_task_hints(ws, title, exclude=path)
         ]
-    return json.dumps({"ok": ok, "message": msg, "path": rel, "similar": similar}, indent=2, ensure_ascii=False)
+    from k3dge.engine import gate_facts
+
+    return json.dumps(
+        {
+            "ok": ok,
+            "message": msg,
+            "path": rel,
+            "similar": similar,
+            # 给进程的闭集投影：档位由声明面定（observe＝不阻断、不裁决）
+            "similar_severity": gate_facts.severity("DUP_CHECK") if similar else None,
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
 
 
 @mcp.tool()

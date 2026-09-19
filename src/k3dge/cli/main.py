@@ -443,9 +443,11 @@ def cmd_task(args: argparse.Namespace) -> int:
         if ok and path is not None:
             hints = _similar_task_hints(workspace, title, exclude=path)
             if hints:
-                print("[DUP-CHECK] k3che 相似/历史提示（观测建议，不阻断、不裁决）：", file=sys.stdout)
+                # 档位与文案查声明面（gate_facts），CLI 不自己写散文；候选是事实，逐条列
+                print(gate_facts.render("DUP_CHECK", {"count": len(hints)}), file=sys.stdout)
+                print("  candidates:", file=sys.stdout)
                 for hp, ht in hints:
-                    print(f"  - {hp}" + (f" — {ht}" if ht else ""), file=sys.stdout)
+                    print(f"    - {hp}" + (f" — {ht}" if ht else ""), file=sys.stdout)
         _append_log(workspace, f"[{datetime.datetime.now().isoformat()}] task create -> {msg}")
         return 0 if ok else 1
     if args.task_action == "done":

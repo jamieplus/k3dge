@@ -83,6 +83,16 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         ],
         "pointers": [".agent/manifest.json", "k3dge ADR-0005 §2.8"],
     },
+    # --- observe：观测建议，不阻断、不裁决（service 角色；peer 不可达即无提示）---
+    "DUP_CHECK": {
+        "severity": "observe",
+        "fact": "新建票据与集存内容可能重复（候选见下）——是不是真重复由你判，本条不阻断、不裁决",
+        "options": [
+            "确属重复 → 并入既存票据（`k3dge task done <旧票>` 记关闭理由），不新开",
+            "确属新事 → 保留本票，无需动作",
+        ],
+        "pointers": ["docs/tasks/AUTHORING.md", "k3dge task list --json"],
+    },
     "ORPHAN_ADR": {
         "severity": "warn",
         "fact": "`{path}` 未列入 docs/adr/README.md 的 Topics——决策存在但索引找不到它",

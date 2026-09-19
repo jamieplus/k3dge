@@ -117,10 +117,23 @@ def _is_aux(name: str, aux: frozenset) -> bool:
     return name in aux
 
 
-def run_schema_gate(files: list[str], pure_schema, pure_refs) -> tuple[list[str], list[str]]:
-    """Returns (blocking_errors, warnings). Staged content only."""
+def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -> tuple[list[str], list[str]]:
+    """Returns (blocking, non_blocking). Staged content only.
+
+    **档位由 `gate_facts` 声明面决定**，不由"append 到哪个列表"隐式决定；未声明的 code
+    一律 block（保守：新码默认拦，降级必须显式声明）。已声明且有结构化事实的 code 走
+    单一渲染器（fact + 成对 options + pointers）；未迁移的 code 保持旧串（增量迁移）。
+    """
     errs: list[str] = []
     warns: list[str] = []
+
+    def _add(code: str, msg: str, where: str = "", facts: dict | None = None) -> None:
+        sev = gate_facts.severity(code) if gate_facts else "block"
+        text = ""
+        if gate_facts is not None and gate_facts.is_declared(code):
+            text = gate_facts.render(code, facts or {}, where=where)
+        line = text or (f"{where}: [{code}] {msg}" if where else f"[{code}] {msg}")
+        (warns if sev != "block" else errs).append(line)
     aux = getattr(pure_schema, "AUX_NAMES", _AUX_FALLBACK)
     doc_files = [
         f for f in files
@@ -141,13 +154,13 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs) -> tuple[list[str]
             continue
         # B3 bytes first: undecodable files cannot be text-checked
         for code, msg in pure_refs.check_markdown_bytes(raw, rel):
-            errs.append(f"{rel}: [{code}] {msg.split(': ', 1)[-1]}")
+            _add(code, msg.split(': ', 1)[-1], where=rel)
         try:
             text = raw.decode("utf-8")
         except UnicodeDecodeError:
             continue
         if schema_err:
-            errs.append(f"{schema_err}")
+            errs.append(f"{schema_err}")   # schema 文件本身坏：无 code 可查，直接拦
             continue
         if schema is not None:
             # A-part: file-local structure
@@ -155,33 +168,34 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs) -> tuple[list[str]
                 schema, Path(rel).name, text, schema_rel=f"docs/{typ}/.schema.json")
             for code, msg, scope in violations:
                 loc = f"docs/{typ}/.schema.json" if scope == "schema" else rel
-                errs.append(f"{loc}: [{code}] {msg}")
+                _add(code, msg, where=loc)
             if ok and schema.get("index"):
                 idx_path = WS / "docs" / typ / schema["index"]
                 idx_text = idx_path.read_text(encoding="utf-8") if idx_path.is_file() else ""
                 for code, msg, _s in pure_schema.check_index_ref(
                         idx_text, ident, schema.get("codes") or {}, schema["index"], Path(rel).name):
-                    errs.append(f"{rel}: [{code}] {msg}")
+                    _add(code, msg, where=rel)
         # B1 dangling refs (block)
         for code, msg in pure_refs.check_dangling_adr(WS, rel, text):
-            errs.append(f"[{code}] {msg}")
+            _add(code, msg)
         for code, msg in pure_refs.check_report_pointer(WS, rel, text):
-            errs.append(f"[{code}] {msg}")
+            _add(code, msg)
         for code, msg in pure_refs.check_footnotes(rel, text):
-            errs.append(f"[{code}] {msg}")
+            _add(code, msg)
         # B2 name/content consistency (block)
         for code, msg in pure_refs.check_task_consistency(rel, text):
-            errs.append(f"[{code}] {msg}")
+            _add(code, msg)
         for code, msg in pure_refs.check_adr_consistency(rel, text):
-            errs.append(f"[{code}] {msg}")
+            _add(code, msg)
         for code, msg in pure_refs.check_supersede_unreconciled(WS, rel, text):
-            errs.append(f"[{code}] {msg}")
-        # B3 text markdown (block)
+            _add(code, msg)
+        # B3 text markdown
         for code, msg in pure_refs.check_markdown_text(text, rel):
-            errs.append(f"[{code}] {msg}")
-    # B4 orphans: workspace-wide, WARN-only
+            _add(code, msg)
+    # B4 orphans：档位查表（声明为 warn），不在这里写死"WARN-only"
     if any(f.startswith(("docs/", "tests/")) or f == ".agent/manifest.json" for f in files):
-        warns.extend(_orphan_warnings(pure_refs))
+        for code, msg, facts in _orphan_warnings(pure_refs):
+            _add(code, msg, facts=facts)
     return errs, warns
 
 
@@ -223,8 +237,9 @@ def _load_type_schema(typ: str, pure_schema):
     return schema, None
 
 
-def _orphan_warnings(pure_refs) -> list[str]:
-    warns: list[str] = []
+def _orphan_warnings(pure_refs) -> list[tuple[str, str, dict]]:
+    """返回 [(code, 事实摘要, 结构化事实)]；档位与文案由 `gate_facts` 声明面决定。"""
+    out: list[tuple[str, str, dict]] = []
     try:
         mp = WS / ".agent" / "manifest.json"
         spec_paths: list[str] = []
@@ -234,14 +249,14 @@ def _orphan_warnings(pure_refs) -> list[str]:
                 if isinstance(cfg, dict) and cfg.get("spec"):
                     spec_paths.append(str(cfg["spec"]))
         for code, msg in pure_refs.find_orphan_specs(WS, spec_paths):
-            warns.append(f"[{code}] {msg}")
+            out.append((code, msg, {"path": msg.split(":")[0]}))
         for code, msg in pure_refs.find_orphan_tests(WS):
-            warns.append(f"[{code}] {msg}")
+            out.append((code, msg, {"path": msg.split(":")[0]}))
         for code, msg in pure_refs.find_orphan_adrs(WS):
-            warns.append(f"[{code}] {msg}")
+            out.append((code, msg, {"path": msg.split(":")[0]}))
     except Exception as exc:
-        warns.append(f"[ORPHAN_SCAN] skipped ({exc})")
-    return warns
+        out.append(("ORPHAN_SCAN", f"skipped ({exc})", {}))
+    return out
 
 
 def main() -> int:
@@ -285,7 +300,7 @@ def main() -> int:
     if doc_files:
         pure_schema, pure_refs = _load_pure()
         if pure_schema is not None and pure_refs is not None:
-            schema_errs, schema_warns = run_schema_gate(files, pure_schema, pure_refs)
+            schema_errs, schema_warns = run_schema_gate(files, pure_schema, pure_refs, _load_gate_facts())
             for w in schema_warns:
                 print(f"[k3dge schema] WARN (non-blocking): {w}")
             if schema_errs:

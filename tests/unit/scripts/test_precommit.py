@@ -32,6 +32,8 @@ TASK_GOOD = (
 
 class TestSchemaGateWiring(unittest.TestCase):
     def _run(self, files, blobs, orphan_warns=()):
+        from k3dge.engine import gate_facts
+
         orig_staged = hook._staged_bytes
         orig_orphans = hook._orphan_warnings
         hook._staged_bytes = lambda rel: blobs.get(rel)
@@ -39,7 +41,8 @@ class TestSchemaGateWiring(unittest.TestCase):
         try:
             pure_schema, pure_refs = hook._load_pure()
             self.assertIsNotNone(pure_schema)
-            return hook.run_schema_gate(files, pure_schema, pure_refs)
+            # 档位查声明面（与 main() 同口径）
+            return hook.run_schema_gate(files, pure_schema, pure_refs, gate_facts)
         finally:
             hook._staged_bytes = orig_staged
             hook._orphan_warnings = orig_orphans
@@ -81,13 +84,20 @@ class TestSchemaGateWiring(unittest.TestCase):
         self.assertTrue(any("MD_CONFLICT_MARKER" in e for e in errs), errs)
 
     def test_orphan_is_warn_only(self):
+        from k3dge.engine.gate_facts import severity as gate_facts_severity
+
         errs, warns = self._run(
             ["docs/tasks/2026-09-16-fix-x.md"],
             {"docs/tasks/2026-09-16-fix-x.md": TASK_GOOD.encode()},
-            orphan_warns=["[ORPHAN_TEST] tests/unit/test_lonely.py: ..."],
+            orphan_warns=[("ORPHAN_TEST", "tests/unit/test_lonely.py: no matrix ref",
+                           {"path": "tests/unit/test_lonely.py"})],
         )
         self.assertEqual(errs, [])
         self.assertEqual(len(warns), 1)
+        # 档位来自声明（warn），文案来自声明面（fact + 成对 options），不是 hook 里拼的
+        self.assertEqual(gate_facts_severity("ORPHAN_TEST"), "warn")
+        self.assertIn("fact:", warns[0])
+        self.assertGreaterEqual(warns[0].count("option:"), 2)
 
     def test_non_utf8_blocks(self):
         errs, _warns = self._run(

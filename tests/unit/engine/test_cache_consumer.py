@@ -185,7 +185,9 @@ class TestDupCheck(unittest.TestCase):
                         rc = main(["task", "create", "Dupcheck Demo A", "--type", "feat", "--milestone", "M1"])
                 out = buf.getvalue()
                 self.assertEqual(rc, 0)
-                self.assertIn("[DUP-CHECK]", out)
+                # 档位与文案来自 gate_facts 声明面（code=DUP_CHECK，observe 档）
+                self.assertIn("[DUP_CHECK]", out)
+                self.assertIn("fact:", out)
                 self.assertIn("docs/tasks/archive/old-0.md", out)
                 self.assertIn("不阻断、不裁决", out)
                 # service 挂掉：无提示，创建照旧成功
@@ -195,7 +197,7 @@ class TestDupCheck(unittest.TestCase):
                     with contextlib.redirect_stdout(buf2):
                         rc2 = main(["task", "create", "Dupcheck Demo B", "--type", "feat", "--milestone", "M1"])
                 self.assertEqual(rc2, 0)
-                self.assertNotIn("[DUP-CHECK]", buf2.getvalue())
+                self.assertNotIn("[DUP_CHECK]", buf2.getvalue())
             finally:
                 os.chdir(old)
 
