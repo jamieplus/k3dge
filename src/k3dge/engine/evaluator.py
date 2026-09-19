@@ -173,7 +173,9 @@ def _run_batch_tests(
             cmd = shlex.split(template.format(refs=" ".join(refs)))
         except (KeyError, ValueError, TypeError) as exc:
             return [
-                Violation("MANIFEST_INVALID", f"test_command_template is invalid: {exc}")
+                Violation("MANIFEST_INVALID", f"test_command_template invalid: {exc}",
+                          detail={"path": ".agent/manifest.json",
+                                  "reason": f"test_command_template 不是合法模板：{exc}"})
             ]
     else:
         cmd = [sys.executable, "-m", "pytest", *refs, "-q"]
@@ -187,9 +189,10 @@ def _run_batch_tests(
                 violations.append(
                     Violation(
                         "TEST_FAILURE",
-                        f"Tests timed out after 300s (batch {refs})",
+                        f"tests timed out after 300s (batch {refs})",
                         domain=d,
                         file_path=_spec_violation_path(workspace, manifest, d),
+                        detail={"domain": d, "target": refs, "reason": "300s 超时"},
                     )
                 )
         return violations
@@ -199,9 +202,10 @@ def _run_batch_tests(
                 violations.append(
                     Violation(
                         "TEST_ENV_MISSING",
-                        "pytest not available; cannot run --with-tests",
+                        "pytest not available",
                         domain=d,
                         file_path=_spec_violation_path(workspace, manifest, d),
+                        detail={"domain": d},
                     )
                 )
         return violations
@@ -213,9 +217,10 @@ def _run_batch_tests(
                 violations.append(
                     Violation(
                         "TEST_ENV_MISSING",
-                        "pytest not available; cannot run --with-tests",
+                        "pytest not available",
                         domain=d,
                         file_path=_spec_violation_path(workspace, manifest, d),
+                        detail={"domain": d},
                     )
                 )
         return violations
@@ -228,9 +233,10 @@ def _run_batch_tests(
             violations.append(
                 Violation(
                     "TEST_FAILURE",
-                    f"Test '{ref}' failed (run with --with-tests)",
+                    f"test '{ref}' failed",
                     domain=d,
                     file_path=_spec_violation_path(workspace, manifest, d),
+                    detail={"domain": d, "target": ref, "reason": "退出码非 0（--with-tests）"},
                 )
             )
     return violations
@@ -267,7 +273,10 @@ class ConsistencyEngine:
                 passed=False,
                 changed_files=(),
                 modified_domains=(),
-                violations=(Violation("MANIFEST_INVALID", str(exc)),),
+                violations=(Violation("MANIFEST_INVALID", str(exc),
+                                      file_path=".agent/manifest.json",
+                                      detail={"path": ".agent/manifest.json",
+                                              "reason": str(exc)}),),
             )
             events.emit(self.workspace_root, "gate_fail", violations=len(report.violations))
             return report
@@ -282,6 +291,7 @@ class ConsistencyEngine:
                         Violation(
                             "GIT_UNAVAILABLE",
                             f"git unavailable: {exc}",
+                            detail={"reason": str(exc)},
                         )
                     ]
                     if not manifest.domains:
@@ -289,8 +299,8 @@ class ConsistencyEngine:
                             0,
                             Violation(
                                 "NO_DOMAINS",
-                                "manifest.domains is empty; register at least one domain "
-                                "(src/spec/tests) so the gate can protect this repo",
+                                "manifest.domains is empty",
+                                file_path=".agent/manifest.json",
                             ),
                         )
                     report = GateReport(
@@ -308,8 +318,8 @@ class ConsistencyEngine:
             violations.append(
                 Violation(
                     "NO_DOMAINS",
-                    "manifest.domains is empty; register at least one domain "
-                    "(src/spec/tests) so the gate can protect this repo",
+                    "manifest.domains is empty",
+                    file_path=".agent/manifest.json",
                 )
             )
         modified_domains, specs_touched, dom_vs = self._collect_modified_domains(files, manifest)
@@ -372,8 +382,9 @@ class ConsistencyEngine:
                     out.append(
                         Violation(
                             "DOCS_ROOT_DISALLOWED",
-                            f"docs root file '{path}' must be in a subdirectory (e.g. docs/generated/, docs/guides/); create a new subdirectory if none fits",
+                            f"docs root file '{path}' must live in a docs/<type>/ subdirectory",
                             file_path=path,
+                            detail={"path": path},
                         )
                     )
                     continue
@@ -390,6 +401,7 @@ class ConsistencyEngine:
                         "UNREGISTERED_DOMAIN",
                         f"'{path}' lives under package_root but no domain maps it",
                         file_path=path,
+                        detail={"path": path},
                     )
                 )
                 continue
@@ -549,6 +561,7 @@ class ConsistencyEngine:
                     f"pipeline validation crashed: {exc}",
                     domain="pipelines",
                     file_path=".agent/pipeline.toml",
+                    detail={"path": ".agent/pipeline.toml", "reason": str(exc)},
                 )
             )
         return out
@@ -577,7 +590,8 @@ class ConsistencyEngine:
                     continue
                 msg = self._logs_overwrite(node)
                 if msg:
-                    out.append(Violation("AUDIT_TRAIL_APPEND_ONLY", msg, file_path=rel))
+                    out.append(Violation("AUDIT_TRAIL_APPEND_ONLY", msg, file_path=rel,
+                                         detail={"path": rel, "reason": msg}))
         return out
 
     @staticmethod
@@ -656,6 +670,7 @@ class ConsistencyEngine:
                     "SPEC_NOT_FOUND",
                     f"domain '{domain}' has no spec path in manifest",
                     domain=domain,
+                    detail={"domain": domain, "spec": "(manifest 未声明 spec 路径)"},
                 )
             ], None, None
 
@@ -667,6 +682,7 @@ class ConsistencyEngine:
                     f"spec missing for domain '{domain}': {spec_rel}",
                     domain=domain,
                     file_path=str(spec_path),
+                    detail={"domain": domain, "spec": spec_rel},
                 )
             ], None, None
 
@@ -679,6 +695,7 @@ class ConsistencyEngine:
                     f"spec is not UTF-8 for domain '{domain}': {exc}",
                     domain=domain,
                     file_path=str(spec_path),
+                    detail={"domain": domain, "spec": str(spec_path), "reason": str(exc)},
                 )
             ], None, None
         return [], spec_path, content
@@ -689,7 +706,8 @@ class ConsistencyEngine:
         out: List[Violation] = []
         for err in spec_schema.validate_structure(content):
             out.append(
-                Violation("SPEC_MISSING_SECTION", err, domain=domain, file_path=str(spec_path))
+                Violation("SPEC_MISSING_SECTION", err, domain=domain, file_path=str(spec_path),
+                          detail={"domain": domain, "spec": str(spec_path), "reason": err})
             )
         for m in _TEST_REF_RE.finditer(_verification_matrix_section(content)):
             ref = m.group(1).strip().rstrip(".,)")
@@ -711,6 +729,7 @@ class ConsistencyEngine:
                         + (" (cross-domain reference)" if foreign else ""),
                         domain=domain,
                         file_path=str(spec_path),
+                        detail={"domain": domain, "ref": ref},
                     )
                 )
                 continue
@@ -728,6 +747,8 @@ class ConsistencyEngine:
                             + (" (cross-domain reference)" if foreign else ""),
                             domain=domain,
                             file_path=str(spec_path),
+                            detail={"domain": domain, "ref": ref,
+                                    "reason": f"{fpath} 里没有名为 {tname} 的测试"},
                         )
                     )
             elif not re.search(r"\bdef\s+test_", _t_src):
@@ -737,6 +758,8 @@ class ConsistencyEngine:
                         f"Verification Matrix row references '{fpath}' which contains no test functions",
                         domain=domain,
                         file_path=str(spec_path),
+                        detail={"domain": domain, "ref": fpath,
+                                "reason": "该文件里没有任何测试函数"},
                     )
                 )
         return out
@@ -761,6 +784,7 @@ class ConsistencyEngine:
                     str(exc),
                     domain=domain,
                     file_path=str(spec_path),
+                    detail={"domain": domain, "spec": str(spec_path), "reason": str(exc)},
                 )
             )
             return out, True
@@ -837,9 +861,10 @@ class ConsistencyEngine:
                     out.append(
                         Violation(
                             "DOMAIN_IMPORT_VIOLATION",
-                            f"domain '{domain}' imports '{target}' but does not declare depends_on ('{target}')",
+                            f"domain '{domain}' imports '{target}' but does not declare depends_on",
                             domain=domain,
                             file_path=str(py),
+                            detail={"domain": domain, "target": target, "path": str(py)},
                         )
                     )
         return out

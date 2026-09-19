@@ -221,6 +221,104 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "options": ["把编号改回升序（不移动内容）", "内容确需换序 → 连编号一起重排，并核对文内自引"],
         "pointers": ["docs/adr/AUTHORING.md「杂项」"],
     },
+    # --- 环境/配置（evaluator）：都不是仓内文件的机械偏差，故一律 judgment ---
+    "MANIFEST_INVALID": {
+        "fix": "judgment", "severity": "block",
+        "fact": "`.agent/manifest.json` 不可用（{reason}）——它是域划分的唯一源，坏了闸就没有判据",
+        "options": ["修 manifest（JSON 语法 / 缺字段 / 字段类型）后重跑 k3dge check", "刚 init 的仓 → 按 docs/guides/downstream.md 补域声明（src/spec/tests 三件）"],
+        "pointers": [".agent/manifest.json", "k3dge ADR-0005 §2.8"],
+    },
+    "NO_DOMAINS": {
+        "fix": "judgment", "severity": "block",
+        "fact": "manifest.domains 是空的——没有任何域被登记，闸无从保护这个仓",
+        "options": ["登记至少一个域（src / spec / tests 三件齐）", "本仓确实无代码域 → 在 manifest 里显式声明 ignore，而不是留空"],
+        "pointers": [".agent/manifest.json", "k3dge ADR-0005 §2.8"],
+    },
+    "GIT_UNAVAILABLE": {
+        "fix": "judgment", "severity": "block",
+        "fact": "拿不到 git 改动集（{reason}）——闸靠 diff 定范围，没有它就只能全量或失败",
+        "options": ["在 git 仓里重跑（浅克隆需 --unshallow 或 fetch-depth: 0）", "CI 里指定基线 → 导出 K3DGE_BASE_SHA", "本就想全量 → k3dge check --force-full"],
+        "pointers": ["k3dge check --help", "docs/guides/downstream.md"],
+    },
+    "TEST_ENV_MISSING": {
+        "fix": "judgment", "severity": "block",
+        "fact": "域 {domain} 要跑测试但 pytest 不可用——这是**环境**缺失，不是仓内文件偏差，故不自动修",
+        "options": ["装 dev 依赖（.venv/bin/pip install -e '.[dev]'）后重跑", "本轮不跑测试 → 去掉 --with-tests（硬闸仍跑静态部分）"],
+        "pointers": ["scripts/init.sh", "k3dge check --with-tests"],
+    },
+    "TEST_FAILURE": {
+        "fix": "judgment", "severity": "block",
+        "fact": "域 {domain} 的测试未过（{reason}）——改代码还是改测试要人判",
+        "options": ["修代码让测试过（测试是契约）", "测试本身过期 → 改测试并同轮更新 spec 的 Verification Matrix", "确实卡住 → 按 AGENTS.md §12 转 docs/branches/ 并 stash，不第四次重试"],
+        "pointers": ["docs/specs/<domain>/spec.md", "AGENTS.md §12"],
+    },
+    "PIPELINE_SCHEMA_INVALID": {
+        "fix": "judgment", "severity": "block",
+        "fact": "`.agent/pipeline.toml` 语义校验未过（{reason}）——它声明角色/peer/传输链，坏了出向编排就没有依据",
+        "options": ["按 docs/protocols/peer_contract.md 修声明（角色→peer→actions→transports）", "刚继承自模板 → 对照 src/k3dge/templates/assets/pipeline.toml.template"],
+        "pointers": [".agent/pipeline.toml", "docs/protocols/peer_contract.md"],
+    },
+    "AUDIT_TRAIL_APPEND_ONLY": {
+        "fix": "judgment", "severity": "block",
+        "fact": "`{path}` 违反审计留痕 append-only（{reason}）——改史必须人判，进程不代改",
+        "options": ["恢复被改写/删除的历史行（append-only：只增不改）", "确需更正 → 追加新行说明更正，不动旧行"],
+        "pointers": ["k3dge ADR-0025", "docs/reviews/AUTHORING.md"],
+    },
+    "DOCS_ROOT_DISALLOWED": {
+        "fix": "judgment", "severity": "block",
+        "fact": "`{path}` 直接躺在 docs/ 根上——受管文档必须住在 docs/<type>/ 里（每个 type 有 README + AUTHORING + .schema.json）",
+        "options": ["移进合适的 docs/<type>/（`k3dge doc list` 看现有类型）", "确属新类型 → 建 docs/<type>/ 并补齐 README.md + AUTHORING.md（+ .schema.json）"],
+        "pointers": ["docs/README.md", "AGENTS.md「Docs — locate, then load」"],
+    },
+    "UNREGISTERED_DOMAIN": {
+        "fix": "judgment", "severity": "block",
+        "fact": "`{path}` 在 package_root 下但没有域映射它——新代码域未登记，闸与契约都看不见它",
+        "options": ["补 manifest 域声明 + docs/specs/<domain>/spec.md + tests/，再 k3dge sync 回写契约哈希", "它属既有域 → 调整该域的 src 路径使其覆盖", "确不该纳管 → 在 manifest 的 ignore 里显式声明"],
+        "pointers": [".agent/manifest.json", "k3dge ADR-0005 §2.8", "k3dge sync"],
+    },
+    # --- spec / 契约（evaluator）---
+    "SPEC_NOT_FOUND": {
+        "fix": "judgment", "severity": "block",
+        "fact": "域 {domain} 的 spec 找不到（{spec}）——零假设纪律要求 manifest → spec → src，缺 spec 就没有判据",
+        "options": ["按 docs/specs/_template/spec.md 补写该域 spec", "manifest 里的 spec 路径写错 → 改路径", "该域已废弃 → 从 manifest 删域声明"],
+        "pointers": ["docs/specs/_template/spec.md", ".agent/manifest.json"],
+    },
+    "SPEC_DECODE_FAILED": {
+        "fix": "judgment", "severity": "block",
+        "fact": "域 {domain} 的 spec 不是合法 UTF-8（{reason}）——无法解析即无判据",
+        "options": ["转成 UTF-8", "文件已损坏 → 从 git 历史恢复（git show <sha>:<path>）"],
+        "pointers": ["docs/specs/<domain>/spec.md"],
+    },
+    "SPEC_MISSING_SECTION": {
+        "fix": "judgment", "severity": "block",
+        "fact": "域 {domain} 的 spec 缺必需章节（{reason}）——缺的是**要写的内容**，不是格式，故不自动修",
+        "options": ["按 docs/specs/_template/spec.md 补齐缺的章节", "该域契约形态确实不同 → 改模板与 spec_schema（改声明，同步资产）"],
+        "pointers": ["docs/specs/_template/spec.md", "src/k3dge/engine/spec_schema.py"],
+    },
+    "MISSING_TEST_FILE": {
+        "fix": "judgment", "severity": "block",
+        "fact": "域 {domain} 的 Verification Matrix 引用了不存在的测试 `{ref}`——矩阵行必须可解析到具体测试（ADR-0001 决策点 6）",
+        "options": ["补上该测试文件", "测试已改名/移动 → 更新矩阵行", "该场景不再验 → 删掉矩阵行（并说明为何不再需要）"],
+        "pointers": ["docs/specs/<domain>/spec.md", "k3dge ADR-0001 §2"],
+    },
+    "MATRIX_TEST_UNRESOLVED": {
+        "fix": "judgment", "severity": "block",
+        "fact": "域 {domain} 的 Verification Matrix 行绑到 `{ref}` 但解析不到具体测试（{reason}）——文件在、场景不在＝红",
+        "options": ["把矩阵行细化到真实存在的测试（文件::用例）", "补上缺的那个测试场景", "跨域引用是有意为之 → 标注清楚，别让它冒充本域验证面"],
+        "pointers": ["docs/specs/<domain>/spec.md", "k3dge ADR-0001 §2"],
+    },
+    "CONTRACT_EXTRACT_FAILED": {
+        "fix": "judgment", "severity": "block",
+        "fact": "域 {domain} 的公有符号抽取失败（{reason}）——抽不出接口就算不出契约哈希",
+        "options": ["修抽取器配置（.agent/extractors.toml / .agent/extractors/）后 k3dge extractor sync", "该语言的抽取器缺失 → 按 docs/specs/sync/spec.md 补一个并注册", "spec 的接口块格式不对 → 对照模板修正"],
+        "pointers": [".agent/extractors.toml", "k3dge extractor sync", "docs/specs/sync/spec.md"],
+    },
+    "DOMAIN_IMPORT_VIOLATION": {
+        "fix": "judgment", "severity": "block",
+        "fact": "域 {domain} 反向 import 了 `{target}` 但未声明 depends_on——**方向要人判**：是依赖该声明，还是这次耦合本就不该存在",
+        "options": ["确属正当依赖 → 在 manifest 的该域 depends_on 里声明，再 k3dge sync", "不该耦合 → 把共用的东西下沉到叶子模块，或反转依赖方向", "边界划错了 → 按 .agent/rules/08-design-discipline.md 重划事实归属（走 ADR）"],
+        "pointers": [".agent/manifest.json", ".agent/rules/08-design-discipline.md", "k3dge ADR-0001 §2"],
+    },
     # --- warn：显示但不拦（孤儿＝可能是有意的新增，判定归人）---
     "ORPHAN_TEST": {
         "fix": "judgment",

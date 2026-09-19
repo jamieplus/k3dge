@@ -132,9 +132,14 @@ class TestViolationWiring(unittest.TestCase):
         self.assertIn("abc123", out)
 
     def test_undeclared_code_keeps_legacy_shape(self):
-        """增量迁移：未进表的 code 仍走旧形状（message 自带），不得变空。"""
-        v = Violation("SPEC_NOT_FOUND", "spec missing", domain="engine", file_path="x.md")
-        self.assertEqual(v.format(), "[GATE ERROR] SPEC_NOT_FOUND <engine>: spec missing [x.md]")
+        """增量迁移：未进表的 code 仍走旧形状（message 自带），不得变空。
+
+        用一个刻意不存在的 code——迁移完成后本测试仍须成立（表的兜底路径不能被删）。
+        """
+        code = "ZZZ_NOT_DECLARED_YET"
+        self.assertFalse(gate_facts.is_declared(code))
+        v = Violation(code, "raw message", domain="engine", file_path="x.md")
+        self.assertEqual(v.format(), f"[GATE ERROR] {code} <engine>: raw message [x.md]")
 
     def test_severity_tag_follows_declaration(self):
         self.assertTrue(Violation("ORPHAN_TEST", "t", file_path="tests/x.py").format()
@@ -182,3 +187,41 @@ class TestProducersFeedDeclaredFacts(unittest.TestCase):
             if "detail" not in {k.arg for k in node.keywords}:
                 missing.append(f"{rel}:{node.lineno} {code} 缺 detail=（声明用了 {sorted(keys)}）")
         self.assertEqual(missing, [])
+
+
+class TestNoProseBackflow(unittest.TestCase):
+    """棘轮：已声明的 code，其构造点不得再拼散文（措辞只能来自表）。
+
+    实测基线 2026-09-19：35 处 Violation 构造点、静态 message 最长 25 字符（全是事实摘要）。
+    阈值放到 100 是给事实字段留余量，不是给散文留口子。
+    """
+
+    MAX_MESSAGE = 100
+
+    def test_declared_code_messages_stay_factual(self):
+        import ast
+
+        root = Path(__file__).resolve().parents[3] / "src" / "k3dge"
+        offenders = []
+        for py in sorted(root.rglob("*.py")):
+            tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fn = node.func
+                name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+                if name != "Violation" or len(node.args) < 2:
+                    continue
+                code = node.args[0].value if isinstance(node.args[0], ast.Constant) else None
+                msg = node.args[1]
+                if not (isinstance(code, str) and gate_facts.is_declared(code)):
+                    continue
+                if isinstance(msg, ast.Constant) and isinstance(msg.value, str):
+                    if len(msg.value) > self.MAX_MESSAGE:
+                        offenders.append(f"{py.relative_to(root)}:{node.lineno} {code} "
+                                         f"message {len(msg.value)} 字符（措辞应归表）")
+                    for word in ("run 'k3dge", "run `k3dge", "；先 ", "please "):
+                        if word in msg.value:
+                            offenders.append(f"{py.relative_to(root)}:{node.lineno} {code} "
+                                             f"message 里出现补救散文 {word!r}（应归 options）")
+        self.assertEqual(offenders, [])
