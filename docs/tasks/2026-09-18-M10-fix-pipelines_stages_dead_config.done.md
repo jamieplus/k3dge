@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M10
 priority: P1
 date: 2026-09-18
@@ -63,3 +63,45 @@ blocking: 2026-09-19-M10-refactor-orch_converge_gate_facts
 
 - 与 `2026-09-18-M10-docs-adr_doc_normalize_strategy`（C1-C5）正交：那票划策略归属，本票修编排声明面（C6）。
 - 与 `2026-09-18-M10-feat-doc_strategy_five_points` 有依赖：新动作要挂哪套声明面，取决于本票定形。
+
+## 落地（2026-09-19）
+
+| 位置 | 改法 |
+| --- | --- |
+| `gates.DEFAULTS["checks"]["audit"]` | 新增 `stages_produce = ["audit.actions.audit"]` / `stages_verify = ["audit.actions.verify"]`；`gates.stages(ws, kind, phase)` + `gates.all_stage_refs(ws)` |
+| `milestone_audit.run_audit_flow` | 删硬编码 `streams`，改读声明；`stages_verify` 为空 ⇒ 跳过二次核对（不拿空 ref 去跑） |
+| `.agent/pipeline.toml` + 资产模板 | 删 `[pipelines.on_seal_enter]` / `[pipelines.on_pre_seal]`，留一段说明指向 `[checks.*]`（PAIRS 字节锁，两份同改） |
+| `pipeline_schema._validate_pipelines` | 改为**迁移守卫**：下游还留着 `[pipelines.*]` ⇒ 显式红一次逼迁移，不静默失效 |
+| `pipeline_schema._validate_declared_stages` | 新增：声明的 stage ref 解析不到 transports ⇒ `PIPELINE_UNRESOLVED_STAGE`（"不让声明空转"的机检半边） |
+| `resolve_role` / `resolve_action` | **下沉到闸核层** `pipeline_schema`，`pipeline_runner` 反向 import 并 re-export |
+| AGENTS.md §12 / rules/04 / protocols 两份 | 去掉「`pipelines.on_seal_enter` → …」的失准表述，改指 `[checks.audit].stages_*` |
+
+### 偏离票面文字一处（记录）
+
+票里写"迁为 `[checks.seal].stages_enter/stages_pre`"，实际落 **`[checks.audit].stages_produce/stages_verify`**。理由：这两步的消费者是**审计流本身**（`k3dge milestone audit` 也能单独调，不经 seal），挂 `seal` 会谎报归属；且 `stages_produce/stages_verify` 与 `run_audit_flow` 的 produce/verify 两相同名，不用另建映射。
+
+### 途中撞到的架构闸（真红，已按规则修）
+
+`_validate_declared_stages` 要解析 action ref，最初从 `pipeline_runner` import `resolve_action` ⇒ `test_gate_imports` 红：**闸核不得 import 生命周期**（T-02）。按既有方向（`pipeline_runner` 已从 `pipeline_schema` 取 `_VALID_PROVIDERS`）把 `resolve_role`/`resolve_action` 这两个纯配置读取函数下沉到闸核层，runner 反向 import 并 re-export（既有 `pipeline_runner.resolve_action` 引用不破）。
+
+### 另一次自伤（记录，防再犯）
+
+用下标切片改 `pipeline_schema.py` 时把文件前缀（docstring + imports）整段替掉，`from __future__` 落到第 59 行 ⇒ SyntaxError。回滚该文件后改用精确锚点编辑。**教训：跨函数搬迁不要用 `index()` 切片，用显式锚点或 AST。**
+
+## 验收（实测）
+
+```
+gates.stages(ws,"audit","produce") == ["audit.actions.audit"]
+gates.all_stage_refs(ws)           == ["audit.actions.audit","audit.actions.verify"]
+validate_pipeline_config(本仓)      == []
+test_downstream_can_rebind_stages   改 .agent/gates.toml 即换实现（下游可配，声明面唯一）
+test_audit_flow_calls_the_declared_ref
+                                    run_audit_flow 真调声明里的 ref（dummy.actions.lens），
+                                    不再出现 k3dit.actions.audit；verify 声明为空 ⇒ 跳过
+test_retired_pipelines_section_is_flagged  下游留旧段 ⇒ PIPELINE_SCHEMA_INVALID(retired)
+test_unresolved_stage               只声明一条腿 ⇒ PIPELINE_UNRESOLVED_STAGE 且指名 verify
+test_declared_stages_resolve_via_role_binding  角色名经 bind 解析 ⇒ 绿
+test_no_pipelines_section_left_in_repo_config  仓内与模板都无 [pipelines.*] 段
+
+567 passed；k3dge sync 回写 engine 契约哈希；check 绿
+```

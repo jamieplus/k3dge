@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -33,6 +33,53 @@ _PIPELINE_REL = ".agent/pipeline.toml"
 
 # Returned tuple: (rule_code, human_message)
 PipelineViolation = Tuple[str, str]
+
+
+# --- action ref 解析（纯配置读取，无副作用）---
+# 归属：闸核层。`pipeline_runner`（出向/生命周期）从这里 import —— 方向 lifecycle → gate，
+# 符合 T-02（闸核不得 import 生命周期，`test_gate_imports` 守）。原先住在 runner 里，
+# 于是闸核想校验“声明的外部步能否解析”就得反向 import 生命周期层（实测红）。
+def resolve_role(pipeline: dict, name: str) -> str:
+    """`[roles.<name>] bind = "<server>"` → 具体 server 名；无绑定返回原名。
+
+    规则 08 / peer contract §0：编排只认角色（audit/quality/cache），角色→实现的绑定
+    是配置事实；k3dge 的代码路径上不出现具体 harness 名。
+    """
+    roles = pipeline.get("roles") if isinstance(pipeline, dict) else None
+    if isinstance(roles, dict):
+        entry = roles.get(name)
+        if isinstance(entry, dict):
+            bind = entry.get("bind")
+            if isinstance(bind, str) and bind and bind != name:
+                return bind
+    return name
+
+
+def resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]:
+    """Resolve `role.actions.name` / `peer.actions.name` (or 2-part alias) to transports."""
+    if not pipeline:
+        return None
+    parts = action_ref.split(".")
+    if parts:
+        bound = resolve_role(pipeline, parts[0])
+        if bound != parts[0]:
+            action_ref = ".".join([bound] + parts[1:])
+    peers = pipeline.get("peers", {})
+    parts = action_ref.split(".")
+    if len(parts) >= 3 and parts[1] == "actions":
+        peer = peers.get(parts[0], {})
+        action = peer.get("actions", {}).get(parts[2])
+        if isinstance(action, dict) and action.get("transports"):
+            return action["transports"]
+    # 2-part alias: peer.name
+    if len(parts) == 2:
+        peer = peers.get(parts[0], {})
+        action = peer.get("actions", {}).get(parts[1])
+        if isinstance(action, dict) and action.get("transports"):
+            return action["transports"]
+        if peer.get("transports"):
+            return peer["transports"]
+    return None
 
 
 # k3dit:leftover Q-6 CC28 validate_pipeline_config 分拆校验
@@ -93,18 +140,46 @@ def _validate_peers(workspace, peers, servers, role_bind):
 
 
 def _validate_pipelines(pipelines, declared) -> List[PipelineViolation]:
+    """`[pipelines.*]` 已废（迁为 `[checks.<op>].stages_<phase>`）：留此只做**迁移守卫**。
+
+    历史病灶：那两处声明只有本函数校验形状，**没有任何执行者读取**——文档声称的
+    机制不存在（AGENTS.md §13 缺“到达”环）。外部步现由 `gates.stages()` 声明、
+    `milestone_audit.run_audit_flow` 真读；下游若还留着旧段，必须显式红一次逼迁移，
+    而不是静默失效。
+    """
     errors: List[PipelineViolation] = []
-    if pipelines and not isinstance(pipelines, dict):
-        errors.append(("PIPELINE_SCHEMA_INVALID", "'pipelines' must be a table"))
-    for pipe_name, pipe_cfg in (pipelines or {}).items():
-        if not isinstance(pipe_cfg, dict):
-            errors.append(("PIPELINE_SCHEMA_INVALID",
-                           f"pipeline '{pipe_name}' must be a table"))
-            continue
-        for stage in pipe_cfg.get("stages", []) or []:
-            if stage not in declared:
-                errors.append(("PIPELINE_UNRESOLVED_STAGE",
-                               f"stage '{stage}' in pipeline '{pipe_name}' is not declared in peers"))
+    if not pipelines:
+        return errors
+    if not isinstance(pipelines, dict):
+        return [("PIPELINE_SCHEMA_INVALID", "'pipelines' must be a table")]
+    for pipe_name in sorted(pipelines):
+        errors.append((
+            "PIPELINE_SCHEMA_INVALID",
+            f"[pipelines.{pipe_name}] is retired: declare external steps as "
+            f"`[checks.<op>].stages_<phase>` (engine/gates.DEFAULTS or .agent/gates.toml); "
+            f"nothing reads [pipelines.*] anymore",
+        ))
+    return errors
+
+
+def _validate_declared_stages(workspace: Path, data: dict) -> List[PipelineViolation]:
+    """声明的外部步必须解析得到 transports —— 不让声明空转。
+
+    `[checks.*].stages_*` 是 action ref（角色名 `audit.actions.x` 或 peer 直名）；
+    解析走 `resolve_action`（含 `[roles.*] bind` 的角色→peer 解析），解析不到 ⇒ 红。
+    这是“声明面唯一 + 声明必须有执行者”的机检半边（另半边是执行器真读它）。
+    """
+    from k3dge.engine import gates
+
+    errors: List[PipelineViolation] = []
+    for ref in gates.all_stage_refs(workspace):
+        if resolve_action(data, ref) is None:
+            errors.append((
+                "PIPELINE_UNRESOLVED_STAGE",
+                f"declared stage '{ref}' resolves to no transports "
+                f"(check [roles.*] bind + [peers.*.actions.*] in .agent/pipeline.toml, "
+                f"or override [checks.audit] in .agent/gates.toml)",
+            ))
     return errors
 
 
@@ -143,6 +218,7 @@ def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
     p_errs, declared = _validate_peers(workspace, peers, servers, role_bind)
     errors.extend(p_errs)
     errors.extend(_validate_pipelines(data.get("pipelines", {}), declared))
+    errors.extend(_validate_declared_stages(workspace, data))
     return errors
 
 

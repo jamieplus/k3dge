@@ -102,8 +102,9 @@ class TestNextStepRender(TestCase):
         """派发表的 key 必须是已声明的闸/动作 id 或内部 id——不得长出野生词汇。"""
         declared = set()
         for kind in gates.DEFAULTS["checks"]:
-            declared.update(gates.DEFAULTS["checks"][kind]["preconditions"])
-            declared.update(gates.DEFAULTS["checks"][kind]["actions"])
+            unit = gates.DEFAULTS["checks"][kind]
+            declared.update(unit.get("preconditions") or [])   # audit 单元只有 stages_*
+            declared.update(unit.get("actions") or [])
         declared.update(gates.INTERNAL_GATE_IDS)
         self.assertEqual(set(nextstep.GATE_NEXT) - declared, set())
         for _gid, (state, fact_key) in nextstep.GATE_NEXT.items():

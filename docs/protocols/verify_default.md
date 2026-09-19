@@ -20,7 +20,7 @@
 
 ## 到达
 
-本文件由 `pipeline.toml` 的 `peers.k3dit.actions.verify.manual` 指向；`k3dge check` 不解析本文件内容，仅审计角色在 `pipelines.on_pre_seal` 阶段按此手验，与 `k3dit check-report` 互为同级降级终点。
+本文件由 `pipeline.toml` 的 `peers.k3dit.actions.verify.manual` 指向；`k3dge check` 不解析本文件内容，仅审计角色在 `[checks.audit].stages_verify` 阶段按此手验，与 `k3dit check-report` 互为同级降级终点。
 
 ## Constraints
 

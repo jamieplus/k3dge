@@ -165,14 +165,16 @@ class TestAuditFlow(TestCase):
         with mock.patch("k3dge.engine.pipeline_runner.run_action", side_effect=fake):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "audited")
+        # ref 是**角色名**（audit.actions.*），由 [roles.audit] bind 解析到 peer——
+        # 下游换实现不用改声明（pipeline.toml 既定口径：新流程一律走角色名）
         produce = {r: a for r, a in calls if r.endswith(("actions.audit", "actions.quality"))}
-        self.assertIn("k3dit.actions.audit", produce)
-        self.assertNotIn("pass_number", produce["k3dit.actions.audit"])  # never leaks k3dit internals
-        self.assertIn("M1", produce["k3dit.actions.audit"].get("target_scope", ""))
-        self.assertEqual(produce["k3dit.actions.audit"].get("milestone_id"), "M1")
+        self.assertIn("audit.actions.audit", produce)
+        self.assertNotIn("pass_number", produce["audit.actions.audit"])  # never leaks k3dit internals
+        self.assertIn("M1", produce["audit.actions.audit"].get("target_scope", ""))
+        self.assertEqual(produce["audit.actions.audit"].get("milestone_id"), "M1")
         verify = {r: a for r, a in calls if r.endswith("actions.verify")}
-        self.assertIn("k3dit.actions.verify", verify)
-        self.assertTrue(str(verify["k3dit.actions.verify"].get("path", "")).endswith(".md"))
+        self.assertIn("audit.actions.verify", verify)
+        self.assertTrue(str(verify["audit.actions.verify"].get("path", "")).endswith(".md"))
 
     def test_rejection_quotes_the_peer_suggested_report_path(self) -> None:
         ws = _ws_oneshot()  # no report on disk
@@ -758,3 +760,60 @@ class TestGateIdDispatch(TestCase):
         text = out.getvalue()
         self.assertIn("发现 1 项待修", text)  # prompt 走 question 投影
         self.assertIn(nextstep.question_text("audit_open", "M1", n=1), text)
+
+
+class TestStagesAreDeclaredNotHardcoded(TestCase):
+    """外部步读声明面（`[checks.audit].stages_*`），不再硬编码 action ref。
+
+    病灶：原 `milestone_audit.streams` 写死 `k3dit.actions.audit|verify`，而
+    `pipeline.toml` 的 `[pipelines.on_seal_enter/on_pre_seal]` 只有校验没有执行者
+    ⇒ AGENTS.md §12 声称的机制不存在（§13 缺"到达"环）。
+    """
+
+    def test_executor_reads_declared_stages(self):
+        from k3dge.engine import gates
+
+        self.assertEqual(gates.stages(_ws(), "audit", "produce"), ["audit.actions.audit"])
+        self.assertEqual(gates.stages(_ws(), "audit", "verify"), ["audit.actions.verify"])
+        self.assertEqual(gates.all_stage_refs(_ws()),
+                         ["audit.actions.audit", "audit.actions.verify"])
+
+    def test_downstream_can_rebind_stages(self):
+        """下游可配（用户裁定）：改 .agent/gates.toml 就换实现，声明面只有一处。"""
+        from k3dge.engine import gates
+
+        ws = _ws()
+        (ws / ".agent" / "gates.toml").write_text(
+            '[checks.audit]\nstages_produce = ["myauditor.actions.lens"]\nstages_verify = []\n',
+            encoding="utf-8")
+        self.assertEqual(gates.stages(ws, "audit", "produce"), ["myauditor.actions.lens"])
+        self.assertEqual(gates.stages(ws, "audit", "verify"), [])
+        self.assertEqual(gates.all_stage_refs(ws), ["myauditor.actions.lens"])
+
+    def test_audit_flow_calls_the_declared_ref(self):
+        ws = _ws_oneshot()
+        _clean_report(ws)
+        (ws / ".agent" / "gates.toml").write_text(
+            '[checks.audit]\nstages_produce = ["dummy.actions.lens"]\nstages_verify = []\n',
+            encoding="utf-8")
+        calls = []
+
+        def fake(_ws, ref, *, io=None, timeout_default=60, arguments=None):
+            calls.append(ref)
+            return TransportResult(True, "manual", "ok")
+
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", side_effect=fake):
+            status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
+        self.assertEqual(status, "audited")
+        self.assertIn("dummy.actions.lens", calls)          # 真读了声明
+        self.assertNotIn("k3dit.actions.audit", calls)      # 没有硬编码兜底
+        self.assertEqual([c for c in calls if c.endswith("actions.verify")], [])  # verify 声明为空 ⇒ 跳过
+
+    def test_no_pipelines_section_left_in_repo_config(self):
+        """声明面唯一：仓内配置不得再有 `[pipelines.*]` 段（注释里提历史不算）。"""
+        root = Path(__file__).resolve().parents[3]
+        for rel in (".agent/pipeline.toml",
+                    "src/k3dge/templates/assets/pipeline.toml.template"):
+            lines = (root / rel).read_text(encoding="utf-8").splitlines()
+            sections = [ln.strip() for ln in lines if ln.strip().startswith("[pipelines.")]
+            self.assertEqual(sections, [], f"{rel} 仍有已废段：{sections}")

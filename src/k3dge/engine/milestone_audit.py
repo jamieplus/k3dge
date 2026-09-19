@@ -203,9 +203,15 @@ def run_audit_flow(
 
     # 单报告（ADR-0025 合并审计模块）：一轮 = 一份 12 列；quality 是模块内窗口，
     # 不再是独立 peer/report。ratchet 模式下审计腿已由步进器闭环，streams 空。
-    streams = {"audit": ("k3dit.actions.audit", "k3dit.actions.verify")}
-    if ratchet:
-        streams.pop("audit")
+    # 外部步读**声明面**（gates [checks.audit].stages_produce/stages_verify），
+    # 不再硬编码 action ref —— 原 pipeline.toml 的 [pipelines.*] 只有校验、无执行者。
+    from k3dge.engine import gates as _gates
+
+    _produce = _gates.stages(workspace, "audit", "produce")
+    _verify = _gates.stages(workspace, "audit", "verify")
+    streams = {"audit": (_produce[0] if _produce else "", _verify[0] if _verify else "")}
+    if ratchet or not _produce:
+        streams.pop("audit", None)
 
     # mandatory audit + fix loop, capped at `max_verify_attempts` verifies.
     while True:
@@ -283,6 +289,8 @@ def run_audit_flow(
 
     # verify phase: secondary cross-check of the audit report.
     for _kind, (_produce_action, verify_action) in streams.items():
+        if not verify_action:
+            continue   # 声明面没给 verify 步（下游可配）⇒ 不做二次核对，不拿空 ref 去跑
         # Verify is per-report and needs to be told *which* report (the check tools take a
         # path); without this the mcp transport can never succeed and falls to manual.
         found = _find_report(workspace, milestone_id, _kind)

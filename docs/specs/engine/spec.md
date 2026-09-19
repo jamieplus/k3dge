@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:90001f5c8bdab840717be75dc03ad5db7d96c32423d0c86a6bbd4e71ebae6ceb`
+- **Contract Hash**: `sha256:8f65204726bdfd398bce05e90b2431d942175f7924a2cf63bdbccaaa72e46620`
 - **Last Updated**: 2026-09-19
 
 ## 1. Domain Boundary & Responsibilities
@@ -208,10 +208,12 @@ class Rejection(str)
 rejection(message: Any, fallback_gate_id: str) -> Rejection
 REL = '.agent/gates.toml'
 INTERNAL_GATE_IDS: tuple = ('unknown_gate_id', 'unknown_action_id', 'audit_report_missing', 'audit_open_declined', 'milestone_id_invalid', 'no_tasks', 'invalid_task_status', 'align_failed', 'archive_failed')
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}, 'audit': {'stages_produce': ['audit.actions.audit'], 'stages_verify': ['audit.actions.verify']}}}
 load(workspace: Path) -> Dict[str, Any]
 get(workspace: Path, section: str, key: str) -> Any
 preconditions(workspace: Path, kind: str) -> list
+stages(workspace: Path, kind: str, phase: str) -> list
+all_stage_refs(workspace: Path) -> list
 actions(workspace: Path, kind: str) -> list
 from __future__ import annotations
 from pathlib import Path
@@ -344,6 +346,8 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 from k3dge.engine.mcp_json import load_mcp_endpoints
+from k3dge.engine.pipeline_schema import resolve_action
+from k3dge.engine.pipeline_schema import resolve_role
 class TransportResult
     ok: bool
     provider: Optional[str]
@@ -352,8 +356,6 @@ class TransportResult
     downgrades: List[str] = field(default_factory=list)
     payload: str = ''
 load_pipeline_config(workspace: Path) -> dict
-resolve_role(pipeline: dict, name: str) -> str
-resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]
 resolve_endpoint_command(workspace: Path, endpoint: dict) -> Tuple[Optional[str], str]
 build_server_params(workspace: Path, endpoint: dict, command: str) -> dict
 call_mcp_tool(params: dict, tool: str, arguments: dict, timeout: int) -> Tuple[bool, str, List[str], str]
@@ -362,8 +364,11 @@ run_action(workspace: Path, action_ref: str, *, io=None, timeout_default: int=60
 from __future__ import annotations
 from pathlib import Path
 from typing import List
+from typing import Optional
 from typing import Tuple
 PipelineViolation = Tuple[str, str]
+resolve_role(pipeline: dict, name: str) -> str
+resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]
 validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
 from __future__ import annotations
 from pathlib import Path

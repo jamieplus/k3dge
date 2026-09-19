@@ -38,7 +38,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from k3dge.engine.mcp_json import load_mcp_endpoints
-from k3dge.engine.pipeline_schema import _VALID_PROVIDERS  # 单源："什么 provider 合法" 归结构校验层
+from k3dge.engine.pipeline_schema import (  # 单源：provider 合法集 + action ref 解析归闸核层
+    _VALID_PROVIDERS,
+    resolve_action,
+    resolve_role,
+)
 
 try:
     import tomllib  # py3.11+
@@ -88,49 +92,6 @@ def load_pipeline_config(workspace: Path) -> dict:
         return tomllib.loads(p.read_text(encoding="utf-8"))
     except Exception:  # pragma: no cover - defensive
         return {}
-
-
-def resolve_role(pipeline: dict, name: str) -> str:
-    """`[roles.<name>] bind = "<server>"` → 具体 server 名；无绑定返回原名。
-
-    规则 08 / peer contract §0：编排只认角色（audit/quality/cache），角色→实现的绑定
-    是配置事实；k3dge 的代码路径上不出现具体 harness 名。
-    """
-    roles = pipeline.get("roles") if isinstance(pipeline, dict) else None
-    if isinstance(roles, dict):
-        entry = roles.get(name)
-        if isinstance(entry, dict):
-            bind = entry.get("bind")
-            if isinstance(bind, str) and bind and bind != name:
-                return bind
-    return name
-
-
-def resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]:
-    """Resolve `role.actions.name` / `peer.actions.name` (or 2-part alias) to transports."""
-    if not pipeline:
-        return None
-    parts = action_ref.split(".")
-    if parts:
-        bound = resolve_role(pipeline, parts[0])
-        if bound != parts[0]:
-            action_ref = ".".join([bound] + parts[1:])
-    peers = pipeline.get("peers", {})
-    parts = action_ref.split(".")
-    if len(parts) >= 3 and parts[1] == "actions":
-        peer = peers.get(parts[0], {})
-        action = peer.get("actions", {}).get(parts[2])
-        if isinstance(action, dict) and action.get("transports"):
-            return action["transports"]
-    # 2-part alias: peer.name
-    if len(parts) == 2:
-        peer = peers.get(parts[0], {})
-        action = peer.get("actions", {}).get(parts[1])
-        if isinstance(action, dict) and action.get("transports"):
-            return action["transports"]
-        if peer.get("transports"):
-            return peer["transports"]
-    return None
 
 
 def _append_log(workspace: Path, line: str) -> None:

@@ -82,14 +82,13 @@ transports = [
   { provider = "skip" },
 ]
 
-# 1) Entering seal triggers the single mandatory audit (merged audit module, ADR-0025).
-[pipelines.on_seal_enter]
-stages = [
-  "k3dit.actions.audit",
-]
-
-# 2) Pre-seal verify checks that one report.
-[pipelines.on_pre_seal]
-stages = [
-  "k3dit.actions.verify",
-]
+# 编排声明面只有一处：`[checks.*]`（缺省在 engine/gates.DEFAULTS，仓内可用
+# .agent/gates.toml 覆盖；下游可配）。**外部 peer 步**声明为 `stages_produce` /
+# `stages_verify`（action ref，交 run_action 走 mcp→cli→manual/skip），**内部动作**
+# 声明为 `actions`（注册表 id）；两类 id 不混一张词表（ADR-0026 §2.1）。
+#
+# 审计流的两步即在此声明（原 [pipelines.on_seal_enter] / [on_pre_seal] 已迁走——
+# 那两处只有 schema 校验、没有执行者，属"文档声称的机制不存在"）：
+#   [checks.audit] stages_produce = ["k3dit.actions.audit"]
+#                  stages_verify  = ["k3dit.actions.verify"]
+# 声明了却解析不到 peer action ⇒ PIPELINE_UNRESOLVED_STAGE（不让声明空转）。

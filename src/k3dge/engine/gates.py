@@ -65,12 +65,21 @@ DEFAULTS: Dict[str, Any] = {
     "search": {"context_max": 3},
     "markers": {"max_note": 80, "max_note_pending": 500},
     "output": {"default_lines": 10},
-    # 编排单元：preconditions（闸 id，全绿才继续）+ actions（动作 id）。见 ADR-0001 §2 第 8 条。
+    # 编排单元：preconditions（闸 id，全绿才继续）+ actions（**内部**动作 id）
+    #            + stages_*（**外部** peer action ref，交 run_action 走传输链）。
+    # 两类 id 不混一张词表（ADR-0026 §2.1：席位原子调用 vs k3dge 自身的步）。
+    # 见 ADR-0001 §2 第 8 条。
     "checks": {
         "seal": {"preconditions": ["tasks_all_done", "audit_closed", "evidence_chain", "align_pass", "guides_filled",
                                    "adrs_all_accepted", "adr_landed"],
                  "actions": ["full_matrix", "archive", "closure_note", "prune"]},
         "align": {"preconditions": ["tasks_all_done"], "actions": ["full_matrix"]},
+        # 审计流的两个外部步（原 pipeline.toml 的 [pipelines.on_seal_enter]/[on_pre_seal]，
+        # 那两处只有 schema 校验、无执行者 ⇒ 迁到这里，由 run_audit_flow 真读）
+        # ref 用**角色名**（audit.*），不写死 peer 名：下游把 [roles.audit] bind 到
+        # 别的实现时，声明不用改（pipeline.toml 的既定口径：新流程一律走角色名）。
+        "audit": {"stages_produce": ["audit.actions.audit"],
+                  "stages_verify": ["audit.actions.verify"]},
     },
 }
 
@@ -108,6 +117,30 @@ def preconditions(workspace: Path, kind: str) -> list:
     return list(load(workspace).get("checks", {}).get(kind, {}).get("preconditions", []))
 
 
+def stages(workspace: Path, kind: str, phase: str) -> list:
+    """某编排单元某相位的**外部 peer 步**（action ref 列表）。
+
+    `phase` ∈ {produce, verify}（读 `stages_<phase>`）。与 `actions()` 分型：
+    actions 是 k3dge 内部动作 id（注册表），stages 是外部 peer 的 action ref
+    （交 `run_action` 走 mcp→cli→manual/skip 传输链）。
+    """
+    decl = load(workspace).get("checks", {}).get(kind, {})
+    return list(decl.get(f"stages_{phase}", []))
+
+
+def all_stage_refs(workspace: Path) -> list:
+    """全部已声明的外部步 ref（供 schema 交叉校验：声明了就必须能解析）。"""
+    checks = load(workspace).get("checks", {})
+    out: list = []
+    for kind, decl in checks.items():
+        if not isinstance(decl, dict):
+            continue
+        for key, val in decl.items():
+            if key.startswith("stages_") and isinstance(val, list):
+                out.extend(str(v) for v in val)
+    return out
+
+
 def actions(workspace: Path, kind: str) -> list:
-    """某编排单元的动作 id 列表。"""
+    """某编排单元的**内部**动作 id 列表。"""
     return list(load(workspace).get("checks", {}).get(kind, {}).get("actions", []))

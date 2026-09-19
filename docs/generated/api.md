@@ -368,15 +368,19 @@ rejection(message: Any, fallback_gate_id: str) -> Rejection
     # doc: 把动作/闸的失败返回值正规化为 `Rejection`（已是 Rejection 则原样透传）。
 REL = '.agent/gates.toml'
 INTERNAL_GATE_IDS: tuple = ('unknown_gate_id', 'unknown_action_id', 'audit_report_missing', 'audit_open_declined', 'milestone_id_invalid', 'no_tasks', 'invalid_task_status', 'align_failed', 'archive_failed')
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}, 'audit': {'stages_produce': ['audit.actions.audit'], 'stages_verify': ['audit.actions.verify']}}}
 load(workspace: Path) -> Dict[str, Any]
     # doc: 缺省 ∪ `.agent/gates.toml`（段内覆盖；`checks.<kind>` 逐键覆盖）；文件缺失/坏 ⇒ 缺省。
 get(workspace: Path, section: str, key: str) -> Any
     # doc: 读某闸的某阈值（含缺省）。
 preconditions(workspace: Path, kind: str) -> list
     # doc: 某编排单元（`check`/`align`/`seal`）的前置闸 id 列表。
+stages(workspace: Path, kind: str, phase: str) -> list
+    # doc: 某编排单元某相位的**外部 peer 步**（action ref 列表）。
+all_stage_refs(workspace: Path) -> list
+    # doc: 全部已声明的外部步 ref（供 schema 交叉校验：声明了就必须能解析）。
 actions(workspace: Path, kind: str) -> list
-    # doc: 某编排单元的动作 id 列表。
+    # doc: 某编排单元的**内部**动作 id 列表。
 # manifest.py
 from __future__ import annotations
 from pathlib import Path
@@ -537,6 +541,8 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 from k3dge.engine.mcp_json import load_mcp_endpoints
+from k3dge.engine.pipeline_schema import resolve_action
+from k3dge.engine.pipeline_schema import resolve_role
 class TransportResult
     ok: bool
     provider: Optional[str]
@@ -546,10 +552,6 @@ class TransportResult
     payload: str = ''
 load_pipeline_config(workspace: Path) -> dict
     # doc: Return parsed pipeline.toml, or {} if absent/unparseable.
-resolve_role(pipeline: dict, name: str) -> str
-    # doc: `[roles.<name>] bind = "<server>"` → 具体 server 名；无绑定返回原名。
-resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]
-    # doc: Resolve `role.actions.name` / `peer.actions.name` (or 2-part alias) to transports.
 resolve_endpoint_command(workspace: Path, endpoint: dict) -> Tuple[Optional[str], str]
     # doc: Land a declared interpreter on this machine, noisily.
 build_server_params(workspace: Path, endpoint: dict, command: str) -> dict
@@ -564,8 +566,13 @@ run_action(workspace: Path, action_ref: str, *, io=None, timeout_default: int=60
 from __future__ import annotations
 from pathlib import Path
 from typing import List
+from typing import Optional
 from typing import Tuple
 PipelineViolation = Tuple[str, str]
+resolve_role(pipeline: dict, name: str) -> str
+    # doc: `[roles.<name>] bind = "<server>"` → 具体 server 名；无绑定返回原名。
+resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]
+    # doc: Resolve `role.actions.name` / `peer.actions.name` (or 2-part alias) to transports.
 validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
     # doc: Validate `.agent/pipeline.toml`. Returns [] when valid or file absent.
 # process_audit.py
