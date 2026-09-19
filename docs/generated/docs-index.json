@@ -673,11 +673,11 @@
       "tokens": "ADR 编号截断：废物理删除、退役单一面 obsolete/、13 个永久退役号入表、分配=max+1、复用可机检"
     },
     {
-      "path": "docs/tasks/2026-09-19-M10-refactor-orch_converge_gate_facts.md",
+      "path": "docs/tasks/2026-09-19-M10-refactor-orch_converge_gate_facts.done.md",
       "type": "tasks",
-      "id": "2026-09-19-M10-refactor-orch_converge_gate_facts",
+      "id": "2026-09-19-M10-refactor-orch_converge_gate_facts.done",
       "title": "编排骨架收敛·第一刀：闸红文案单源 + 阻断档位统一（Violation 只产 code+事实，文案/severity/options 归声明）",
-      "status": "in-progress",
+      "status": "done",
       "tokens": "编排骨架收敛·第一刀：闸红文案单源 + 阻断档位统一（Violation 只产 code+事实，文案/severity/options 归声明）"
     },
     {

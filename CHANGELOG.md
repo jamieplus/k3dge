@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 落 ADR：投影三维契约（目标 × 语法 × 范围）
 - 判定到动作的结构化派发：gate_id 到 action（替掉散文子串匹配）
 - 判定点单源化：prompt 文案源出 STATE_OPTIONS
+- 编排骨架收敛·第一刀：闸红文案单源 + 阻断档位统一（Violation 只产 code+事实，文案/severity/options 归声明）
 ### Fixed
 - seal/align 任务扫描不含 archive/<M>/：提前归档的 done 里程碑任务致封板被拒（No tasks found）
 

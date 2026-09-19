@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 milestone: M10
 priority: P1
 date: 2026-09-19
@@ -92,7 +92,39 @@ cli/main._to_json       violation 带 severity（进程投影）
 555 passed；k3dge check 绿
 ```
 
-待办（本票剩余）：
+## 收尾（2026-09-19，待办 1-5 全部落）
+
+```
+待办 1  迁余下 code                     ✅ commit 84040f5
+        evaluator 16 个 code / 22 处构造点全迁；实测覆盖：
+        Violation 构造点 35 处、未进表 code 0 个；pure_* 侧 20 个 code 全声明；共 42 code
+待办 2  hook schema gate 查表           ✅ commit 589f882（_add 按声明 severity 分流 errs/warns）
+待办 3  _orphan_warnings 档位查表       ✅ 同上（"WARN-only" 散文标签消失，改由 severity=warn 决定）
+待办 4  DUP_CHECK observe 进表          ✅ 同上（cli 散文改查表渲染；mcp JSON 带 similar_severity）
+待办 5  message 降为事实 + 散文回流守卫  ✅ TestNoProseBackflow（已声明 code 的 message ≤100 字符
+                                        且不得含 "run 'k3dge…" 这类补救散文）
+```
+
+分类结论（`fix` 字段，42 个全部显式分类，无默认值蒙混）：
+
+| 类 | 数 | 成员 |
+| --- | --- | --- |
+| 确定性可修 | 10 | 已有命令即修法：`ADR_SUPERSEDE_UNRECONCILED` `CONTRACT_DRIFT` `CONTRACT_HASH_MISSING` `DOC_INDEX_STALE`（k3dge sync）、`VERSION_MISMATCH`（version bump）；纯字节格式：`MD_CRLF` `MD_ENCODING` `MD_NO_FINAL_NEWLINE` `MD_TRAILING_WS` `TASK_BODY_META_REDUNDANT` |
+| 需判断 | 32 | 环境类（`TEST_ENV_MISSING` `GIT_UNAVAILABLE`：不是仓内文件偏差）、内容类（`DOC_SCHEMA_INVALID` `SPEC_MISSING_SECTION`：缺的是要写的内容）、方向类（`DOMAIN_IMPORT_VIOLATION` `TEMPLATE_DRIFT` `ADR_NUMBER_MISMATCH` `TASK_STATUS_MISMATCH`）、会改史类（`AUDIT_TRAIL_APPEND_ONLY`）、判定类（`DOC_NEW_UNSCREENED` `DUP_CHECK` `ORPHAN_*` `DANGLING_*`） |
+
+⇒ 这张表就是 doc 策略要的「进程能修 vs 不能修」清单：**10 : 32**，且 10 个里有 5 个
+   的修法已经存在（sync / version bump / reconcile），真正待造的自动修只有 5 个字节格式类
+   + `TASK_BODY_META_REDUNDANT`。
+
+## 有意留（记此，不在本票做）
+
+- **pure_* 检查器仍返回散文 msg**（2-tuple），hook 把它当 `detail` 行带出——这是 `render(detail=)`
+  的过渡约定。彻底结构化要改 ~20 个检查器的返回形状（3-tuple）与其全部测试，收益是
+  fact 模板能引用具体字段（哪一行/哪个值）而非整句原文。判为下一批，不塞进本票。
+- `Violation.message` 未删：仍是 JSON/MCP 消费者与未声明 code 的兜底。等下游消费面
+  改读 `severity` + `detail` 后再考虑。
+
+待办（原记录，已全部完成，留作轨迹）：
 1. 迁余下 code：evaluator 的 29 处 `Violation(...)` 手拼串（CONTRACT_HASH_MISSING /
    TEMPLATE_DRIFT / VERSION_MISMATCH / DOC_INDEX_STALE / DOMAIN_IMPORT_VIOLATION /
    MATRIX_TEST_UNRESOLVED / MISSING_TEST_FILE / PIPELINE_SCHEMA_INVALID /
