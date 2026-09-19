@@ -609,19 +609,19 @@
       "tokens": "判定点单源化：prompt 文案源出 STATE_OPTIONS"
     },
     {
-      "path": "docs/tasks/2026-09-18-M10-audit-doc_audit_adr_architecture_guides_11.md",
+      "path": "docs/tasks/2026-09-18-M10-audit-doc_audit_adr_architecture_guides_11.done.md",
       "type": "tasks",
-      "id": "2026-09-18-M10-audit-doc_audit_adr_architecture_guides_11",
+      "id": "2026-09-18-M10-audit-doc_audit_adr_architecture_guides_11.done",
       "title": "doc-audit: 文档作者合规审计（adr, architecture, guides 等 11 处）",
-      "status": "idea",
+      "status": "done",
       "tokens": "doc-audit: 文档作者合规审计（adr, architecture, guides 等 11 处）"
     },
     {
-      "path": "docs/tasks/2026-09-18-M10-docs-adr_doc_normalize_strategy.md",
+      "path": "docs/tasks/2026-09-18-M10-docs-adr_doc_normalize_strategy.done.md",
       "type": "tasks",
-      "id": "2026-09-18-M10-docs-adr_doc_normalize_strategy",
+      "id": "2026-09-18-M10-docs-adr_doc_normalize_strategy.done",
       "title": "ADR 修正案：doc 规约化策略重划（C1-C5：0022 §2.2 时机/产物、0005 §2.7 同形同路、耐久改闸、先并入后新建配闸）",
-      "status": "idea",
+      "status": "done",
       "tokens": "ADR 修正案：doc 规约化策略重划（C1-C5：0022 §2.2 时机/产物、0005 §2.7 同形同路、耐久改闸、先并入后新建配闸）"
     },
     {

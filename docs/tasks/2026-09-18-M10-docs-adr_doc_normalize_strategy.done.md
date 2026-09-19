@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M10
 priority: P1
 date: 2026-09-18
@@ -41,3 +41,25 @@ date: 2026-09-18
 - 现行 doc-audit 实现（`engine/doc_audit.py`）在本策略下的去留由实现票裁定；本票只改 ADR。
 - **2026-09-19 拆出两票**（避免本票面过宽）：编号系统本身 → `2026-09-19-M10-docs-adr_number_cutline`（C5 的"复用无闸"在那票解决）；D 线不变量 + 骨架下游可配 → `2026-09-19-M10-docs-adr0026_d_line_and_downstream`。本票保留 C1-C4（doc 策略的 ADR 冲突）。
 - C6（`[pipelines.*]` 无执行者）归 `2026-09-18-M10-fix-pipelines_stages_dead_config`，已裁定取"接通并入节点表"。
+
+## 结案（2026-09-19）：C1-C5 全部落地，逐条对账
+
+| ID | 修法 | 落点（commit） | 状态 |
+| --- | --- | --- | --- |
+| C1 | ADR-0022 §2.2 时机/产物重划：每次变更+报告+票 → 提交时硬闸 / 新建首次排查 / seal 轮规约化 | `f749e27`（🅰1 + 内联 footnote 🅰1.1/🅰1.3） | ✅ |
+| C2 | ADR-0005 §2.7「同形同路」划新线：可判定形式规约归 k3dge 确定性执行，语义质量仍归外部透镜（不推翻同形同路本身） | `f749e27`（🅰1.1 footnote） | ✅ |
+| C3 | 论证「闭集规则 + 幂等 + 每条一测的规约化＝形式层，非 merit」；唯一源＝`gate_facts` 的 `fix` 字段（实测 10 确定性可修 : 32 需判断） | `3c64208`（fix 维度）+ `f749e27`（🅰1.3 明写"形式规约不是 merit"） | ✅ |
+| C4 | 耐久从"票归里程碑"改为"闸"（`docs_normalized` precondition）；实证：09-14 那张票自述"过期空壳…无可执行内容"且 report 绑到待修=0 的报告 ⇒ 关票不需任何实际工作 | `f749e27`（🅰1.4）——**决策已落，闸的实现归 `doc_strategy_five_points`** | ✅ 决策 / ⏳ 实现 |
+| C5 | 「先并入，后新建」配闸：新建受管文档首次排查闸 `DOC_NEW_UNSCREENED`（阻断一次，判定归 agent）+ 编号侧 `ADR_NUMBER_REUSE` / `ADR_REF_RETIRED` | `a04242c`（排查闸）、`48b3301`（编号两码） | ✅ |
+| C6 | `[pipelines.*]` 无执行者 → 接通并迁 `[checks.audit].stages_*` | `a9601a0`（独立票 `pipelines_stages_dead_config`） | ✅ |
+
+### 附带修正（本票触发查出、已修）
+
+- ADR-0004 / ADR-0022 的 `Landed-by` 指向本轮删掉的门面 `engine/milestone.py` ⇒ `adr_landed` 曾报 2 条不可解析（会卡 seal）。已改指叶子（`seal_flow.py` / `task_write.py`），属引用面修正、决策未变，故不进 `Amended-by`（`8f75c04`）。
+- ADR frontmatter 的 `#` 散文注释被 `doc_catalog._TITLE_RE` 当成 H1 ⇒ 12/14 条 ADR 的索引标题变成注释首行。已修（frontmatter 只放数据）+ 4 条回归守卫（`8f75c04`）。
+
+### 本票不做（归属别处）
+
+- `docs_normalized` 闸与 `doc_normalize` 动作的**实现** → `2026-09-18-M10-feat-doc_strategy_five_points`
+- 节点表（`needs/produces/on_error/kind` + ctx + 单执行器）→ `2026-09-19-M10-refactor-orch_node_table`
+- `run_doc_audit` 的退休（删路由/建票/报告绑定）→ 同 `doc_strategy_five_points`
