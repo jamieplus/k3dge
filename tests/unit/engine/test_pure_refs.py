@@ -332,3 +332,59 @@ class TestRepoTaskSingleSource(unittest.TestCase):
                 if code == "TASK_BODY_META_REDUNDANT":
                     offenders.append(msg)
         self.assertEqual(offenders, [])
+
+
+class TestNewDocScreening(unittest.TestCase):
+    """新建受管文档的首次排查闸（阻断一次；回执后放行）。
+
+    判定权在 agent（进程判不了语义覆盖）；闸只负责把排查送到动手那一刻。
+    """
+
+    def test_subjective_new_doc_is_screenable(self):
+        for rel in ("docs/adr/0027-x.md", "docs/memo/2026-09-19-y.md",
+                    "docs/guides/g.md", "docs/architecture/a.md",
+                    "docs/protocols/p.md", "docs/incidents/INC-20260919-x.md"):
+            self.assertTrue(pure_refs.is_screenable_new_doc(rel), rel)
+
+    def test_deterministic_and_aux_are_not(self):
+        """确定性流程生成的文档有权威生成源，不存在"值不值得建"⇒ 不排查。"""
+        for rel in ("docs/generated/api.md", "docs/specs/engine/spec.md",
+                    "docs/tasks/2026-09-19-M10-fix-x.md", "docs/reviews/2026-09-19-M10-audit.md",
+                    "docs/adr/README.md", "docs/adr/AUTHORING.md", "docs/adr/_template.md",
+                    "docs/memo/archive/2026-01-01-old.md", "src/k3dge/x.py", "README.md"):
+            self.assertFalse(pure_refs.is_screenable_new_doc(rel), rel)
+
+    def test_blocks_until_acked(self):
+        with tempfile.TemporaryDirectory() as td:
+            ws = Path(td)
+            rel = "docs/memo/2026-09-19-y.md"
+            out = pure_refs.find_unscreened_new_docs(ws, [rel])
+            self.assertEqual([c for c, _ in out], ["DOC_NEW_UNSCREENED"])
+            msg = out[0][1]
+            # ADR-0026 §2.2：fact + 成对 options，不出疑问句
+            self.assertIn("fact:", msg)
+            self.assertGreaterEqual(msg.count("option:"), 2)
+            self.assertNotIn("？", msg)
+            self.assertIn(f"k3dge doc screen {rel}", msg)
+
+            pure_refs.record_screen_ack(ws, rel)
+            self.assertEqual(pure_refs.find_unscreened_new_docs(ws, [rel]), [])
+
+    def test_ack_records_conclusion_without_judging(self):
+        with tempfile.TemporaryDirectory() as td:
+            ws = Path(td)
+            rel = "docs/adr/0027-x.md"
+            ack = pure_refs.record_screen_ack(ws, rel, into="docs/adr/0005-y.md")
+            text = ack.read_text(encoding="utf-8")
+            self.assertIn("merged-into docs/adr/0005-y.md", text)
+            self.assertIn(f"path: {rel}", text)
+            # 回执在 .protocol-ack/（ephemeral，已 gitignore），不污染受管文档
+            self.assertIn(".protocol-ack/doc-screen", str(ack))
+
+    def test_mixed_batch_only_flags_screenable(self):
+        with tempfile.TemporaryDirectory() as td:
+            ws = Path(td)
+            added = ["docs/generated/api.md", "docs/adr/0027-x.md", "src/x.py"]
+            out = pure_refs.find_unscreened_new_docs(ws, added)
+            self.assertEqual(len(out), 1)
+            self.assertIn("docs/adr/0027-x.md", out[0][1])

@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:7e9c170292f6d48fa63d5c0b4d7624df9a5904212a03f0b651e62273db21175d`
+- **Contract Hash**: `sha256:e7c7b8a0163a4995bd33d57fb8984111f906f0b10460da39272eac9cfaed90a3`
 - **Last Updated**: 2026-09-19
 
 ## 1. Domain Boundary & Responsibilities
@@ -367,6 +367,7 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from typing import Tuple
+from k3dge.engine.pure_schema import AUX_NAMES
 from k3dge.engine.pure_schema import parse_frontmatter_pairs
 Ref = Tuple[str, str]
 strip_fences(text: str) -> str
@@ -383,6 +384,12 @@ check_markdown_text(text: str, rel: str) -> List[Ref]
 find_orphan_specs(workspace: Path, manifest_spec_paths: List[str]) -> List[Ref]
 find_orphan_tests(workspace: Path) -> List[Ref]
 find_orphan_adrs(workspace: Path) -> List[Ref]
+DETERMINISTIC_DOC_PREFIXES: Tuple[str, ...] = ('docs/generated/', 'docs/specs/', 'docs/tasks/', 'docs/reviews/')
+SCREEN_ACK_REL = '.protocol-ack/doc-screen'
+is_screenable_new_doc(rel: str) -> bool
+screen_ack_path(workspace: Path, rel: str) -> Path
+find_unscreened_new_docs(workspace: Path, added_rels) -> List[Ref]
+record_screen_ack(workspace: Path, rel: str, *, into: Optional[str]=None) -> Path
 from __future__ import annotations
 from pathlib import Path
 from typing import Any

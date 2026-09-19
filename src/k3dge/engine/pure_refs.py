@@ -20,7 +20,7 @@ from typing import List, Optional, Tuple
 # chain are docstring-only — verified, no heavy deps). Never import functional
 # engine modules from here; enforced by `test_pure_imports_stdlib_only`.
 
-from k3dge.engine.pure_schema import parse_frontmatter_pairs
+from k3dge.engine.pure_schema import AUX_NAMES, parse_frontmatter_pairs
 
 Ref = Tuple[str, str]  # (code, message)
 
@@ -322,3 +322,76 @@ def find_orphan_adrs(workspace: Path) -> List[Ref]:
         if m.group(1) not in listed:
             out.append(("ORPHAN_ADR", f"docs/adr/{p.name}: ADR-{m.group(1)} not listed in README Topics"))
     return out
+
+
+# --- 新建受管文档的首次排查闸（用户裁定 2026-09-19：阻断，只第一次） ---
+
+#: 由确定性流程生成的受管文档前缀：各有权威生成源（sync / task create / 流程落盘），
+#: 不存在"值不值得建"的主观判断 ⇒ 不排查。剩下的（adr / memo / guides / architecture /
+#: protocols / incidents / branches）才是人/agent 主观撰写的。
+DETERMINISTIC_DOC_PREFIXES: Tuple[str, ...] = (
+    "docs/generated/",   # k3dge sync 生成
+    "docs/specs/",       # 契约哈希 / spec 由 sync 回写
+    "docs/tasks/",       # k3dge task create 生成
+    "docs/reviews/",     # 审计报告 / 收摊清单由流程落盘
+)
+
+#: 排查回执（ephemeral，已在 .gitignore）：一个文件一张回执，只活到本次提交过闸。
+SCREEN_ACK_REL = ".protocol-ack/doc-screen"
+
+
+def is_screenable_new_doc(rel: str) -> bool:
+    """该新增路径是否属"主观撰写的受管文档"（需要首次排查）。"""
+    if not rel.startswith("docs/") or not rel.endswith(".md"):
+        return False
+    name = Path(rel).name
+    if name in AUX_NAMES or name.startswith("."):
+        return False
+    if "archive" in Path(rel).parts:
+        return False
+    return not any(rel.startswith(pre) for pre in DETERMINISTIC_DOC_PREFIXES)
+
+
+def screen_ack_path(workspace: Path, rel: str) -> Path:
+    slug = re.sub(r"[^A-Za-z0-9._-]", "-", rel)
+    return Path(workspace) / SCREEN_ACK_REL / f"{slug}.ack"
+
+
+def find_unscreened_new_docs(workspace: Path, added_rels) -> List[Ref]:
+    """新增受管文档中，尚无排查回执的 ⇒ 阻断（每个文件只拦第一次）。
+
+    判"值不值得建"是**判断主体的事**（进程判不了语义覆盖/子项关系）；本闸只负责
+    把这件事**送到动手那一刻**并拦住一次，制造排查动力。回执后不再提示。
+    """
+    out: List[Ref] = []
+    for rel in added_rels:
+        if not is_screenable_new_doc(rel):
+            continue
+        try:
+            if screen_ack_path(workspace, rel).is_file():
+                continue
+        except OSError:
+            continue
+        out.append(("DOC_NEW_UNSCREENED", (
+            f"{rel}: 新建受管文档（主观撰写类）未经重复/覆盖排查——首次提交拦一次，回执后不再提示。\n"
+            f"    fact: 值不值得建由你判（进程判不了语义覆盖与子项关系）；本闸只负责把排查送到动手这一刻\n"
+            f"    option: 并入既存 → 目标文档收编本节、删掉本文件、写并入说明，再 k3dge sync\n"
+            f"    option: 确认新建 → k3dge doc screen {rel}\n"
+            f"    option: 指明并入目标 → k3dge doc screen {rel} --into docs/<type>/<target>.md"
+        )))
+    return out
+
+
+def record_screen_ack(workspace: Path, rel: str, *, into: Optional[str] = None) -> Path:
+    """写排查回执（结论二值：并入某目标 / 确认新建）。不做语义判断，只记事实。"""
+    import datetime
+
+    path = screen_ack_path(workspace, rel)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    path.write_text(
+        f"path: {rel}\nacked_at: {stamp}\n"
+        f"conclusion: {'merged-into ' + into if into else 'new-no-overlap'}\n",
+        encoding="utf-8",
+    )
+    return path

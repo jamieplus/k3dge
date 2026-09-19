@@ -380,6 +380,22 @@ def cmd_doc(args: argparse.Namespace) -> int:
                 else:
                     print(h["path"])
         return 0
+    if action == "screen":
+        # 新建受管文档的排查回执：判定归 agent（进程判不了语义覆盖），此处只记事实。
+        from k3dge.engine.pure_refs import is_screenable_new_doc, record_screen_ack
+
+        rel = args.path.strip().replace("\\", "/")
+        while rel.startswith("./"):
+            rel = rel[2:]
+        if not is_screenable_new_doc(rel):
+            print(f"[DOC] 不在排查面（确定性流程生成 / aux / archive / 非 docs）：{rel}")
+            return 0
+        ack = record_screen_ack(workspace, rel, into=getattr(args, "into", None))
+        concl = f"merged-into {args.into}" if getattr(args, "into", None) else "new-no-overlap"
+        print(f"[DOC] 排查回执已记（{concl}）：{ack.relative_to(workspace)}")
+        print(f"      {rel} 本次提交放行；回执是 ephemeral（.protocol-ack/，不入库）")
+        _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc screen -> {rel} -> {concl}")
+        return 0
     if args.doc_action == "sync":
         from k3dge.sync.generator import sync_all
 
@@ -1114,7 +1130,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_task.add_argument("task_id", nargs="?", default=None, help="task id substring for done (alternative to title)")
     p_task.set_defaults(func=cmd_task)
 
-    p_doc = sub.add_parser("doc", help="doc catalog (list/where), body grep (path only), sync")
+    p_doc = sub.add_parser("doc", help="doc catalog (list/where), body grep (path only), screen, sync")
     doc_sub = p_doc.add_subparsers(dest="doc_action", required=True)
     p_doc_sync = doc_sub.add_parser("sync", help="regenerate specs + generated docs")
     p_doc_sync.set_defaults(func=cmd_doc)
@@ -1139,6 +1155,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_doc_grep.add_argument("--include-archive", action="store_true")
     p_doc_grep.add_argument("--json", dest="as_json", action="store_true")
     p_doc_grep.set_defaults(func=cmd_doc)
+    p_doc_screen = doc_sub.add_parser(
+        "screen",
+        help="新建受管文档的重复/覆盖排查回执（解 pre-commit 的 DOC_NEW_UNSCREENED 阻断）",
+    )
+    p_doc_screen.add_argument("path", help="新建文档路径（docs/<type>/<file>.md）")
+    p_doc_screen.add_argument("--into", default=None, help="若结论是并入：目标文档路径")
+    p_doc_screen.set_defaults(func=cmd_doc)
 
     p_init = sub.add_parser("init", help="initialize k3dge harness in target directory")
     p_init.add_argument("target", nargs="?", default=".", help="target directory (default: current working dir)")

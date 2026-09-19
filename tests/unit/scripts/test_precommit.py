@@ -105,3 +105,36 @@ class TestSchemaGateWiring(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestScreenGateWiring(unittest.TestCase):
+    """pre-commit 接线：新增受管文档未排查 ⇒ 阻断；回执后放行；工具坏不阻断。"""
+
+    def _pure_refs(self):
+        _ps, pr = hook._load_pure()
+        self.assertIsNotNone(pr)
+        return pr
+
+    def test_added_and_acked_paths(self):
+        import tempfile
+
+        pr = self._pure_refs()
+        with tempfile.TemporaryDirectory() as td:
+            ws = Path(td)
+            rel = "docs/memo/2026-09-19-y.md"
+            orig = hook.WS
+            hook.WS = ws
+            try:
+                self.assertEqual(len(hook.run_screen_gate([rel], pr)), 1)
+                pr.record_screen_ack(ws, rel)
+                self.assertEqual(hook.run_screen_gate([rel], pr), [])
+                self.assertEqual(hook.run_screen_gate([], pr), [])
+            finally:
+                hook.WS = orig
+
+    def test_broken_tool_does_not_block(self):
+        class Boom:
+            def find_unscreened_new_docs(self, *_a, **_k):
+                raise RuntimeError("boom")
+
+        self.assertEqual(hook.run_screen_gate(["docs/adr/0027-x.md"], Boom()), [])

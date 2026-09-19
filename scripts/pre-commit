@@ -42,6 +42,15 @@ def staged_files() -> list[str]:
     return [p for p in out.stdout.splitlines()]
 
 
+def staged_added() -> list[str]:
+    """本次提交**新增**的文件（`--no-renames`：改名算 A+D，新路径须重新排查）。"""
+    out = subprocess.run(
+        ["git", "diff", "--cached", "--name-only", "--diff-filter=A", "--no-renames"],
+        cwd=WS, capture_output=True, text=True,
+    )
+    return [p for p in out.stdout.splitlines() if p.strip()]
+
+
 # k3dge check only matters when code / spec / agent-config / templates change.
 _CHECK_PREFIXES = ("src/", "docs/specs/", ".agent/", "src/k3dge/templates/")
 _CHECK_SUFFIXES = (".py", "manifest.json", "pyproject.toml", ".toml")
@@ -165,6 +174,21 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs) -> tuple[list[str]
     return errs, warns
 
 
+def run_screen_gate(added: list[str], pure_refs) -> list[str]:
+    """新建受管文档的首次排查闸（阻断；每个文件只拦一次，`k3dge doc screen` 回执后放行）。
+
+    判「值不值得建 / 是否与既存文档覆盖」是判断主体的事——进程只负责把它送到动手那一刻。
+    确定性流程生成的文档（generated/specs/tasks/reviews）与 aux 不在排查面。
+    """
+    if not added:
+        return []
+    try:
+        return [f"[{code}] {msg}" for code, msg in pure_refs.find_unscreened_new_docs(WS, added)]
+    except Exception as exc:  # 工具坏不得阻断所有提交（与 schema gate 同口径）
+        print(f"[k3dge screen] WARN: 排查闸不可用（{exc}）；跳过")
+        return []
+
+
 def _load_type_schema(typ: str, pure_schema):
     """Returns (schema_dict|None, error_str|None). None schema = no gate (downstream-safe)."""
     sp = WS / "docs" / typ / ".schema.json"
@@ -253,6 +277,19 @@ def main() -> int:
                 rc = 1
             else:
                 print(f"[k3dge schema] PASS: {len(doc_files)} staged doc(s) structurally clean")
+
+    # screen gate: 新增受管文档须先排查重复/覆盖（阻断一次；回执后放行）
+    if doc_files:
+        _ps, _pr = _load_pure()
+        if _pr is not None:
+            screen_errs = run_screen_gate(staged_added(), _pr)
+            if screen_errs:
+                print("[k3dge screen] FAIL: 新建受管文档未排查 -> commit blocked")
+                for e in screen_errs:
+                    print(f"  - {e}")
+                rc = 1
+            else:
+                print("[k3dge screen] PASS (无待排查的新建受管文档)")
 
     # consistency gate (k3dge check): only when code/spec/agent changed
     if relevant_for_check(files):

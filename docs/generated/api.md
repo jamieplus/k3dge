@@ -567,6 +567,7 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from typing import Tuple
+from k3dge.engine.pure_schema import AUX_NAMES
 from k3dge.engine.pure_schema import parse_frontmatter_pairs
 Ref = Tuple[str, str]
 strip_fences(text: str) -> str
@@ -597,6 +598,15 @@ find_orphan_tests(workspace: Path) -> List[Ref]
     # doc: `tests/**/*.py` files no Verification Matrix references (warn-tier).
 find_orphan_adrs(workspace: Path) -> List[Ref]
     # doc: `docs/adr/NNNN-*.md` numbers missing from README Topics (warn-tier).
+DETERMINISTIC_DOC_PREFIXES: Tuple[str, ...] = ('docs/generated/', 'docs/specs/', 'docs/tasks/', 'docs/reviews/')
+SCREEN_ACK_REL = '.protocol-ack/doc-screen'
+is_screenable_new_doc(rel: str) -> bool
+    # doc: 该新增路径是否属"主观撰写的受管文档"（需要首次排查）。
+screen_ack_path(workspace: Path, rel: str) -> Path
+find_unscreened_new_docs(workspace: Path, added_rels) -> List[Ref]
+    # doc: 新增受管文档中，尚无排查回执的 ⇒ 阻断（每个文件只拦第一次）。
+record_screen_ack(workspace: Path, rel: str, *, into: Optional[str]=None) -> Path
+    # doc: 写排查回执（结论二值：并入某目标 / 确认新建）。不做语义判断，只记事实。
 # pure_schema.py
 from __future__ import annotations
 from pathlib import Path

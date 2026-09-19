@@ -50,6 +50,7 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 | 空转（同动作+同错误 ≥3 次，含改而复改） | **立即停机 surface**：列已试签名，问人或转 `docs/branches/`；禁止第四次重试（机制化=tool-call 计数器 task；Hall 侧 W6） |
 | Audit done | `docs/reviews/` + leftovers in `docs/reviews/LEFTOVERS.md` |
 | Audit fix done | Backfill `## 回填` to same report + `docs/incidents/INC-YYYYMMDD-<TYPE>-<slug>.md` B-T-D |
+| 新建受管文档（主观撰写类：adr/memo/guides/architecture/protocols/incidents/branches） | `scripts/pre-commit` 阻断一次（`DOC_NEW_UNSCREENED`）：按规约先排查是否与既存文档**冲突/覆盖/只是其子项**——**判定归 agent**（进程判不了语义），闸只把排查送到动手这一刻。并入既存 ⇒ 收编 + 删新文件 + `k3dge sync`；确认新建 ⇒ `k3dge doc screen <path>`（回执 ephemeral，`.protocol-ack/`，不入库；同文件不再拦）。确定性流程生成的文档（`docs/generated|specs|tasks|reviews`）与 aux 不在排查面 |
 | 文档改动（`docs/**` 变更） | check 绿后（**不在 check 内**，T-01）给 `[NEXT] doc_audit`：`k3dge doc-audit` 走 authoring 合规、**非阻断**，出 k3dit 报告 + 建**带 Milestone 的 task**（本轮不改，封板轮也得改，ADR-0022）。**ADR 冲突/覆盖**仍只在里程碑审计（`k3dge_adr_index`+k3dit，ADR-0005），不在每次 commit |
 | Move/delete fact source | Update all pointers; memo target gone → move back |
 | 新增一条可机检规则（`check`/schema/hook 能红的那种） | 同轮配闸（违规码或消费者）；只写进 `AGENTS.md`/`.agent/rules` 散文、没有到达执行者 → 本轮补闸或标有意留。**不**因此硬阻断人写的散文 |
