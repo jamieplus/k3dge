@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M10
 priority: P1
 date: 2026-09-19
@@ -74,3 +74,35 @@ date: 2026-09-19
 - 与 `adr_doc_normalize_strategy`（C1-C5）正交：那票管 doc 策略的 ADR 冲突，本票管编号系统本身。
 - 与 `adr0026_d_line_and_downstream` 有交点：两票都要改 ADR 面，建议同轮落，避免 0026 被就地改两次。
 - 本轮 0026 复用**不处置**（用户裁定"不管了，就此截断"）；本票的②表里如实记两次旧占用即可。
+
+## 落地（2026-09-19，①-⑥ 全部执行）
+
+| 项 | 落点 | 实测 |
+| --- | --- | --- |
+| ① baseline | `docs/adr/obsolete/README.md` 表头 + AUTHORING「编号分配」节 | baseline = 2026-09-19 / `f749e27` |
+| ② 13 个永久退役号入表 | 同上（号 \| 曾是 \| 退役方式 \| 去向 \| 删除 commit），**未伪造墓碑文件** | `retired_adr_numbers()` 解析出 13 条，与 git 史一致 |
+| ③ 废物理删除 | AUTHORING：退役只有一条路＝移入 `obsolete/` 并写去向；「先并入，后新建」里的"被并者物理删除"同步改口径（两处表述不得相抵） | 两份（仓 + 资产镜像）PAIRS ✓ |
+| ④ 分配 = max+1 | AUTHORING 明写 max over（`adr/` ∪ `obsolete/*.md` ∪ 账本表）；下游模板句上一轮已改 | 历史最大号 0027 ⇒ 下一安全号 **0028** |
+| ⑤ 闸 | 新码 `ADR_NUMBER_REUSE`（占用退役号）+ `ADR_REF_RETIRED`（引用退役号 ⇒ 给去向）；两码进 `gate_facts` 声明面（fact/options/pointers）；接线 hook + `doc_catalog.validate_docs` | 造 `0020-x.md` ⇒ 红并给出「去向 ADR-0005 §2.7」；`0028-y.md` ⇒ 绿 |
+| ⑥ 存量不追 | 6 个已复用号（0008/0009/0010/0022/0023/0026）现役不迁号；「曾被复用的号」单独一张表记账，`_live_adr_numbers` 保证它们不被 `ADR_NUMBER_REUSE` 误伤 | `test_live_number_not_flagged_as_reuse` + 自举测试 |
+
+### 边界裁定（实测后定的，不在原方案里）
+
+`ADR_REF_RETIRED` **不扫 `docs/reviews/` 与 `archive/`**：那是 append-only 的审计/历史记录，引用的是"当时那条 ADR"，改写等于篡改当时的事实。实测依据：全仓非归档文档只有 2 处命中，都在 `docs/reviews/`（`2026-09-10-doc-audit-docs.md`、`2026-09-14-M10-audit.md`），且都是历史报告正文。
+
+### 顺手修正 AUTHORING 的一处失准
+
+旧文声称复用编号的机验码是 `ADR_FILENAME_MISMATCH`——它只查「文件名号 ↔ H1 号一致」，管不了复用。现已明写四个码各管什么（`ADR_NUMBER_REUSE` / `ADR_REF_RETIRED` / `ADR_FILENAME_MISMATCH` / `ADR_NUMBER_COLLISION`），并注明前者管不了复用是旧文的错。
+
+## 验收（实测）
+
+```
+tests/unit/engine/test_pure_refs.py::TestAdrNumberRetirement（9 条）
+  账本只读"永久退役号"段（"曾被复用"表的 0008 不混进来）
+  占用退役号 ⇒ ADR_NUMBER_REUSE 且给去向 / 安全号 ⇒ 绿 / 现役号不误伤
+  obsolete/ 里的真文件同样拦住复用（baseline 之后的退役路径）
+  引用退役号 ⇒ ADR_REF_RETIRED 且给去向
+  reviews/ 与 archive/ 不报（历史记录）
+  自举：本仓账本 13 号、现役 14 条无一占用退役号
+575 passed；k3dge check 绿；adr_landed / adrs_all_accepted 未退化
+```

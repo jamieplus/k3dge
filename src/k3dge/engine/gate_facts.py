@@ -112,6 +112,22 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         ],
         "pointers": ["AGENTS.md §12", "docs/adr/AUTHORING.md「先并入，后新建」", "k3dge doc list --type <type>"],
     },
+    # --- ADR 编号退役账本（obsolete/README.md 的表是唯一源）---
+    "ADR_NUMBER_REUSE": {
+        "fix": "judgment", "severity": "block",
+        "fact": "`{path}` 占了一个**已永久退役**的 ADR 号——`Numbers are never reused`："
+                "号一次分配即永久绑定那一个决策，退役号不得再发出（否则旧引用静默指错）",
+        "options": ["改用下一个安全号 = max(docs/adr ∪ obsolete ∪ 账本表)+1，并同步 H1 与 README Topics",
+                    "这不是新决策 → 按「先并入，后新建」并入既存 ADR（写 Amended-by，不新开号）"],
+        "pointers": ["docs/adr/obsolete/README.md（退役账本）", "docs/adr/AUTHORING.md「编号分配」"],
+    },
+    "ADR_REF_RETIRED": {
+        "fix": "judgment", "severity": "block",
+        "fact": "`{path}` 引用了已退役的 ADR 号——那条决策已被合并/改名，引用会静默指错对象",
+        "options": ["改指去向（账本表里记了 merged-into / superseded-by 的小节）",
+                    "确属历史陈述 → 去掉 `ADR-` 前缀写成事件（如「原 0020 harness 职责划分」）"],
+        "pointers": ["docs/adr/obsolete/README.md（退役账本）", "k3dge doc list --type adr"],
+    },
     # --- markdown 完整性（pure_refs B3）---
     "MD_TRAILING_WS": {
         "severity": "block", "fix": "deterministic",

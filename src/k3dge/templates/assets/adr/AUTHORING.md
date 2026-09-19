@@ -16,7 +16,7 @@ Do not judge whether the decision is a *good* idea (soft; value window of the au
 - 能扩写现有 ADR（就地增补 / `Amended by`）的，**不新开**。
 - 只有确属**新决策类**（现有 ADR 都不覆盖）才 copy `_template.md`。
 - 判断"同类"看**不变量与所有权**，不看措辞；同一条不变量被两篇各写一半＝应并。
-- 合并不降清晰：宿主 ADR 用子节收编，被并者**物理删除**（git 留档），全仓指针重指。
+- 合并不降清晰：宿主 ADR 用子节收编，被并者**移入 `obsolete/`** 并写清去向（`merged-into`），全仓指针重指；号随之永久退役（见「编号分配」）。
 
 ## 人读优先 (readability)
 
@@ -136,11 +136,16 @@ Amend 时在正文被修改处紧跟 Markdown footnote：
 
 ### 编号分配 / 删除 / 改名 / 复用
 
-- **分配**：下一个号 ＝ `docs/adr/` 与 `docs/adr/obsolete/` 里最大号 + 1（都空则 `0001`）。
-- **Numbers are never reused**：号一旦分配就永久绑定那一个决策；被合并/删除/改名腾号后**该号退役**，不再分配。
-- **删除 / 改名**：一律需显式人工授权（**物理删除**含改名腾号）。
-- 机验实况（不要误信旧说法）：`ADR_FILENAME_MISMATCH` 只查「文件名号 ↔ H1 号一致」；`ADR_NUMBER_COLLISION` 只查 `docs/adr/*.md` 内部重号（**不含 `obsolete/`**）。⇒ **「号是否被复用」目前无闸**，靠本条散文 + 分配规则；补闸方案见 `docs/tasks/`（ADR 编号账本议题）。
-- 后果（实测）：物理删除会让退役号从目录里消失，于是「max + 1」可能重新发出退役号——本仓 `0026` 被发出过三次即此因。
+- **分配**：下一个号 ＝ max over（`docs/adr/*.md` ∪ `docs/adr/obsolete/*.md` ∪ 退役账本表）+ 1。只增不减 ⇒ 退役号永不再发出。
+- **Numbers are never reused**：号一旦分配就永久绑定那一个决策；被合并/取代/否决后**该号退役**。
+- **退役只有一条路：移入 `obsolete/`**（frontmatter 写清去向：`merged-into` / `superseded-by`），由 `adr_gate.reconcile_supersedes`（挂 `k3dge sync`）执行。**不再物理删除**——物理删除会让退役号从目录消失，于是"本目录最大号 +1"必然把它重新发出（实测：19 个号被删过，其中 6 个被发出两次）。
+- **退役账本** = `docs/adr/obsolete/README.md` 的「永久退役号」表。它只承载 baseline（2026-09-19 / `f749e27`）**之前**被物理删除、因而没有墓碑文件的 13 个号；baseline 之后的退役一律是 `obsolete/` 里的真文件，不进表。
+- **存量不追**：baseline 之前已被复用的 6 个号（0008/0009/0010/0022/0023/0026）保持现役、不迁号——迁号会打断全仓与下游仓继承的引用。口径同 ADR-0026 §2.5。
+- **机验码**（别再误信旧说法）：
+  - `ADR_NUMBER_REUSE` — 新 ADR 占了退役号（查 `obsolete/*.md` + 账本表）
+  - `ADR_REF_RETIRED` — 正文引用退役号 ⇒ 给出去向（比 `DANGLING_ADR_REF` 更有用：号是"曾存在"，不是"写错"）
+  - `ADR_FILENAME_MISMATCH` — 文件名号 ↔ H1 号一致（**它管不了复用**，旧文声称能管，是错的）
+  - `ADR_NUMBER_COLLISION` — 现役文件之间重号（`doc_catalog.validate_docs`）
 
 ### 杂项
 

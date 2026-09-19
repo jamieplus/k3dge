@@ -665,11 +665,11 @@
       "tokens": "ADR-0026 追加：D 线不变量（k3dge 不编排自主↔自主）+ 骨架声明的下游可配边界"
     },
     {
-      "path": "docs/tasks/2026-09-19-M10-docs-adr_number_cutline.md",
+      "path": "docs/tasks/2026-09-19-M10-docs-adr_number_cutline.done.md",
       "type": "tasks",
-      "id": "2026-09-19-M10-docs-adr_number_cutline",
+      "id": "2026-09-19-M10-docs-adr_number_cutline.done",
       "title": "ADR 编号截断：废物理删除、退役单一面 obsolete/、13 个永久退役号入表、分配=max+1、复用可机检",
-      "status": "idea",
+      "status": "done",
       "tokens": "ADR 编号截断：废物理删除、退役单一面 obsolete/、13 个永久退役号入表、分配=max+1、复用可机检"
     },
     {

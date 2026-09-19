@@ -393,3 +393,89 @@ def record_screen_ack(workspace: Path, rel: str, *, into: Optional[str] = None) 
         encoding="utf-8",
     )
     return path
+
+
+# --- ADR 编号退役账本（docs/adr/obsolete/README.md 的「永久退役号」表）---
+
+_RETIRED_LEDGER_REL = "docs/adr/obsolete/README.md"
+_RETIRED_ROW_RE = re.compile(r"^\|\s*(\d{4})\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|", re.MULTILINE)
+_ADR_NUM_RE = re.compile(r"^(\d{4})-")
+
+
+def retired_adr_numbers(workspace: Path) -> dict:
+    """退役号 → {was, how, dest}。账本＝`docs/adr/obsolete/README.md` 的表（唯一源）。
+
+    「曾被复用的号（存量不追）」那张表也在同一文件里，但它的行是 `| 号 | 旧占用 | 现役 |`
+    三列且**号现役** ⇒ 由 `_live_adr_numbers` 排除，不会被当成退役号。
+    """
+    path = Path(workspace) / _RETIRED_LEDGER_REL
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    # 只读「永久退役号」那一段，避免把"曾被复用"表里的现役号也收进来
+    seg = text.split("## 永久退役号", 1)
+    if len(seg) < 2:
+        return {}
+    seg = seg[1].split("### 曾被复用的号", 1)[0]
+    out: dict = {}
+    for num, was, how, dest in _RETIRED_ROW_RE.findall(seg):
+        out[num] = {"was": was, "how": how, "dest": dest}
+    return out
+
+
+def _live_adr_numbers(workspace: Path) -> set:
+    d = Path(workspace) / "docs" / "adr"
+    if not d.is_dir():
+        return set()
+    return {m.group(1) for p in d.glob("*.md") if (m := _ADR_NUM_RE.match(p.name))}
+
+
+def check_adr_number_reuse(workspace: Path, rel: str) -> List[Ref]:
+    """新 ADR 不得占用退役号（`Numbers are never reused` 的机检半边）。
+
+    退役面有两处，都算：`obsolete/*.md` 真文件（baseline 之后）+ 账本表（baseline 之前
+    物理删除的 13 个号）。现役号之间的重号由 `ADR_NUMBER_COLLISION` 管，不在此。
+    """
+    name = Path(rel).name
+    m = _ADR_NUM_RE.match(name)
+    if not m or not rel.startswith("docs/adr/") or "obsolete" in Path(rel).parts:
+        return []
+    num = m.group(1)
+    ledger = retired_adr_numbers(workspace)
+    if num in ledger:
+        info = ledger[num]
+        return [("ADR_NUMBER_REUSE",
+                 f"{rel}: 号 {num} 已永久退役（曾是 {info['was']}；{info['how']} → {info['dest']}）；"
+                 f"取 max(adr ∪ obsolete ∪ 账本)+1")]
+    obs = Path(workspace) / "docs" / "adr" / "obsolete"
+    if obs.is_dir() and list(obs.glob(f"{num}-*.md")):
+        return [("ADR_NUMBER_REUSE",
+                 f"{rel}: 号 {num} 已在 docs/adr/obsolete/ 退役；不得再分配（Numbers are never reused）")]
+    return []
+
+
+def check_adr_ref_retired(workspace: Path, rel: str, text: str) -> List[Ref]:
+    """引用退役号 ⇒ 报去向（比 DANGLING 更有用：号是"曾存在过"，不是"写错了"）。
+
+    只对**非现役**的退役号报；现役号（含 baseline 前被复用的 6 个）走 `check_dangling_adr`
+    的存在性判断——存量不追（用户裁定 2026-09-19）。
+
+    **不扫 `docs/reviews/` 与 `archive/`**：那是 append-only 的审计/历史记录，引用的是
+    "当时那条 ADR"，改写它等于篡改当时的事实（实测：全仓非归档文档只有 2 处命中，都在
+    reviews 里，且都是历史报告正文）。
+    """
+    parts = set(Path(rel).parts)
+    if "archive" in parts or rel.startswith("docs/reviews/"):
+        return []
+    live = _live_adr_numbers(workspace)
+    ledger = retired_adr_numbers(workspace)
+    out: List[Ref] = []
+    for num in sorted(set(_ADR_RE.findall(strip_fences(text)))):
+        if num in live or num not in ledger:
+            continue
+        info = ledger[num]
+        out.append(("ADR_REF_RETIRED",
+                    f"{rel}: ADR-{num} 已退役（曾是 {info['was']}）；去向 {info['dest']}"
+                    f"——引用改指去向，或去掉 `ADR-` 前缀写成历史事件"))
+    return out

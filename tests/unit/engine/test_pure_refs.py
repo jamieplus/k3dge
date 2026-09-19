@@ -392,3 +392,85 @@ class TestNewDocScreening(unittest.TestCase):
             out = pure_refs.find_unscreened_new_docs(ws, added)
             self.assertEqual(len(out), 1)
             self.assertIn("docs/adr/0027-x.md", out[0][1])
+
+
+class TestAdrNumberRetirement(unittest.TestCase):
+    """编号退役账本：`Numbers are never reused` 的机检半边（票 adr_number_cutline）。
+
+    病灶：AUTHORING 声称 `ADR_FILENAME_MISMATCH` 管复用，实际它只查文件名号↔H1 号一致；
+    加上"被并者物理删除"+"本目录最大号+1"两条规则相打架 ⇒ 实测 19 个号被删过、6 个被发出两次。
+    """
+
+    def _ws_with_ledger(self, td):
+        ws = Path(td)
+        (ws / "docs" / "adr" / "obsolete").mkdir(parents=True)
+        (ws / "docs" / "adr" / "0005-x.md").write_text("# ADR-0005: x\n", encoding="utf-8")
+        (ws / "docs" / "adr" / "obsolete" / "README.md").write_text(
+            "# Obsolete ADRs\n\n## 永久退役号（账本）\n\n"
+            "| 号 | 曾是 | 退役方式 | 去向 | 删除 commit |\n| --- | --- | --- | --- | --- |\n"
+            "| 0020 | harness-responsibility-split | 合并 | ADR-0005 §2.7 | `0fc2d3a` |\n\n"
+            "### 曾被复用的号（存量不追，仅记账）\n\n"
+            "| 号 | 旧占用 | 现役 |\n| --- | --- | --- |\n| 0008 | sibling | triggers |\n",
+            encoding="utf-8")
+        return ws
+
+    def test_ledger_reads_only_the_retired_section(self):
+        with tempfile.TemporaryDirectory() as td:
+            ws = self._ws_with_ledger(td)
+            led = pure_refs.retired_adr_numbers(ws)
+            self.assertEqual(sorted(led), ["0020"])          # "曾被复用"表的 0008 不得混进来
+            self.assertIn("harness-responsibility-split", led["0020"]["was"])
+            self.assertIn("ADR-0005", led["0020"]["dest"])
+
+    def test_reuse_of_retired_number_blocks(self):
+        with tempfile.TemporaryDirectory() as td:
+            ws = self._ws_with_ledger(td)
+            out = pure_refs.check_adr_number_reuse(ws, "docs/adr/0020-new-idea.md")
+            self.assertEqual([c for c, _ in out], ["ADR_NUMBER_REUSE"])
+            self.assertIn("ADR-0005 §2.7", out[0][1])       # 给去向，不只说"不行"
+
+    def test_safe_number_passes(self):
+        with tempfile.TemporaryDirectory() as td:
+            ws = self._ws_with_ledger(td)
+            self.assertEqual(pure_refs.check_adr_number_reuse(ws, "docs/adr/0021-y.md"), [])
+
+    def test_live_number_not_flagged_as_reuse(self):
+        """存量不追：baseline 前被复用且现役的号不得被本码误伤。"""
+        with tempfile.TemporaryDirectory() as td:
+            ws = self._ws_with_ledger(td)
+            (ws / "docs" / "adr" / "0008-live.md").write_text("# ADR-0008: live\n", encoding="utf-8")
+            self.assertEqual(pure_refs.check_adr_number_reuse(ws, "docs/adr/0008-live.md"), [])
+
+    def test_obsolete_file_also_retires_the_number(self):
+        """baseline 之后的退役是 obsolete/ 里的真文件（不进账本表），同样拦住复用。"""
+        with tempfile.TemporaryDirectory() as td:
+            ws = self._ws_with_ledger(td)
+            (ws / "docs" / "adr" / "obsolete" / "0007-old.md").write_text("# ADR-0007\n", encoding="utf-8")
+            out = pure_refs.check_adr_number_reuse(ws, "docs/adr/0007-new.md")
+            self.assertEqual([c for c, _ in out], ["ADR_NUMBER_REUSE"])
+
+    def test_ref_to_retired_number_gives_destination(self):
+        with tempfile.TemporaryDirectory() as td:
+            ws = self._ws_with_ledger(td)
+            out = pure_refs.check_adr_ref_retired(ws, "docs/memo/x.md", "见 ADR-0020 与 ADR-0005")
+            self.assertEqual([c for c, _ in out], ["ADR_REF_RETIRED"])
+            self.assertIn("ADR-0005 §2.7", out[0][1])
+
+    def test_reviews_and_archive_are_history_not_violations(self):
+        """append-only 的历史记录引用"当时那条 ADR"，改写＝篡改事实 ⇒ 不报。"""
+        with tempfile.TemporaryDirectory() as td:
+            ws = self._ws_with_ledger(td)
+            for rel in ("docs/reviews/2026-09-10-x.md", "docs/tasks/archive/M7/y.md"):
+                self.assertEqual(pure_refs.check_adr_ref_retired(ws, rel, "见 ADR-0020"), [], rel)
+
+    def test_repo_ledger_is_loaded_and_consistent(self):
+        """自举：本仓账本 13 个退役号，且现役 14 条无一占用退役号。"""
+        led = pure_refs.retired_adr_numbers(REPO)
+        self.assertEqual(len(led), 13)
+        self.assertEqual(sorted(led), ["0002", "0003", "0007", "0011", "0013", "0014",
+                                       "0015", "0016", "0019", "0020", "0021", "0024", "0027"])
+        live = pure_refs._live_adr_numbers(REPO)
+        self.assertEqual(live & set(led), set())            # 退役号没有现役文件
+        for name in sorted((REPO / "docs" / "adr").glob("0*.md")):
+            self.assertEqual(
+                pure_refs.check_adr_number_reuse(REPO, f"docs/adr/{name.name}"), [], name.name)

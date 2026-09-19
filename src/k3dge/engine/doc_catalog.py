@@ -330,6 +330,13 @@ def _validate_file(workspace: Path, typ: str, path: Path, schema: dict, seen: di
         idx_text = idx_path.read_text(encoding="utf-8") if idx_path.is_file() else ""
         for code, msg, _scope in _pure_check_index_ref(idx_text, ident, codes, index_rel, path.name):
             out.append(Violation(code, msg, file_path=rel))
+    # 编号退役账本（baseline 之前的物理删除也在账上）：复用号 + 引用退役号
+    from k3dge.engine import pure_refs as _pr
+
+    for code, msg in _pr.check_adr_number_reuse(workspace, rel):
+        out.append(Violation(code, msg, file_path=rel, detail={"path": rel}))
+    for code, msg in _pr.check_adr_ref_retired(workspace, rel, text):
+        out.append(Violation(code, msg, file_path=rel, detail={"path": rel}))
     return out
 
 def validate_docs(workspace: Path, types: Optional[Iterable[str]] = None) -> List[Violation]:

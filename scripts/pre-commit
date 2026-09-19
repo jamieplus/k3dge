@@ -181,6 +181,10 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -
         # B1 dangling refs (block)
         for code, msg in pure_refs.check_dangling_adr(WS, rel, text):
             _add(code, msg)
+        for code, msg in pure_refs.check_adr_ref_retired(WS, rel, text):
+            _add(code, msg, facts={"path": rel})
+        for code, msg in pure_refs.check_adr_number_reuse(WS, rel):
+            _add(code, msg, facts={"path": rel})
         for code, msg in pure_refs.check_report_pointer(WS, rel, text):
             _add(code, msg)
         for code, msg in pure_refs.check_footnotes(rel, text):
