@@ -28,7 +28,7 @@
 
 * **审计条件 Checklist（不是封板 checklist）** —— `.agent/audit_checklist.json` 记**审计条件达成 + 审计环状态**：量化触发快照（账齐/C2/体积 + reasons）、该审计报告的 `待修`（closure）、`verify_attempts`（>3 升级用）、`audit_started_at`；以当前里程碑任务状态 hash 为键缓存（任务集不变 `check` 不重算）。**`k3dge milestone audit <id>` 发起审计时重置**（verify 预算归零 + 打 started_at，重跑拿新的 3 次预算）。封板资格不在此，由 `audit_trigger.audit_closed` 判。`k3dge milestone checklist <id>` 查看。
 
-* **钩子链** —— 外部步声明在 `[checks.audit]`：`stages_produce` = `k3dit.actions.audit`（一份必做）；`stages_verify` = `k3dit.actions.verify`（核对本报告）。缺省在 `engine/gates.DEFAULTS`，`.agent/gates.toml` 可覆盖（下游可配）；声明了却解析不到 peer action ⇒ `PIPELINE_UNRESOLVED_STAGE`（不让声明空转）。原 `[pipelines.on_seal_enter]` / `[on_pre_seal]` **已废**：那两处只有 schema 校验、没有执行者。`transports` 链 `mcp→cli→manual`/`skip`，`skip` 记 `HARNESS_SKIP` 于 `logs/k3dge.log`。k3dge 只调透镜、不自己审/打分（sidecar，ADR-0006）。
+* **钩子链** —— 外部步声明在 `[checks.audit]`：`stages_produce` = `k3dit.actions.audit`（一份必做）；`stages_verify` = `k3dit.actions.verify`（核对本报告）。缺省在 `engine/gates.DEFAULTS`，**声明面唯一**＝`.agent/pipeline.toml`（`[checks.*]`/`[gates.*]`），下游可配、坏配置回落缺省；`.agent/gates.toml` 已废（存在即红一次逼迁移）；声明了却解析不到 peer action ⇒ `PIPELINE_UNRESOLVED_STAGE`（不让声明空转）。原 `[pipelines.on_seal_enter]` / `[on_pre_seal]` **已废**：那两处只有 schema 校验、没有执行者。`transports` 链 `mcp→cli→manual`/`skip`，`skip` 记 `HARNESS_SKIP` 于 `logs/k3dge.log`。k3dge 只调透镜、不自己审/打分（sidecar，ADR-0006）。
 
 * **`[NEXT]` 提示（命令结果附下一跳）** —— 单一事实源 `engine/nextstep.STATE_OPTIONS` + `engine/audit_trigger.py`，与 `pipeline.toml`/`AGENTS.md §12` 同一张表。优先级：`pending_findings`（有钉的 pending）> `seal_ready`（审计报告闭环）> `audit_suggested`（量化触发）。只报合法下一步、不替人决定；`reasons` 可数。`new_domain` 仍单独报；`overview` 更新已移出钩子。
 

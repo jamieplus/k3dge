@@ -1,7 +1,8 @@
 ---
 Status: Accepted
 Supersedes: -
-Amended-by: -
+Amended-by:
+  - 🅰1 | Core Maintainer | 2026-09-19 | §2 条 8：硬闸契约的声明面从 `.agent/gates.toml` 改为 `.agent/pipeline.toml`（`[checks.*]` + `[gates.*]`），声明面收为一处
 Landed-by: src/k3dge/engine/evaluator.py
 Date: 2026-08-19
 Deciders: Core Maintainer
@@ -58,9 +59,9 @@ Note: 修订痕迹见 git 历史。
    - `templates` 仍是脚手架孤岛：`scaffold` 不读 `engine.pairs`；`test_template_sync` 可 import `engine.pairs`（测试不是域运行时依赖）。
    - 不拆第五域；MCP check 与 `milestone align` 都走 `evaluate`，同一把锁。
    - 重开：templates 运行时需读 `PAIRS` 时，把表抽到两边都能 import 的无依赖模块（仍禁止 engine import templates）。
-8. **硬闸契约（`.agent/gates.toml`）**：闸的**声明式阈值/开关**在此覆盖；缺省在 `engine/gates.DEFAULTS`（唯一源），执行器读契约；配置缺失/坏 ⇒ 回落缺省（**闸不因配置坏而失效**）。
+8. **硬闸契约（`.agent/pipeline.toml` 的 `[checks.*]` + `[gates.*]`）**[^🅰1.1]：闸的**声明式阈值/开关**与**编排单元**在此声明；缺省在 `engine/gates.DEFAULTS`（唯一源，必须完整），执行器读契约；配置缺失/坏 ⇒ 回落缺省（**闸不因配置坏而失效**）。
    - 契约只承载**数据**，不含逻辑/表达式（不长第二套判定语言）。
-   - **编排单元**：`[checks.<kind>].preconditions` 声明该单元消费的闸 id（全绿才继续）；`seal` 首批＝`tasks_all_done/align_pass/guides_filled/adrs_all_accepted/adr_landed`。未实现的 id 视为配置错（拒绝）。
+   - **编排单元**：`[checks.<kind>].preconditions` 声明该单元消费的闸 id（全绿才继续）、`actions` 声明 k3dge **内部**动作 id（注册表）、`stages_<phase>` 声明**外部** peer 的 action ref（用角色名，交 `run_action` 走传输链）；两类 id 不混一张词表（ADR-0026 §2.1/§2.7）。`seal` 首批＝`tasks_all_done/audit_closed/evidence_chain/align_pass/guides_filled/adrs_all_accepted/adr_landed`。未实现的 id 视为配置错（拒绝）。
    - **ADR＝事实源**：封版要求范围内 ADR 全 `Accepted` 且各带**可解析落地指针** `Landed-by: <路径> [§节]`（`engine/adr_gate`）；只验结构事实，不判决策内容（归 k3dit）。
 9. **实现语言基线（Rust 重写否决）**：保留 Python 3.10+ 标准库（核心零依赖），**不 Rust 重写**。
    - 依据尖刀实验（`../k3dge-contract-rs` Phase-1/2/3）：Rust 护栏（漏一分支＝编译错 `E0004`）**只在"自有闭枚举且无 `_` wildcard"时成立**；在**解析外部语言语义**（contract 提取：公开签名归一化哈希）上**不成立**且成本高（需自造 `ast.unparse` 等价 + tree-sitter crates，破零依赖）。
@@ -74,3 +75,7 @@ Note: 修订痕迹见 git 历史。
 - **负面影响 / 权衡**：变更公开接口需额外跑一次 `k3dge sync`；跨语言契约校验依赖可选 tree-sitter 依赖。
 - **何时重开**：要把质量/审计/检索做成门禁出口码，或 L1 从签名哈希扩到函数体。
   - 在那之前，不把透镜或语义检索长进 `src/k3dge`。
+
+---
+
+[^🅰1.1]: 修改：声明面从 `.agent/gates.toml` 改为 `.agent/pipeline.toml`。理由（实测）：仓内曾并存两处编排声明——`.agent/gates.toml`（阈值 + `[checks.*]`）与 `pipeline.toml` 的 `[pipelines.on_seal_enter/on_pre_seal].stages`；后者**只有 schema 校验、没有任何执行者**（AGENTS.md §12 却声称它驱动必做审计，缺 §13 的"到达"环），前者本仓已删（曾是 `DEFAULTS` 的冗余副本且漂移过：覆盖列表漏了 reconcile ⇒ 功能静默死亡）。收敛为一处后：`.agent/gates.toml` 若仍存在 ⇒ `PIPELINE_SCHEMA_INVALID` 红一次逼迁移（不静默忽略）；`[pipelines.*]` 同为迁移守卫。不变量未变（缺省完整、坏配置回落、未知 id 拒绝、契约只承载数据）。

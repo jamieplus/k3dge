@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:3e0cfd2838b99817d09389477da6a2c42d0fa1fc01f1ef467e87b1379a9edc1e`
+- **Contract Hash**: `sha256:12d88965ed8d3bc2121cd20395e4ad52b6a380ff814f3b6e615f1d4d12e948b5`
 - **Last Updated**: 2026-09-19
 
 ## 1. Domain Boundary & Responsibilities
@@ -206,10 +206,12 @@ from typing import Any
 from typing import Dict
 class Rejection(str)
 rejection(message: Any, fallback_gate_id: str) -> Rejection
-REL = '.agent/gates.toml'
+REL = '.agent/pipeline.toml'
+LEGACY_REL = '.agent/gates.toml'
 INTERNAL_GATE_IDS: tuple = ('unknown_gate_id', 'unknown_action_id', 'audit_report_missing', 'audit_open_declined', 'milestone_id_invalid', 'no_tasks', 'invalid_task_status', 'align_failed', 'archive_failed')
 DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}, 'audit': {'stages_produce': ['audit.actions.audit'], 'stages_verify': ['audit.actions.verify']}}}
 load(workspace: Path) -> Dict[str, Any]
+legacy_config_present(workspace: Path) -> bool
 get(workspace: Path, section: str, key: str) -> Any
 preconditions(workspace: Path, kind: str) -> list
 stages(workspace: Path, kind: str, phase: str) -> list

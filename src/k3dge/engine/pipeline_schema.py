@@ -162,6 +162,21 @@ def _validate_pipelines(pipelines, declared) -> List[PipelineViolation]:
     return errors
 
 
+def _validate_legacy_gates_toml(workspace: Path) -> List[PipelineViolation]:
+    """`.agent/gates.toml` 已废（声明面收进 pipeline.toml 一处）：存在即红一次逼迁移。
+
+    不静默忽略——静默忽略会让下游以为自己的覆盖生效了（实测前科：本仓 gates.toml
+    覆盖列表漏了 reconcile，功能静默死亡，见 2026-09-17-M10-refactor-adr_archive_to_sync）。
+    """
+    from k3dge.engine import gates
+
+    if not gates.legacy_config_present(workspace):
+        return []
+    return [("PIPELINE_SCHEMA_INVALID",
+             ".agent/gates.toml is retired: move [checks.*] and thresholds into "
+             ".agent/pipeline.toml ([checks.<op>] / [gates.<name>]); nothing reads gates.toml anymore")]
+
+
 def _validate_declared_stages(workspace: Path, data: dict) -> List[PipelineViolation]:
     """声明的外部步必须解析得到 transports —— 不让声明空转。
 
@@ -218,6 +233,7 @@ def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
     p_errs, declared = _validate_peers(workspace, peers, servers, role_bind)
     errors.extend(p_errs)
     errors.extend(_validate_pipelines(data.get("pipelines", {}), declared))
+    errors.extend(_validate_legacy_gates_toml(workspace))
     errors.extend(_validate_declared_stages(workspace, data))
     return errors
 

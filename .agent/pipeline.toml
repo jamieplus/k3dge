@@ -83,7 +83,7 @@ transports = [
 ]
 
 # 编排声明面只有一处：`[checks.*]`（缺省在 engine/gates.DEFAULTS，仓内可用
-# .agent/gates.toml 覆盖；下游可配）。**外部 peer 步**声明为 `stages_produce` /
+# 本文件的 [checks.*]/[gates.*] 覆盖；下游可配）。**外部 peer 步**声明为 `stages_produce` /
 # `stages_verify`（action ref，交 run_action 走 mcp→cli→manual/skip），**内部动作**
 # 声明为 `actions`（注册表 id）；两类 id 不混一张词表（ADR-0026 §2.1）。
 #
@@ -92,3 +92,37 @@ transports = [
 #   [checks.audit] stages_produce = ["k3dit.actions.audit"]
 #                  stages_verify  = ["k3dit.actions.verify"]
 # 声明了却解析不到 peer action ⇒ PIPELINE_UNRESOLVED_STAGE（不让声明空转）。
+
+# ── 编排骨架声明（唯一声明面；下游可配）──────────────────────────────────────
+# 缺省在 engine/gates.DEFAULTS（必须完整）；本段按 key 覆盖，`checks.<op>` 逐键覆盖。
+# 文件缺失/解析失败 ⇒ 回落缺省（闸不因配置坏而失效，ADR-0026 §2.7）。
+# 未知 id 一律拒绝（不让声明空转）。两类 id 不混词表：
+#   preconditions / actions = k3dge 内部（闸 id / 注册表动作 id）
+#   stages_<phase>          = 外部 peer 的 action ref（用**角色名**，换 bind 即换实现）
+
+[checks.seal]
+preconditions = ["tasks_all_done", "audit_closed", "evidence_chain", "align_pass",
+                 "guides_filled", "adrs_all_accepted", "adr_landed"]
+actions = ["full_matrix", "archive", "closure_note", "prune"]
+
+[checks.align]
+preconditions = ["tasks_all_done"]
+actions = ["full_matrix"]
+
+[checks.audit]
+stages_produce = ["audit.actions.audit"]   # 一份必做（合并审计模块，ADR-0025）
+stages_verify = ["audit.actions.verify"]   # 待修==0 的二次核对
+
+[gates.audit_trigger]
+c2_nesting_max = 5      # 审计建议触发：C2 嵌套阈值
+volume_max = 8          # 审计建议触发：本轮体积阈值
+
+[gates.search]
+context_max = 3
+
+[gates.markers]
+max_note = 80
+max_note_pending = 500
+
+[gates.output]
+default_lines = 10

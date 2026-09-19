@@ -711,7 +711,7 @@ class TestGateIdDispatch(TestCase):
 
         ws = _ws()
         _mk_task(ws)
-        (ws / ".agent" / "gates.toml").write_text(
+        (ws / ".agent" / "pipeline.toml").write_text(
             '[checks.seal]\npreconditions = ["audit_closed"]\n', encoding="utf-8")
         err = seal_preconditions_error(ws, "M1")
         self.assertIsInstance(err, gates.Rejection)
@@ -779,11 +779,11 @@ class TestStagesAreDeclaredNotHardcoded(TestCase):
                          ["audit.actions.audit", "audit.actions.verify"])
 
     def test_downstream_can_rebind_stages(self):
-        """下游可配（用户裁定）：改 .agent/gates.toml 就换实现，声明面只有一处。"""
+        """下游可配（用户裁定）：改声明面 .agent/pipeline.toml 就换实现，只有一处。"""
         from k3dge.engine import gates
 
         ws = _ws()
-        (ws / ".agent" / "gates.toml").write_text(
+        (ws / ".agent" / "pipeline.toml").write_text(
             '[checks.audit]\nstages_produce = ["myauditor.actions.lens"]\nstages_verify = []\n',
             encoding="utf-8")
         self.assertEqual(gates.stages(ws, "audit", "produce"), ["myauditor.actions.lens"])
@@ -793,7 +793,7 @@ class TestStagesAreDeclaredNotHardcoded(TestCase):
     def test_audit_flow_calls_the_declared_ref(self):
         ws = _ws_oneshot()
         _clean_report(ws)
-        (ws / ".agent" / "gates.toml").write_text(
+        (ws / ".agent" / "pipeline.toml").write_text(
             '[checks.audit]\nstages_produce = ["dummy.actions.lens"]\nstages_verify = []\n',
             encoding="utf-8")
         calls = []

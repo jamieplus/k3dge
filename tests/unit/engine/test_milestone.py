@@ -23,7 +23,7 @@ def _set_seal_gates(ws: pathlib.Path, *gate_ids: str) -> None:
     """测试用：把契约 `[checks.seal].preconditions` 收窄到指定闸，隔离被测闸。"""
     (ws / ".agent").mkdir(parents=True, exist_ok=True)
     body = ", ".join(f'"{g}"' for g in gate_ids)
-    (ws / ".agent" / "gates.toml").write_text(
+    (ws / ".agent" / "pipeline.toml").write_text(
         f"[checks.seal]\npreconditions = [{body}]\n", encoding="utf-8"
     )
 

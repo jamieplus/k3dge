@@ -22,9 +22,12 @@ def _write(root: pathlib.Path, rel: str, text: str) -> None:
 
 
 def _no_audit_stages(root: pathlib.Path) -> None:
-    """下游可配路径：用 .agent/gates.toml 把审计线两步清空（本仓缺省引用 k3dit 角色）。"""
-    _write(root, ".agent/gates.toml",
-           "[checks.audit]\nstages_produce = []\nstages_verify = []\n")
+    """下游可配路径：在**同一声明面**（pipeline.toml）把审计线两步清空。"""
+    cfg = root / ".agent" / "pipeline.toml"
+    body = cfg.read_text(encoding="utf-8") if cfg.is_file() else ""
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+    cfg.write_text(body + "\n[checks.audit]\nstages_produce = []\nstages_verify = []\n",
+                   encoding="utf-8")
 
 
 class TestPipelineSchema(unittest.TestCase):
@@ -267,3 +270,31 @@ class TestPipelineSchema(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLegacyConfigGuard(unittest.TestCase):
+    """已废的第二个配置文件：存在即红一次逼迁移（不静默忽略）。
+
+    前科：本仓 `.agent/gates.toml` 曾是 DEFAULTS 的冗余副本且漂移——覆盖列表漏了
+    reconcile ⇒ 功能静默死亡（2026-09-17-M10-refactor-adr_archive_to_sync）。
+    """
+
+    def test_gates_toml_present_is_flagged(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            _write(root, ".agent/pipeline.toml",
+                   '[roles.audit]\nbind = "k3dit"\n'
+                   '[peers.k3dit.actions.audit]\ntransports = [ { provider = "skip" } ]\n'
+                   '[peers.k3dit.actions.verify]\ntransports = [ { provider = "skip" } ]\n')
+            self.assertEqual(validate_pipeline_config(root), [])   # 先证明基线绿
+            _write(root, ".agent/gates.toml", "[checks.seal]\npreconditions = []\n")
+            errs = validate_pipeline_config(root)
+            self.assertTrue(any(c == "PIPELINE_SCHEMA_INVALID" and "gates.toml is retired" in m
+                                for c, m in errs), errs)
+
+    def test_repo_has_no_legacy_config(self):
+        root = pathlib.Path(__file__).resolve().parents[3]
+        self.assertFalse((root / ".agent" / "gates.toml").exists())
+        self.assertTrue((root / ".agent" / "pipeline.toml").is_file())

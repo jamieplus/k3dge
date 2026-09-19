@@ -1,7 +1,16 @@
-"""硬闸契约（`.agent/gates.toml`）：声明式阈值/开关；执行器读契约，缺省在代码。
+"""硬闸契约：**声明面只有一处** ＝ `.agent/pipeline.toml`（`[checks.*]` + `[gates.*]`）。
 
-单一源：缺省值在 `DEFAULTS`，仓内 `.agent/gates.toml` 按段覆盖；解析失败回落缺省
-（**闸不因配置坏而失效**）。契约只承载数据，不含逻辑/表达式。机制见 ADR-0001 §2 第 8 条。
+- `[checks.<op>]`：编排单元 —— `preconditions`（闸 id）/ `actions`（内部动作 id）/
+  `stages_<phase>`（外部 peer action ref）。两类 id 不混一张词表（ADR-0026 §2.1）。
+- `[gates.<name>]`：阈值/开关（`audit_trigger` / `search` / `markers` / `output`）。
+
+单一源与缺省：缺省值在 `DEFAULTS`（代码内，**必须完整**）；仓内声明按段覆盖；
+文件缺失或解析失败 ⇒ 回落缺省（**闸不因配置坏而失效**，ADR-0026 §2.7）。
+契约只承载数据，不含逻辑/表达式。机制见 ADR-0001 §2 第 8 条。
+
+历史：曾有两个配置文件（`.agent/gates.toml` + `.agent/pipeline.toml` 的 `[pipelines.*]`），
+后者只有校验没有执行者、前者本仓已删 ⇒ 收敛到 pipeline.toml 一处。
+`.agent/gates.toml` 若仍存在，由 `pipeline_schema` 红一次逼迁移（不静默忽略）。
 """
 from __future__ import annotations
 
@@ -44,7 +53,8 @@ try:
 except ModuleNotFoundError:  # Python 3.10
     import tomli as tomllib  # type: ignore[no-redef]
 
-REL = ".agent/gates.toml"
+REL = ".agent/pipeline.toml"        #: 声明面唯一入口
+LEGACY_REL = ".agent/gates.toml"    #: 已废；存在即红（pipeline_schema 出迁移守卫）
 
 #: 内部拒绝 id（不由 pipeline.toml 声明，但同样进 `nextstep.GATE_NEXT` 闭集）。
 INTERNAL_GATE_IDS: tuple = (
@@ -59,7 +69,7 @@ INTERNAL_GATE_IDS: tuple = (
     "archive_failed",
 )
 
-#: 各闸的缺省阈值/开关（唯一源）。仓内 `.agent/gates.toml` 可覆盖。
+#: 各闸的缺省阈值/开关（唯一源，必须完整）。仓内 `.agent/pipeline.toml` 可覆盖。
 DEFAULTS: Dict[str, Any] = {
     "audit_trigger": {"c2_nesting_max": 5, "volume_max": 8},
     "search": {"context_max": 3},
@@ -84,16 +94,8 @@ DEFAULTS: Dict[str, Any] = {
 }
 
 
-def load(workspace: Path) -> Dict[str, Any]:
-    """缺省 ∪ `.agent/gates.toml`（段内覆盖；`checks.<kind>` 逐键覆盖）；文件缺失/坏 ⇒ 缺省。"""
-    data: Dict[str, Any] = copy.deepcopy(DEFAULTS)  # 深拷贝：覆盖不得回写 DEFAULTS
-    p = Path(workspace) / REL
-    if not p.is_file():
-        return data
-    try:
-        raw = tomllib.loads(p.read_text(encoding="utf-8"))
-    except Exception:  # 坏 TOML：回落缺省，不抛（闸继续可用）
-        return data
+def _merge_section(data: Dict[str, Any], raw: Dict[str, Any]) -> None:
+    """段内覆盖；`checks.<kind>` 逐键覆盖（下游只改一个 op 不必抄全表）。"""
     for section, vals in (raw or {}).items():
         if not isinstance(vals, dict):
             data[section] = vals
@@ -104,7 +106,31 @@ def load(workspace: Path) -> Dict[str, Any]:
                     data.setdefault("checks", {}).setdefault(kind, {}).update(decl)
         else:
             data.setdefault(section, {}).update(vals)
+
+
+def load(workspace: Path) -> Dict[str, Any]:
+    """缺省 ∪ `.agent/pipeline.toml` 的 `[gates.*]` + `[checks.*]`；缺失/坏 ⇒ 缺省。"""
+    data: Dict[str, Any] = copy.deepcopy(DEFAULTS)  # 深拷贝：覆盖不得回写 DEFAULTS
+    p = Path(workspace) / REL
+    if not p.is_file():
+        return data
+    try:
+        raw = tomllib.loads(p.read_text(encoding="utf-8"))
+    except Exception:  # 坏 TOML：回落缺省，不抛（闸继续可用）
+        return data
+    if not isinstance(raw, dict):
+        return data
+    # [gates.<name>] 的内容即阈值段本身（audit_trigger/search/markers/output），平铺合并
+    if isinstance(raw.get("gates"), dict):
+        _merge_section(data, raw["gates"])
+    if isinstance(raw.get("checks"), dict):
+        _merge_section(data, {"checks": raw["checks"]})
     return data
+
+
+def legacy_config_present(workspace: Path) -> bool:
+    """已废的 `.agent/gates.toml` 是否还在（在 ⇒ 迁移守卫红一次，不静默忽略）。"""
+    return (Path(workspace) / LEGACY_REL).is_file()
 
 
 def get(workspace: Path, section: str, key: str) -> Any:

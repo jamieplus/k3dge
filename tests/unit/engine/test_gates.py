@@ -1,4 +1,8 @@
-"""硬闸契约加载器：缺省 / 覆盖 / 坏配置回落缺省。"""
+"""硬闸契约加载器：声明面唯一（`.agent/pipeline.toml`）+ 缺省完整 + 坏配置回落。
+
+ADR-0026 §2.7：代码内缺省必须完整（下游删掉整段也能跑）；解析失败回落缺省
+（**闸不因配置坏而失效**）；未知 id 由执行器拒绝（"不让声明空转"）。
+"""
 import tempfile
 from pathlib import Path
 
@@ -9,11 +13,12 @@ def _ws(d, body=None):
     p = Path(d) / ".agent"
     p.mkdir(parents=True)
     if body is not None:
-        (p / "gates.toml").write_text(body, encoding="utf-8")
+        (p / "pipeline.toml").write_text(body, encoding="utf-8")
     return Path(d)
 
 
 def test_defaults_when_absent():
+    """无声明文件 ⇒ 代码内缺省完整可用（下游最小仓不必配）。"""
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d)
         assert gates.get(ws, "audit_trigger", "c2_nesting_max") == 5
@@ -22,15 +27,26 @@ def test_defaults_when_absent():
 
 def test_override_keeps_other_defaults():
     with tempfile.TemporaryDirectory() as d:
-        ws = _ws(d, "[audit_trigger]\nc2_nesting_max = 3\n")
+        ws = _ws(d, "[gates.audit_trigger]\nc2_nesting_max = 3\n")
         assert gates.get(ws, "audit_trigger", "c2_nesting_max") == 3
-        assert gates.get(ws, "audit_trigger", "volume_max") == 8
+        assert gates.get(ws, "audit_trigger", "volume_max") == 8   # 同段其它键不被清掉
 
 
 def test_malformed_falls_back_to_defaults():
+    """坏 TOML ⇒ 回落缺省，不抛（闸不因配置坏而失效）。"""
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d, "this is not toml = = =\n")
         assert gates.get(ws, "audit_trigger", "c2_nesting_max") == 5
+        assert gates.preconditions(ws, "seal")            # 缺省编排仍在
+
+
+def test_pipeline_toml_with_peers_only_keeps_check_defaults():
+    """下游只配了 peer、没碰 [checks.*] ⇒ 编排走缺省（两段互不干扰）。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, '[roles.audit]\nbind = "k3dit"\n[peers.k3dit.actions.audit]\n'
+                    'transports = [ { provider = "skip" } ]\n')
+        assert gates.preconditions(ws, "seal")[0] == "tasks_all_done"
+        assert gates.stages(ws, "audit", "produce") == ["audit.actions.audit"]
 
 
 def test_seal_preconditions_default_and_override():
@@ -43,6 +59,7 @@ def test_seal_preconditions_default_and_override():
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d, "[checks.seal]\npreconditions = []\n")
         assert gates.preconditions(ws, "seal") == []
+        assert gates.actions(ws, "seal")                   # 逐键覆盖：没写的键保留缺省
         assert gates.get(ws, "audit_trigger", "c2_nesting_max") == 5
 
 
@@ -53,6 +70,32 @@ def test_markers_and_output_defaults_and_override():
         assert gates.get(ws, "markers", "max_note_pending") == 500
         assert gates.get(ws, "output", "default_lines") == 10
     with tempfile.TemporaryDirectory() as d:
-        ws = _ws(d, "[markers]\nmax_note = 200\n")
+        ws = _ws(d, "[gates.markers]\nmax_note = 200\n")
         assert gates.get(ws, "markers", "max_note") == 200
         assert gates.get(ws, "markers", "max_note_pending") == 500
+
+
+def test_repo_declares_the_same_values_as_defaults():
+    """自举：本仓声明段的值 == 代码缺省（声明是显式化，不是偷偷改语义）。
+
+    前科：本仓曾有 `.agent/gates.toml`，是 DEFAULTS 的冗余副本且已漂移（覆盖列表漏了
+    reconcile ⇒ 功能静默死亡，见 2026-09-17-M10-refactor-adr_archive_to_sync）。
+    """
+    repo = Path(__file__).resolve().parents[3]
+    declared = gates.load(repo)
+    fresh = gates.load(Path(tempfile.mkdtemp()))     # 无声明文件 ⇒ 纯缺省
+    assert declared == fresh, {
+        k: (declared.get(k), fresh.get(k)) for k in set(declared) | set(fresh)
+        if declared.get(k) != fresh.get(k)
+    }
+
+
+def test_legacy_gates_toml_is_detected():
+    """已废的第二个配置文件：检测到（由 pipeline_schema 红一次逼迁移，不静默忽略）。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d)
+        assert gates.legacy_config_present(ws) is False
+        (ws / ".agent" / "gates.toml").write_text("[checks.seal]\npreconditions = []\n", encoding="utf-8")
+        assert gates.legacy_config_present(ws) is True
+        # 且它**不再生效**（声明面只有一处）
+        assert gates.preconditions(ws, "seal")[0] == "tasks_all_done"

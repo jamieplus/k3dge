@@ -366,11 +366,14 @@ class Rejection(str)
 # doc: 结构化拒绝：消息文本（str 兼容）+ 闭集 `gate_id`（机器分支用）。
 rejection(message: Any, fallback_gate_id: str) -> Rejection
     # doc: 把动作/闸的失败返回值正规化为 `Rejection`（已是 Rejection 则原样透传）。
-REL = '.agent/gates.toml'
+REL = '.agent/pipeline.toml'
+LEGACY_REL = '.agent/gates.toml'
 INTERNAL_GATE_IDS: tuple = ('unknown_gate_id', 'unknown_action_id', 'audit_report_missing', 'audit_open_declined', 'milestone_id_invalid', 'no_tasks', 'invalid_task_status', 'align_failed', 'archive_failed')
 DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}, 'audit': {'stages_produce': ['audit.actions.audit'], 'stages_verify': ['audit.actions.verify']}}}
 load(workspace: Path) -> Dict[str, Any]
-    # doc: 缺省 ∪ `.agent/gates.toml`（段内覆盖；`checks.<kind>` 逐键覆盖）；文件缺失/坏 ⇒ 缺省。
+    # doc: 缺省 ∪ `.agent/pipeline.toml` 的 `[gates.*]` + `[checks.*]`；缺失/坏 ⇒ 缺省。
+legacy_config_present(workspace: Path) -> bool
+    # doc: 已废的 `.agent/gates.toml` 是否还在（在 ⇒ 迁移守卫红一次，不静默忽略）。
 get(workspace: Path, section: str, key: str) -> Any
     # doc: 读某闸的某阈值（含缺省）。
 preconditions(workspace: Path, kind: str) -> list
