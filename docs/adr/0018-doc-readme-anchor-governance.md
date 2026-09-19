@@ -1,18 +1,11 @@
 ---
 Status: Accepted
-# Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
-# NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
 Landed-by: src/k3dge/engine/doc_catalog.py
 Date: 2026-08-30
 Deciders: Core Maintainer
-Note: ① 就地修订（protocols/ 描述对齐 ADR-0025 合并审计模块，撤销独立 quality peer/fallback）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。
-      ② 正交收尾（catalog 排除 `archive/` 与 ADR-0023 §2.2 互指）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
-      ③ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
-      ④ **合并原 ADR「docs 判据与投影的语义分工」入本条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：docs 判据/投影与托管布局同属"docs 治理"一决策；被并者 0002 删除，全仓指针改指本条（**保留本条 §2.3/§2.4/§2.6/§2.8 节号**）。过闸口径 = manual fallback。
-      ⑤ **合并原 ADR「No load-proof」入本条 §2.11**（物理删旧文件）2026-09-12，经 Core Maintainer 本轮显式授权：同属 docs 寻址/装载决策；被并者 0019 删除，指针改指本条。过闸口径 = manual fallback。
-      ⑥ **合并原 ADR「tasks 与 backlog 合并」入本条 §2.12**（物理删旧文件）2026-09-12，经 Core Maintainer 本轮显式授权：tasks 目录属托管文档布局；被并者 0003 删除，指针改指本条。过闸口径 = manual fallback。
+Note: 修订痕迹见 git 历史。
 ---
 
 # ADR-0018: Docs 治理（托管布局 + 判据/投影分工）

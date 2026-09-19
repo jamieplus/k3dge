@@ -4,10 +4,8 @@ k3dge 的架构决策记录。每条是一次取舍的单一事实源：只记�
 
 - **Address**: `k3dge doc list --type adr` / `k3dge doc where ADR-0001`. Do not grep `docs/adr/`.
 - **Write**: read [`AUTHORING.md`](AUTHORING.md); copy [`_template.md`](_template.md). Do not invent a skeleton.
-
-**Before creating a new ADR, prefer folding into an existing one of the same class**（见 AUTHORING「先并入，后新建」）. Entries are append-only after Accepted. Revise via `Amended-by` list or `Supersedes`. Physical delete only with explicit human authorization. Numbers are never reused.
-
-**Superseded / Rejected ADRs** 由闸自动移入 [`obsolete/`](obsolete/)（`adr_gate.reconcile_supersedes`）。
+- **Rules**: 修订/取代/编号/归档的规则一律以 [`AUTHORING.md`](AUTHORING.md) 为准（唯一投递点，本文件不复述）。
+- **Retired**: `Superseded` / `Rejected` 由闸自动移入 [`obsolete/`](obsolete/)（`adr_gate.reconcile_supersedes`）；编号永久退役，不再分配。
 
 ## Topics
 

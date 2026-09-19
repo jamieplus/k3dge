@@ -181,3 +181,46 @@ class TestSectionOrder(unittest.TestCase):
             )
             codes = [v.rule_id for v in validate_docs(ws, ["adr"])]
             self.assertIn("ADR_SECTION_ORDER", codes)
+
+
+class TestCardTitleSkipsFrontmatter(unittest.TestCase):
+    """回归守卫：frontmatter 里的 YAML 注释不得被当成 H1 标题。
+
+    实测病灶：12/14 条 ADR 的 frontmatter 带 `# Append-only after Accepted…` 注释，
+    `_TITLE_RE` 全文搜索 ⇒ `doc list` 与 docs-index.json 的 title 全变成那行注释。
+    """
+
+    def _card(self, text: str):
+        from k3dge.engine.doc_catalog import build_card
+
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            p = ws / "docs" / "adr" / "0001-x.md"
+            p.parent.mkdir(parents=True)
+            p.write_text(text, encoding="utf-8")
+            return build_card(ws, "adr", p)
+
+    def test_yaml_comment_is_not_the_title(self):
+        card = self._card(
+            "---\nStatus: Accepted\n"
+            "# Append-only after Accepted. Revise via Amended-by — do NOT rewrite.\n"
+            "Date: 2026-09-01\n---\n\n# ADR-0001: 真标题\n\n正文\n"
+        )
+        self.assertEqual(card["title"], "ADR-0001: 真标题")
+        self.assertEqual(card["status"], "Accepted")
+
+    def test_no_frontmatter_still_finds_h1(self):
+        self.assertEqual(self._card("# ADR-0002: 裸标题\n")["title"], "ADR-0002: 裸标题")
+
+    def test_unterminated_frontmatter_does_not_swallow_body(self):
+        """`---` 未闭合 ⇒ 不当 frontmatter 处理，正文 H1 仍可抽到。"""
+        card = self._card("---\nStatus: Accepted\n\n# ADR-0003: 标题\n")
+        self.assertIn("ADR-0003", card["title"])
+
+    def test_repo_adr_titles_are_real_h1(self):
+        """自举：本仓 ADR 的索引标题必须是 `ADR-NNNN: …`，不是注释残句。"""
+        ws = Path(__file__).resolve().parents[3]
+        cards = [c for c in list_docs(ws, typ="adr") if c["id"].startswith("ADR-")]
+        self.assertTrue(cards)
+        bad = [c["id"] for c in cards if not c["title"].startswith(c["id"])]
+        self.assertEqual(bad, [])

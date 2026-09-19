@@ -6,7 +6,7 @@ Amended-by:
 Landed-by: src/k3dge/cli/mcp.py
 Date: 2026-08-24
 Deciders: Core Maintainer
-Note: ①-⑦ 修订痕迹见 git 历史（2026-09-02 至 2026-09-12）；新格式自 🅰1 起生效。
+Note: 修订痕迹见 git 历史。
 ---
 
 # ADR-0006: 对外注入面与并列 harness 编排（入向兼容层 + 出向通道）

@@ -1,22 +1,28 @@
 ---
 Status: Draft
-# Append-only after Accepted. Revise via Amended-by list in frontmatter;
-# supersede via Supersedes field (see AUTHORING.md).
-# Numbers are never reused.
 Supersedes: -
 Amended-by: -
-# Landed-by: 落地指针（Accepted 前必填；seal 闸 adr_landed 要求其可解析）。
-# 写代码路径（src/... 或 scripts/...）或文档锚点；多个以空格分隔，闸只验首个。
 Landed-by: src/k3dge/engine/<module>.py
 Date: YYYY-MM-DD
 Deciders: Core Maintainer
 Note: -
-# Note: default `-`. Non-revision metadata only (e.g. gate verification notes).
-# Amendment history lives in Amended-by; see docs/adr/AUTHORING.md.
 ---
 
 # ADR-NNNN: <title>
 
+<!--
+Frontmatter is DATA ONLY (no prose comments — a `#` line inside it is read as an
+H1 by naive parsers and corrupts `k3dge doc list` / docs-index titles).
+
+- Append-only after Accepted: revise via the `Amended-by` list
+  (`- 🅰<n> | <授权席位> | <日期> | <简述>`) + an inline footnote `[^🅰n.m]` at each
+  edited spot. Never rewrite this decision's prose in place.
+- Supersede via `Supersedes:` (new ADR only); the gate flips the old one to
+  `Status: Superseded` and moves it to `obsolete/` (`adr_gate.reconcile_supersedes`).
+- `Landed-by:` is required before Accepted — the seal gate `adr_landed` resolves it.
+- `Note:` = non-revision metadata only; default `-`. Revision traces never go here.
+- Numbers are never reused. See AUTHORING.md (the single delivery point for these rules).
+-->
 <!--
 Section-number rule (hard-gated by `k3dge check`, code ADR_SECTION_ORDER):
 numbered sections must ascend in document order — ## 1, ## 2, ### 2.1, ### 2.1.1, …

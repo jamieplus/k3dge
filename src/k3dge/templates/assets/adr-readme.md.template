@@ -2,7 +2,7 @@
 
 Record this project's lasting choices. k3dge's own ADRs stay in the k3dge checkout; do not copy them here.
 
-Next number: max `NNNN` in this directory plus one (start at `0001` if empty).
+Next number: max `NNNN` over this directory **and** `obsolete/` plus one (start at `0001` if empty). Retired numbers are never reused — a merged or deleted ADR leaves its number retired (see `AUTHORING.md`).
 
 - **Address**: `k3dge doc list --type adr` / `k3dge doc where ADR-0001`.
 - **Write**: read `AUTHORING.md`; copy `_template.md`.

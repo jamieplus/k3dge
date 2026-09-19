@@ -1,14 +1,11 @@
 ---
 Status: Accepted
-# Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
-# NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
 Landed-by: src/k3dge/engine/task_write.py
 Date: 2026-09-02
 Deciders: Core Maintainer (待 k3dit/人 复核后转 Accepted)
-Note: ①-⑥ 修订痕迹见 git 历史（2026-09-10 至 2026-09-12：钉=写源/报告=投影对齐 ADR-0025 §2.7、正交去重/收尾、人读化改写、合并原 0021「doc-audit 后置非阻断」入 §2.2、转 Accepted）；新格式自 🅰1 起生效（`Amended-by`），迁移口径同 ADR-0006。
-      `Landed-by` 指针 2026-09-19 由已删的 `engine/milestone.py`（兼容门面）改指叶子 `engine/task_write.py`（`mark_task_done`：report-task 闭环闸）——引用面修正，决策未变，故不进 `Amended-by`。
+Note: 修订痕迹见 git 历史。
 ---
 
 # ADR-0022: 审计报告的收口（1 report = 1 task；doc-audit 后置非阻断）

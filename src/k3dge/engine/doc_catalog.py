@@ -37,6 +37,7 @@ AUX_NAMES = frozenset(
 SKIP_TYPES = frozenset({"generated"})
 
 _TITLE_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
+_FM_BLOCK_RE = re.compile(r"\A---\r?\n.*?\r?\n---\r?\n", re.S)
 _SUMMARY_RE = re.compile(r"可检索摘要[：:]\s*(.+)")
 _HEADER_RE = re.compile(r"^-\s+\*\*([^*]+)\*\*:\s*(.+)$", re.MULTILINE)
 
@@ -98,6 +99,17 @@ def _tokens(text: str, title: str) -> str:
     return title[:120]
 
 
+def _body(text: str) -> str:
+    """正文＝去掉开头 `---` … `---` frontmatter 块。
+
+    为何必要：frontmatter 里的 YAML 注释（`# …`）对朴素解析器就是 H1。实测：12/14 条
+    ADR 的 title 被抽成注释首行（「Append-only after Accepted…」），污染 `doc list`
+    与 `docs/generated/docs-index.json`。标题只能来自正文的真 H1。
+    """
+    m = _FM_BLOCK_RE.match(text)
+    return text[m.end():] if m else text
+
+
 def build_card(workspace: Path, typ: str, path: Path) -> dict:
     rel = str(path.relative_to(workspace)).replace("\\", "/")
     try:
@@ -106,7 +118,7 @@ def build_card(workspace: Path, typ: str, path: Path) -> dict:
         return {"path": rel, "type": typ, "id": path.stem, "title": path.stem, "status": "", "tokens": ""}
     fm = dict(_frontmatter_pairs(text))
     headers = _headers(text)
-    tm = _TITLE_RE.search(text)
+    tm = _TITLE_RE.search(_body(text))
     title = (tm.group(1).strip() if tm else path.stem)[:200]
     status = fm.get("Status") or fm.get("status") or headers.get("Status") or ""
     ident = _card_id(typ, path)

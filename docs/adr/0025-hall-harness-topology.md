@@ -1,44 +1,11 @@
 ---
 Status: Accepted
-# Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
-# NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
 Landed-by: src/k3dge/engine/audit_flow.py
 Date: 2026-09-05
 Deciders: Core Maintainer
-Note: ① 2026-09-05 授权就地修订（Proposed 段，会话四则裁决）：合并语义明确为「audit/quality 内容精细编排为一个模块（同屋檐、多窗多席）」；判断权威分离载体由「独立工件/独立发布轨」改定为「签名钥 + 席位隔离 + 章在人手」；W4 改中性保管表述。授权人：Core Maintainer。
-      ② 2026-09-06 续修订（Proposed 段）：W6 活性墙；复核窗（验收+过程审计合并）；统计席位归进程侧；窗序固定（文档→代码→价值）；§2.6 Accepted 双门（G2+G3，席用原机制）；k3che 可调用；标题审计模块优先。授权人：Core Maintainer。
-      ③ 2026-09-09 续修订（Proposed 段）：折叠本 ADR 早期拟稿入 §2.7（判读席只写钉、信封/签名/join 归进程、done＝包装器交收成、§8 钉语法 v2 随实现步落）；就地精化 §2.2 锚点②与 §2.3 章笔分离的措辞指向（签的物＝本窗钉的收成），独立性三载体与"席不自签"不变。授权人：Core Maintainer。
-      ④ 2026-09-09 再修 §2.7 拓扑（Proposed 段，实现前对齐）：done 信号从"窗 root 内 `artifact.json` 由包装器写"改定为"**Hall 私有心跳 `done_path`（`{K3DIT_HALL_ROOT}/.run/{job}/{window}.done`，在 CLI 目录树外，防内层 edit=allow 伪造）**"；"包装器合成 items 写 artifact.json"划掉，改定**包装器只 touch 心跳、`step_judges` harvest 树并 `_apply_live` 只吃收成、忽略席产 JSON**；修/核窗本批不动；补"分批边界"（k3dit 侧 v2 先行、§8/markers/strip 留契约镜像批）。授权人：Core Maintainer。
-      ⑤ 2026-09-10 §2.7 补修/核规程（Proposed 段）：修/核腿**废 `accepted` 二值**、改钉/树驱动——修席删 `pending` 标=改（§8 结案凭据）/翻 `leftover`/`disputed`；Hall 对 Hall 私域 `.orig` 原快照 `diff(窗src,.orig)` 逐条推 state（删标且 diff≠∅=`fixed`；删标但 diff=∅=FORMAT；未碰=`pending` 留 open 由复核打回）；复核按合线 advance diff retest；done=心跳；原快照 `{K3DIT_HALL_ROOT}/.run/{job}/{window}.orig`。授权人：Core Maintainer。
-      ⑥ 2026-09-10 再修（Proposed 段）：W4 以 §2.7 心跳/原快照为准（Hall 调度状态可重放，运行现场在私域 `.run/`）；`sign-report` 署名口径＝人或席位（baseline 形式比对归 Hall 机械进程）；引用的早期拟稿 ADR 号改指自身。授权人：Core Maintainer。
-      ⑦ 2026-09-10 正交去重（Proposed 段）：W3 降级格式改指 ADR-0006 §2.4；章笔分离去掉对 ADR-0025 P3 的循环引，本 ADR 为署名/收钉单源。授权人：Core Maintainer。
-      ⑧ 2026-09-10 正交收尾（Proposed 段）：§2.7 补齐报告文件落盘主语（k3dge 进程落盘，Hall 只 join），与 ADR-0025 §2.9.1 对齐。授权人：Core Maintainer。
-      ⑨ 2026-09-10 经 Core Maintainer 本轮显式授权，改名/平移编号（重排前该文件占另一号 → 本号 ADR-0025，填空缺；全仓引用同步）。依 `docs/adr/AUTHORING.md`。
-      ⑩ 去 changelog 化（删「就地精化 / 划掉旧稿 / 反转旧 prompt / 双源划掉」等元叙述与「补定 date」）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
-       ⑪ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长机制拆块；不变量与章节号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`。
-       ⑫ §2.7 修/核钉生命周期更正（Proposed 段，覆盖 ⑤ 的"修席删标＝改"）2026-09-10，经 Core Maintainer 授权，依 `docs/adr/AUTHORING.md`：**删钉归复核**，修席只 `pending→fixnote`（主张，不删、不自证结案）；`fixed` 只由复核**删 `fixnote`** 产生（独立手）；复核输入＝账本 + 按 location 归的 present diff，不 grep 裸钉；`fixnote` 但 `.orig` diff=∅＝FORMAT（主张却未改码）。授权人：Core Maintainer。
-       ⑬ §2.7 拔钉归 Hall（Proposed 段，覆盖 ⑫ 的"删钉归复核"）2026-09-10，经 Core Maintainer 授权，依 `docs/adr/AUTHORING.md`：**任何席不删钉**（席只增/翻，删除＝账本结论的机械后果归 Hall）；修席翻 `fixnote` 主张、复核**不认可翻回 `pending`、认可不动**（也不删）；**Hall 在复核收工时把仍是 `fixnote`（＝未被打回）的拔钉 ⇒ `fixed`**。`fixed`＝修主张(fixnote∧真码差) ∧ 复核未打回 ∧ Hall 拔 三合。授权人：Core Maintainer。
-       ⑭ §2.7 复核须正向背书 + 结案前 verify 硬门（Proposed 段，覆盖 ⑬ 的"认可不动即 fixed"）2026-09-10，经 Core Maintainer 授权，依 `docs/adr/AUTHORING.md`：真跑坐实"沉默/正向背书都挡不住改坏测试"（M8 线 version.py 原子写改崩 test_bump_is_atomic）。改定：`fixed`＝**修主张(fixnote∧真码差) ∧ 复核正向背书(翻 `fixnote→fixed`，沉默＝未验不算) ∧ 结案前 Hall 跑被审仓自带 verify 命令绿 ∧ Hall 拔 `fixed`** 四合；新增 `fixed` 钉 kind（非 open）；verify 命令经 `k3dit_audit_submit(verify=…)` 由被审仓带入、Hall 只执行。授权人：Core Maintainer。
-      ⑮ 正文按审计结论收紧（信任模型/W1 env 面/W6 签名/pin-only 对齐/verify 执行面/修订纪律/scope 面）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（Core Maintainer 会话授权，agent 代改字，未经 k3dit 文审）。
-      ⑯ D-1..D-3 独立文审回填 2026-09-10，经 Core Maintainer 本轮授权，依 `docs/adr/AUTHORING.md`：① §2.2/§2.3 旧生命周期措辞抹平到 §2.7（复核翻 `fixnote→fixed`、Hall 拔；消同篇自相抵）；② Note 旧号改事件表述（消 `pointer_dangling`）；③ 补独立文审证据——本轮就地修订经 k3dit Doc Audit 透镜独立复核，报告 `docs/reviews/2026-09-10-doc-audit-docs.md`（首轮待修 7，修后复审至 0）；过闸口径 = real lens（独立 agent 执行，非自审）。
-      ⑰ 复核加硬（Proposed 段）2026-09-10，经 Core Maintainer 授权，依 `docs/adr/AUTHORING.md`：① 钉加可选尾段 `evidence=<可复跑命令>`，结案前 Hall 逐条 retest；② 复核输入补 `facts/verify.txt`/`tests.json`；③ `fixed` 理由须落到具体符号/调用点/测试名，纯复述 diff 判 FORMAT；④ 复核与修/判用**不同模型**（第二双眼睛）；⑤ verify/evidence 红改「`fixed` 回退 `pending` + 打回」，超 MAX_BOUNCE 才升级。过闸口径 = manual fallback（Core Maintainer 会话授权，agent 代改字）。
-      ⑱ §2.7 处置/验证分写 + 盲对比（Proposed 段，覆盖同日"处置＝复核署名"试作）2026-09-10，经 Core Maintainer 授权：修席 `fixnote` note＝报告**处置**（对复核盲：物化 `_blind_fixnotes` 抹 note、`findings.json` 的 `how` 置空）；复核独立写 `fixed` note＝报告**验证**；Hall 并置两侧 `_text_overlap` 粗判（零交集仅公示不阻断）。过闸口径 = manual fallback（Core Maintainer 会话授权）。
-      ⑲ §2.2 职责卡单一源（Proposed 段）2026-09-10，经 Core Maintainer 授权：窗职责/焦点/协议/样例＝入库 `src/k3dit/windows/<窗>.md`；Hall 写进窗 `README.md`+`facts/instruction.md`，`seat_prompt` 只指路（"先读职责卡"）不复述，消 prompt/instruction 双源（曾致 C1 提示与 harvest 不一致）。过闸口径 = manual fallback。
-      ⑳ §2.7 两阶段复核 + 拔钉后移（Proposed 段）2026-09-10，经 Core Maintainer 授权：R1 盲写验证、**不拔钉**；新增 `compare` 相位，Hall 并置 `处置‖验证` 交**复核席**裁决（`复审:通过` 才通过，沉默/驳回⇒回退 `pending` 打回）；Hall 只封/并/识别标记，不判语义（`_text_overlap` 退役）；**拔钉移到 `_finish`（R2 通过 + verify 绿后）**——`fixed` 是终态，R1 拔早会让 R2 无对比对象、且把终态提前。过闸口径 = manual fallback。
-      ㉑ 未尽项完结 + scope 含 docs（Proposed 段）2026-09-10，经 Core Maintainer 授权：① 反复打回/verify 连续红达 MAX_BOUNCE ⇒ 不再 kill；未关留 `pending`，出 `<!-- k3dge:incomplete -->` 报告、工单 `done` 供 collect——`待修>0` 自然过不了 k3dge `audit_closed`/封板 verify，与既有闸"合流"，人据 `[NEXT]` 授意 CLI agent 处理（如模板对只需 `k3dge sync`）。② 送检 scope 默认含 `src`+`docs`、**不含 `.agent` 等隐藏配置**（隐藏文件不进审计；无 docs 的文档审无意义）。过闸口径 = manual fallback。
-      ㉒ 审计耗时统计（Proposed 段）2026-09-10，经 Core Maintainer 授权：进程侧记 `collect`/`compare`/`verify` 事件 `dur_s`（spawn→收成墙钟），`observe` 聚合逐窗/合计，报告附录同源——只出事实、不判定、不占判读窗（G8 观测的一部分；统计席位仍待后续）。
-      ㉓ 统计席位（部分，Proposed 段）2026-09-10，经 Core Maintainer 授权：事件记座位 `tries`/成功 `model`；`observe` 汇总 counts/tries/models/`verify_fail`/`bounces`/耗时并出**观测行 `line`**；`job_status` 回带 `line`/`total_dur_s`/`tries`，`peer_status` 透传给 `k3dge audit status`。只出事实、不判定；逃逸/误诊口径与跨单汇总仍待定。
-      ㉔ 统计口径 + 统计账（Proposed 段）2026-09-10，经 Core Maintainer 授权：k3dit 记 **append-only 统计账** `ledger/stats.jsonl`（每单终态一条：counts/findings/windows/tries/models/bounces/verify_fail/耗时/rounds）；口径（可数、不判定）＝误诊率 disputed/total、有意留率 leftover/total、打回率 bounces/rounds、座位重试率 Σtries/窗运行数、逃逸代理「重提率」见 `metrics.recurrence()`；`k3dit stats --by {milestone,job,date,type,severity,priority,state,window,model}` **任意维度聚合**（账是唯一源，报告/观测行是投影）。
-      ㉕ 模型维度（Proposed 段）2026-09-10，经 Core Maintainer 授权：事件记**失败档链** `tried=["<model>: <why>", …]`；判读发现打**产出模型** `finding.model`、修/核记 `last_model`；`stats.jsonl` 的 findings 带 `model`；`k3dit stats --by model`＝发现级聚合；`--models` 出按模型度量（发现数/误诊率/有意留率/窗运行数/重试/耗时/失败档），供模型选型。只出事实、不判定。
-      ㉖ verify 解耦（Proposed 段，覆盖 ⑭ 的"结案前 verify 硬门"与 ⑰ 的"verify 红回退打回"）2026-09-11，经 Core Maintainer 授权，依 `docs/adr/AUTHORING.md`：真跑坐实 Hall 侧 mechanical verify **越位**——审计线 worktree 缺 `.venv`/收据 ⇒ 环境假红；all-or-nothing 回退连坐已复核的 `fixed`；打回让席重做做过的事。改定：**审计侧不执行任何被审仓代码**——删结案前 `_verify_line`（仓级 verify + 逐条 evidence 执行）与 `_verify_failed` 打回；`fixed`＝**修主张(fixnote∧真码差) ∧ 复核正向背书 ∧ Hall 拔** 三合，语义＝**复核背书**（非"机械验证通过"）。机械闸归**消费侧落点**：k3dge 既有 pre-commit `check` + CI `k3dge check --with-tests`/`pytest`（环境正确、时机在落地）。`audit_closed`（审计完备）与机械绿（代码能跑）分家，`seal` 两者都要。钉尾 `evidence=<命令>` 退为**证据主张**（进报告、审计侧不执行，由消费侧 CI/落地统一跑）；`k3dit_audit_submit` 不再带 `verify`。过闸口径 = manual fallback（Core Maintainer 会话授权，agent 代改字）。
-      ㉗ **合并原 ADR「审计证据交换拓扑」入本条 §2.9**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：审计线与 Hall 同属“审计模块拓扑”一决策；被并者 0024 删除，全仓指针改指本条（原 §2.1–§2.5 → §2.9.1–§2.9.5）。过闸口径 = manual fallback。
-      ㉘ W1 第三方实证 + Reopen 反向条件 + PURPOSE 回指惯例 2026-09-13，经 Core Maintainer 授权，依 `docs/adr/AUTHORING.md`：① 引 WikiSkill（arXiv:2608.27454 Table 3）ablation——给执行席开放累积知识使准确率 63.7%→60.9%——为 W1（执行席只读当轮材料）的第三方依据；② §3 Reopen 补「若放开 W1 隔离（执行席可读累积知识/账本历史），须先复现并推翻该 ablation」；③ 立 **PURPOSE 回指**惯例＝重大透镜修订在 ADR Decision 写驱动它的 pattern（并入既有 ADR 惯例，不新增机制）。过闸口径 = manual fallback。
-# Note: 非修订类元信息（过闸口径、历史痕迹摘要）。修订痕迹一律进 `Amended-by`
-# （格式 `- 🅰<序号> | <授权席位> | <日期> | <简述>`）——见 docs/adr/AUTHORING.md。
-# 本条上方 ①-㉘ 为旧格式存量（新格式自 ADR-0006 🅰1 起），迁移待专票，不就地改写。
-      (40) 2026-09-12 转 `Accepted`：经 Core Maintainer 显式批准（M9 内容项「ADR 成事实源」），补 `Landed-by` 指针；过闸口径 = manual fallback。
+Note: 修订痕迹见 git 历史。
 ---
 
 # ADR-0025: 审计模块（audit+quality）——Hall 确定性编排 + 物理隔离子席位

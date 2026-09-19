@@ -1,16 +1,11 @@
 ---
 Status: Accepted
-# Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
-# NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
 Landed-by: .agent/rules/07-audit.md
 Date: 2026-08-24
 Deciders: Core Maintainer
-Note: ① 就地修订（rules 集合由 00–03 更新为 00–10；quality harness 表述对齐 ADR-0025 合并模型）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。
-      ② 正交去重（`.agent/` 三件套职责改指本条 §2.3）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
-      ③ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
-      ④ **合并原独立 ADR「`.agent/` 是 harness 机器配置」入本条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：`.agent/` 发现面与 rules 切片同属"Agent 发现面"一决策，故作一；被并者 0011 删除，全仓指针改指本条。过闸口径 = manual fallback。
+Note: 修订痕迹见 git 历史。
 ---
 
 # ADR-0010: `AGENTS.md` 是唯一发现面；`.agent/` 是进程配置（rules 是其协议切片）

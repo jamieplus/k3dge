@@ -1,20 +1,11 @@
 ---
 Status: Accepted
-# Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
-# NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
 Landed-by: src/k3dge/cli/main.py
 Date: 2026-08-24
 Deciders: Core Maintainer
-Note: ① 就地修订（补 VCS 源形态）2026-09-05，经 Core Maintainer 本轮显式授权（「resource 指向 GitHub」指令），依 `docs/adr/AUTHORING.md`。
-      ② 就地修订（L2 矩阵语义对齐 ADR-0001：矩阵行可解析到具体测试，原"只保证文件存在"句作废）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。
-      ③ 正交去重（seal 闸/L2/审计 harness 复述改指 0001/0004/0006/0017/0019）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
-      ④ 就地修订（`k3dge audit` 口径：透镜不进 k3dge ≠ 审计线消费侧 CLI；原句作废）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
-      ⑤ 去 changelog 化（删「（2026-09-05 就地补记）」与「原句作废」元叙述）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
-      ⑥ 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
-      ⑦ **合并原 ADR「Harness Responsibility Split」入本条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：职责切分与本地自用同属一层；被并者 0020 删除，全仓指针改指本条（含模板镜像/协议/rules）。原「三 harness」来源消失，冲突处以 ADR-0025 为准。过闸口径 = manual fallback。
-      ⑧ **合并原 ADR「下游 init 被门禁咬住」入本条 §2.8**（物理删旧文件）2026-09-12，经 Core Maintainer 本轮显式授权：下游 init 属"本地自用/init"一决策；被并者 0015 删除，指针改指本条。过闸口径 = manual fallback。
+Note: 修订痕迹见 git 历史。
 ---
 
 # ADR-0005: 本地自用、职责切分、审计独立 harness

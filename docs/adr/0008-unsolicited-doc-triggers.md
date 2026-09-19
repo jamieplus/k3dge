@@ -1,13 +1,11 @@
 ---
 Status: Accepted
-# Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
-# NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
 Landed-by: src/k3dge/engine/nextstep.py
 Date: 2026-08-24
 Deciders: Core Maintainer
-Note: ①-⑦ 修订痕迹见 git 历史（2026-09-10 至 2026-09-12：里程碑触发对齐 ADR-0004、正交去重/收尾、去 changelog 化、人读化改写、增补 §2 渐进披露并 Accepted→Proposed→Accepted）；新格式自 🅰1 起生效（`Amended-by`），迁移口径同 ADR-0006。
+Note: 修订痕迹见 git 历史。
 ---
 
 # ADR-0008: 触发式文档维护与先读已敲定设计

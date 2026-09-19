@@ -1,16 +1,11 @@
 ---
 Status: Accepted
-# Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
-# NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
 Landed-by: src/k3dge/engine/evaluator.py
 Date: 2026-08-19
 Deciders: Core Maintainer
-Note: ① 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit` 无输出，no live lens）。
-      ② **合并原 ADR「TEMPLATE_DRIFT 锁在 engine」入本条 §2 第 7 条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：engine/templates 边界属架构基线；被并者 0014 删除，全仓指针改指本条。过闸口径 = manual fallback。
-      ③ 就地增补 §2 第 8 条「硬闸契约（`.agent/gates.toml`）」（闸的声明式阈值/开关，执行器读契约，缺省在 `engine/gates.DEFAULTS`）2026-09-12，经 Core Maintainer 本轮显式授权（M9 治理配置化），依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback。
-      ④ 就地增补 §2 第 9 条「实现语言基线（Rust 重写否决）」2026-09-13，经 Core Maintainer 本轮会话指令与裁定（据尖刀实验处置实现语言约束），依 `docs/adr/AUTHORING.md`；证据＝`../k3dge-contract-rs` Phase-1（contract parity 14/40，护栏不成立）/Phase-2（`compile_fail` 证 E0004）/Phase-3（双语言漂移对照）。过闸口径 = manual fallback（实测 `command -v k3dit` 无输出，no live lens）。
+Note: 修订痕迹见 git 历史。
 ---
 
 # ADR-0001: k3dge 架构设计与工程治理基线

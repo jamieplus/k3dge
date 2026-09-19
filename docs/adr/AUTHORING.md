@@ -88,7 +88,8 @@ Note: -                          # 非修订类元信息（过闸口径、历史
 
 - **`Supersedes`**：仅新 ADR 填写。旧 ADR 被 seal 闸自动修复为 `Status: Superseded` + `superseded_by`。
 - **`Amended-by`**：列表格式 `- 🅰<修订序号> | <授权席位> | <日期> | <简述>`。无修订则 `-`。
-- **`Note`**：非修订类元信息。修订痕迹全部进 `Amended-by`。
+- **`Note`**：非修订类元信息，默认 `-`。修订痕迹全部进 `Amended-by`；早期长 Note 已收敛为「修订痕迹见 git 历史」。
+- **frontmatter 只放数据，不放散文注释**：`---` 块里的 `#` 行会被朴素解析器当成 H1，实测污染过 `k3dge doc list` 与 `docs/generated/docs-index.json` 的 title（12/14 条 ADR 标题变成注释首行）。写法指引一律放正文的 `<!-- … -->`（见 `_template.md`）。
 
 ### `obsolete/` 归档闸
 
@@ -133,9 +134,13 @@ Amend 时在正文被修改处紧跟 Markdown footnote：
 
 **先查同类 ADR 并入**（见「先并入，后新建」）；确无同类才 copy `_template.md`，`Status: Proposed` → 由人/k3dit 判 `Accepted`。机验码：`ADR_SECTIONS_MISSING`, `ADR_NUMBER_COLLISION`, `ADR_FRONTMATTER_MISSING`。
 
-### 删除 / 改名 / 复用编号
+### 编号分配 / 删除 / 改名 / 复用
 
-一律不允许；**Numbers are never reused**。需显式人工授权：**物理删除**（含改名腾号）。机验码：`ADR_FILENAME_MISMATCH`。
+- **分配**：下一个号 ＝ `docs/adr/` 与 `docs/adr/obsolete/` 里最大号 + 1（都空则 `0001`）。
+- **Numbers are never reused**：号一旦分配就永久绑定那一个决策；被合并/删除/改名腾号后**该号退役**，不再分配。
+- **删除 / 改名**：一律需显式人工授权（**物理删除**含改名腾号）。
+- 机验实况（不要误信旧说法）：`ADR_FILENAME_MISMATCH` 只查「文件名号 ↔ H1 号一致」；`ADR_NUMBER_COLLISION` 只查 `docs/adr/*.md` 内部重号（**不含 `obsolete/`**）。⇒ **「号是否被复用」目前无闸**，靠本条散文 + 分配规则；补闸方案见 `docs/tasks/`（ADR 编号账本议题）。
+- 后果（实测）：物理删除会让退役号从目录里消失，于是「max + 1」可能重新发出退役号——本仓 `0026` 被发出过三次即此因。
 
 ### 杂项
 

@@ -1,15 +1,11 @@
 ---
 Status: Accepted
-# Append-only after Accepted. Revise via `Amended by` / `Superseded by` below — do
-# NOT rewrite this decision's prose in place, and never reuse a number (see README).
 Supersedes: -
 Amended-by: -
 Landed-by: AGENTS.md
 Date: 2026-08-24
 Deciders: Core Maintainer
-Note: ① 就地修订（正交去重：后继 harness 名单不再复述，名单以 ADR-0025 §2.4 为准）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径 = manual fallback（实测 `command -v k3dit`/`k3dge` 无输出，no live lens）。
-      ② 人读化改写（按 AUTHORING「人读优先」：决策先行、一行一点、长条拆子项；不变量与编号不变）2026-09-10，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`；过闸口径同上。
-      ③ **合并原 ADR「自举开发」与「外部模式吸收纪律」入本条**（物理删旧文件，git 历史留档）2026-09-12，经 Core Maintainer 本轮显式授权，依 `docs/adr/AUTHORING.md`：二者都是"目的"的阶段立场与吸收立场；被并者 0007/0016 删除，全仓指针改指本条。过闸口径 = manual fallback。
+Note: 修订痕迹见 git 历史。
 ---
 
 # ADR-0009: k3dge 的目的与立场（收住失败态 + 自举 + 吸收纪律）
