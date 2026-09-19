@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from k3dge.engine import gate_facts
 from k3dge.engine.models import Violation
@@ -109,3 +110,58 @@ class TestViolationWiring(unittest.TestCase):
         rep = GateReport(passed=False, violations=(Violation("ORPHAN_ADR", "a"),))
         row = _to_json(rep)["violations"][0]
         self.assertEqual(row["severity"], "warn")
+
+
+class TestProducersFeedDeclaredFacts(unittest.TestCase):
+    """结构守卫：声明了占位符的 code，其构造点必须给 `detail=`（否则文案永远缺字段）。
+
+    这是"内容/流程解耦"的接缝检查——表里写了 `{path}`，检查器就必须真给 `path`。
+    静态扫 AST，不靠人记。
+    """
+
+    def _violation_calls(self):
+        import ast
+
+        root = Path(__file__).resolve().parents[3] / "src" / "k3dge"
+        for py in sorted(root.rglob("*.py")):
+            tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fn = node.func
+                name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+                if name != "Violation" or not node.args:
+                    continue
+                first = node.args[0]
+                code = first.value if isinstance(first, ast.Constant) else None
+                if isinstance(code, str):
+                    yield py.relative_to(root), node, code
+
+    def test_declared_codes_with_placeholders_pass_detail(self):
+        missing = []
+        for rel, node, code in self._violation_calls():
+            keys = set(gate_facts.facts_of(code))
+            if not keys:
+                continue
+            kw = {k.arg for k in node.keywords}
+            if "detail" not in kw:
+                missing.append(f"{rel}:{node.lineno} {code} 缺 detail=（声明用了 {sorted(keys)}）")
+        self.assertEqual(missing, [])
+
+    def test_no_unfilled_placeholder_in_rendered_output(self):
+        """代表性事实喂进去后，渲染结果不得残留 `{key}`。"""
+        samples = {
+            "CONTRACT_DRIFT": {"expected_hash": "a", "actual_hash": "b"},
+            "DOC_INDEX_STALE": {"reason": "stale"},
+            "CONTRACT_HASH_MISSING": {"domain": "engine", "spec": "docs/specs/engine/spec.md"},
+            "VERSION_MISMATCH": {"drift": "pyproject=1 ≠ manifest=2"},
+            "TEMPLATE_DRIFT": {"asset": "assets/agents.md", "repo": "AGENTS.md"},
+            "DOC_NEW_UNSCREENED": {"path": "docs/memo/x.md"},
+            "ORPHAN_TEST": {"path": "tests/x.py"},
+            "ORPHAN_SPEC": {"path": "docs/specs/x.md"},
+            "ORPHAN_ADR": {"path": "docs/adr/0099-x.md"},
+            "DUP_CHECK": {"count": 3},
+        }
+        self.assertEqual(set(samples), set(gate_facts.GATE_FACTS))  # 表增删必须同步本测试
+        for code, facts in samples.items():
+            self.assertNotIn("{", gate_facts.render(code, facts), code)

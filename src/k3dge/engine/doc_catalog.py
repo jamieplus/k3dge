@@ -367,13 +367,15 @@ def validate_docs_index(workspace: Path) -> List[Violation]:
     try:
         actual = json.loads(dest.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        return [Violation("DOC_INDEX_STALE", f"{INDEX_REL} unreadable: {exc}", file_path=INDEX_REL)]
+        return [Violation("DOC_INDEX_STALE", f"unreadable: {exc}", file_path=INDEX_REL,
+                          detail={"reason": f"不可读：{exc}"})]
     if actual != expected:
         return [
             Violation(
                 "DOC_INDEX_STALE",
-                f"{INDEX_REL} is stale; run `k3dge sync`",
+                "stale",
                 file_path=INDEX_REL,
+                detail={"reason": "盘上内容与按当前 docs/ 重建的结果不同"},
             )
         ]
     return []

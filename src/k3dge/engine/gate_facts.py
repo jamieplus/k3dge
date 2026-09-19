@@ -53,6 +53,48 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         ],
         "pointers": ["AGENTS.md Core Invariants 2", "k3dge sync"],
     },
+    "DOC_INDEX_STALE": {
+        "severity": "block",
+        "fact": "`docs/generated/docs-index.json` 与重建结果不一致（{reason}）——它是**投影**，"
+                "由 `k3dge sync` 重生，不手改",
+        "options": [
+            "k3dge sync（重生 docs-index + 回写契约哈希）",
+            "索引本不该变 → 回退本轮 docs 改动，再跑 k3dge check",
+        ],
+        "pointers": ["k3dge sync", "docs/generated/", "AGENTS.md §12"],
+    },
+    "CONTRACT_HASH_MISSING": {
+        "severity": "block",
+        "fact": "`{spec}` 没有 Contract Hash 行（域 {domain}）——契约哈希由 `k3dge sync` 写入，不手写",
+        "options": [
+            "k3dge sync（写入/回写契约哈希）",
+            "该域本不该有契约 → 核对 .agent/manifest.json 的域声明与 spec 路径",
+        ],
+        "pointers": ["AGENTS.md Core Invariants 2", "k3dge sync", ".agent/manifest.json"],
+    },
+    "VERSION_MISMATCH": {
+        "severity": "block",
+        "fact": "版本号在三处各存一份、必须同值（pyproject.toml / .agent/manifest.json / "
+                "src/k3dge/__init__.py）：{drift}。三处逐个写、非原子事务，半漂移由本闸暴露"
+                "（有意留 BV-01，不引入跨文件原子）",
+        "options": [
+            "k3dge version bump（以 pyproject 为权威同步三处）",
+            "本轮不该提版 → 把三处改回同值，再跑 k3dge check",
+        ],
+        "pointers": ["k3dge version show", "docs/reviews/LEFTOVERS.md（BV-01）"],
+    },
+    "TEMPLATE_DRIFT": {
+        "severity": "block",
+        "fact": "字节锁两侧不一致：`{asset}` ≠ `{repo}`（PAIRS 见 engine/pairs.py）。"
+                "**方向要靠意图判**：本仓改协议面 ⇒ 仓→资产；升级下游 ⇒ 资产→仓。"
+                "进程不知道意图，故此码**不属确定性可修**",
+        "options": [
+            "本轮改的是仓内协议面 → 把仓内文件同步进 src/k3dge/templates/assets/",
+            "本轮改的是模板资产 → 把资产同步进仓内文件",
+            "两侧都该改 → 改完再跑 k3dge check",
+        ],
+        "pointers": ["src/k3dge/engine/pairs.py", "docs/guides/downstream.md"],
+    },
     "DOC_NEW_UNSCREENED": {
         "severity": "block",
         "fact": "新建受管文档 `{path}`（主观撰写类）未经重复/覆盖排查——首次提交拦一次，回执后不再提示。"

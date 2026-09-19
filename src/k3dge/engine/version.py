@@ -118,24 +118,27 @@ def validate_versions(workspace: Path) -> list[Violation]:
         violations.append(
             Violation(
                 "VERSION_MISMATCH",
-                f"version drift: pyproject.toml={py_v} vs .agent/manifest.json={mf_v}; run 'k3dge version bump' or 'k3dge sync'",
+                f"pyproject.toml={py_v} != .agent/manifest.json={mf_v}",
                 file_path=str(_manifest_path(workspace)),
+                detail={"drift": f"pyproject.toml={py_v} ≠ .agent/manifest.json={mf_v}"},
             )
         )
     if py_v is not None and init_v != py_v and _init_path(workspace).exists():
         violations.append(
             Violation(
                 "VERSION_MISMATCH",
-                f"version drift: pyproject.toml={py_v} vs src/k3dge/__init__.py={init_v}; run 'k3dge version bump'",
+                f"pyproject.toml={py_v} != src/k3dge/__init__.py={init_v}",
                 file_path=str(_init_path(workspace)),
+                detail={"drift": f"pyproject.toml={py_v} ≠ src/k3dge/__init__.py={init_v}"},
             )
         )
     if py_v is None and mf_v is not None and init_v is not None and init_v != mf_v:
         violations.append(
             Violation(
                 "VERSION_MISMATCH",
-                f"version drift: .agent/manifest.json={mf_v} vs src/k3dge/__init__.py={init_v}; run 'k3dge version bump'",
+                f".agent/manifest.json={mf_v} != src/k3dge/__init__.py={init_v}",
                 file_path=str(_init_path(workspace)),
+                detail={"drift": f".agent/manifest.json={mf_v} ≠ src/k3dge/__init__.py={init_v}"},
             )
         )
     return violations

@@ -419,8 +419,9 @@ class ConsistencyEngine:
             return [
                 Violation(
                     "VERSION_MISMATCH",
-                    f"version validation failed: {exc}",
+                    f"validation failed: {exc}",
                     file_path=str(self.workspace_root / "pyproject.toml"),
+                    detail={"drift": f"版本校验未能完成：{exc}"},
                 )
             ]
 
@@ -499,8 +500,9 @@ class ConsistencyEngine:
                             out.append(
                                 Violation(
                                     "TEMPLATE_DRIFT",
-                                    f"template drift: assets/{asset} != {rel}",
+                                    f"assets/{asset} != {rel}",
                                     file_path=rel,
+                                    detail={"asset": f"src/k3dge/templates/assets/{asset}", "repo": rel},
                                 )
                             )
                     except (OSError, UnicodeDecodeError):
@@ -523,8 +525,9 @@ class ConsistencyEngine:
             out.append(
                 Violation(
                     "TEMPLATE_DRIFT",
-                    f"template drift check failed: {exc}",
+                    f"check failed: {exc}",
                     file_path="src/k3dge/engine/pairs.py",
+                    detail={"asset": "src/k3dge/templates/assets/", "repo": f"比对未完成：{exc}"},
                 )
             )
         return out
@@ -764,9 +767,10 @@ class ConsistencyEngine:
             out.append(
                 Violation(
                     "CONTRACT_HASH_MISSING",
-                    "no contract hash in spec; run 'k3dge sync'",
+                    "no contract hash in spec",
                     domain=domain,
                     file_path=str(spec_path),
+                    detail={"domain": domain, "spec": str(spec_path)},
                 )
             )
         elif not ok:
