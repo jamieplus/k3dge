@@ -1,7 +1,8 @@
 ---
 Status: Accepted
 Supersedes: -
-Amended-by: -
+Amended-by:
+  - 🅰1 | Core Maintainer | 2026-09-19 | §2.7「代码审计与文档审计同形同路」划新线：可判定的形式规约归 k3dge 确定性执行，需语义判断的文档质量仍归外部透镜
 Landed-by: src/k3dge/cli/main.py
 Date: 2026-08-24
 Deciders: Core Maintainer
@@ -61,7 +62,8 @@ k3dge 只留 `docs/reviews/` 槽位与 seal 证据；MCP `k3dge_5pass_audit_prom
 
 ### 2.7 harness 职责边界（原独立 ADR，合并入本条；「三 harness」历史让位于 ADR-0025 合并审计模块）
 - **边界裁决（仍有效）**：`k3dge`=形式硬闸（哈希/章节/结构枚举；提交时；硬）；`k3dit`=文档文本质量 + ADR 集合自洽（冲突/覆盖）+ 代码是否守已商定 ADR（文档变动时；结构硬、文本可勤可硬）；~~`k3lity`~~=商定/实现好不好（复杂度/重复/设计过重/ADR 值不值；里程碑时；必须软）——quality 已并入审计模块（ADR-0025）。
-- **代码审计与文档审计同形同路**：一个 peer（k3dit）、一份 12 列报告、一个 `on_pre_seal` verify；`k3dge` 只出一个指路 prompt（按 `target_scope` 路由 5-Pass / Doc Audit），无独立 doc-audit prompt/transport。
+- **代码审计与文档审计同形同路**[^🅰1.1]：一个 peer（k3dit）、一份 12 列报告、一个 verify 步（`[checks.audit].stages_verify`）；`k3dge` 只出一个指路 prompt（按 `target_scope` 路由 5-Pass / Doc Audit），无独立 doc-audit prompt/transport。
+  - **线划在哪**（🅰1）：**可判定的形式规约**（闭集码、幂等、每条一测）归 k3dge 确定性执行，不经透镜；**需语义判断的文档质量**（Context 是否写成 timeline、Decision 是否只写不变量、有无过程叙述）仍归外部透镜，且只在里程碑轮。判据见 ADR-0022 §2.2。
 - **doc review ≠ idea scoring**：k3dge 只验「报告存在」，不判优劣；「定得对不对 / 有无更简做法」归 soft review。
 - **k3dge 文档硬闸** = 各 `docs/<type>/.schema.json` 结构闸（结构 only，never merit）；ADR 冲突/覆盖的**事实**由 `k3dge_adr_index` 供，**判断**归 k3dit。
 - 原「three sibling harnesses」来源消失；冲突处以 ADR-0025 为准。
@@ -76,3 +78,7 @@ k3dge 只留 `docs/reviews/` 槽位与 seal 证据；MCP `k3dge_5pass_audit_prom
 - **正**：本仓可直接 `./k3dge-init.sh`；align/check 测集不再分叉；封板无法用任意 md 冒充 align 产物；审计与一致性门禁解耦。
 - **负**：下游未设 `K3DGE_SOURCE` 时 editable 装的是下游自己；拆第五域的诉求被否决直到里程碑副作用再膨胀。
 - **职责边界**：`k3dge` 保持确定性与结构硬闸；语义审阅在 `k3dit`（文本质量、ADR 冲突判断）——硬闸是地板，不是语义裁判。
+
+---
+
+[^🅰1.1]: 修改：原句读作"文档侧一切审查都走审计路径"，于是 doc 合规只有"路由透镜 → 报告 → 票"一条路；实测该路未走通（`run_doc_audit` 丢弃透镜返回、票绑错报告，详见 ADR-0022 §2.2 的 🅰1.1）。本次不推翻"同形同路"（透镜、报告形、verify 步仍共用），只**划清哪一段不必进透镜**：形式规约由 k3dge 确定性执行（`gate_facts` 的 `fix=deterministic` 是唯一源，实测 10 : 32），语义质量仍归 k3dit。故本条与 ADR-0005 §2.7「k3dge never merit」不冲突——形式规约不是 merit。
