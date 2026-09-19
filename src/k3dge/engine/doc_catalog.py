@@ -281,6 +281,7 @@ def _load_schema(workspace: Path, typ: str) -> Tuple[Optional[dict], Optional[Vi
             "DOC_SCHEMA_INVALID",
             f"cannot read {rel}: {exc}",
             file_path=rel,
+            detail={"path": rel},
         )
     schema = parse_doc_schema(text)
     if schema is None:
@@ -290,6 +291,7 @@ def _load_schema(workspace: Path, typ: str) -> Tuple[Optional[dict], Optional[Vi
             "DOC_SCHEMA_INVALID",
             f"{rel} is not a JSON object",
             file_path=rel,
+            detail={"path": rel},
         )
     return schema, None
 

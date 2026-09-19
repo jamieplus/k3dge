@@ -631,6 +631,7 @@ class ConsistencyEngine:
                     "DOC_SCHEMA_INVALID",
                     f"docs catalog check crashed: {extra}",
                     file_path="docs",
+                    detail={"path": "docs"},
                 )
             ]
 

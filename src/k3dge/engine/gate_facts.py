@@ -44,7 +44,8 @@ class _SafeFacts(dict):
 GATE_FACTS: Dict[str, Dict[str, Any]] = {
     # --- block：拦下并要求判断主体选一条路 ---
     "CONTRACT_DRIFT": {
-        "severity": "block",
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "k3dge sync（回写契约哈希 + 重生 docs/generated）",
         "fact": "公有接口变了，spec 的契约哈希没跟上（spec={expected_hash} ≠ code={actual_hash}）；"
                 "哈希由 `k3dge sync` 回写，不手写",
         "options": [
@@ -54,7 +55,8 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "pointers": ["AGENTS.md Core Invariants 2", "k3dge sync"],
     },
     "DOC_INDEX_STALE": {
-        "severity": "block",
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "k3dge sync（重生 docs/generated/docs-index.json）",
         "fact": "`docs/generated/docs-index.json` 与重建结果不一致（{reason}）——它是**投影**，"
                 "由 `k3dge sync` 重生，不手改",
         "options": [
@@ -64,7 +66,8 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "pointers": ["k3dge sync", "docs/generated/", "AGENTS.md §12"],
     },
     "CONTRACT_HASH_MISSING": {
-        "severity": "block",
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "k3dge sync（写入契约哈希）",
         "fact": "`{spec}` 没有 Contract Hash 行（域 {domain}）——契约哈希由 `k3dge sync` 写入，不手写",
         "options": [
             "k3dge sync（写入/回写契约哈希）",
@@ -73,7 +76,8 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "pointers": ["AGENTS.md Core Invariants 2", "k3dge sync", ".agent/manifest.json"],
     },
     "VERSION_MISMATCH": {
-        "severity": "block",
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "k3dge version bump（以 pyproject 为权威同步三处）",
         "fact": "版本号在三处各存一份、必须同值（pyproject.toml / .agent/manifest.json / "
                 "src/k3dge/__init__.py）：{drift}。三处逐个写、非原子事务，半漂移由本闸暴露"
                 "（有意留 BV-01，不引入跨文件原子）",
@@ -84,6 +88,7 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "pointers": ["k3dge version show", "docs/reviews/LEFTOVERS.md（BV-01）"],
     },
     "TEMPLATE_DRIFT": {
+        "fix": "judgment",
         "severity": "block",
         "fact": "字节锁两侧不一致：`{asset}` ≠ `{repo}`（PAIRS 见 engine/pairs.py）。"
                 "**方向要靠意图判**：本仓改协议面 ⇒ 仓→资产；升级下游 ⇒ 资产→仓。"
@@ -96,6 +101,7 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "pointers": ["src/k3dge/engine/pairs.py", "docs/guides/downstream.md"],
     },
     "DOC_NEW_UNSCREENED": {
+        "fix": "judgment",
         "severity": "block",
         "fact": "新建受管文档 `{path}`（主观撰写类）未经重复/覆盖排查——首次提交拦一次，回执后不再提示。"
                 "值不值得建由你判（进程判不了语义覆盖与子项关系），本闸只负责把排查送到动手这一刻",
@@ -106,8 +112,118 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         ],
         "pointers": ["AGENTS.md §12", "docs/adr/AUTHORING.md「先并入，后新建」", "k3dge doc list --type <type>"],
     },
+    # --- markdown 完整性（pure_refs B3）---
+    "MD_TRAILING_WS": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "删掉行尾空白（幂等，无需判断）",
+        "fact": "`{path}` 有行尾空白——纯格式偏差，进程可按固定规则修",
+        "options": ["删掉行尾空白后重新提交", "该文件不该进受管面 → 在 .schema.json/排查面里声明排除（改声明，不改闸）"],
+        "pointers": ["docs/*/AUTHORING.md", "scripts/pre-commit"],
+    },
+    "MD_CRLF": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "CRLF → LF（幂等）",
+        "fact": "`{path}` 用了 CRLF 行尾——纯格式偏差，进程可按固定规则修",
+        "options": ["转成 LF 后重新提交", "确需 CRLF → 在 .gitattributes 声明（改声明，不改闸）"],
+        "pointers": ["scripts/pre-commit"],
+    },
+    "MD_NO_FINAL_NEWLINE": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "文件末尾补一个换行（幂等）",
+        "fact": "`{path}` 末尾缺换行——纯格式偏差，进程可按固定规则修",
+        "options": ["补末尾换行后重新提交", "该文件是二进制/生成物 → 声明排除"],
+        "pointers": ["scripts/pre-commit"],
+    },
+    "MD_FENCE_UNCLOSED": {
+        "severity": "block", "fix": "judgment",
+        "fact": "`{path}` 有未闭合的代码围栏（``` 或 ~~~ 数量为奇数）——补在哪、围哪段要读懂内容",
+        "options": ["补上缺失的围栏（确认围住的是哪一段）", "删掉多余的围栏（若本不该有代码块）"],
+        "pointers": ["docs/*/AUTHORING.md"],
+    },
+    "MD_CONFLICT_MARKER": {
+        "severity": "block", "fix": "judgment",
+        "fact": "`{path}` 里留着 git 冲突标记（<<<<<<< / >>>>>>>）——合并结果必须由人判",
+        "options": ["解冲突：保留正确一侧并删标记", "放弃本次合并（git merge --abort）后重来"],
+        "pointers": ["docs/branches/AUTHORING.md"],
+    },
+    "MD_ENCODING": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "转 UTF-8（字节级，无需判断）",
+        "fact": "`{path}` 不是合法 UTF-8——受管文档一律 UTF-8",
+        "options": ["转成 UTF-8 后重新提交", "该文件不该是文本 → 移出 docs/ 或声明排除"],
+        "pointers": ["scripts/pre-commit"],
+    },
+    # --- 票据一致性（pure_refs B2）---
+    "TASK_BODY_META_REDUNDANT": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "删掉正文里复写 frontmatter 的元数据行（frontmatter 是唯一源）",
+        "fact": "`{path}` 的正文复写了 frontmatter 已有的任务元数据——第二源只能漂移",
+        "options": ["删掉正文的 `- **Status|Milestone|Priority|Date|Report**:` 行", "该字段确实只该在正文 → 改 docs/tasks/.schema.json 与 AUTHORING（改声明，不双写）"],
+        "pointers": ["docs/tasks/AUTHORING.md"],
+    },
+    "TASK_STATUS_MISMATCH": {
+        "severity": "block", "fix": "judgment",
+        "fact": "`{path}` 的 frontmatter `status` 与文件名 `.done.md` 后缀不一致——哪边是真的要人判",
+        "options": ["票确实做完了 → `k3dge task done <path>`（它同时改名，别手改）", "票没做完 → 把 frontmatter status 改回 idea/in-progress 并去掉 .done 后缀"],
+        "pointers": ["docs/tasks/AUTHORING.md", "k3dge task done"],
+    },
+    "TASK_MILESTONE_MISMATCH": {
+        "severity": "block", "fix": "judgment",
+        "fact": "`{path}` 的 frontmatter `milestone` 与文件名里的里程碑号不一致",
+        "options": ["改 frontmatter 对齐文件名（文件名是归档/扫描的依据）", "改里程碑归属 → 连文件名一起改（`git mv`），别只改一边"],
+        "pointers": ["docs/tasks/AUTHORING.md", "k3dge milestone status <id>"],
+    },
+    # --- ADR 一致性（pure_refs B2 / B1）---
+    "ADR_NUMBER_MISMATCH": {
+        "severity": "block", "fix": "judgment",
+        "fact": "`{path}` 的文件名号与正文 H1/引用号不一致。**不得机械改号**：文档会老化，"
+                "机械改会把对的一侧改错——要先判哪边是真号，并同步 README 索引与全部引用点",
+        "options": ["以文件名为准 → 改 H1 与文内自引，并核对 README Topics", "以 H1 为准 → `git mv` 改文件名，并全仓改引用（`k3dge doc grep ADR-<号>`）"],
+        "pointers": ["docs/adr/AUTHORING.md", "docs/adr/README.md", "k3dge doc grep"],
+    },
+    "ADR_SUPERSEDE_UNRECONCILED": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "k3dge sync（`adr_gate.reconcile_supersedes` 自动标记旧 ADR 并移入 obsolete/）",
+        "fact": "`{path}` 声明了 Supersedes 但旧 ADR 未被标记/归档——这一步是机械的，由 sync 完成",
+        "options": ["k3dge sync（自动 reconcile：改 frontmatter + 移入 obsolete/）", "Supersedes 写错了 → 改指向真正被取代的那条"],
+        "pointers": ["docs/adr/AUTHORING.md「obsolete/ 归档闸」", "k3dge sync"],
+    },
+    "DANGLING_ADR_REF": {
+        "severity": "block", "fix": "judgment",
+        "fact": "`{path}` 引用了一个在 docs/adr/（含 obsolete/）找不到的 ADR 号——要么号写错，"
+                "要么那条 ADR 已被物理删除（历史退役号见 obsolete/README.md）",
+        "options": ["改成正确的 ADR 号（`k3dge doc list --type adr` 查现役）", "该决策已并入别条 → 改指宿主 ADR 与其小节", "确属历史陈述 → 去掉 `ADR-` 前缀写成事件描述（如「原 0020」）"],
+        "pointers": ["k3dge doc list --type adr", "docs/adr/README.md"],
+    },
+    "DANGLING_REPORT_REF": {
+        "severity": "block", "fix": "judgment",
+        "fact": "`{path}` 的 `report:` 指针指向不存在的文件——票与报告的绑定断了",
+        "options": ["补上报告（`k3dge milestone audit-submit <id>`）", "改指真正对应的那份报告", "这张票不该绑报告 → 删掉 frontmatter 的 report 字段"],
+        "pointers": ["docs/reviews/", "k3dge ADR-0022"],
+    },
+    "DANGLING_FOOTNOTE": {
+        "severity": "block", "fix": "judgment",
+        "fact": "`{path}` 有 `[^X]` 引用但没有对应定义（行内 code span 里的字面量已排除）",
+        "options": ["补上 `[^X]:` 定义（Amended-by 的内联修订标记见 docs/adr/AUTHORING.md）", "删掉这个引用（若本不需要脚注）"],
+        "pointers": ["docs/adr/AUTHORING.md「内联修订标记」"],
+    },
+    # --- 结构（pure_schema）---
+    "DOC_SCHEMA_INVALID": {
+        "severity": "block", "fix": "judgment",
+        "fact": "`{path}` 不符合该类型的 `.schema.json`（frontmatter/章节/文件名/索引）——"
+                "缺的通常是**要写的内容**，不是格式，故不自动修",
+        "options": ["按 docs/<type>/_template.md 与 AUTHORING.md 补齐缺的部分", "规则本身不对 → 改 docs/<type>/.schema.json（改声明，同步模板资产）"],
+        "pointers": ["docs/*/AUTHORING.md", "docs/*/_template.md"],
+    },
+    "DOC_SECTION_ORDER": {
+        "severity": "block", "fix": "judgment",
+        "fact": "`{path}` 的编号章节没有升序（或有重号）——重排会移动散文，必须人判",
+        "options": ["把编号改回升序（不移动内容）", "内容确需换序 → 连编号一起重排，并核对文内自引"],
+        "pointers": ["docs/adr/AUTHORING.md「杂项」"],
+    },
     # --- warn：显示但不拦（孤儿＝可能是有意的新增，判定归人）---
     "ORPHAN_TEST": {
+        "fix": "judgment",
         "severity": "warn",
         "fact": "`{path}` 没有被任何 Verification Matrix 行引用——测试存在但不在验证面上",
         "options": [
@@ -117,6 +233,7 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "pointers": ["docs/specs/<domain>/spec.md", "k3dge ADR-0005 §2.5"],
     },
     "ORPHAN_SPEC": {
+        "fix": "judgment",
         "severity": "warn",
         "fact": "`{path}` 没有被 manifest 的任何域引用——spec 存在但不是任何域的判据",
         "options": [
@@ -127,6 +244,7 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
     },
     # --- observe：观测建议，不阻断、不裁决（service 角色；peer 不可达即无提示）---
     "DUP_CHECK": {
+        "fix": "judgment",
         "severity": "observe",
         "fact": "新建票据与集存内容可能重复（候选见下）——是不是真重复由你判，本条不阻断、不裁决",
         "options": [
@@ -136,6 +254,7 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "pointers": ["docs/tasks/AUTHORING.md", "k3dge task list --json"],
     },
     "ORPHAN_ADR": {
+        "fix": "judgment",
         "severity": "warn",
         "fact": "`{path}` 未列入 docs/adr/README.md 的 Topics——决策存在但索引找不到它",
         "options": [
@@ -145,6 +264,21 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "pointers": ["docs/adr/README.md", "docs/adr/AUTHORING.md"],
     },
 }
+
+
+#: 可修性闭集（唯一源）。deterministic = 进程可按固定规则改（幂等、无需判断）；
+#: judgment = 必须人/agent 判（方向不明、要读懂语义、或会改史）。
+FIX_KINDS: tuple = ("deterministic", "judgment")
+
+
+def fix_kind(code: str) -> str:
+    """该 code 的修复性质。
+
+    未声明的 code 按 `judgment` 兜底（保守：不假装能自动修）；但**已进表的 code 必须
+    显式写 `fix`**——由 test_gate_facts 守，防止靠默认值蒙混过关（那份"进程能不能修"
+    的清单是本表的主要产出之一，默认值会让它失真）。
+    """
+    return str((GATE_FACTS.get(code) or {}).get("fix") or "judgment")
 
 
 def is_declared(code: str) -> bool:
@@ -171,15 +305,23 @@ def fill(template: str, facts: Optional[Dict[str, Any]]) -> str:
         return _PLACEHOLDER.sub(lambda m: str(facts.get(m.group(1), m.group(0))), template)
 
 
-def render(code: str, facts: Optional[Dict[str, Any]] = None, *, where: str = "") -> str:
+def render(code: str, facts: Optional[Dict[str, Any]] = None, *, where: str = "",
+           detail: str = "") -> str:
     """给**判断主体**的投影：陈述式 fact + 成对 options + pointers（不出疑问句）。
 
-    `where` = 位置（文件/域），有则挂在首行末尾，与 `[GATE ERROR] … [path]` 的旧形状兼容。
+    `where`  = 位置（文件/域），挂在首行末尾，与 `[GATE ERROR] … [path]` 的旧形状兼容。
+    `detail` = 检查器给出的具体事实（哪一行/哪个值不一致）。**过渡约定**：检查器尚未
+               结构化为 `facts` 的，用它把细节带出来，避免为了单源而丢掉信息；
+               检查器迁到结构化事实后本参数可空。
     """
     decl = GATE_FACTS.get(code)
     if not decl:
         return ""
     lines = [f"fact: {fill(str(decl.get('fact', '')), facts)}"]
+    if detail:
+        lines.append(f"detail: {detail}")
+    if decl.get("fix") == "deterministic":
+        lines.append(f"fix: 确定性可修——{fill(str(decl.get('fix_hint', '')), facts)}")
     for opt in decl.get("options") or []:
         lines.append(f"option: {fill(str(opt), facts)}")
     ptrs = [fill(str(p), facts) for p in (decl.get("pointers") or [])]

@@ -131,7 +131,10 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -
         sev = gate_facts.severity(code) if gate_facts else "block"
         text = ""
         if gate_facts is not None and gate_facts.is_declared(code):
-            text = gate_facts.render(code, facts or {}, where=where)
+            f = {"path": where or msg.split(":")[0]}
+            f.update(facts or {})
+            # 检查器原文作为 detail 带出（过渡约定：尚未结构化的检查器不丢信息）
+            text = gate_facts.render(code, f, where=where, detail=msg)
         line = text or (f"{where}: [{code}] {msg}" if where else f"[{code}] {msg}")
         (warns if sev != "block" else errs).append(line)
     aux = getattr(pure_schema, "AUX_NAMES", _AUX_FALLBACK)
