@@ -788,8 +788,8 @@ class ConsistencyEngine:
             out.append(
                 Violation(
                     "CONTRACT_DRIFT",
-                    f"public interface changed (spec={expected[:12]}..., code={actual[:12]}...); "
-                    "run 'k3dge sync'",
+                    # 事实摘要（非文案）：措辞/选项/指针归 gate_facts 声明面
+                    f"spec={expected[:12]} code={actual[:12]}",
                     domain=domain,
                     file_path=str(spec_path),
                     detail={

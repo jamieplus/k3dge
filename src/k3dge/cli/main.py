@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Sequence
 
+from k3dge.engine import gate_facts
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.models import GateReport
 
@@ -67,6 +68,8 @@ def _to_json(report: GateReport) -> dict:
                 "message": v.message,
                 "domain": v.domain,
                 "file_path": v.file_path,
+                # 给进程的闭集投影（ADR-0026 §2.2）：档位 + 事实，无文案、无分支余地
+                "severity": gate_facts.severity(v.rule_id),
                 **({"detail": v.detail} if v.detail is not None else {}),
             }
             for v in report.violations

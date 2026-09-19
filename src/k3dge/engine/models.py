@@ -15,8 +15,23 @@ class Violation:
     detail: Optional[dict] = None
 
     def format(self) -> str:
+        """渲染闸红。
+
+        已进 `gate_facts.GATE_FACTS` 声明面的 code 走**单一渲染器**（陈述式 fact +
+        成对 options + pointers，档位前缀由声明定）；未声明的 code 保持旧形状
+        （`message` 由构造点自带）——迁移是增量的，搬一个就少一处手拼串。
+        """
+        from k3dge.engine import gate_facts
+
         loc = f" [{self.file_path}]" if self.file_path else ""
         dom = f" <{self.domain}>" if self.domain else ""
+        if gate_facts.is_declared(self.rule_id):
+            facts = dict(self.detail or {})
+            body = gate_facts.render(self.rule_id, facts, where=f"{dom}{loc}".strip())
+            tag = {"block": "GATE ERROR", "warn": "GATE WARN", "observe": "GATE NOTE"}[
+                gate_facts.severity(self.rule_id)
+            ]
+            return f"[{tag}] {body}"
         return f"[GATE ERROR] {self.rule_id}{dom}: {self.message}{loc}"
 
 

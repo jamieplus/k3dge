@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 from typing import Sequence
+from k3dge.engine import gate_facts
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.models import GateReport
 from k3dge.cli.mcp_peers import cmd_mcp_probe
@@ -332,6 +333,27 @@ sync_extractors(workspace: Path) -> Dict[str, Any]
     # doc: Render all resolved languages into `.agent/extractors/`. Idempotent.
 describe_extractors(workspace: Path) -> List[str]
     # doc: Human-readable lines for `k3dge extractor list`.
+# gate_facts.py
+from __future__ import annotations
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+SEVERITIES: tuple = ('block', 'warn', 'observe')
+DEFAULT_SEVERITY = 'block'
+GATE_FACTS: Dict[str, Dict[str, Any]] = {'CONTRACT_DRIFT': {'severity': 'block', 'fact': '公有接口变了，spec 的契约哈希没跟上（spec={expected_hash} ≠ code={actual_hash}）；哈希由 `k3dge sync` 回写，不手写', 'options': ['k3dge sync（回写契约哈希 + 重生 docs/generated）', '接口本不该变 → 回退代码改动，再跑 k3dge check'], 'pointers': ['AGENTS.md Core Invariants 2', 'k3dge sync']}, 'DOC_NEW_UNSCREENED': {'severity': 'block', 'fact': '新建受管文档 `{path}`（主观撰写类）未经重复/覆盖排查——首次提交拦一次，回执后不再提示。值不值得建由你判（进程判不了语义覆盖与子项关系），本闸只负责把排查送到动手这一刻', 'options': ['并入既存 → 目标文档收编本节、删掉本文件、写并入说明，再 k3dge sync', '确认新建 → k3dge doc screen {path}', '指明并入目标 → k3dge doc screen {path} --into docs/<type>/<target>.md'], 'pointers': ['AGENTS.md §12', 'docs/adr/AUTHORING.md「先并入，后新建」', 'k3dge doc list --type <type>']}, 'ORPHAN_TEST': {'severity': 'warn', 'fact': '`{path}` 没有被任何 Verification Matrix 行引用——测试存在但不在验证面上', 'options': ['在对应 spec 的 Verification Matrix 里补一行引用它', '确认是有意留（探索性/临时测试）→ 不处理，本条只观测不拦'], 'pointers': ['docs/specs/<domain>/spec.md', 'k3dge ADR-0005 §2.5']}, 'ORPHAN_SPEC': {'severity': 'warn', 'fact': '`{path}` 没有被 manifest 的任何域引用——spec 存在但不是任何域的判据', 'options': ['在 .agent/manifest.json 的域里补 spec 指针', '确认是有意留（跨域说明/模板）→ 不处理，本条只观测不拦'], 'pointers': ['.agent/manifest.json', 'k3dge ADR-0005 §2.8']}, 'ORPHAN_ADR': {'severity': 'warn', 'fact': '`{path}` 未列入 docs/adr/README.md 的 Topics——决策存在但索引找不到它', 'options': ['在 README 的 Topics 里补一行（按类归入）', '该 ADR 已退役 → 移入 docs/adr/obsolete/（reconcile 由 k3dge sync 跑）'], 'pointers': ['docs/adr/README.md', 'docs/adr/AUTHORING.md']}}
+is_declared(code: str) -> bool
+    # doc: 该 code 是否已进声明表（未进 ⇒ 调用方用自己的 message 兜底）。
+severity(code: str) -> str
+    # doc: 档位唯一源：查表；未声明按 `DEFAULT_SEVERITY`。消费者不得自己判档位。
+fill(template: str, facts: Optional[Dict[str, Any]]) -> str
+    # doc: 把 `{key}` 用检查器给的结构化事实填上；缺失键原样留着（不抛）。
+render(code: str, facts: Optional[Dict[str, Any]]=None, *, where: str='') -> str
+    # doc: 给**判断主体**的投影：陈述式 fact + 成对 options + pointers（不出疑问句）。
+projection(code: str, facts: Optional[Dict[str, Any]]=None) -> dict
+    # doc: 给**进程**的投影：闭集（code + severity + 事实），无文案、无分支余地。
+facts_of(code: str) -> List[str]
+    # doc: 声明里用到的占位键名（供守卫测试核对检查器是否真给了这些事实）。
 # gates.py
 from __future__ import annotations
 from pathlib import Path
@@ -457,6 +479,7 @@ class Violation
     file_path: Optional[str] = None
     detail: Optional[dict] = None
     format(self) -> str
+        # doc: 渲染闸红。
 class GateReport
     passed: bool
     changed_files: Tuple[str, ...] = ()
@@ -604,7 +627,7 @@ is_screenable_new_doc(rel: str) -> bool
     # doc: 该新增路径是否属"主观撰写的受管文档"（需要首次排查）。
 screen_ack_path(workspace: Path, rel: str) -> Path
 find_unscreened_new_docs(workspace: Path, added_rels) -> List[Ref]
-    # doc: 新增受管文档中，尚无排查回执的 ⇒ 阻断（每个文件只拦第一次）。
+    # doc: 新增受管文档中，尚无排查回执的 ⇒ `(code, path)`（每个文件只拦一次）。
 record_screen_ack(workspace: Path, rel: str, *, into: Optional[str]=None) -> Path
     # doc: 写排查回执（结论二值：并入某目标 / 确认新建）。不做语义判断，只记事实。
 # pure_schema.py

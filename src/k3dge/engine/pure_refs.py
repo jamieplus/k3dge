@@ -358,10 +358,13 @@ def screen_ack_path(workspace: Path, rel: str) -> Path:
 
 
 def find_unscreened_new_docs(workspace: Path, added_rels) -> List[Ref]:
-    """新增受管文档中，尚无排查回执的 ⇒ 阻断（每个文件只拦第一次）。
+    """新增受管文档中，尚无排查回执的 ⇒ `(code, path)`（每个文件只拦一次）。
 
     判"值不值得建"是**判断主体的事**（进程判不了语义覆盖/子项关系）；本闸只负责
     把这件事**送到动手那一刻**并拦住一次，制造排查动力。回执后不再提示。
+
+    返回的第二项是**事实**（路径），不是文案——文案/选项/档位由 `gate_facts` 声明，
+    消费者（`scripts/pre-commit`）查表渲染。
     """
     out: List[Ref] = []
     for rel in added_rels:
@@ -372,13 +375,8 @@ def find_unscreened_new_docs(workspace: Path, added_rels) -> List[Ref]:
                 continue
         except OSError:
             continue
-        out.append(("DOC_NEW_UNSCREENED", (
-            f"{rel}: 新建受管文档（主观撰写类）未经重复/覆盖排查——首次提交拦一次，回执后不再提示。\n"
-            f"    fact: 值不值得建由你判（进程判不了语义覆盖与子项关系）；本闸只负责把排查送到动手这一刻\n"
-            f"    option: 并入既存 → 目标文档收编本节、删掉本文件、写并入说明，再 k3dge sync\n"
-            f"    option: 确认新建 → k3dge doc screen {rel}\n"
-            f"    option: 指明并入目标 → k3dge doc screen {rel} --into docs/<type>/<target>.md"
-        )))
+        # 只产 code + 事实（路径）；文案/options/档位归 `gate_facts` 声明面（内容/流程解耦）
+        out.append(("DOC_NEW_UNSCREENED", rel))
     return out
 
 

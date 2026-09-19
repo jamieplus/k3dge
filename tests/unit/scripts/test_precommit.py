@@ -118,6 +118,8 @@ class TestScreenGateWiring(unittest.TestCase):
     def test_added_and_acked_paths(self):
         import tempfile
 
+        from k3dge.engine import gate_facts
+
         pr = self._pure_refs()
         with tempfile.TemporaryDirectory() as td:
             ws = Path(td)
@@ -125,10 +127,27 @@ class TestScreenGateWiring(unittest.TestCase):
             orig = hook.WS
             hook.WS = ws
             try:
-                self.assertEqual(len(hook.run_screen_gate([rel], pr)), 1)
+                out = hook.run_screen_gate([rel], pr, gate_facts)
+                self.assertEqual([sev for sev, _ in out], ["block"])   # 档位查表，不写死
+                self.assertIn("fact:", out[0][1])                       # 文案查表，不在 hook 里拼
                 pr.record_screen_ack(ws, rel)
-                self.assertEqual(hook.run_screen_gate([rel], pr), [])
-                self.assertEqual(hook.run_screen_gate([], pr), [])
+                self.assertEqual(hook.run_screen_gate([rel], pr, gate_facts), [])
+                self.assertEqual(hook.run_screen_gate([], pr, gate_facts), [])
+            finally:
+                hook.WS = orig
+
+    def test_without_declaration_falls_back_to_plain(self):
+        """声明面不可用 ⇒ 回落 `[code] 事实`，绝不因为工具坏而放行或崩掉。"""
+        import tempfile
+
+        pr = self._pure_refs()
+        with tempfile.TemporaryDirectory() as td:
+            ws = Path(td)
+            orig, hook.WS = hook.WS, ws
+            try:
+                sev, text = hook.run_screen_gate(["docs/memo/2026-09-19-y.md"], pr, None)[0]
+                self.assertEqual(sev, "block")
+                self.assertEqual(text, "[DOC_NEW_UNSCREENED] docs/memo/2026-09-19-y.md")
             finally:
                 hook.WS = orig
 
@@ -137,4 +156,4 @@ class TestScreenGateWiring(unittest.TestCase):
             def find_unscreened_new_docs(self, *_a, **_k):
                 raise RuntimeError("boom")
 
-        self.assertEqual(hook.run_screen_gate(["docs/adr/0027-x.md"], Boom()), [])
+        self.assertEqual(hook.run_screen_gate(["docs/adr/0028-x.md"], Boom()), [])

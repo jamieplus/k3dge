@@ -355,17 +355,21 @@ class TestNewDocScreening(unittest.TestCase):
             self.assertFalse(pure_refs.is_screenable_new_doc(rel), rel)
 
     def test_blocks_until_acked(self):
+        from k3dge.engine import gate_facts
+
         with tempfile.TemporaryDirectory() as td:
             ws = Path(td)
             rel = "docs/memo/2026-09-19-y.md"
             out = pure_refs.find_unscreened_new_docs(ws, [rel])
-            self.assertEqual([c for c, _ in out], ["DOC_NEW_UNSCREENED"])
-            msg = out[0][1]
-            # ADR-0026 §2.2：fact + 成对 options，不出疑问句
-            self.assertIn("fact:", msg)
-            self.assertGreaterEqual(msg.count("option:"), 2)
-            self.assertNotIn("？", msg)
-            self.assertIn(f"k3dge doc screen {rel}", msg)
+            self.assertEqual(out, [("DOC_NEW_UNSCREENED", rel)])   # 只产 code + 事实，不产文案
+
+            # 文案由声明面渲染（ADR-0026 §2.2：fact + 成对 options，不出疑问句）
+            text = gate_facts.render("DOC_NEW_UNSCREENED", {"path": out[0][1]})
+            self.assertIn("fact:", text)
+            self.assertGreaterEqual(text.count("option:"), 2)
+            self.assertNotIn("？", text)
+            self.assertIn(f"k3dge doc screen {rel}", text)
+            self.assertEqual(gate_facts.severity("DOC_NEW_UNSCREENED"), "block")
 
             pure_refs.record_screen_ack(ws, rel)
             self.assertEqual(pure_refs.find_unscreened_new_docs(ws, [rel]), [])
