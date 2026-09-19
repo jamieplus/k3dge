@@ -1,5 +1,5 @@
 ---
-status: idea
+status: in-progress
 milestone: M10
 priority: P1
 date: 2026-09-19
@@ -67,3 +67,48 @@ date: 2026-09-19
 - 与 `2026-09-18-M10-fix-pipelines_stages_dead_config`（③）互为前后件：本票先落声明面的一半（code→文案/档位），③ 落另一半（hook→stages）。
 - 与 `2026-09-19-M10-refactor-orch_node_table` 的关系：本票是那张表的第一批居民，不是另建一张表。
 - 本票是**现行 ADR-0026 违规的修复**（闸红无 options），不只是重构。
+
+## 进度（2026-09-19，桩已落 · commit b189846）
+
+已落（骨架 + 5 个 code 迁移，实测两投影同形）：
+
+```
+engine/gate_facts.py（零依赖，pre-commit 与 engine 共用）
+  GATE_FACTS 声明表：code → severity | fact | options | pointers
+  severity() / render()（给判断主体）/ projection()（给进程）/ fill() / facts_of()
+  档位闭集 block|warn|observe 只在此定义
+Violation.format()      已声明 code 走表（[GATE ERROR|WARN|NOTE] + fact/options/pointers）
+                        未声明保持旧形状 ⇒ 迁移可增量
+已迁 5 个 code          CONTRACT_DRIFT(block) DOC_NEW_UNSCREENED(block)
+                        ORPHAN_TEST|ORPHAN_SPEC|ORPHAN_ADR(warn)
+evaluator               CONTRACT_DRIFT 的 message 降为事实摘要（spec=… code=…）
+pure_refs               find_unscreened_new_docs 返回 (code, path)，只产事实不产文案
+scripts/pre-commit      run_screen_gate → [(severity, 文本)]，档位/文案查表；
+                        声明面不可用 ⇒ 回落 `[code] 事实`（不放行、不崩）
+cli/main._to_json       violation 带 severity（进程投影）
+守卫测试 16 条          档位闭集 / block 必 ≥2 options / 声明文案无疑问句与 y/N、倒计时 /
+                        占位符缺失不抛 / 未声明兜底 / projection 闭集 /
+                        声明占位键 ↔ 检查器 detail 对齐 / hook 回落
+555 passed；k3dge check 绿
+```
+
+待办（本票剩余）：
+1. 迁余下 code：evaluator 的 29 处 `Violation(...)` 手拼串（CONTRACT_HASH_MISSING /
+   TEMPLATE_DRIFT / VERSION_MISMATCH / DOC_INDEX_STALE / DOMAIN_IMPORT_VIOLATION /
+   MATRIX_TEST_UNRESOLVED / MISSING_TEST_FILE / PIPELINE_SCHEMA_INVALID /
+   SPEC_MISSING_SECTION / UNREGISTERED_DOMAIN / AUDIT_TRAIL_APPEND_ONLY / …）
+   + pure_schema/pure_refs 的 ~20 个 code（ADR_* / DOC_* / MD_* / TASK_* / DANGLING_*）
+2. hook 的 schema gate：`run_schema_gate` 现在把 `(code,msg)` 拍平成字符串再打印
+   （`f"{rel}: [{code}] {msg}"`）⇒ 档位/文案仍在 hook 里；改为查表（与本票同口径）
+3. `_orphan_warnings` 的 "WARN (non-blocking)" 散文标签改为查表 severity
+4. `[DUP-CHECK]` / k3che hints 的 observe 档进表（现在是 cli 里的 print 散文）
+5. 全部迁完后：`Violation.message` 降为纯事实字段（或删），并加守卫
+   「已声明的 code 不得再在构造点拼散文」
+
+## Notes（补）
+
+- 与 `orch_node_table` 的接口已对齐：本表就是那张节点表的 `severity/fact/options/pointers`
+  四个字段，届时**并入而非并存**（避免长出第二张文案表）。
+- 档位声明放在代码里而非 `pipeline.toml`：code 词表是 k3dge 自己的（下游不能发明 code），
+  下游可配的是"走哪些步/什么顺序/失败怎么办/阈值"（见 `adr0026_d_line_and_downstream` §2.7 草案）。
+  若后续要求下游能降档（block→warn），再把 severity 提升为 toml 可覆盖项。

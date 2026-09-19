@@ -677,7 +677,7 @@
       "type": "tasks",
       "id": "2026-09-19-M10-refactor-orch_converge_gate_facts",
       "title": "编排骨架收敛·第一刀：闸红文案单源 + 阻断档位统一（Violation 只产 code+事实，文案/severity/options 归声明）",
-      "status": "idea",
+      "status": "in-progress",
       "tokens": "编排骨架收敛·第一刀：闸红文案单源 + 阻断档位统一（Violation 只产 code+事实，文案/severity/options 归声明）"
     },
     {
