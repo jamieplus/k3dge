@@ -39,3 +39,5 @@ date: 2026-09-18
 - Accepted ADR **append-only**：只能 `Amended by` / `Superseded by`，就地修订须在 frontmatter `Note:` 记「经 Core Maintainer 显式授权 + 过闸口径」（仓内既有惯例，见 0008/0022 的 Note 段）。
 - 相关但独立：`2026-09-18-M10-fix-pipelines_stages_dead_config`（C6：AGENTS.md §12 声称的 `pipelines.on_seal_enter/on_pre_seal` 无执行者）——那是编排声明面的问题，不属本票的策略边界。
 - 现行 doc-audit 实现（`engine/doc_audit.py`）在本策略下的去留由实现票裁定；本票只改 ADR。
+- **2026-09-19 拆出两票**（避免本票面过宽）：编号系统本身 → `2026-09-19-M10-docs-adr_number_cutline`（C5 的"复用无闸"在那票解决）；D 线不变量 + 骨架下游可配 → `2026-09-19-M10-docs-adr0026_d_line_and_downstream`。本票保留 C1-C4（doc 策略的 ADR 冲突）。
+- C6（`[pipelines.*]` 无执行者）归 `2026-09-18-M10-fix-pipelines_stages_dead_config`，已裁定取"接通并入节点表"。

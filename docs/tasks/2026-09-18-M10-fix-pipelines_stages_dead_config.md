@@ -3,6 +3,7 @@ status: idea
 milestone: M10
 priority: P1
 date: 2026-09-18
+blocking: 2026-09-19-M10-refactor-orch_converge_gate_facts
 ---
 
 # pipelines.on_seal_enter/on_pre_seal 无执行者：AGENTS.md §12 声称的 seal hook 机制不存在（接通或废声明，只留一套声明面）
@@ -46,7 +47,11 @@ date: 2026-09-18
 | **(a) 接通 B** | `milestone_audit`/`seal_flow` 改为读 `[pipelines.<hook>].stages` 派发（stages 里就是 action ref，`run_action` 已能跑），删 `streams` 硬编码 | 要定义 hook 名闭集与未知 hook 的处理；`gates.checks.actions` 与 `pipelines.stages` 的分工要写清（前者＝k3dge 内部动作 id，后者＝外部 peer action ref） |
 | **(b) 废 B** | 删 `[pipelines.*]` 声明 + `_validate_pipelines`，改 `AGENTS.md` §12 指向 `gates.checks`；外部 action ref 仍由代码按角色解析（`resolve_role`） | 失去「换 hook 顺序/加 stage 不改代码」的可配面；AGENTS.md §12 与 pipeline.toml 注释都要改 |
 
-倾向 (a)：`stages` 已是 action ref 列表，`run_action` + 角色解析（`resolve_role`/`resolve_action`）已就绪，接通成本低于废除成本；且新 doc 策略（`doc_strategy_five_points`）需要一个「seal 轮跑外部、降级跑内部」的声明位，(b) 之后还得再造。
+**定形已裁定（用户，2026-09-19）：取 (a) 接通，且并入统一节点表**——`[pipelines.on_seal_enter]` / `[pipelines.on_pre_seal]` 迁为 `[checks.seal].stages_enter` / `stages_pre`（节点表见 `2026-09-19-M10-refactor-orch_node_table`），执行器改读声明，删 `milestone_audit.py:213` 的硬编码 `streams`。理由：`stages` 已是 action ref 列表，`run_action` + 角色解析（`resolve_role`/`resolve_action`）已就绪，接通成本低于废除成本；且骨架声明要求"只留一套声明面"。
+
+**附带裁定**：编排骨架**下游可配** ⇒ 声明缺失/解析失败必须回落代码内缺省（`gates.DEFAULTS` 原则：闸不因配置坏而失效），未知 id 一律拒绝不静默跳过。
+
+本票是收敛顺序的**第二步**（B 线文案单源之后、节点表全量之前）：它只把 `[pipelines.*]` 这一处死声明接通/迁移，不顺带落 `needs/produces/on_error` 等节点属性（那是 `orch_node_table`）。
 
 ## 边界与拆分（规则 08）
 

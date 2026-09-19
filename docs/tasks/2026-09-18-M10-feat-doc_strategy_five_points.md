@@ -3,7 +3,7 @@ status: idea
 milestone: M10
 priority: P2
 date: 2026-09-18
-blocking: 2026-09-18-M10-docs-adr_doc_normalize_strategy 2026-09-18-M10-fix-pipelines_stages_dead_config
+blocking: 2026-09-18-M10-docs-adr_doc_normalize_strategy 2026-09-19-M10-refactor-orch_node_table
 ---
 
 # doc 策略五点落地：格式硬闸 / 新建重复覆盖确认（并入优先）/ seal 轮规约化（外部优先，降级 k3dge）/ 用现成 checks 编排
@@ -24,9 +24,18 @@ blocking: 2026-09-18-M10-docs-adr_doc_normalize_strategy 2026-09-18-M10-fix-pipe
 | ④ 归属 | ① 已是纯 stdlib 零 peer | ② 依赖 k3che（service 角色，非 audit 模块）——需在 ADR 里写明判定权归 k3dge/agent，k3che 只供候选 |
 | ⑤ 编排 | **活的**声明面：`gates.py:25 DEFAULTS["checks"][<kind>]{preconditions,actions}` + 执行器注册表（`seal_flow.py registry` / `seal.py:182 gate_fns` / `align.py:44 _reg`），未知 id ⇒ 拒绝 | **死的那套**：`[pipelines.*].stages` 只有 `pipeline_schema.py:95` 校验、无执行者（见 `pipelines_stages_dead_config` 票）——不先收口就会长出第三套硬编码 |
 
-## 待定形（三个必须裁定的点）
+## 已裁定（用户，2026-09-19）——原"三个待裁定切线"作废
 
-1. **可机械修 vs 需判断的切线**。k3dit Doc Audit 透镜的四条软规则实测分类：
+- **不存在"可机械修 vs 需判断"的切线问题**：确定性修复的对象是**硬闸检出项**（已枚举的闭集码），对它们只有一问——进程能修还是不能修。软规则（Context 无 timeline / Decision 只写不变量 / 无过程叙述）**不在 doc fix 里**，属外部透镜，seal 轮过。
+- **规约化的形状 = 阻断闸 + 投喂事实源**（B 线）：闸拦住并指路，投喂的事实源把调查范围限定住；投喂必须是**已有投影**（docs-index / adr_index / markers 账 / 12 列报告 / events.jsonl），不新造调查通道。
+- **新建受管文档的排查闸已落**（commit `a04242c`）：`DOC_NEW_UNSCREENED` 阻断、只拦第一次、回执 `.protocol-ack/doc-screen/`（ephemeral）、`k3dge doc screen <path> [--into]`。判定权归 agent（进程判不了语义覆盖/子项关系）。**撤回**原方案的 `Screened:` frontmatter 字段（过度设计）。
+- **耐久机制**：从"票卡 seal"改为"闸卡 seal"（`[checks.seal].preconditions += docs_normalized`，detector 零偏差才过）。
+- **C 线归约**：自主→自动不是独立机制，是"自主单位调用 A 线声明式入口"；不经接口的交付（直接改盘上事实）必须有验证器，验证器就是 B 线的闸。**残渣待补**：`.ack` 的 `--into` 目标存在性无校验。
+- **编排挂法**：`doc_normalize` / `docs_normalized` 就是统一节点表里的一个 action / 一个 precondition（见 `orch_node_table`），不新造流程机制。
+
+## 原切线分析（存档，判据已被上面取代）
+
+1. ~~可机械修 vs 需判断的切线~~。k3dit Doc Audit 透镜的四条软规则实测分类：
    ```
    可判定 + 可机械修（→ 进 DOC_FIX_RULES 或 .schema.json 硬闸）
      Consequences 三段齐 / frontmatter↔body 三头一致（已有 task_meta_dual_source 闸）
@@ -36,8 +45,8 @@ blocking: 2026-09-18-M10-docs-adr_doc_normalize_strategy 2026-09-18-M10-fix-pipe
      「Context 无 timeline」「Decision 只写不变量与 non-goal」「无过程叙述」
    ```
    对第二类做「直接改」＝agent 自由改写散文：无声变异、无问责、规则变成被优化的靶（Goodhart）。**不得进 fix 动作。**
-2. **Accepted ADR 正文不可自动改**。仓内不变量：append-only，只能 `Amended by`/`Superseded by`，就地修订须在 `Note:` 记显式授权 + 过闸口径（见 0008/0022 的 Note 段）。⇒ fix 范围必须显式排除 Accepted ADR 散文段。
-3. **有意留的出口**。全变成静默改文件会丢掉「谁改的/为什么/哪条是有意留」（12 列的 `处置/验证/复审/验收` 是决策史）。需要就地标记（如 `<!-- k3dge:doc-fix-off <rule-id> -->`）或 LEFTOVERS 式登记，否则「修不动就删规则」会成默认退路。
+2. **Accepted ADR 正文不可自动改**（仍成立；格式面改动不记 Amended-by，内容面改动才记——用户裁定 2026-09-19）。仓内不变量：append-only，只能 `Amended by`/`Superseded by`，就地修订须在 `Note:` 记显式授权 + 过闸口径（见 0008/0022 的 Note 段）。⇒ fix 范围必须显式排除 Accepted ADR 散文段。
+3. **有意留的出口**（仍成立）。全变成静默改文件会丢掉「谁改的/为什么/哪条是有意留」（12 列的 `处置/验证/复审/验收` 是决策史）。需要就地标记（如 `<!-- k3dge:doc-fix-off <rule-id> -->`）或 LEFTOVERS 式登记，否则「修不动就删规则」会成默认退路。
 
 ## 方案骨架（用现成机制，不新造）
 
