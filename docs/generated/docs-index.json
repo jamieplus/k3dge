@@ -657,11 +657,11 @@
       "tokens": "判定到动作的结构化派发：gate_id 到 action（替掉散文子串匹配）"
     },
     {
-      "path": "docs/tasks/2026-09-19-M10-docs-adr0026_d_line_and_downstream.md",
+      "path": "docs/tasks/2026-09-19-M10-docs-adr0026_d_line_and_downstream.done.md",
       "type": "tasks",
-      "id": "2026-09-19-M10-docs-adr0026_d_line_and_downstream",
+      "id": "2026-09-19-M10-docs-adr0026_d_line_and_downstream.done",
       "title": "ADR-0026 追加：D 线不变量（k3dge 不编排自主↔自主）+ 骨架声明的下游可配边界",
-      "status": "idea",
+      "status": "done",
       "tokens": "ADR-0026 追加：D 线不变量（k3dge 不编排自主↔自主）+ 骨架声明的下游可配边界"
     },
     {

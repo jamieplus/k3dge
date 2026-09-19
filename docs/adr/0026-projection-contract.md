@@ -5,7 +5,7 @@ Amended-by: -
 Landed-by: src/k3dge/engine/nextstep.py
 Date: 2026-09-17
 Deciders: Core Maintainer
-Note: 2026-09-19 在 `Proposed` 段就地修订（append-only 只约束 Accepted 之后）：§2.2 语法维补「疑问句为何不得进纯打印面」的判据（疑问句不客观反映事实，带预设即引导性话术），§2.5 记存量已清。授权人：Core Maintainer。
+Note: 2026-09-19 在 `Proposed` 段就地修订（append-only 只约束 Accepted 之后）：§2.2 语法维补「疑问句为何不得进纯打印面」的判据（疑问句不客观反映事实，带预设即引导性话术），§2.5 记存量已清。授权人：Core Maintainer；同日增补 §2.6（D 线不可编排）与 §2.7（骨架声明的下游可配边界）。授权人：Core Maintainer。
 ---
 
 # ADR-0026: 投影契约（对 agent 的三维投影与三层拓扑）
@@ -73,6 +73,30 @@ ADR-0006 §2.3.6 只管产出侧；消费侧对称补两条，两侧共用同一
 - 不新增机制：无语法检查器、无渲染层。本文只把**已成立的约定**记为不变量（语法维的四条已由 `test_nextstep.TestProjectionInvariants` 守住）。
 - 不追溯存量：不符合三维的既有输出面不因此变红；改到哪面才按哪面判。
   - **存量已清（2026-09-19）**：`[NEXT]` 的 5 个疑问句（`pending_findings` / `audit_suggested` / `seal_ready` / `audit_open` / `new_domain`）已改陈述式 `fact` + `options`；疑问句只留在 `STATE_OPTIONS[*].question`，仅由 `prompt.ask`（有 stdin）消费。本条豁免从此空转。
+
+### 2.6 D 线：自主 ↔ 自主不由 k3dge 编排
+
+§2.1 的三层拓扑讲的是"谁可被编排"；本节把**第四种流转**显式判为不可编排，免得下一次有人在 k3dge 里给席位排步骤。
+
+- **判据**（承 §2.1）：可编排 ⇔ 该过程的「归属」与「判断」同属一个主体，且该主体就是编排者。自主 ↔ 自主的归属与判断分属不同自主单位（审席 / 修席 / 复核席 / 人）⇒ 对 k3dge **恒不可编排**。
+- **k3dge 在 D 线只做三件事（闭集）**：
+  1. **状态可见**：`[NEXT] ratchet_open` / `escalated`；`k3dge audit status|show`。
+  2. **事实供给**：`present` / `materialize`（worktree 机械抽取）、账本、钉、`events.jsonl`。
+  3. **幂等步进**：`advance`——一次调用推一步，**进程不等人**，绝不在闸里等席。
+- **禁止**：给席位排步骤；代签（承 ADR-0006 §2.3.6「机器不自签」）；把 D 线状态塞进 `[checks.*]` 节点表。
+- **实例**（现存，编排权都在 k3dge 之外）：Hall 席位圈（`docs/protocols/peer_contract.md` §1.4：判读落钉 → 修翻 `fixnote` → 复核翻 `fixed` → Hall 拔 → `sign-report`）；`escalated` 转人工；Accepted ADR 就地修订需显式人工授权；新建文档判定为"并入"时需宿主 ADR 的授权席位认可。
+- **为何仓内看不到 D 线机制**：因为它的编排在 Hall/人那边，k3dge 里只剩仪表与介质。**这不是缺设计，是设计生效的样子。**
+
+### 2.7 骨架声明的下游可配边界
+
+编排声明（`[checks.*]`：preconditions / actions / stages_*）是**下游可配面**——下游仓能改顺序、关步骤、换角色绑定。可配不等于无约束：
+
+- **权威与缺省**：仓内权威 ＝ 该仓自己的声明文件；**代码内缺省必须完整**（`engine/gates.DEFAULTS`）。声明缺失或解析失败 ⇒ 回落缺省，**闸不因配置坏而失效**。下游删掉整段也必须能跑。
+- **未知 id 一律拒绝**，不静默跳过（"不让声明空转"）：下游写错 id 要立刻红。
+- **两类 id 不混一张词表**：`actions` ＝ k3dge 内部动作 id（注册表）；`stages_*` ＝ 外部 peer 的 action ref（交 `run_action` 走 `mcp→cli→manual/skip`）。ref 用**角色名**（`audit.actions.x`），下游换 `[roles.audit] bind` 即换实现，声明不用改。
+- **字节锁的边界**：本仓声明文件 ↔ `src/k3dge/templates/assets/*.template` 受 `PAIRS` 锁；下游拿到的是 init 时的副本，**可自由改、不受锁**。
+- **字段即契约**：加字段可以（必须带缺省）；改字段语义 / 删字段 / 改档位默认值 ⇒ 走 ADR（下游既有配置会静默变义）。
+- **不可配的部分**（明写，避免"全可配"幻觉）：判据本体（`docs/<type>/.schema.json` 的结构规则、`evaluator` 的检查函数）、投影形状（§2.2 三维）、档位与文案的**词表**（`gate_facts`：code 是 k3dge 自己的，下游不能发明 code）、D 线不变量（§2.6）。下游可配的是"走哪些步、什么顺序、失败怎么办、绑哪个实现"。
 
 ## 3. 产生后果 (Consequences)
 
