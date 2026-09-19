@@ -265,10 +265,10 @@ def run_audit_flow(
         prompt._write(
             nextstep.NextStep.from_state("audit_open", milestone_id, pending=pending_total).render_cli() + "\n"
         )
-        # 文案单源：STATE_OPTIONS["audit_open"].ask（与 [NEXT] 同一句）；
+        # 文案单源：STATE_OPTIONS["audit_open"].question（与 [NEXT] 的 fact 同一判定的两个投影）；
         # countdown/default_yes 是**通道行为**，留在调用点。
         if not prompt.ask(
-            nextstep.ask_text("audit_open", milestone_id, n=pending_total),
+            nextstep.question_text("audit_open", milestone_id, n=pending_total),
             countdown=60,
             default_yes=True,
         ):

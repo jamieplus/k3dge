@@ -6,7 +6,7 @@ Commands therefore end with a fixed-shape `[NEXT]` line (CLI) / `next` field
 
 Single source: every option string lives ONLY in `STATE_OPTIONS` (and the
 rejection routing table `GATE_NEXT`). Commands never hand-write their own
-playbook — they call `NextStep.from_state(...)` / `ask_text(...)` /
+playbook — they call `NextStep.from_state(...)` / `question_text(...)` /
 `next_for_rejection(...)`, which derive from the same state machine as
 `pipeline.toml` / `AGENTS.md`.
 
@@ -21,7 +21,7 @@ Shape (CLI):
       if y: <action>
       if n: <action>
 
-MCP isomorphic JSON: {"next": {"state", "milestone", "pending"?, "ask"?, "if_y"?, "if_n"?, "note"?}}
+MCP isomorphic JSON: {"next": {"state", "milestone", "pending"?, "reasons"?, "fact"?, "options"?, "question"?, "pointers"?}}
 
 Constraints (design review):
   - success -> state; failure -> action. Never decide for the human.
@@ -35,67 +35,95 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, TextIO
 
-# Success / neutral states: the option text is the single source of truth.
-# `pointers` = 纵深指针（doc id / ADR 节 / 命令），推"去哪取细节"而非灌正文（ADR-0008 §2 渐进披露）。
+# 单一源：一个判定 = 一条声明，两个投影（ADR-0026 §2.2）：
+#   fact     陈述句事实 → `[NEXT]`（纯打印面，无应答通道；不用疑问句——疑问句不客观
+#            反映事实，会变成带预设的引导性话术）+ 决策权归属
+#   options  合法选项（≥ 2，否则＝只给一条路＝下令）；不替判断主体选
+#   question 疑问句 → **只**给 `prompt.ask`（有 stdin 应答通道），与 fact 同一判定的另一投影
+# `pointers` = 纵深指针（doc id / ADR 节 / 命令），推"去哪取细节"而非灌正文（ADR-0008 §2）。
+#: 播报态（无 options）：只陈述事实 + 指针，不给分支。
 STATE_OPTIONS: dict = {
-    "normal": {"note": "常规提交门禁通过", "pointers": ["AGENTS.md §12"]},
+    "normal": {"fact": "常规提交门禁通过", "pointers": ["AGENTS.md §12"]},
     "pending_findings": {
-        "ask": "有 findings 钉在代码/文档里；继续处理这些 pending？",
-        "if_y": "修完删 `k3dit:pending <ID>` 标记；有意留改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）",
-        "if_n": "stop",
+        "fact": "代码/文档里有 findings 钉（`k3dit:pending`）未处置；怎么处置由你决定",
+        "options": [
+            "修完删 `k3dit:pending <ID>` 标记",
+            "有意留 → 改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）",
+            "本轮不处理（钉仍在，下次照旧提示）",
+        ],
         "pointers": ["peer_contract §8", "k3dge ADR-0025"],
     },
     "ratchet_open": {
-        "note": "有在办棘轮工单（k3dge ADR-0025）：进程不等人，但账必须可见",
-        "if_y": "k3dge audit status <job> 查对端；席位侧一圈见契约 §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）",
-        "pointers": ["k3dge audit status <id>", "peer_contract §1.4", "k3dge ADR-0025 §2.7"],
+        "fact": "有在办棘轮工单（k3dge ADR-0025）：进程不等人，但账必须可见",
+        "pointers": [
+            "k3dge audit status <id>",
+            "peer_contract §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）",
+            "k3dge ADR-0025 §2.7",
+        ],
     },
     "doc_audit": {
-        "note": "docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断——`k3dge doc-audit` 出报告(k3dit)+建里程碑 task（本轮不改，封板轮也得闭环）",
+        "fact": "docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断（本轮不改，封板轮也得闭环）",
         "pointers": ["k3dge ADR-0022 §2.2", "k3dge doc-audit"],
     },
     "audit_suggested": {
-        "ask": "要审吗？",
-        "if_y": "k3dge milestone audit <id>（必审，待修=0 才谈封板）",
-        "if_n": "stop（继续干活）",
+        "fact": "里程碑 <id> 命中审计触发条件（reason 见上）；审与不审由你决定",
+        "options": [
+            "k3dge milestone audit <id>（必审，待修=0 才谈封板）",
+            "不审，继续干活（触发条件仍在，下次照旧提示）",
+        ],
         "pointers": ["k3dge ADR-0004 §2.1.5", "k3dge milestone audit <id>"],
     },
     "seal_ready": {
-        "ask": "里程碑 <id>：审计已闭环（待修=0），封板？",
-        "if_y": "k3dge milestone seal <id>（align→归档+版本+指针）",
-        "if_n": "stop（里程碑继续挂着，不封）",
+        "fact": "里程碑 <id> 审计已闭环（待修=0）；封板与否由你决定（封＝归档+版本+指针）",
+        "question": "里程碑 <id>：封板？",
+        "options": [
+            "k3dge milestone seal <id>（align→归档+版本+指针）",
+            "不封（里程碑继续挂着，当普通提交结束）",
+        ],
         "pointers": ["k3dge ADR-0004 §2.1.4", "docs/reviews/"],
     },
     "audit_needed": {
-        "note": "未审计不可封板（封=归档+版本+指针，非界限）：先 k3dge milestone audit <id>",
+        "fact": "里程碑 <id> 未审计，不可封板（封＝归档+版本+指针，非界限）",
+        "options": [
+            "k3dge milestone audit <id>（先闭环审计）",
+            "不封板，当普通提交结束",
+        ],
         "pointers": ["k3dge ADR-0004 §2.1.6", "k3dge milestone audit <id>"],
     },
     "audit_open": {
-        "ask": "里程碑 <id>：发现 <n> 项待修，agent 修？",
-        "if_y": "修完重跑 k3dge milestone audit <id>（重审）",
-        "if_n": "stop / 转人工干预",
+        "fact": "里程碑 <id> 审计发现 <n> 项待修，环未闭环；由谁修由你决定",
+        "question": "里程碑 <id>：<n> 项待修，agent 修？",
+        "options": [
+            "agent 修 → 修完重跑 k3dge milestone audit <id>（重审）",
+            "不由 agent 修 → stop / 转人工干预",
+        ],
         "pointers": ["k3dge ADR-0022", "k3dge milestone audit <id>"],
     },
     "escalated": {
-        "note": "verify 连续 >3 次未闭环，转人工干预：k3dge milestone audit-submit <id> 或人工复核",
+        "fact": "verify 连续 >3 次未闭环，已转人工干预（k3dge milestone audit-submit <id> 或人工复核）",
         "pointers": ["k3dge milestone audit-submit <id>", "docs/incidents/"],
     },
-    "sealed": {"note": "已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑", "pointers": ["docs/reviews/*-closure.md", "k3dge ADR-0004 §2.1.4"]},
-    "seal_declined": {"note": "已放弃封板（当普通提交结束）", "pointers": ["AGENTS.md §12"]},
-    # 兑底态：闸/动作拒绝且其 gate_id 不在 `GATE_NEXT` 路由表内。原文照登，不猜。
-    "rejected": {"note": "操作被拒（原因见上）", "pointers": ["AGENTS.md §12", "k3dge milestone status <id>"]},
+    "sealed": {
+        "fact": "已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑",
+        "pointers": ["docs/reviews/*-closure.md", "k3dge ADR-0004 §2.1.4"],
+    },
+    "seal_declined": {"fact": "已放弃封板（当普通提交结束）", "pointers": ["AGENTS.md §12"]},
+    # 兜底态：闸/动作拒绝且其 gate_id 不在 `GATE_NEXT` 路由表内。原文照登，不猜。
+    "rejected": {"fact": "操作被拒（原因见上）", "pointers": ["AGENTS.md §12", "k3dge milestone status <id>"]},
     # `new_domain` is a cross-cutting trigger the hard gate does not turn red on
     # but has a file-level signal. Architecture/overview updates are intentionally
     # NOT a hook — they are done inside the milestone closure note (ADR-0004).
     "new_domain": {
-        "ask": "新建 src/ 域未在 manifest 注册？",
-        "if_y": "补 manifest + spec + tests，再 k3dge sync 回写契约",
-        "if_n": "stop",
+        "fact": "新建 src/ 域未在 manifest 注册（硬闸不红，但有文件级信号）",
+        "options": [
+            "补 manifest + spec + tests，再 k3dge sync 回写契约哈希",
+            "有意不注册 → 在 manifest `ignore` 里声明",
+        ],
         "pointers": ["k3dge ADR-0005 §2.8", "k3dge sync"],
     },
 }
 
-#: 拒绝派发闭集（唯一源）：`gate_id` → (state, note_key)。
+#: 拒绝派发闭集（唯一源）：`gate_id` → (state, fact_key)。
 #: **不在表里的 id 兜底为 `rejected` + 原文**（不猜）。id 词表：`pipeline.toml`
 #: `[checks.*].preconditions/actions` + `gates.INTERNAL_GATE_IDS`。
 GATE_NEXT: dict = {
@@ -106,8 +134,8 @@ GATE_NEXT: dict = {
     "tasks_all_done": ("rejected", "tasks_pending"),
 }
 
-#: 拒绝备注文案（仅当 state 自带的 note 不够用时；`<id>` 占位）。
-REJECTION_NOTES: dict = {
+#: 拒绝事实文案（仅当 state 自带的 fact 不够用时；`<id>` 占位）。
+REJECTION_FACTS: dict = {
     "audit_missing": "审计缺失：先落盘报告（k3dge milestone audit-submit <id>）或 k3dge milestone audit <id>",
     "audit_open_declined": "stop / 转人工干预（待修未修复且 agent 拒绝修复）",
     "tasks_pending": "票据未全 done：先干活或改挂里程碑，再谈 align/seal",
@@ -119,10 +147,9 @@ class NextStep:
     state: str
     milestone: str
     pending: Optional[int] = None
-    note: Optional[str] = None
-    ask: Optional[str] = None
-    if_y: Optional[str] = None
-    if_n: Optional[str] = None
+    fact: Optional[str] = None
+    options: Optional[list] = None
+    question: Optional[str] = None
     reasons: Optional[list] = None
     pointers: Optional[list] = None
 
@@ -133,10 +160,9 @@ class NextStep:
             state=state,
             milestone=milestone,
             pending=pending,
-            ask=opt.get("ask"),
-            if_y=opt.get("if_y"),
-            if_n=opt.get("if_n"),
-            note=opt.get("note"),
+            fact=opt.get("fact"),
+            options=list(opt["options"]) if opt.get("options") else None,
+            question=opt.get("question"),
             reasons=reasons,
             pointers=opt.get("pointers"),
         )
@@ -149,7 +175,11 @@ class NextStep:
             out = out.replace("<n>", str(self.pending))
         return out
 
+    def filled_options(self) -> list:
+        return [self._fill(o) or o for o in (self.options or [])]
+
     def render_cli(self) -> str:
+        """纯打印面：**只出 fact + options**（陈述句，无应答通道故不用疑问句）。"""
         head = f"[NEXT] state={self.state} milestone={self.milestone}"
         if self.pending is not None:
             head += f" pending={self.pending}"
@@ -157,17 +187,11 @@ class NextStep:
         if self.reasons:
             for r in self.reasons:
                 lines.append(f"  reason: {r}")
-        ask = self._fill(self.ask)
-        if_y = self._fill(self.if_y)
-        if_n = self._fill(self.if_n)
-        if ask:
-            lines.append(f"  ask: {ask}")
-        if if_y:
-            lines.append(f"  if y: {if_y}")
-        if if_n:
-            lines.append(f"  if n: {if_n}")
-        if self.note:
-            lines.append(f"  note: {self.note}")
+        fact = self._fill(self.fact)
+        if fact:
+            lines.append(f"  fact: {fact}")
+        for o in self.filled_options():
+            lines.append(f"  option: {o}")
         if self.pointers:
             lines.append("  pointers: " + " | ".join(self._fill(p) or p for p in self.pointers))
         return "\n".join(lines)
@@ -178,17 +202,15 @@ class NextStep:
             d["pending"] = self.pending
         if self.reasons:
             d["reasons"] = list(self.reasons)
-        ask = self._fill(self.ask)
-        if_y = self._fill(self.if_y)
-        if_n = self._fill(self.if_n)
-        if ask:
-            d["ask"] = ask
-        if if_y:
-            d["if_y"] = if_y
-        if if_n:
-            d["if_n"] = if_n
-        if self.note:
-            d["note"] = self.note
+        fact = self._fill(self.fact)
+        if fact:
+            d["fact"] = fact
+        opts = self.filled_options()
+        if opts:
+            d["options"] = opts
+        question = self._fill(self.question)
+        if question:
+            d["question"] = question   # 只给有应答通道的消费者（prompt.ask）
         if self.pointers:
             d["pointers"] = [self._fill(p) or p for p in self.pointers]
         return d
@@ -236,7 +258,7 @@ def load_persisted(workspace: Path) -> Optional[dict]:
 
 
 def next_for_rejection(milestone: str, message, gate_id: Optional[str] = None) -> NextStep:
-    """Failure -> action. **闭集派发**：`gate_id` → `GATE_NEXT` → state/note。
+    """Failure -> action. **闭集派发**：`gate_id` → `GATE_NEXT` → state/fact。
 
     `message` 可为 `gates.Rejection`（自带 gate_id）或裸 str。裸 str（无 id）一律
     兜底为 `rejected` + 原文——**不从文案里猜**（猜错＝静默给错下一步）。
@@ -245,24 +267,32 @@ def next_for_rejection(milestone: str, message, gate_id: Optional[str] = None) -
     text = "" if message is None else str(message)
     route = GATE_NEXT.get(gid) if gid else None
     if route is None:
-        return NextStep(state="rejected", milestone=milestone, note=f"操作被拒：{text}")
-    state, note_key = route
-    note = REJECTION_NOTES.get(note_key or "", "").replace("<id>", milestone)
-    if not note:
-        note = STATE_OPTIONS.get(state, {}).get("note", "").replace("<id>", milestone)
-    if text and text not in note:
-        note = f"{text}\n  {note}" if note else text
-    return NextStep(state=state, milestone=milestone, note=note)
+        return NextStep(state="rejected", milestone=milestone, fact=f"操作被拒：{text}")
+    state, fact_key = route
+    fact = REJECTION_FACTS.get(fact_key or "", "").replace("<id>", milestone)
+    if not fact:
+        fact = STATE_OPTIONS.get(state, {}).get("fact", "").replace("<id>", milestone)
+    if text and text not in fact:
+        fact = f"{text}\n  {fact}" if fact else text
+    return NextStep(
+        state=state,
+        milestone=milestone,
+        fact=fact,
+        options=list(STATE_OPTIONS.get(state, {}).get("options") or []) or None,
+    )
 
 
-def ask_text(state: str, milestone: str, *, n: Optional[int] = None) -> str:
-    """判定文案单源投影：交互式 `prompt.ask` 与 `[NEXT]` 共用 `STATE_OPTIONS[state]`。
+def question_text(state: str, milestone: str, *, n: Optional[int] = None) -> str:
+    """交互式 `prompt.ask` 的文案单源投影：取 `STATE_OPTIONS[state]["question"]`。
 
+    与 `[NEXT]` 的 `fact` 是**同一判定的两个投影**（ADR-0026 §2.2 语法维）：
+    有应答通道（prompt 读 stdin）→ 疑问句；纯打印（`[NEXT]`）→ 陈述句。
+    两者都不是第二源：同一声明里的两个字段，各投影一次。
     通道行为（`default_yes` / `countdown`）留在调用点——那是**怎么问**，不是**问什么**。
-    占位符：`<id>` = 里程碑，`<n>` = 待修计数。
+    占位符：`<id>` = 里程碑，`<n>` = 待修计数。无 `question` 的态回落 `fact`。
     """
     opt = STATE_OPTIONS.get(state, {})
-    text = opt.get("ask") or opt.get("note") or ""
+    text = opt.get("question") or opt.get("fact") or ""
     out = text.replace("<id>", milestone)
     if n is not None:
         out = out.replace("<n>", str(n))

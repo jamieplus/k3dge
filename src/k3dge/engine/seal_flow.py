@@ -132,9 +132,9 @@ def run_seal_flow(
         return "audit_needed", msg + "\n" + _ns.render_cli()
 
     # enter-seal prompt — NO countdown; N = keep milestone open. Skipped with --yes.
-    # 文案单源：STATE_OPTIONS["seal_ready"].ask（与 [NEXT] 同一句）；通道行为（default_yes）留在此处。
+    # 文案单源：STATE_OPTIONS["seal_ready"].question（与 [NEXT] 的 fact 同一判定的两个投影）；通道行为（default_yes）留在此处。
     if not skip_enter_prompt and not prompt.ask(
-        nextstep.ask_text("seal_ready", milestone_id), default_yes=False
+        nextstep.question_text("seal_ready", milestone_id), default_yes=False
     ):
         msg = f"Milestone {milestone_id}: seal declined — 不封，里程碑继续挂着。"
         _ns = nextstep.NextStep.from_state("seal_declined", milestone_id)

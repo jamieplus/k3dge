@@ -210,7 +210,9 @@ def test_open_ratchet_jobs_filters_closed(tmp_path):
 def test_nextstep_has_ratchet_open():
     from k3dge.engine.nextstep import STATE_OPTIONS
 
-    assert "ratchet_open" in STATE_OPTIONS and "§1.4" in STATE_OPTIONS["ratchet_open"]["if_y"]
+    # 播报态：席位一圈的细节走 pointers（不再有 if_y 分支字段）
+    assert "ratchet_open" in STATE_OPTIONS
+    assert any("§1.4" in p for p in STATE_OPTIONS["ratchet_open"]["pointers"])
 
 
 def test_peer_status_no_peer_is_graceful(tmp_path):

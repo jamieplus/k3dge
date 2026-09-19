@@ -693,7 +693,7 @@ class TestGateIdDispatch(TestCase):
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "rejected")
-        self.assertIn("k3dge milestone audit-submit M1", self._sidecar(ws)["note"])
+        self.assertIn("k3dge milestone audit-submit M1", self._sidecar(ws)["fact"])
 
     def test_declined_fix_routes_by_gate_id(self) -> None:
         ws = _ws_oneshot()
@@ -701,7 +701,7 @@ class TestGateIdDispatch(TestCase):
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["n"]))
         self.assertEqual(status, "rejected")
-        self.assertIn("转人工干预", self._sidecar(ws)["note"])
+        self.assertIn("转人工干预", self._sidecar(ws)["fact"])
 
     def test_seal_preconditions_rejection_carries_declared_gate_id(self) -> None:
         from k3dge.engine import gates
@@ -729,7 +729,7 @@ class TestGateIdDispatch(TestCase):
                     status, msg = run_seal_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "rejected")
         self.assertIn("票没干完", msg)                    # 原文照登
-        self.assertIn("票据未全 done", self._sidecar(ws)["note"])
+        self.assertIn("票据未全 done", self._sidecar(ws)["fact"])
 
     def test_seal_prompt_wording_is_single_sourced(self) -> None:
         """封板那一问的两个投影同一句（票 decision_single_source）。"""
@@ -745,7 +745,7 @@ class TestGateIdDispatch(TestCase):
                     status, _ = run_seal_flow(
                         ws, "M1", prompter=_Prompt(out_stream=out, answers=["n"]))
         self.assertEqual(status, "seal_declined")
-        self.assertIn(nextstep.ask_text("seal_ready", "M1"), out.getvalue())
+        self.assertIn(nextstep.question_text("seal_ready", "M1"), out.getvalue())
 
     def test_audit_open_prompt_wording_is_single_sourced(self) -> None:
         from k3dge.engine import nextstep
@@ -756,5 +756,5 @@ class TestGateIdDispatch(TestCase):
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
             run_audit_flow(ws, "M1", prompter=_Prompt(out_stream=out, answers=["n"]))
         text = out.getvalue()
-        self.assertIn("发现 1 项待修", text)
-        self.assertIn(nextstep.ask_text("audit_open", "M1", n=1), text)
+        self.assertIn("发现 1 项待修", text)  # prompt 走 question 投影
+        self.assertIn(nextstep.question_text("audit_open", "M1", n=1), text)

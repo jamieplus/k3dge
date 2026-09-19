@@ -13,9 +13,13 @@ class TestNextStepRender(TestCase):
     def test_seal_ready_shape(self) -> None:
         cli = nextstep.NextStep.from_state("seal_ready", "M7").render_cli()
         self.assertTrue(cli.startswith("[NEXT] state=seal_ready milestone=M7"))
-        self.assertIn("封板？", cli)
-        self.assertNotIn("y/N", cli)   # [NEXT] 无应答通道：不得写 y/N（见 memo S7）
-        self.assertIn("if y: k3dge milestone seal M7", cli)
+        # 陈述式事实 + 成对选项；[NEXT] 无应答通道 ⇒ 不出疑问句、不出 y/N
+        self.assertIn("fact: 里程碑 M7 审计已闭环（待修=0）；封板与否由你决定", cli)
+        self.assertIn("option: k3dge milestone seal M7", cli)
+        self.assertIn("option: 不封", cli)
+        self.assertNotIn("？", cli)
+        self.assertNotIn("y/N", cli)
+        self.assertNotIn("ask:", cli)
         self.assertNotIn("<id>", cli)
 
     def test_audit_suggested_shape_with_reasons(self) -> None:
@@ -24,37 +28,55 @@ class TestNextStepRender(TestCase):
         ).render_cli()
         self.assertIn("[NEXT] state=audit_suggested milestone=M7", cli)
         self.assertIn("reason: 账齐", cli)
-        self.assertIn("ask: 要审吗？", cli)
+        self.assertIn("fact: 里程碑 M7 命中审计触发条件", cli)
+        self.assertIn("option: k3dge milestone audit M7", cli)
+        self.assertIn("option: 不审", cli)
+        self.assertNotIn("？", cli)
         self.assertNotIn("y/N", cli)
-        self.assertIn("if y: k3dge milestone audit M7", cli)
 
     def test_audit_open_includes_pending(self) -> None:
         cli = nextstep.NextStep.from_state("audit_open", "M7", pending=3).render_cli()
         self.assertIn("pending=3", cli)
-        self.assertIn("ask: 里程碑 M7：发现 3 项待修，agent 修？", cli)
+        self.assertIn("fact: 里程碑 M7 审计发现 3 项待修", cli)
         self.assertNotIn("<n>", cli)   # 占位符已填
+        self.assertNotIn("？", cli)     # 疑问句只走 prompt（有 stdin）
         self.assertNotIn("倒计时", cli)   # [NEXT] 无倒计时在跑
 
-    def test_seal_declined_is_note_only(self) -> None:
+    def test_seal_declined_is_broadcast_only(self) -> None:
+        """播报态：只陈述事实，不给分支（无 options / 无 question）。"""
         cli = nextstep.NextStep.from_state("seal_declined", "M7").render_cli()
-        self.assertIn("note: 已放弃封板", cli)
-        self.assertNotIn("if y:", cli)
+        self.assertIn("fact: 已放弃封板", cli)
+        self.assertNotIn("option:", cli)
+        ns = nextstep.NextStep.from_state("seal_declined", "M7")
+        self.assertIsNone(ns.options)
+        self.assertIsNone(ns.question)
 
     def test_mcp_isomorphic(self) -> None:
         d = nextstep.NextStep.from_state("seal_ready", "M7").render_mcp()
         self.assertEqual(d["state"], "seal_ready")
-        self.assertIn("封板？", d["ask"])
-        self.assertIn("k3dge milestone seal M7", d["if_y"])
+        self.assertIn("封板与否由你决定", d["fact"])
+        self.assertNotIn("？", d["fact"])
+        self.assertIn("k3dge milestone seal M7", d["options"][0])
+        self.assertGreaterEqual(len(d["options"]), 2)
+        # question 只给有应答通道的消费者；旧 ask/if_y/if_n 字段已退役
+        self.assertIn("封板？", d["question"])
+        for gone in ("ask", "if_y", "if_n", "note"):
+            self.assertNotIn(gone, d)
 
     def test_rejection_maps_to_action(self) -> None:
-        """闭集派发：gate_id → state/note（不看文案）。"""
+        """闭集派发：gate_id → state/fact/options（不看文案）。"""
         n = nextstep.next_for_rejection(
             "M7", gates.Rejection("audit_report_missing", "no 12-col audit report found"))
-        self.assertIn("k3dge milestone audit-submit M7", n.note)
+        self.assertIn("k3dge milestone audit-submit M7", n.fact)
         n2 = nextstep.next_for_rejection(
             "M7", gates.Rejection("audit_closed", "audit not closed"))
         self.assertEqual(n2.state, "audit_needed")
-        self.assertIn("k3dge milestone audit M7", n2.note)
+        self.assertIn("未审计", n2.fact)
+        # 命令在 options（成对选项），不再塞进 fact；占位符在渲染时填（filled_options）
+        self.assertGreaterEqual(len(n2.options or []), 2)
+        self.assertIn("k3dge milestone audit M7", n2.filled_options()[0])
+        self.assertIn("option: k3dge milestone audit M7", n2.render_cli())
+        self.assertNotIn("<id>", n2.render_cli())
 
     def test_rejection_without_gate_id_does_not_guess(self) -> None:
         """裸 str（无 gate_id）即使写满「未审计」也只能兑底为 rejected。
@@ -64,17 +86,17 @@ class TestNextStepRender(TestCase):
         for prose in ("未审计不可封板", "no 12-col audit report", "audit_needed", "audit-submit"):
             n = nextstep.next_for_rejection("M7", prose)
             self.assertEqual(n.state, "rejected", prose)
-            self.assertIn(prose, n.note)   # 原文照登，不丢信息
+            self.assertIn(prose, n.fact)   # 原文照登，不丢信息
 
     def test_explicit_gate_id_kwarg_wins(self) -> None:
         n = nextstep.next_for_rejection("M7", "任意文案", gate_id="tasks_all_done")
         self.assertEqual(n.state, "rejected")
-        self.assertIn("票据未全 done", n.note)
+        self.assertIn("票据未全 done", n.fact)
 
     def test_unknown_gate_id_falls_back(self) -> None:
         n = nextstep.next_for_rejection("M7", gates.Rejection("some_future_gate", "boom"))
         self.assertEqual(n.state, "rejected")
-        self.assertIn("boom", n.note)
+        self.assertIn("boom", n.fact)
 
     def test_gate_next_vocabulary_is_closed(self) -> None:
         """派发表的 key 必须是已声明的闸/动作 id 或内部 id——不得长出野生词汇。"""
@@ -84,35 +106,39 @@ class TestNextStepRender(TestCase):
             declared.update(gates.DEFAULTS["checks"][kind]["actions"])
         declared.update(gates.INTERNAL_GATE_IDS)
         self.assertEqual(set(nextstep.GATE_NEXT) - declared, set())
-        for _gid, (state, note_key) in nextstep.GATE_NEXT.items():
+        for _gid, (state, fact_key) in nextstep.GATE_NEXT.items():
             self.assertIn(state, nextstep.STATE_OPTIONS)
-            if note_key:
-                self.assertIn(note_key, nextstep.REJECTION_NOTES)
+            if fact_key:
+                self.assertIn(fact_key, nextstep.REJECTION_FACTS)
 
 
 class TestDecisionSingleSource(TestCase):
     """判定文案单源：prompt 与 [NEXT] 共用 STATE_OPTIONS（票 decision_single_source）。"""
 
-    def test_ask_text_fills_placeholders(self) -> None:
+    def test_question_text_fills_placeholders(self) -> None:
+        self.assertEqual(nextstep.question_text("seal_ready", "M7"), "里程碑 M7：封板？")
         self.assertEqual(
-            nextstep.ask_text("seal_ready", "M7"),
-            "里程碑 M7：审计已闭环（待修=0），封板？",
-        )
-        self.assertEqual(
-            nextstep.ask_text("audit_open", "M7", n=3),
-            "里程碑 M7：发现 3 项待修，agent 修？",
-        )
+            nextstep.question_text("audit_open", "M7", n=3), "里程碑 M7：3 项待修，agent 修？")
 
-    def test_prompt_and_next_channel_agree(self) -> None:
-        """两个投影同一句：[NEXT] 的 ask == prompt 用的 ask_text。"""
-        ns = nextstep.NextStep.from_state("seal_ready", "M7")
-        self.assertIn(nextstep.ask_text("seal_ready", "M7"), ns.render_cli())
-        ns2 = nextstep.NextStep.from_state("audit_open", "M7", pending=5)
-        self.assertIn(nextstep.ask_text("audit_open", "M7", n=5), ns2.render_cli())
+    def test_two_projections_of_one_declaration(self) -> None:
+        """同一判定两个投影：`[NEXT]` 出陈述式 fact，prompt 出疑问式 question。
 
-    def test_ask_text_falls_back_to_note(self) -> None:
-        self.assertIn("未审计不可封板", nextstep.ask_text("audit_needed", "M7"))
-        self.assertEqual(nextstep.ask_text("no_such_state", "M7"), "")
+        两者同源于 STATE_OPTIONS 的同一条声明（不是两份文案）；各自的形状由
+        ADR-0026 §2.2 语法维决定（有无应答通道）。
+        """
+        for state, n in (("seal_ready", None), ("audit_open", 5)):
+            opt = nextstep.STATE_OPTIONS[state]
+            self.assertTrue(opt.get("fact") and opt.get("question"), state)
+            ns = nextstep.NextStep.from_state(state, "M7", pending=n)
+            cli = ns.render_cli()
+            self.assertIn(ns._fill(opt["fact"]), cli)          # fact 进 [NEXT]
+            self.assertNotIn(opt["question"].split("：")[-1], cli)  # question 不进 [NEXT]
+            self.assertEqual(nextstep.question_text(state, "M7", n=n), ns._fill(opt["question"]))
+
+    def test_question_text_falls_back_to_fact(self) -> None:
+        """无 question 的态（不交互）回落 fact；未知态返回空串。"""
+        self.assertIn("不可封板", nextstep.question_text("audit_needed", "M7"))
+        self.assertEqual(nextstep.question_text("no_such_state", "M7"), "")
 
     def test_no_hardcoded_ask_literals_in_src(self) -> None:
         """结构守卫：`prompt.ask(...)` 的首参不得是硬编码字面量（否则又长出第二源）。"""
@@ -378,3 +404,42 @@ class TestNextStepPointers(TestCase):
             f"next-step 态名与 task status 撞名：{sorted(overlap)}；"
             "请改名（参考 seal_declined 的处理）",
         )
+
+
+class TestProjectionInvariants(TestCase):
+    """ADR-0026 §2.2 语法维/目标维的可执行版（memo S7 四条不变量，本轮落地）。"""
+
+    def test_fact_never_ends_with_question_mark(self) -> None:
+        bad = [s for s, o in nextstep.STATE_OPTIONS.items()
+               if (o.get("fact") or "").rstrip().endswith(("？", "?"))]
+        self.assertEqual(bad, [])
+
+    def test_rendered_next_has_no_interrogative(self) -> None:
+        """`[NEXT]` 是纯打印面：渲染结果不得出现疑问句/应答通道词汇。"""
+        for state in nextstep.STATE_OPTIONS:
+            cli = nextstep.NextStep.from_state(state, "M7", pending=2).render_cli()
+            self.assertNotIn("？", cli, state)
+            self.assertNotIn("?", cli.split("pointers:")[0], state)
+            for word in ("y/N", "Y/n", "倒计时", "ask:", "if y:", "if n:"):
+                self.assertNotIn(word, cli, f"{state}: {word}")
+
+    def test_options_come_in_pairs(self) -> None:
+        """有 options 的态必须 ≥2 个（只给一条路＝下令，不是给判断主体）。"""
+        bad = [s for s, o in nextstep.STATE_OPTIONS.items()
+               if o.get("options") and len(o["options"]) < 2]
+        self.assertEqual(bad, [])
+
+    def test_broadcast_states_have_no_branch(self) -> None:
+        """播报态（无 options）不得带 question——没有分支就没有可问的判定。"""
+        bad = [s for s, o in nextstep.STATE_OPTIONS.items()
+               if not o.get("options") and o.get("question")]
+        self.assertEqual(bad, [])
+
+    def test_question_implies_interactive_state(self) -> None:
+        """question 只允许出现在真有 prompt 的态（seal_ready / audit_open）。"""
+        prompted = {"seal_ready", "audit_open"}
+        with_q = {s for s, o in nextstep.STATE_OPTIONS.items() if o.get("question")}
+        self.assertEqual(with_q, prompted)
+
+    def test_every_state_projects_a_fact(self) -> None:
+        self.assertEqual([s for s, o in nextstep.STATE_OPTIONS.items() if not o.get("fact")], [])

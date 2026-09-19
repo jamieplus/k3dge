@@ -20,7 +20,12 @@ def test_persist_writes_sidecar():
         data = json.loads(sidecar.read_text(encoding="utf-8"))
         assert data["state"] == "seal_ready"
         assert data["milestone"] == "M10"
-        assert "ask" in data
+        # 陈述式事实 + 成对选项（ADR-0026 §2.2）；question 只给有应答通道的消费者
+        assert "封板与否由你决定" in data["fact"]
+        assert not data["fact"].rstrip().endswith(("？", "?"))
+        assert len(data["options"]) >= 2
+        assert "封板？" in data["question"]
+        assert "ask" not in data and "if_y" not in data and "note" not in data
 
 
 def test_persist_is_idempotent():
