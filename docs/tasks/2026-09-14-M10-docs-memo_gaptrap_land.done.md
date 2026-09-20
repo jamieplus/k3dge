@@ -16,3 +16,8 @@ date: 2026-09-14
 - 事实归属：审计判据归 `audit_default.md`；agent 触发词归 `AGENTS.md`；Rust 否决归 ADR-0001。
 - 边界检查：① 不进 `evaluate()`；k3dit `audit-method.md` 本轮不改（跨仓）。
 - 桩子先行：协议条文先行，无新闸码。
+
+## 结案
+
+- 关闭提交：`ebaff64`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

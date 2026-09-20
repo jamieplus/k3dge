@@ -177,6 +177,14 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "options": ["删掉正文的 `- **Status|Milestone|Priority|Date|Report**:` 行", "该字段确实只该在正文 → 改 docs/tasks/.schema.json 与 AUTHORING（改声明，不双写）"],
         "pointers": ["docs/tasks/AUTHORING.md"],
     },
+    "TASK_CLOSURE_MISSING": {
+        "fix": "judgment", "severity": "block",
+        "fact": "`{path}` 已翻 done 但没有结案记录——票是自包含事实源，不留落地痕迹，"
+                "后续就会出现「票里说待办、实际已做」的漂移",
+        "options": ["补一个结案类段并写清落地情况（`## 结案` / `## 落地` / `## 关闭理由` / `## 收尾` / `## 回填` / `## 进度`）",
+                    "票其实没做完 → 把 frontmatter status 改回 in-progress 并去掉 .done 后缀"],
+        "pointers": ["docs/tasks/AUTHORING.md", "k3dge ADR-0012"],
+    },
     "TASK_STATUS_MISMATCH": {
         "severity": "block", "fix": "judgment",
         "fact": "`{path}` 的 frontmatter `status` 与文件名 `.done.md` 后缀不一致——哪边是真的要人判",

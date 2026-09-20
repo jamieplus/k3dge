@@ -88,3 +88,8 @@ Engine 函数不持有 stream，只做 `_persist(workspace, ns)` 并把 `render_
 - 改动量：`nextstep.py` ~15 行 + 14 处调用点各改 1 行 + 1 条规则 + 测试
 - 不删 `[NEXT]` stdout 输出（CLI 用户依赖）
 - events.jsonl 已拆为独立 task（`2026-09-14-M10-feat-event_log.md`）
+
+## 结案
+
+- 关闭提交：`ebaff64`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

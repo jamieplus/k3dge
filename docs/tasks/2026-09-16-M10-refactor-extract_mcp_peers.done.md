@@ -60,3 +60,8 @@ main.py 是 god file：52 个函数跨 4 类职责。MCP peer 管理（探测 si
 
 - 行为零变化：纯搬迁 + 命名去下划线（`_cmd_mcp_*` → `cmd_mcp_*`，因其已成为跨模块公开 API）
 - main.py 剩余可继续提取的子域：attest 系列（`_attest_*` 8 个函数）、doc 命令族。本票不做，避免一次改动面过大
+
+## 结案
+
+- 关闭提交：`ebaff64`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

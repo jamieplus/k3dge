@@ -106,3 +106,8 @@ E15  pipeline_runner 依赖：mcp_json(+stdlib) → 新增 pipeline_schema 边�
 - 改动量：~10 处字面量 + 2 处 import + 2 条守卫
 - MCP 面变化：`k3dge_milestone_seal` 返回 JSON 的 `status` 值由 `deferred` 变 `seal_declined`（外部消费者可见，属契约变更）⇒ 已跑 `k3dge sync`
 - 记入 LEFTOVERS（待真出误读再动）：TERM-01 `scope` 四义、TERM-02 `kind` 三义、TERM-03 `state` 四义、DUP-01 `AUX_NAMES` 刻意复制（已有守卫）
+
+## 结案
+
+- 关闭提交：`ebaff64`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

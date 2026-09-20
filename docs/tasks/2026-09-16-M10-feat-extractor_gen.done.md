@@ -63,3 +63,8 @@ asset `ts.py` 删除（改为生成）；本仓 `.agent/extractors/ts.py` 改为
   - 通用规则：含逻辑体的容器走成员步进，只含声明的容器整片收录；import/include 类一律跳过
 - TS 保真要求：生成版 ts.py 对同一样本必须输出与现行版完全一致（迁移不红闸），fixture 锁定
 - cpp/java 未核对，不进内置表（后续 task 逐个实证加入）
+
+## 结案
+
+- 关闭提交：`ebaff64`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

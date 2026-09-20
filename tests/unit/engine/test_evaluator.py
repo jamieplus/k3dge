@@ -359,12 +359,14 @@ class TestTaskGovernance(unittest.TestCase):
     def _task(self, ws, name, status="done"):
         p = ws / "docs" / "tasks" / name
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(f"---\nstatus: {status}\n---\n\n# {name}\n", encoding="utf-8")
+        # done 票需带结案记录（TASK_CLOSURE_MISSING）；文件名的 .done 后缀与 status 须一致
+        tail = "\n## 结案\n- 落地于 abc\n" if status == "done" else ""
+        p.write_text(f"---\nstatus: {status}\n---\n\n# {name}\n{tail}", encoding="utf-8")
 
     def test_valid_status_passes(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Path(d)
-            self._task(ws, "a.md", status="done")
+            self._task(ws, "a.done.md", status="done")
             self._task(ws, "b.md", status="idea")
             self.assertEqual(self._violations(ws), [])
 

@@ -84,3 +84,8 @@ ADR-0025 §2.7 规定钉是 findings 的写源，`parse_sidecar`/`open_samples` 
 
 - 剩余浅覆盖（间接覆盖为主，本票不做）：`seal._seal_archive`/`_seal_review_gate`、`review_archive._rewrite_leftover_links`、`audit_checklist._snapshot`/`_tasks_hash`、`task_index._scan_task_dir`、`audit_report._report_kind`
 - 这些均由集成测试（`test_seal_flow.py`、`test_milestone.py`）间接执行，风险低于本票补的四个
+
+## 结案
+
+- 关闭提交：`ebaff64`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

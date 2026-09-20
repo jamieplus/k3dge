@@ -89,3 +89,8 @@ datetime.now().astimezone().isoformat(timespec="seconds")
 - 改动量：~10 行（7 处改动 + 3 处测试断言更新）
 - 不统一时区（保持本地时间），只加显式偏移
 - 不引入共享函数（7 处分散在不同模块，抽函数反而增加耦合）
+
+## 结案
+
+- 关闭提交：`ebaff64`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

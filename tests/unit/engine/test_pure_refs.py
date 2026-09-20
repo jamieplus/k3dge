@@ -95,12 +95,15 @@ class TestTaskConsistency(unittest.TestCase):
 
     def test_suffix_without_done(self):
         out = pure_refs.check_task_consistency(
-            "docs/tasks/2026-09-16-fix-x.done.md", "---\nstatus: idea\n---\n# t\n")
+            "docs/tasks/2026-09-16-fix-x.done.md",
+            "---\nstatus: idea\n---\n# t\n\n## 结案\n- 落地于 abc\n")   # 隔离：只测状态↔文件名
         self.assertEqual(len(out), 1)
+        self.assertEqual(out[0][0], "TASK_STATUS_MISMATCH")
 
     def test_consistent_ok(self):
         out = pure_refs.check_task_consistency(
-            "docs/tasks/2026-09-16-fix-x.done.md", "---\nstatus: done\n---\n# t\n")
+            "docs/tasks/2026-09-16-fix-x.done.md",
+            "---\nstatus: done\n---\n# t\n\n## 结案\n- 落地于 abc\n")
         self.assertEqual(out, [])
 
     def test_milestone_mismatch(self):
@@ -474,3 +477,50 @@ class TestAdrNumberRetirement(unittest.TestCase):
         for name in sorted((REPO / "docs" / "adr").glob("0*.md")):
             self.assertEqual(
                 pure_refs.check_adr_number_reuse(REPO, f"docs/adr/{name.name}"), [], name.name)
+
+
+class TestTaskClosureRecord(unittest.TestCase):
+    """done 票必须留结案记录（防"票里说待办、实际已做"的漂移）。
+
+    实测来源：三张票的 blocking 与验收段全漂了，全靠人工扫才发现；根因之一是关票时
+    **没有任何地方要求写下落地痕迹**（33 张 done 里只有 2 张有）。
+    """
+
+    REL = "docs/tasks/2026-09-16-fix-x.done.md"
+
+    def _t(self, body: str) -> str:
+        return f"---\nstatus: done\n---\n# t\n\n{body}"
+
+    def test_missing_section_blocks(self):
+        out = pure_refs.check_task_closure_record(self.REL, self._t("正文"))
+        self.assertEqual([c for c, _ in out], ["TASK_CLOSURE_MISSING"])
+
+    def test_empty_section_blocks(self):
+        out = pure_refs.check_task_closure_record(self.REL, self._t("## 结案\n\n"))
+        self.assertEqual([c for c, _ in out], ["TASK_CLOSURE_MISSING"])
+        self.assertIn("空的", out[0][1])
+
+    def test_any_of_the_closed_set_passes(self):
+        for heading in ("## 结案", "## 落地", "## 关闭理由", "## 收尾", "## 回填", "## 进度"):
+            self.assertEqual(
+                pure_refs.check_task_closure_record(self.REL, self._t(f"{heading}\n- 有内容\n")), [],
+                heading)
+
+    def test_heading_with_qualifier_passes(self):
+        """标题可带限定词（自然写法）：`## 落地（2026-09-19，①-⑥ 全部执行）`。"""
+        self.assertEqual(
+            pure_refs.check_task_closure_record(self.REL, self._t("## 落地（2026-09-19）\n- 内容\n")), [])
+
+    def test_open_ticket_not_checked(self):
+        self.assertEqual(
+            pure_refs.check_task_closure_record("docs/tasks/2026-09-16-fix-x.md",
+                                                "---\nstatus: idea\n---\n# t\n"), [])
+
+    def test_repo_done_tickets_all_have_a_record(self):
+        """自举：本仓每张 done 票都有结案记录（回填后应恒成立）。"""
+        offenders = []
+        for p in sorted(REPO.glob("docs/tasks/*.done.md")):
+            rel = f"docs/tasks/{p.name}"
+            for code, msg in pure_refs.check_task_closure_record(rel, p.read_text(encoding="utf-8")):
+                offenders.append(msg)
+        self.assertEqual(offenders, [])

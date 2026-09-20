@@ -137,3 +137,8 @@ def check_task_meta_agreement(rel: str, text: str) -> List[Ref]:
 - 改动量：`pure_refs` ~30 行 + 8 条测试 + 8 个既有文件修正
 - 工具路径本就双写（`_finalize_task_done` 同时改 frontmatter 与 body）⇒ 只有**手工编辑**会漂移，闸正好补这个口
 - 本票副产品：清理了本会话遗留的 8 处自身漂移
+
+## 结案
+
+- 关闭提交：`ebaff64`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

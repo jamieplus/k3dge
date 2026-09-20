@@ -62,3 +62,8 @@ def emit(workspace: Path, evt: str, **data) -> None:
 - 改动量：`events.py` ~30 行 + 7 处 emit 调用点 + 测试
 - rotate 策略：超 1000 行时保留后 800 行（截断头部）
 - 单进程模型，无并发写问题
+
+## 结案
+
+- 关闭提交：`ebaff64`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

@@ -65,3 +65,8 @@ src/k3dge/engine/milestone_audit.py:185   ratchet = _audit_mode(workspace) == "r
 
 - 改动量：~10 处字面量替换，零行为变化
 - 选 `oneshot` 而非 `legacy`：命名行为（一次性跑完并在 loop 内等待）而非命名状态，与 pipeline.toml 原注释「旧一次性形」一致
+
+## 结案
+
+- 关闭提交：`ebaff64`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

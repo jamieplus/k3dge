@@ -16,3 +16,8 @@ Agent 还当真话读的面（rules / 模板 / CLI help / 有意留 / 现行 gui
 - 事实归属：角色集合归 `pipeline.toml` `[roles.*]`；bind 实现名只出现在那一行。
 - 边界检查：本票不改出向行为、不删 `--kind quality` 对旧报告的读取、不改 ADR 正文。
 - 桩子先行：不适用（措辞/注释/help）。
+
+## 结案
+
+- 关闭提交：`ebaff64`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

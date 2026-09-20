@@ -71,3 +71,8 @@ date: 2026-09-16
 - 改动量：~50 行删改，无新增
 - 风险：低（测试覆盖 + parity oracle）
 - 不做：datetime.now() 时区统一（P2）、函数内 import 整理（P3）
+
+## 结案
+
+- 关闭提交：`ebaff64`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

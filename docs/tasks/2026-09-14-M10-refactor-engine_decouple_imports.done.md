@@ -16,3 +16,8 @@ date: 2026-09-14
 - 事实归属：指针→`milestone_pointer`；任务→`task_index`/`task_write`；报告→`audit_report`；endpoint 表→`mcp_json`；闸核只出 `Violation`。
 - 边界检查：不拆第五域；CLI 可继续走门面；templates 不 import engine。
 - 桩子先行：先加闸核 import 不变量测试，再改 import。
+
+## 结案
+
+- 关闭提交：`ebaff64`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

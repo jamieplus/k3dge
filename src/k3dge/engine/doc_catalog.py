@@ -390,6 +390,12 @@ def _validate_file(workspace: Path, typ: str, path: Path, schema: dict, seen: di
         out.append(Violation(code, msg, file_path=rel, detail={"path": rel}))
     for code, msg in _pr.check_adr_ref_retired(workspace, rel, text):
         out.append(Violation(code, msg, file_path=rel, detail={"path": rel}))
+    if typ == "tasks":
+        # 仓库级也验票一致性（此前**只有 pre-commit 对 staged 文件验** ⇒ 历史漂移无人管，
+        # 自举测试 test_repo_tasks_conform 也因此空转）。四条：status↔文件名、milestone↔文件名、
+        # 正文复写元数据、done 票须有结案记录。
+        for code, msg in _pr.check_task_consistency(rel, text):
+            out.append(Violation(code, msg, file_path=rel, detail={"path": rel}))
     return out
 
 def validate_docs(workspace: Path, types: Optional[Iterable[str]] = None) -> List[Violation]:

@@ -56,3 +56,8 @@ tests/unit/engine/test_seal_flow.py::TestDocAudit::test_change_set_includes_comm
 
 - 同类前科：`2026-09-13-M10-fix-seal_scan_archive`（seal/align 扫描不含 `archive/<M>/` ⇒ 提前归档即「No tasks found」）——都是「范围口径漏了已落盘/已提交的那一半」。
 - 影响面：本票修完后，doc-audit 的送审范围会**变大**（含本轮已提交的受管文档），属预期恢复而非扩权。
+
+## 结案
+
+- 关闭提交：`5675663`（2026-09-18）
+- 落地记录：见该提交 message 与本文正文（回填于 2026-09-19，事实取自 `git log --diff-filter=AR -1 -- <path>`）。

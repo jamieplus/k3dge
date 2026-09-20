@@ -137,6 +137,7 @@ def check_task_consistency(rel: str, text: str) -> List[Ref]:
     if ms and ms not in base:
         out.append(("TASK_MILESTONE_MISMATCH", f"{rel}: frontmatter milestone '{ms}' not in filename"))
     out.extend(check_task_body_meta_redundant(rel, text))
+    out.extend(check_task_closure_record(rel, text))
     return out
 
 
@@ -479,3 +480,37 @@ def check_adr_ref_retired(workspace: Path, rel: str, text: str) -> List[Ref]:
                     f"{rel}: ADR-{num} 已退役（曾是 {info['was']}）；去向 {info['dest']}"
                     f"——引用改指去向，或去掉 `ADR-` 前缀写成历史事件"))
     return out
+
+
+# --- 关票必须留"结案记录"（防"done 票无落地痕迹"这一类漂移）---
+
+#: 结案类标题的闭集（唯一源）。闸只验"有没有写"，内容归人/agent——
+#: **不做自动填充**：自动写占位等于制造伪合规（docs/tasks/archive/…feat-protocol-resolver
+#: 的既有教训：不把不可机检项伪装成可机检）。
+_CLOSURE_HEADINGS = ("## 结案", "## 落地", "## 关闭理由", "## 收尾", "## 回填", "## 进度")
+
+
+def check_task_closure_record(rel: str, text: str) -> List[Ref]:
+    """`*.done.md` 必须含结案类段且有**非空内容**。
+
+    为何：票是自包含事实源；关票时不写落地/结案，后续就出现"票里说待办、实际已做"
+    的漂移（实测 2026-09-19：三张票的 blocking 与验收段全漂了，全靠人工扫才发现）。
+    闸管两件事：段在不在、段后有没有内容；至于内容对不对仍归人（k3dit/审计）。
+    """
+    if not rel.startswith("docs/tasks/") or not rel.endswith(".done.md"):
+        return []
+    if Path(rel).name in AUX_NAMES:   # 零依赖层：不 import milestone_files
+        return []
+    lines = text.splitlines()
+    for i, ln in enumerate(lines):
+        # 前缀匹配：允许标题带限定词（`## 落地（2026-09-19，①-⑥ 全部执行）` 也算数）
+        hit = next((h for h in _CLOSURE_HEADINGS if ln.strip().startswith(h)), None)
+        if hit:
+            rest = "\n".join(lines[i + 1:]).strip()
+            if rest:
+                return []
+            return [("TASK_CLOSURE_MISSING",
+                     f"{rel}: 结案段 `{ln.strip()}` 是空的——闸只验有没有写，内容归人")]
+    return [("TASK_CLOSURE_MISSING",
+             f"{rel}: done 票缺结案记录（需 {' / '.join(_CLOSURE_HEADINGS)} 之一且有内容）"
+             f"——票是自包含事实源，不写落地痕迹后续就会漂")]
