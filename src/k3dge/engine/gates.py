@@ -82,7 +82,8 @@ DEFAULTS: Dict[str, Any] = {
     "checks": {
         # 耐久＝闸（ADR-0022 §2.2 🅰1.4）：docs 规约化必须在封板**之前**做完
         "seal": {"preconditions": ["tasks_all_done", "audit_closed", "evidence_chain", "align_pass", "guides_filled",
-                                   "adrs_all_accepted", "adr_landed", "docs_normalized"],
+                                   "adrs_all_accepted", "adr_landed", "docs_normalized",
+                                   "audit_fresh"],
                  "actions": ["full_matrix", "archive", "closure_note", "prune"]},
         "align": {"preconditions": ["tasks_all_done"], "actions": ["full_matrix"]},
         # sync 链：顺序＝声明序；各步性质（投影/事实源）见 nodes.NODE_DEFAULTS
@@ -93,7 +94,11 @@ DEFAULTS: Dict[str, Any] = {
         # ref 用**角色名**（audit.*），不写死 peer 名：下游把 [roles.audit] bind 到
         # 别的实现时，声明不用改（pipeline.toml 的既定口径：新流程一律走角色名）。
         "audit": {"stages_produce": ["audit.actions.audit"],
-                  "stages_verify": ["audit.actions.verify"]},
+                  "stages_verify": ["audit.actions.verify"],
+                  # audit_fresh 的豁免面：审计自家产物 + 隐藏配置 + 本地/派生态。
+                  # **默认全算**（含 docs/tasks/**：票是里程碑的事实源）⇒ 快照过期的审计挡封板。
+                  "fresh_ignore": ["docs/reviews/", ".agent/", "logs/", "tmp/",
+                                   ".k3dge/", "dist/", ".ua/"]},
     },
 }
 

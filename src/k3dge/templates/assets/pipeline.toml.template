@@ -103,7 +103,8 @@ transports = [
 [checks.seal]
 preconditions = ["tasks_all_done", "audit_closed", "evidence_chain", "align_pass",
                  "guides_filled", "adrs_all_accepted", "adr_landed",
-                 "docs_normalized"]   # 耐久＝闸：规约化须在封板前做完（k3dge doc fix）
+                 "docs_normalized",   # 耐久＝闸：规约化须在封板前做完（k3dge doc fix）
+                 "audit_fresh"]       # 报告基线须覆盖当前内容（否则审计已过期 ⇒ 重审）
 actions = ["full_matrix", "archive", "closure_note", "prune"]
 
 [checks.align]
@@ -113,6 +114,11 @@ actions = ["full_matrix"]
 [checks.audit]
 stages_produce = ["audit.actions.audit"]   # 一份必做（合并审计模块，ADR-0025）
 stages_verify = ["audit.actions.verify"]   # 待修==0 的二次核对
+# audit_fresh 的豁免面：报告基线之后的改动**除这些前缀外全部算未审**。
+#   docs/reviews/ 审计自家产物（否则报告一落地就把自己算成未审改动）
+#   .agent/ 隐藏配置（ADR-0025 §2.7 送检 scope 明确不含）；其余本地/派生态同此
+# 注意：**不含 docs/tasks/** —— 票是里程碑的事实源，改了就该重审。
+fresh_ignore = ["docs/reviews/", ".agent/", "logs/", "tmp/", ".k3dge/", "dist/", ".ua/"]
 
 [checks.sync]
 actions = ["sync_extractors", "reconcile_adrs", "sync_domains",
