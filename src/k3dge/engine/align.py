@@ -32,41 +32,29 @@ def _align_run_gates(
     消费方（`nextstep.GATE_NEXT`）表驱动派发，不再从文案里搜关键词。
     """
 
-    def _tasks_all_done():
+    from k3dge.engine import nodes
+
+    def _tasks_all_done(_ctx):
         if pending:
             return f"Cannot align milestone '{milestone_id}'. {len(pending)} pending tasks:\n" + "\n".join(
                 f"  - {t.path.name} (status: {t.status})" for t in pending
             )
         return None
 
-    def _full_matrix():
+    def _full_matrix(_ctx):
         report = ConsistencyEngine(workspace).evaluate(run_tests=True, force_full=True)
         if not report.passed:
             return f"Regression tests failed during milestone alignment:\n{report.render()}"
         return None
 
-    _reg = {"tasks_all_done": _tasks_all_done, "full_matrix": _full_matrix}
-    for _gid in gates.preconditions(workspace, "align"):
-        _fn = _reg.get(_gid)
-        if _fn is None:
-            return gates.Rejection(
-                "unknown_gate_id",
-                f"[ALIGN REJECTED] gate contract references unknown gate id: '{_gid}'",
-            )
-        _err = _fn()
-        if _err:
-            return gates.Rejection(_gid, str(_err))
-    for _aid in gates.actions(workspace, "align"):
-        _fn = _reg.get(_aid)
-        if _fn is None:
-            return gates.Rejection(
-                "unknown_action_id",
-                f"[ALIGN REJECTED] gate contract references unknown action id: '{_aid}'",
-            )
-        _err = _fn()
-        if _err:
-            return gates.Rejection(_aid, str(_err))
-    return None
+    reg = {"tasks_all_done": _tasks_all_done, "full_matrix": _full_matrix}
+    ctx = {"workspace": workspace, "milestone_id": milestone_id,
+           "tasks": tasks, "pending": pending}
+    ok, out = nodes.run_phase(workspace, "align", "preconditions", reg, ctx)
+    if not ok:
+        return out
+    ok, out = nodes.run_phase(workspace, "align", "actions", reg, ctx)
+    return None if ok else out
 
 
 def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]:

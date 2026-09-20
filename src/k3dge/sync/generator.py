@@ -178,53 +178,85 @@ def render_manual_docs(
     return written
 
 
-def sync_all(workspace: Path, domains: Optional[Sequence[str]] = None) -> Tuple[List[str], bool]:
-    manifest = Manifest.load(workspace)
-    # Extractor plugins first: generated .py files must exist before interfaces
-    # are collected below. Opt-in: only when the repo has extractors.toml or
-    # the extractors/ dir (no surprise files for repos without config).
-    if (workspace / ".agent" / "extractors.toml").is_file() or (workspace / ".agent" / "extractors").is_dir():
-        from k3dge.engine import extractor_gen
+def _sync_registry():
+    """sync 链的各步：`fn(ctx) -> (ok, msg)`；步间数据经 **ctx** 传递（＝节点声明的 produces）。
 
-        try:
-            extractor_gen.sync_extractors(workspace)
-        except extractor_gen.ExtractorConfigError as exc:
-            print(f"[SYNC] extractor config error: {exc}")
-    # ADR 归档：从 `Supersedes:` 声明重建 docs/adr/ 的归档状态。
-    # 放在这里而非 seal：它的触发源是文件里的声明（作者/提交时事件），产出是派生状态——
-    # 与 contract hash / docs-index / extractor 插件同性质；且 sync 本就写文件，
-    # 不会像 seal 的只读判定通道那样把「修复报告」误当拒绝理由。
-    from k3dge.engine import adr_gate
-
-    try:
-        adr_report = adr_gate.reconcile_supersedes(workspace)
-    except Exception as exc:  # 归档失败不得阻断其余同步
-        adr_report = None
-        print(f"[SYNC] ADR reconcile failed: {exc}")
-    if adr_report:
-        print(f"[SYNC] {adr_report}")
-    # Pre-collect once per domain: clean interfaces for the contract hash (spec),
-    # doc-included for display (api.md). Docstring churn must NOT touch the hash.
-    iface_cache: dict[str, str] = {}
-    doc_cache: dict[str, str] = {}
-    for d, cfg in manifest.domains.items():
-        src = cfg.get("src", "")
-        if src:
-            src_dir = workspace / Path(src)
-            iface_cache[d] = contract.collect_domain_interface(src_dir, manifest, workspace)
-            doc_cache[d] = contract.collect_domain_interface(src_dir, manifest, workspace, include_doc=True)
-    targets = list(domains) if domains else list(manifest.domains)
-    changed: List[str] = []
-    for domain in targets:
-        if domain not in manifest.domains:
-            continue
-        result = sync_domain(workspace, manifest, domain, iface=iface_cache.get(domain))
-        if result is not None:
-            changed.append(domain)
-    # README 由收尾脚本（docs 生成）经 agent 更新，不再由 sync 触碰；基础版本始终存在于仓库
-    manual_written = render_manual_docs(workspace, manifest, doc_cache)
+    分型（票 orch_node_table）：`sync_extractors` / `sync_domains` / `sync_manual_docs` /
+    `sync_docs_index` 是**投影**（可幂等重算）；`reconcile_adrs` 是**事实源写入**
+    （改 ADR frontmatter + 移文件 ⇒ 重跑是追加，不是重算）。此前这条链的顺序与失败语义
+    都硬编码在本函数里，与声明面并存 ⇒ 现收进 `[checks.sync].actions` + `nodes.run_phase`。
+    """
+    from k3dge.engine import adr_gate, extractor_gen, nodes
     from k3dge.engine.doc_catalog import write_docs_index
+    from k3dge.engine.nodes import on_error as _on_error  # noqa: F401  (声明可读性)
 
-    write_docs_index(workspace)
-    docs_updated = bool(manual_written)
-    return changed, docs_updated
+    def sync_extractors(ctx):
+        ws = ctx["workspace"]
+        if not ((ws / ".agent" / "extractors.toml").is_file() or (ws / ".agent" / "extractors").is_dir()):
+            return True, ""      # opt-in：没有配置就不产生意外文件
+        try:
+            extractor_gen.sync_extractors(ws)
+            return True, ""
+        except extractor_gen.ExtractorConfigError as exc:
+            return False, f"[SYNC] extractor config error: {exc}"
+
+    def reconcile_adrs(ctx):
+        ws = ctx["workspace"]
+        try:
+            report = adr_gate.reconcile_supersedes(ws)
+        except Exception as exc:      # 归档失败不得阻断其余同步（on_error=continue）
+            return False, f"[SYNC] ADR reconcile failed: {exc}"
+        ctx["adr_report"] = report
+        return True, (f"[SYNC] {report}" if report else "")
+
+    def sync_domains(ctx):
+        ws, manifest = ctx["workspace"], ctx["manifest"]
+        # 每域只采一次接口：契约哈希用干净接口，api.md 用含 docstring 的版本
+        # （docstring 变动不得动哈希）
+        iface_cache: dict[str, str] = {}
+        doc_cache: dict[str, str] = {}
+        for d, cfg in manifest.domains.items():
+            src = cfg.get("src", "")
+            if src:
+                src_dir = ws / Path(src)
+                iface_cache[d] = contract.collect_domain_interface(src_dir, manifest, ws)
+                doc_cache[d] = contract.collect_domain_interface(src_dir, manifest, ws, include_doc=True)
+        ctx["doc_cache"] = doc_cache
+        targets = list(ctx["domains"]) if ctx.get("domains") else list(manifest.domains)
+        for domain in targets:
+            if domain not in manifest.domains:
+                continue
+            if sync_domain(ws, manifest, domain, iface=iface_cache.get(domain)) is not None:
+                ctx["changed"].append(domain)
+        return True, ""
+
+    def sync_manual_docs(ctx):
+        # README 由收尾脚本（docs 生成）经 agent 更新，不再由 sync 触碰
+        ctx["docs_updated"] = bool(render_manual_docs(ctx["workspace"], ctx["manifest"], ctx.get("doc_cache") or {}))
+        return True, ""
+
+    def sync_docs_index(ctx):
+        write_docs_index(ctx["workspace"])
+        return True, ""
+
+    return {"sync_extractors": sync_extractors, "reconcile_adrs": reconcile_adrs,
+            "sync_domains": sync_domains, "sync_manual_docs": sync_manual_docs,
+            "sync_docs_index": sync_docs_index}
+
+
+def sync_all(workspace: Path, domains: Optional[Sequence[str]] = None) -> Tuple[List[str], bool]:
+    """按 `[checks.sync].actions` 的**声明序**跑同步链；步间数据经 ctx 传递。
+
+    返回值仍是 `(changed_domains, docs_updated)`（调用方契约不变），但两者来自
+    ctx 的 `produces`（由节点写入），而不是本函数里的局部变量。
+    """
+    from k3dge.engine import nodes
+
+    ctx = {"workspace": workspace, "manifest": Manifest.load(workspace),
+           "domains": domains, "changed": [], "docs_updated": False}
+    ok, out = nodes.run_phase(workspace, "sync", "actions", _sync_registry(), ctx)
+    if out:
+        print(out)
+    if not ok:
+        print(f"[SYNC] 中止：{out}")
+    return ctx["changed"], ctx["docs_updated"]

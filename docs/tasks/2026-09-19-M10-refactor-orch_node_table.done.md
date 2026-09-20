@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M10
 priority: P2
 date: 2026-09-19
@@ -107,3 +107,34 @@ fact / options / pointers          # B 线文案（与 STATE_OPTIONS 同形，�
 - 依赖：`blocking:` 两票（B 线文案单源先落，③ 声明面先接通），否则本票会同时改三处形状。
 - 与 `doc_strategy_five_points` 的交点：`doc_normalize` / `docs_normalized` 就是本表的一个节点 + 一个 precondition，不需要新机制。
 - 风险登记：`pipeline.toml` 从"peer 配置"升为"骨架声明"，是下游继承面 ⇒ 字段稳定性按 ADR 管（见 `adr0026_d_line_and_downstream`）。
+
+## 落地（2026-09-19）
+
+| 项 | 落点 | 实测 |
+| --- | --- | --- |
+| 节点声明 | `engine/nodes.NODE_DEFAULTS`（唯一源）+ `.agent/pipeline.toml` 的 `[nodes.<id>]`（下游可覆盖） | `nodes.decl(ws,"archive")` ⇒ `{kind:fact, on_error:rollback, on_rerun:reject, produces:[archived_paths]}` |
+| 五属性 | `kind`(projection\|fact) / `on_error`(stop\|rollback\|continue) / `on_rerun`(仅 fact，append\|reject) / `needs`·`produces`（ctx 键名） | `test_nodes`：缺省覆盖已知节点、fact 必声明 on_rerun、下游可覆盖、缺失回落缺省、自举"本仓声明==缺省" |
+| ctx 传值 | 节点签名 `fn(ctx)`；`sync` 各步把结果**写回 ctx**，调用方读 ctx（`changed` / `docs_updated`）而非局部变量 | `test_ctx_is_passed_to_nodes`；`gates.sync_all` 返回值来自 ctx |
+| **单执行器** | `nodes.run_phase(workspace, op, phase, registry, ctx)`：未知 id 拒绝、两相形状宽容（`(ok,out)` 与 `Optional[str]`）、失败经 `gates.rejection` 正规化、`on_error=continue` 不中断 | 三处旧循环（`seal.gate_fns` / `seal_flow.registry` / `align._reg` 的派发）已消失，**结构守卫**断言它们不再出现 |
+| `sync` 链收编 | `[checks.sync].actions`（顺序＝声明序）；`sync_extractors`/`sync_domains`/`sync_manual_docs`/`sync_docs_index`＝**投影**，`reconcile_adrs`＝**事实源写入** | 实跑 `k3dge sync` 行为不变（契约回写 + 生成物重生）；`on_error=continue` 让 extractor 配置坏 / ADR reconcile 失败不挡其余步（与原逻辑一致） |
+| 保留项 | `Violation` 侧、`task done` 链**有意留**（票内裁定）；`persist`/`emit` 的 run 语义见 `next_multi_decision` | — |
+
+### 有意留（记此，不在本票做）
+
+1. **`kind=fact` + `on_rerun=reject` 的"重跑即红"未加独立标记**。理由：`archive` 自身在已归档时会报「无任务可封」⇒ 拒绝语义已由动作实现；另建事件标记＝第二个事实存储，属新基建且无第二个消费者（规则 12）。`on_rerun` 现在的作用是**声明 + 守卫**（fact 必声明、下游可见），不是运行时拦截。
+2. `preconditions` 的 `kind` 目前恒为 projection（前置闸只读判定，不写盘）；若将来出现"会写盘的前置闸"，按那时的事实补分类。
+3. `needs` 只在 `archive` 等处声明了 `produces`；`needs` 尚未被消费（执行器不做拓扑排序——顺序仍按声明序）。理由：仓内链条无并发、无分支，拓扑排序当前无收益；等出现"声明序 ≠ 依赖序"的真实场景再引。
+
+## 验收（实测）
+
+```
+619 passed；k3dge check 绿
+tests/unit/engine/test_nodes.py（11 条）
+  声明：缺省完整（fact 必带 on_rerun）/ 下游可覆盖 / 缺失回落 / 自举本仓声明==缺省
+  执行器：preconditions 停在首个失败且 gate_id＝声明的 id / 未知 id 拒绝 /
+          两种动作形状都能跑 / on_error=continue 不中断且消息并入输出 /
+          on_error=stop 立即中止 / ctx 真被传入
+  结构守卫：三处旧派发循环在源码里已消失（逼迫后续新编排也走单一执行器）
+端到端：k3dge sync（收编后）行为不变；k3dge milestone align/seal 路径 test_milestone /
+        test_seal_flow / test_evaluator 全绿
+```

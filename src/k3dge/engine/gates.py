@@ -84,6 +84,9 @@ DEFAULTS: Dict[str, Any] = {
                                    "adrs_all_accepted", "adr_landed"],
                  "actions": ["full_matrix", "archive", "closure_note", "prune"]},
         "align": {"preconditions": ["tasks_all_done"], "actions": ["full_matrix"]},
+        # sync 链：顺序＝声明序；各步性质（投影/事实源）见 nodes.NODE_DEFAULTS
+        "sync": {"actions": ["sync_extractors", "reconcile_adrs", "sync_domains",
+                             "sync_manual_docs", "sync_docs_index"]},
         # 审计流的两个外部步（原 pipeline.toml 的 [pipelines.on_seal_enter]/[on_pre_seal]，
         # 那两处只有 schema 校验、无执行者 ⇒ 迁到这里，由 run_audit_flow 真读）
         # ref 用**角色名**（audit.*），不写死 peer 名：下游把 [roles.audit] bind 到
@@ -123,6 +126,9 @@ def load(workspace: Path) -> Dict[str, Any]:
     # [gates.<name>] 的内容即阈值段本身（audit_trigger/search/markers/output），平铺合并
     if isinstance(raw.get("gates"), dict):
         _merge_section(data, raw["gates"])
+    # [nodes.<id>]：编排节点的属性声明（kind/on_error/on_rerun/needs/produces）
+    if isinstance(raw.get("nodes"), dict):
+        _merge_section(data, {"nodes": raw["nodes"]})
     if isinstance(raw.get("checks"), dict):
         _merge_section(data, {"checks": raw["checks"]})
     return data

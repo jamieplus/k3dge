@@ -3,7 +3,6 @@ status: idea
 milestone: M10
 priority: P2
 date: 2026-09-18
-blocking: 2026-09-19-M10-refactor-orch_node_table
 ---
 
 # doc 策略五点落地：格式硬闸 / 新建重复覆盖确认（并入优先）/ seal 轮规约化（外部优先，降级 k3dge）/ 用现成 checks 编排
@@ -89,3 +88,12 @@ blocking: 2026-09-19-M10-refactor-orch_node_table
   `CONTRACT_HASH_MISSING`/`VERSION_MISMATCH`/`ADR_SUPERSEDE_UNRECONCILED`/`MD_CRLF`/
   `MD_ENCODING`/`MD_NO_FINAL_NEWLINE`/`MD_TRAILING_WS`/`TASK_BODY_META_REDUNDANT`），
   不再另建一张规则表（避免第二源）。
+
+## 解锁（2026-09-19）
+
+`orch_node_table` 已关（`nodes.run_phase` 单执行器 + `[nodes.*]` 声明 + ctx 传值已落）⇒
+本票的 ③ 现在有了落点：`docs_normalized` 作 `[checks.seal].preconditions` 的新节点、
+`doc_normalize` 作 `[checks.seal].actions` 的新节点，各在 `[nodes.*]` 声明 `kind`/`on_error`
+（规约化改写写盘 ⇒ `kind=fact` 还是 `projection` 取决于是否幂等——**先定形再落**）。
+
+`blocking:` 已清空（原指向的票已关；task_dag 的观测面会把它报成"指向已关票"）。

@@ -143,24 +143,26 @@ def run_seal_flow(
 
     # 动作：读「硬闸契约」`[checks.seal].actions`（ADR-0001 §2 第 8 条）——执行器按声明跑；
     # 未实现的 id 视为配置错（拒绝，不让声明空转）。
-    def _full_matrix():
+    from k3dge.engine import nodes
+
+    def _full_matrix(_ctx):
         ok, amsg, _ = run_milestone_alignment(workspace, milestone_id)
         if not ok:
             return False, amsg
         _strip_align_stub(workspace, milestone_id)
         return True, ""
 
-    def _archive():
+    def _archive(_ctx):
         err = seal_preconditions_error(workspace, milestone_id)
         if err:
             return False, err
         return seal_milestone(workspace, milestone_id)
 
-    def _closure_note():
+    def _closure_note(_ctx):
         p = _write_closure_note(workspace, milestone_id)
         return True, f"\n  收摊清单: {p.relative_to(workspace)}"
 
-    def _prune():
+    def _prune(_ctx):
         try:  # end-flow 清理钩子：派生件（worktree/已并入的审计线）收口即删；史在主干
             from k3dge.engine.audit_flow import prune_finished
 
@@ -173,25 +175,14 @@ def run_seal_flow(
 
     registry = {"full_matrix": _full_matrix, "archive": _archive,
                 "closure_note": _closure_note, "prune": _prune}
-    msg = ""
-    for aid in gates.actions(workspace, "seal"):
-        fn = registry.get(aid)
-        if fn is None:
-            rej = gates.Rejection(
-                "unknown_action_id",
-                f"[SEAL REJECTED] gate contract references unknown action id: '{aid}'",
-            )
-            _ns = nextstep.next_for_rejection(milestone_id, rej)
-            nextstep.persist(workspace, _ns)
-            return "rejected", str(rej) + "\n" + _ns.render_cli()
-        ok, out = fn()
-        if not ok:
-            # 动作失败：产出方已给 gate_id 则透传，否则用动作 id 兑底（闭集，不猜文案）
-            rej = gates.rejection(out, aid)
-            _ns = nextstep.next_for_rejection(milestone_id, rej)
-            nextstep.persist(workspace, _ns)
-            return "rejected", str(rej) + "\n" + _ns.render_cli()
-        msg += str(out)
+    ctx = {"workspace": workspace, "milestone_id": milestone_id}
+    ok, out = nodes.run_phase(workspace, "seal", "actions", registry, ctx)
+    if not ok:
+        rej = gates.rejection(out, "unknown_action_id")
+        _ns = nextstep.next_for_rejection(milestone_id, rej)
+        nextstep.persist(workspace, _ns)
+        return "rejected", str(rej) + "\n" + _ns.render_cli()
+    msg = str(out)
     from k3dge.engine import events
     events.emit(workspace, "sealed", milestone=milestone_id)
     _ns = nextstep.NextStep.from_state("sealed", milestone_id)

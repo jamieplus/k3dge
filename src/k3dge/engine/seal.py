@@ -179,39 +179,33 @@ def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gat
     """
     from k3dge.engine.audit_trigger import audit_closed
 
+    from k3dge.engine import nodes
+
     tasks = scan_milestone_tasks(workspace, milestone_id)
     pending = [t for t in tasks if t.status != "done"]
     unfilled = scan_unfilled_guides(workspace)
     gate_fns = {
-        "tasks_all_done": lambda: (
+        "tasks_all_done": lambda _ctx: (
             f"Cannot seal milestone '{milestone_id}'. Tasks not done: "
             f"{[t.path.name for t in pending]}" if pending else None
         ),
-        "audit_closed": lambda: (
+        "audit_closed": lambda _ctx: (
             None if audit_closed(workspace, milestone_id)
             else f"[SEAL REJECTED] Milestone '{milestone_id}' audit not closed（无 12 列报告 / 待修≠0）。"
         ),
-        "evidence_chain": lambda: process_audit.evidence_chain_error(workspace, milestone_id),
-        "align_pass": lambda: _seal_review_gate(workspace, milestone_id, tasks),
-        "guides_filled": lambda: (
+        "evidence_chain": lambda _ctx: process_audit.evidence_chain_error(workspace, milestone_id),
+        "align_pass": lambda _ctx: _seal_review_gate(workspace, milestone_id, tasks),
+        "guides_filled": lambda _ctx: (
             f"[SEAL REJECTED] Unfilled guide stubs detected in docs/guides/: {unfilled}.\n"
             f"  Complete the documentation before milestone seal." if unfilled else None
         ),
-        "adrs_all_accepted": lambda: adr_gate.adrs_all_accepted(workspace),
-        "adr_landed": lambda: adr_gate.adr_landed(workspace),
+        "adrs_all_accepted": lambda _ctx: adr_gate.adrs_all_accepted(workspace),
+        "adr_landed": lambda _ctx: adr_gate.adr_landed(workspace),
     }
-    for gid in gates.preconditions(workspace, "seal"):
-        fn = gate_fns.get(gid)
-        if fn is None:
-            return gates.Rejection(
-                "unknown_gate_id",
-                f"[SEAL REJECTED] gate contract references unknown gate id: '{gid}'",
-            )
-        err = fn()
-        if err:
-            # gate id 就是契约里声明的那个——产出点已知，不得在消费点靠文案还原
-            return gates.Rejection(gid, str(err))
-    return None
+    ctx = {"workspace": workspace, "milestone_id": milestone_id,
+           "tasks": tasks, "pending": pending, "unfilled": unfilled}
+    ok, out = nodes.run_phase(workspace, "seal", "preconditions", gate_fns, ctx)
+    return None if ok else out
 
 
 def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:

@@ -113,6 +113,10 @@ actions = ["full_matrix"]
 stages_produce = ["audit.actions.audit"]   # 一份必做（合并审计模块，ADR-0025）
 stages_verify = ["audit.actions.verify"]   # 待修==0 的二次核对
 
+[checks.sync]
+actions = ["sync_extractors", "reconcile_adrs", "sync_domains",
+           "sync_manual_docs", "sync_docs_index"]   # 顺序即声明序；各步性质见 [nodes.*]
+
 [gates.audit_trigger]
 c2_nesting_max = 5      # 审计建议触发：C2 嵌套阈值
 volume_max = 8          # 审计建议触发：本轮体积阈值
@@ -126,3 +130,30 @@ max_note_pending = 500
 
 [gates.output]
 default_lines = 10
+
+# ── 编排节点属性（每个 action/precondition 的性质与失败语义；下游可配）──────
+# 缺省在 engine/nodes.NODE_DEFAULTS（必须完整）。字段：
+#   kind      projection（可幂等重算）| fact（写一次即历史）
+#   on_error  stop（失败即停）| rollback（回滚该步）| continue（不中断，消息并入输出）
+#   on_rerun  （仅 kind=fact）append | reject —— 重跑是追加还是拒绝
+#   needs / produces  ctx 键名（这一步读/写哪些上下文字段；只声明键名，不声明结构）
+# 未知 id 一律拒绝（不让声明空转）；失败经 gates.rejection 正规化为闭集 gate_id。
+
+[nodes.archive]
+kind = "fact"
+on_error = "rollback"
+on_rerun = "reject"        # 归档写一次即历史：已归档再跑应被拒（动作自身也会报"无任务可封"）
+produces = ["archived_paths"]
+
+[nodes.prune]
+kind = "fact"
+on_error = "continue"      # 派生件清理失败不该挡住封板
+on_rerun = "append"
+
+[nodes.closure_note]
+kind = "projection"        # 收摊清单可重生成
+on_error = "continue"
+
+[nodes.full_matrix]
+kind = "projection"
+on_error = "stop"

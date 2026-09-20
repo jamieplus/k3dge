@@ -713,11 +713,11 @@
       "tokens": "编排骨架收敛·第一刀：闸红文案单源 + 阻断档位统一（Violation 只产 code+事实，文案/severity/options 归声明）"
     },
     {
-      "path": "docs/tasks/2026-09-19-M10-refactor-orch_node_table.md",
+      "path": "docs/tasks/2026-09-19-M10-refactor-orch_node_table.done.md",
       "type": "tasks",
-      "id": "2026-09-19-M10-refactor-orch_node_table",
+      "id": "2026-09-19-M10-refactor-orch_node_table.done",
       "title": "编排骨架收敛·节点表：pipeline.toml [checks.*] 单一声明面 + 五属性 + ctx + 单执行器（下游可配）",
-      "status": "idea",
+      "status": "done",
       "tokens": "编排骨架收敛·节点表：pipeline.toml [checks.*] 单一声明面 + 五属性 + ctx + 单执行器（下游可配）"
     }
   ]

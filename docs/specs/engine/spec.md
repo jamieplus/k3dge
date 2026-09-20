@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:a13b3c6e97c8c63e6aab89773037e8e6f0d5964306418da5168be6e7424a72c5`
+- **Contract Hash**: `sha256:4983bb74244386c2263347d956ee01411d3c369ec3ac72fbb022ea8c03092743`
 - **Last Updated**: 2026-09-19
 
 ## 1. Domain Boundary & Responsibilities
@@ -210,7 +210,7 @@ rejection(message: Any, fallback_gate_id: str) -> Rejection
 REL = '.agent/pipeline.toml'
 LEGACY_REL = '.agent/gates.toml'
 INTERNAL_GATE_IDS: tuple = ('unknown_gate_id', 'unknown_action_id', 'audit_report_missing', 'audit_open_declined', 'milestone_id_invalid', 'no_tasks', 'invalid_task_status', 'align_failed', 'archive_failed')
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}, 'audit': {'stages_produce': ['audit.actions.audit'], 'stages_verify': ['audit.actions.verify']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}, 'sync': {'actions': ['sync_extractors', 'reconcile_adrs', 'sync_domains', 'sync_manual_docs', 'sync_docs_index']}, 'audit': {'stages_produce': ['audit.actions.audit'], 'stages_verify': ['audit.actions.verify']}}}
 load(workspace: Path) -> Dict[str, Any]
 legacy_config_present(workspace: Path) -> bool
 get(workspace: Path, section: str, key: str) -> Any
@@ -341,6 +341,20 @@ load_all(workspace: Path) -> list
 load_persisted(workspace: Path) -> Optional[dict]
 next_for_rejection(milestone: str, message, gate_id: Optional[str]=None) -> NextStep
 question_text(state: str, milestone: str, *, n: Optional[int]=None) -> str
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import Optional
+from typing import Tuple
+from k3dge.engine import gates
+NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {'tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'audit_closed': {'kind': 'projection', 'on_error': 'stop'}, 'evidence_chain': {'kind': 'projection', 'on_error': 'stop'}, 'align_pass': {'kind': 'projection', 'on_error': 'stop'}, 'guides_filled': {'kind': 'projection', 'on_error': 'stop'}, 'adrs_all_accepted': {'kind': 'projection', 'on_error': 'stop'}, 'adr_landed': {'kind': 'projection', 'on_error': 'stop'}, 'full_matrix': {'kind': 'projection', 'on_error': 'stop'}, 'archive': {'kind': 'fact', 'on_error': 'rollback', 'on_rerun': 'reject', 'produces': ['archived_paths']}, 'closure_note': {'kind': 'projection', 'on_error': 'continue'}, 'prune': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'align_tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'sync_extractors': {'kind': 'projection', 'on_error': 'continue'}, 'reconcile_adrs': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append', 'produces': ['adr_report']}, 'sync_domains': {'kind': 'projection', 'on_error': 'stop', 'produces': ['changed']}, 'sync_manual_docs': {'kind': 'projection', 'on_error': 'stop', 'produces': ['docs_updated']}, 'sync_docs_index': {'kind': 'projection', 'on_error': 'stop'}}
+decl(workspace: Path, node_id: str) -> Dict[str, Any]
+kind(workspace: Path, node_id: str) -> str
+on_error(workspace: Path, node_id: str) -> str
+NodeFn = Callable[[Dict[str, Any]], Any]
+run_phase(workspace: Path, op: str, phase: str, registry: Dict[str, NodeFn], ctx: Dict[str, Any]) -> Tuple[bool, Any]
 from __future__ import annotations
 PAIRS: list[tuple[str, str]] = [('gate.py', 'scripts/gate.py'), ('gate.sh', 'scripts/gate.sh'), ('gate.ps1', 'scripts/gate.ps1'), ('init.sh', 'scripts/init.sh'), ('init.ps1', 'scripts/init.ps1'), ('k3dge-init-wrapper.sh', 'k3dge-init.sh'), ('k3dge-init-wrapper.ps1', 'k3dge-init.ps1'), ('generate-docs.sh', 'scripts/generate-docs.sh'), ('generate-docs.ps1', 'scripts/generate-docs.ps1'), ('agents.md', 'AGENTS.md'), ('agent-readme.md', '.agent/README.md'), ('extractors-readme.md', '.agent/extractors/README.md'), ('rules/00-core-discipline.md', '.agent/rules/00-core-discipline.md'), ('rules/01-docs-structure.md', '.agent/rules/01-docs-structure.md'), ('rules/02-simplification.md', '.agent/rules/02-simplification.md'), ('rules/03-self-contained.md', '.agent/rules/03-self-contained.md'), ('rules/04-milestone.md', '.agent/rules/04-milestone.md'), ('rules/05-branches.md', '.agent/rules/05-branches.md'), ('rules/06-memo.md', '.agent/rules/06-memo.md'), ('rules/07-audit.md', '.agent/rules/07-audit.md'), ('rules/08-design-discipline.md', '.agent/rules/08-design-discipline.md'), ('rules/09-absorption.md', '.agent/rules/09-absorption.md'), ('rules/10-structure-over-prose.md', '.agent/rules/10-structure-over-prose.md'), ('rules/11-next-sidecar.md', '.agent/rules/11-next-sidecar.md'), ('rules/12-introduction-discipline.md', '.agent/rules/12-introduction-discipline.md'), ('docs.toml.template', '.agent/docs.toml'), ('pipeline.toml.template', '.agent/pipeline.toml'), ('spec.md.template', 'docs/specs/_template/spec.md'), ('tasks-readme.md', 'docs/tasks/README.md'), ('reviews-readme.md', 'docs/reviews/README.md'), ('tasks/_template.md', 'docs/tasks/_template.md'), ('memo/_template.md', 'docs/memo/_template.md'), ('branches/_template.md', 'docs/branches/_template.md'), ('adr/_template.md', 'docs/adr/_template.md'), ('adr/AUTHORING.md', 'docs/adr/AUTHORING.md'), ('adr/.schema.json', 'docs/adr/.schema.json'), ('tasks/AUTHORING.md', 'docs/tasks/AUTHORING.md'), ('memo/AUTHORING.md', 'docs/memo/AUTHORING.md'), ('branches/AUTHORING.md', 'docs/branches/AUTHORING.md'), ('incidents/AUTHORING.md', 'docs/incidents/AUTHORING.md'), ('tasks/.schema.json', 'docs/tasks/.schema.json'), ('memo/.schema.json', 'docs/memo/.schema.json'), ('branches/.schema.json', 'docs/branches/.schema.json'), ('incidents/.schema.json', 'docs/incidents/.schema.json'), ('pre-commit.yaml.template', '.pre-commit-config.yaml'), ('branches-readme.md', 'docs/branches/README.md'), ('memo-readme.md', 'docs/memo/README.md'), ('downstream.md', 'docs/guides/downstream.md'), ('protocols/audit_default.md', 'docs/protocols/audit_default.md'), ('protocols/verify_default.md', 'docs/protocols/verify_default.md')]
 from __future__ import annotations

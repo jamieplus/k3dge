@@ -82,8 +82,9 @@ def test_repo_declares_the_same_values_as_defaults():
     reconcile ⇒ 功能静默死亡，见 2026-09-17-M10-refactor-adr_archive_to_sync）。
     """
     repo = Path(__file__).resolve().parents[3]
-    declared = gates.load(repo)
-    fresh = gates.load(Path(tempfile.mkdtemp()))     # 无声明文件 ⇒ 纯缺省
+    declared = {k: v for k, v in gates.load(repo).items() if k != "nodes"}
+    fresh = {k: v for k, v in gates.load(Path(tempfile.mkdtemp())).items() if k != "nodes"}
+    # `[nodes.*]` 覆盖的是 nodes.NODE_DEFAULTS（另一张表）⇒ 由 test_nodes 的自举断言管，不在此比
     assert declared == fresh, {
         k: (declared.get(k), fresh.get(k)) for k in set(declared) | set(fresh)
         if declared.get(k) != fresh.get(k)
