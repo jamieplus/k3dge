@@ -1,7 +1,8 @@
 ---
 Status: Accepted
 Supersedes: -
-Amended-by: -
+Amended-by:
+  - 🅰1 | Core Maintainer | 2026-09-20 | 审计＝封版主体：唯一入口 `seal`（预审 align → 审计 → 审核后自动化）；版号由**审计正常返回**推进；边界＝审计基线（`tag <M> = <B>`），基线之后归下一里程碑；报告降级为可选产物；完成记录＝封版提交 trailer；运行态与 durable 分层；CHANGELOG 由提交区间生成
 Landed-by: src/k3dge/engine/seal_flow.py
 Date: 2026-08-23
 Deciders: Core Maintainer
@@ -30,21 +31,24 @@ Note: 修订痕迹见 git 历史。
 * **Macro Gate**（里程碑对齐）：`k3dge milestone align` 对 `manifest.domains` 做 **Full Matrix** 全域结构 + 契约 + 矩阵测试。
 
 ### 2.1.2 触发（Agent，无需用户提醒）
-- 某 `Milestone` 下 `docs/tasks/` 顶层条目全部 `Status: done` → 当轮 `k3dge milestone align <id>`（Full Matrix，无人问）。
+- 某 `Milestone` 下 `docs/tasks/` 顶层条目全部 `Status: done` → 当轮 `k3dge milestone align <id>`（Full Matrix，无人问）。[^🅰1.1]
 - align 通过不等于可封：下一步是建议审计（§2.1.4），不是建议封板。
 
 ### 2.1.3 封板闸机
 - 机器闸（reviews 文件）：含 `align-pass`、不含 `align-stub`、正文列出该里程碑全部任务、`docs/guides/` 无 `guide-stub`。
-- 资格闸：由 `audit_trigger.audit_closed` 判（审计闭环、`待修=0`，§2.1.4/§2.1.7）；未闭环时 `seal` 返回 `audit_needed`。
+- 资格闸：由 `audit_trigger.audit_closed` 判（审计闭环、`待修=0`，§2.1.4/§2.1.7）；未闭环时 `seal` 返回 `audit_needed`。[^🅰1.2]
 - 不读 `docs/reviews/SUMMARY.md`（禁止手维护类型索引，ADR-0018）；有意留只在 `docs/reviews/LEFTOVERS.md`。
 
 ### 2.1.4 两问拆分：审计是界限，封板只是收摊
+> **🅰1 起**：本节的「两问」形态由 **§2.1.9（一次声明 + 一条链）** 取代；本节的两条不变量
+> （**封板没有尺子** / **审计才是界限**）不变。以下保留作决策史。
+
 - **封板没有尺子**：全 done、硬闸绿、甚至零 task 都能被说成"可封"；封板只是归档+版本+指针，不构成界限。
 - 真正的界限是**审计闭环**（定义见 §2.1.6）；之后问封不封，是在问"要不要压缩上下文收摊"。
-- **问题一·要不要审（可量化触发，§2.1.5）**：
+- **问题一·要不要审（可量化触发，§2.1.5）**：[^🅰1.3]
   - `check`(绿) / `task done` / `align` / `status` 命中定量信号 → `[NEXT] audit_suggested` + reasons；人只答要不要审。
   - 答是 → `k3dge milestone audit <id>`：必审 → `待修>0` 问 agent 修（倒计时默认修）→ 重审；`>3` 次未闭环 → `escalated` 转人工。
-- **问题二·要不要封（仅审计闭环后唯一一次）**：
+- **问题二·要不要封（仅审计闭环后唯一一次）**：[^🅰1.4]
   - `待修=0` 且有报告 → `[NEXT] seal_ready`；`k3dge milestone seal <id>` 才问"封板？(y/N，无倒计时)"。
   - 未审计先调 → `audit_needed` 指回 audit；答是 → align → 归档+版本+指针 + `*-closure.md` 收摊清单；答否 → 不封。
 - **空窗 / 零 task / 只是硬闸绿**：不建议审、也不建议封。
@@ -54,7 +58,7 @@ Note: 修订痕迹见 git 历史。
 - **封板动作＝收摊/上下文压缩**：`seal` 机械部分只做归档+版本+指针。
   - `run_seal_flow` 写 `docs/reviews/<date>-<id>-closure.md` 清单，指引补齐落盘失败/未采用方案、清理上下文、更新设计文档、提交里程碑。
 
-### 2.1.5 审计建议的量化尺子（§2.1.4 的触发条件）
+### 2.1.5 审计建议的量化尺子（§2.1.4 的触发条件）[^🅰1.5]
 - "建议审"只用 k3dge 能自量的条件（不连 MCP、不跑 LLM），过线才 `[NEXT] audit_suggested`：
   - **账齐**：当前里程碑顶层任务 N>0 且 in-progress/idea=0。
   - **C2 嵌套**：触及 `src/` 控制流 AST（if/for/while/try/with）最大深度 ≥ 5。
@@ -66,14 +70,14 @@ Note: 修订痕迹见 git 历史。
 
 ### 2.1.6 一轮 = 一份报告 + 位置钉子
 - 报告 schema 见 ADR-0017；单报告模型见 ADR-0005；钉的写源/收钉语义见 ADR-0025 §2.7。
-- **闭环界定**：报告 `待修=0` 即 `audit_trigger.audit_closed`；改后由 `verify` 核该报告。
+- **闭环界定**：报告 `待修=0` 即 `audit_trigger.audit_closed`；改后由 `verify` 核该报告。[^🅰1.6]
 - **`[NEXT] pending_findings`**：
   - `scan_pending_findings` 扫 `src/`+`docs/`（跳 archive/reviews/generated）的 `k3dit:pending` 钉（语法见 `peer_contract §8`）。
   - `check`/`status` 以最高优先报 `pending=N`——修的人打开文件就看见。
   - 往配对模板里插注释仍会误触 `TEMPLATE_DRIFT`。
 
 ### 2.1.7 人工入口 / Checklist 缓存 / 自动 loop 上限
-- **人工主动入口**：`k3dge milestone audit <id>` 与 `k3dge milestone seal [--yes] <id>` 走同一套 `run_audit_flow` / `run_seal_flow`。
+- **人工主动入口**：`k3dge milestone audit <id>` 与 `k3dge milestone seal [--yes] <id>` 走同一套 `run_audit_flow` / `run_seal_flow`。[^🅰1.7]
   - `--yes` 仅跳过"要不要封"提问，不跳过审计（未闭环时 `seal` 返回 `audit_needed`）。
   - 自动探测（`[NEXT] audit_suggested` / `seal_ready`）与人工入口收敛到同一条流程。
 - **审计条件 Checklist 缓存（非封板 checklist）**：`.agent/audit_checklist.json` 记条件快照（账齐/C2/体积 + reasons）、报告的 `待修`、`verify_attempts`、`audit_started_at`，以任务状态 hash 为键。
@@ -84,7 +88,57 @@ Note: 修订痕迹见 git 历史。
 - 人把报告贴进对话框（或 agent 转发）＝**外部审计源**，不能直接被流程解析。
 - 必须落盘为 `docs/reviews/YYYY-MM-DD-<id>-external-audit.md`：`k3dge milestone audit-submit <id> [--file <报告.md> | -]`（CLI）或 MCP `k3dge_submit_audit_report`。
 - `persist_external_audit_report` 缺 12 列表头时自动补；最新一份覆盖旧的。
-- 落盘后 `audit_closed` 即可判闭环，进入"问题二·要不要封"；外部源与 peer 产出走同一条路径。
+- 落盘后 `audit_closed` 即可判闭环，进入"问题二·要不要封"；外部源与 peer 产出走同一条路径。[^🅰1.8]
+
+### 2.1.9 审计＝封版主体：一次声明 + 一条链（🅰1）
+
+- **唯一入口**：`k3dge milestone seal <id>`。它同时是"人宣布要收这一章"与"开启封版流程"，
+  **幂等重入**：预审失败 ⇒ 人修完再 seal；审计未闭环 ⇒ 返回"在办"，不阻塞、不空转。
+- **三相位**：
+  1. **预审**（进审计的门槛）：`tasks_all_done` + Full Matrix 绿（写对齐报告含 `align-pass`）
+     + 形式闸（`docs/guides/` 无 stub / ADR 全 `Accepted` 且带可解析 `Landed-by` / docs 规约化）。
+  2. **审计**：对**基线版本**跑（棘轮或 oneshot）；**审计正常返回 ⇒ 版号前进**（闭集见 §2.1.11），
+     **不管有没有报告**。
+  3. **审核后（自动）**：封版提交（提版 + 归档 + 收摊清单 + 记录 trailer，见 §2.1.10）
+     → `tag <M> = <B>` → 指针前进 → 交接（打印待执行命令）。
+- **机械验证两道**：相位 1 的预审，以及**落点闸**（审计线的修复合并回主干时跑
+  sync/check/doc-gate/pytest，红则回滚主干——先验后并）。
+- **边界与标识**：审计的输入标识＝**基线 B 的 git hash**（不用 job id 作标识）；
+  封板边界由 `tag <M> = B` 表示。**B 之后的主线改动归下一个里程碑**（票随之重挂）。
+- **不要求封版提交紧贴 B**：审计期主线可自由提交，不冻结、不重写公共历史
+  （代价：历史中封版提交位于后续工作之后，边界靠 tag 表达——这是有意的取舍）。
+
+### 2.1.10 完成记录与运行态分层（🅰1）
+
+- **durable（判据只认这些）**：基线 B、`tag <M> = B`、以及封版提交的 trailer：
+  `seal-milestone` / `audit-baseline` / `audit-seat` / `audit-result`。
+- **报告＝可选产物**：存在则须合格（12 列表头 + `审计人` / `透镜来源` / `基线`）；不存在不卡流程。
+- **运行态（投影，不作判据）**：`.agent/audit_jobs.json`（phase / rounds / attempts / worktree /
+  合并欠账）与 `.agent/audit_checklist.json`（verify 预算 / attempts）。它们是本地状态、可重建；
+  **与 git 事实冲突时以 git 为准**（同 ADR-0025 §2.7 的写源/投影纪律）。
+
+### 2.1.11 保证审计不可空转（🅰1）
+
+- "审计正常返回"是**闭集**，逐条落进封版提交 trailer 的 `audit-result`：
+  `closed`（真实执行且闭环）| `degraded-manual`（降级到 manual 协议，**须带签名/席位**）
+  | `escalated`（转人工）| `refused`（skip / 无可达透镜）。
+- **只有 `closed` 与带签名的 `degraded-manual` 允许推进版号**；`escalated` 交人；
+  `refused` 拒绝且不推进。
+- 禁止把"跳过/降级"当成功：审计失败、席未到位、透镜不可达，都不得表现为"时间到了就前进"。
+
+### 2.1.12 CHANGELOG 由提交区间生成（🅰1）
+
+- 来源：`<上一里程碑 tag>..<本轮 tag>` 区间的**非机械提交**（过滤进程作者与审计线机械件）；
+  类型取 conventional 前缀（commit-msg 闸已强制）。
+- 闸只验**不漏项**（区间内每个非机械提交都有对应条目）与类型合法；**写得好**归人/审计，
+  不假装有机检。
+- 目的：消除"票各写一行 + 封版再写一次"的双写（漏项与漂移的常见来源）。
+
+### 2.1.13 非目标（🅰1）
+
+- **不重写公共历史**（不为"封版提交紧贴基线"rebase 主线）；**不引入过渡号**（如 `M+` 形态）。
+- **对外发布动作（push 等）归人**：k3dge 只打印待执行命令。
+- closure 清单的人判项（落盘未采用方案 / 清理上下文 / 更新设计文档）保持 **advisory**，不塞硬闸。
 
 ### 2.2 为什么通过文件系统物理移动实现上下文压缩
 `k3dge milestone seal` 将 `docs/tasks/*.md` 物理移入 `docs/tasks/archive/<id>/`。
@@ -99,10 +153,30 @@ Note: 修订痕迹见 git 历史。
 ### 2.3 版本与变更日志（原独立 ADR，合并入本条）
 - **单源**：`pyproject.toml` 的 `project.version` 唯一事实源；`k3dge version bump` 镜像至 `.agent/manifest.json` 与 `src/k3dge/__init__.py`；三者不一致时门禁 `VERSION_MISMATCH` 阻断。
 - **入口**：`k3dge version show` / `k3dge version bump [--major|--minor|--patch|--set X.Y.Z] [-m msg]`；bump 同时追加 `CHANGELOG.md`（Keep a Changelog + SemVer），原子写、失败回滚。
-- **seal 联动**：`seal` 成功自动 `patch` bump + CHANGELOG 条目（`Seal milestone <id>.`）；`--no-version-bump` 可跳过；CLI 与 MCP 行为一致。
+- **seal 联动**：`seal` 成功自动 `patch` bump + CHANGELOG 条目（`Seal milestone <id>.`）；`--no-version-bump` 可跳过；CLI 与 MCP 行为一致。[^🅰1.9]
 - **失败语义**：`bump_version` 原子；`seal` 后自动 bump 失败**不回滚已归档 tasks**，仅 stderr / MCP `version_bump_failed` 告警——禁止"归档成功、版本一半"被静默忽略。
 - **不引入** hatch-vcs / setuptools_scm（自举期 `pip install -e` 已满足）。重开条件：需 `git tag` 驱动或 PyPI 发布。
 
 ## 3. 产生后果 (Consequences)
 - **正面**：确定性验收 + 防过度工程 + 上下文经济性闭环；`engine` 扩展为"门禁判定与生命周期治理核心"（边界见 `overview.md` / `engine/spec.md`）。
 - **负面**：`engine` 引入文件生成/移动副作用，需与 `sync` 的 spec 回写职责保持边界（`engine` 管归档，`sync` 管契约）。
+
+---
+
+[^🅰1.1]: 修改（🅰1）：align 不再是独立自动步骤，而是**封板流程的预审相位**（§2.1.9 相位 1）。`[NEXT]` 仍以量化信号提醒"要不要审"（§2.1.5），但不再自动调 align。
+
+[^🅰1.2]: 修改（🅰1）：`audit_closed`（报告存在 + `待修=0`）**不再是封板前置**；边界改由"审计正常返回 + 基线"定义（§2.1.9/§2.1.11）。报告降级为**可选产物**：存在则须合格（12 列 + 署名 + 基线），不存在不卡流程。
+
+[^🅰1.3]: 修改（🅰1）：量化信号降为**提醒**，且"要不要审"不再是独立的第一个人工问答——人发起 `seal` 即表示进入封版流程，预审通过后由同一条链自动发起审计（§2.1.9）。
+
+[^🅰1.4]: 修改（🅰1）：不再是独立的第二个问答。人发起 `seal` 就是在宣布"要收这一章"；审计闭环后由**同一条链**自动收尾（§2.1.9 相位 3），无需再敲一次命令。
+
+[^🅰1.5]: 修改（🅰1）：量化尺子**只作提醒**（"要不要审"的建议），与"能不能封"无关；封板由 §2.1.9 的链定义。"本里程碑已有报告即视为已审"在提醒语境下仍成立。
+
+[^🅰1.6]: 修改（🅰1）：闭环界定从"报告 `待修=0`"改为"**审计正常返回**"（闭集见 §2.1.11）。报告与钉仍是产物/写源，但不再是"封板资格"的唯一判据；机械闸另由落点闸托底（§2.1.9）。
+
+[^🅰1.7]: 修改（🅰1）：人工入口收敛为 `k3dge milestone seal <id>` **唯一入口**（幂等重入）；`--yes` 只跳"封板？"提问。`.agent/audit_checklist.json` 降为**运行态**，不作判据（§2.1.10）。
+
+[^🅰1.8]: 修改（🅰1）：`audit-submit` 只**补证据**（落盘报告），**不推进版号、不触发封板**——版号前进由"审计正常返回"决定（§2.1.11）。
+
+[^🅰1.9]: 修改（🅰1）：版本在**审计正常返回后**前进（不再等"seal 成功"）；CHANGELOG 改由**提交区间**生成（§2.1.12），闸只验不漏项，语义润色归人。
