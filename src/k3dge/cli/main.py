@@ -683,6 +683,14 @@ def cmd_milestone(args: argparse.Namespace) -> int:
                 pass
         return 0 if ok else 1
 
+    if action == "seal-check":
+        # 只读：打印全量封板前置清单（不执行任何动作）；有未过项 ⇒ 退 1
+        from k3dge.engine.seal import render_checklist, unmet_seal_preconditions
+
+        print(render_checklist(workspace, m_id))
+        _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone seal-check -> {m_id} unmet={len(unmet_seal_preconditions(workspace, m_id))}")
+        return 1 if unmet_seal_preconditions(workspace, m_id) else 0
+
     if action == "checklist":
         from k3dge.engine import audit_checklist
 
@@ -1133,7 +1141,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_extractor.set_defaults(func=cmd_extractor)
 
     p_milestone = sub.add_parser("milestone", help="milestone alignment and context compaction")
-    p_milestone.add_argument("action", choices=["status", "align", "seal", "audit", "checklist", "audit-submit"], help="milestone action")
+    p_milestone.add_argument("action", choices=["status", "align", "seal", "audit", "checklist", "audit-submit", "seal-check"], help="milestone action")
     p_milestone.add_argument("milestone_id", help="milestone identifier (matches Milestone field in tasks)")
     p_milestone.add_argument(
         "--no-version-bump",

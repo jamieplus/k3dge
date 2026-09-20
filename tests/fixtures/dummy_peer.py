@@ -92,7 +92,7 @@ def dummy_collect(job_id: str) -> str:
         f"# 审计：{job.get('scope') or 'target'}（milestone {ms}）\n\n"
         f"- **基线**: {job.get('baseline') or '-'}\n"
         f"- **审计人**: dummy+test-seat\n"
-        f"- **透镜来源**: dummy（peer contract 桩）\n"
+        f"- **透镜来源**: dummy（peer contract 桩）\n"        f"- **基线**: {'0' * 40}\n"   # 桩：格式闸只验可解析
         f"- **范围**: {job.get('scope') or '-'}\n\n"
         f"{_HEADER}\n{_SEP}\n" + ("\n".join(rows) + "\n" if rows else "")
     )

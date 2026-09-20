@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:29163fc932089304eaa4f2c95c94bfa127b6677d0215a4c0a185c39f7e9a6f7d`
+- **Contract Hash**: `sha256:4bf663a4ecc49eff85f271556cb5a2779151d74f0912dff6c4f980041938e691`
 - **Last Updated**: 2026-09-20
 
 ## 1. Domain Boundary & Responsibilities
@@ -500,7 +500,9 @@ from k3dge.engine.task_index import scan_milestone_tasks
 GUIDE_STUB_RE = re.compile('<!--\\s*k3dge:guide-stub\\s*-->', re.IGNORECASE)
 scan_unfilled_guides(workspace: Path) -> List[str]
 seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gates.Rejection]
+seal_checklist(workspace: Path, milestone_id: str) -> list
 unmet_seal_preconditions(workspace: Path, milestone_id: str) -> list
+render_checklist(workspace: Path, milestone_id: str) -> str
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
 from __future__ import annotations
 from pathlib import Path

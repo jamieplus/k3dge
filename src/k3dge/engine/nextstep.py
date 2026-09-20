@@ -273,8 +273,15 @@ def _write_cards(workspace: Path, cards: list, primary: Optional[str]) -> None:
 
 
 def begin_run(workspace: Path) -> None:
-    """一轮的开始：清空侧车（处理点集合按轮重置；否则上一条命令的提示会留到这一轮）。"""
-    _write_cards(workspace, [], None)
+    """一轮的开始：清空侧车（处理点集合按轮重置；否则上一条命令的提示会留到这一轮）。
+
+    **只在文件已存在时删除**（不写空壳）：这样"没有提示的一轮"不留任何文件，
+    只读命令（如 `milestone seal-check`）也就真的不产状态。
+    """
+    try:
+        (Path(workspace) / _SIDECAR_REL).unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def persist(workspace: Path, ns: NextStep) -> None:

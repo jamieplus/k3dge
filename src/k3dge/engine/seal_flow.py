@@ -129,7 +129,11 @@ def run_seal_flow(
         msg = f"Milestone {milestone_id}: 未审计（待修未归零或无 12 列报告），不可封板。"
         _ns = nextstep.NextStep.from_state("audit_needed", milestone_id)
         nextstep.persist(workspace, _ns)
-        return "audit_needed", msg + "\n" + _ns.render_cli()
+        # 同 `_archive` 的拒绝路径：给**全量清单**（否则操作者只看到审计这一项，
+        # 补完审计再跑 seal 才发现还有别的未过闸）
+        from k3dge.engine.seal import render_checklist
+
+        return "audit_needed", msg + "\n" + render_checklist(workspace, milestone_id) + "\n" + _ns.render_cli()
 
     # enter-seal prompt — NO countdown; N = keep milestone open. Skipped with --yes.
     # 文案单源：STATE_OPTIONS["seal_ready"].question（与 [NEXT] 的 fact 同一判定的两个投影）；通道行为（default_yes）留在此处。
@@ -181,7 +185,10 @@ def run_seal_flow(
         rej = gates.rejection(out, "unknown_action_id")
         _ns = nextstep.next_for_rejection(milestone_id, rej)
         nextstep.persist(workspace, _ns)
-        return "rejected", str(rej) + "\n" + _ns.render_cli()
+        # 全量清单：只报首个失败会让操作者试错（修一个再跑才发现下一个）
+        from k3dge.engine.seal import render_checklist
+
+        return "rejected", str(rej) + "\n" + render_checklist(workspace, milestone_id) + "\n" + _ns.render_cli()
     msg = str(out)
     from k3dge.engine import events
     events.emit(workspace, "sealed", milestone=milestone_id)

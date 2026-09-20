@@ -234,24 +234,45 @@ def _seal_gate_registry(workspace: Path, milestone_id: str) -> dict:
     return {"fns": gate_fns, "ctx": ctx}
 
 
-def unmet_seal_preconditions(workspace: Path, milestone_id: str) -> list:
-    """**全量**报出未过的封板前置闸 `[(gate_id, message)]`（顺序＝声明序）。
+def seal_checklist(workspace: Path, milestone_id: str) -> list:
+    """**全量**封板前置清单：`[(gate_id, ok, message)]`，顺序＝声明序。
 
-    为什么需要：`seal_preconditions_error` 只报**首个**失败，而 `[NEXT] seal_ready` 的
-    事实若只说"审计已闭环"，就与 `seal` 的实际判据不一致（操作者以为可以封，跑 seal 才发现
-    缺 marker / ADR 未 Accepted）。本函数让投影面与实际判据同源。
+    为什么需要全量：`seal_preconditions_error` 只报**首个**失败（闸的语义是"停"），
+    于是操作者实际体验是"跑 seal → 修一个 → 再跑 → 又发现一个"的试错。清单让
+    "封板前必须做的事"一次看清（`k3dge milestone seal-check <id>`），
+    `[NEXT]` 的 blockers 与 seal 的拒绝信息都从这一份数据投影。
     """
     refs = _seal_gate_registry(workspace, milestone_id)
     out = []
     for gid in gates.preconditions(workspace, "seal"):
         fn = refs["fns"].get(gid)
         if fn is None:
-            out.append(("unknown_gate_id", f"gate contract references unknown gate id: '{gid}'"))
+            out.append((gid, False, f"gate contract references unknown gate id: '{gid}'"))
             continue
         err = fn(refs["ctx"])
-        if err:
-            out.append((gid, str(err)))
+        out.append((gid, not err, "" if not err else str(err)))
     return out
+
+
+def unmet_seal_preconditions(workspace: Path, milestone_id: str) -> list:
+    """未过的前置闸 `[(gate_id, message)]`（由 `seal_checklist` 派生，单一判据源）。"""
+    return [(gid, msg) for gid, ok, msg in seal_checklist(workspace, milestone_id) if not ok]
+
+
+def render_checklist(workspace: Path, milestone_id: str) -> str:
+    """清单的人读投影（✓/✗ + 原因），供 seal 拒绝信息与 `seal-check` 共用。"""
+    rows = seal_checklist(workspace, milestone_id)
+    bad = [gid for gid, ok, _ in rows if not ok]
+    lines = [f"封板前置清单（{milestone_id}）：{len(rows) - len(bad)}/{len(rows)} 通过"]
+    for gid, ok, msg in rows:
+        if ok:
+            lines.append(f"  ✅ {gid}")
+        else:
+            first = msg.splitlines()[0] if msg else ""
+            lines.append(f"  ❌ {gid} —— {first[:110]}")
+    if bad:
+        lines.append(f"  ⇒ 先清 {len(bad)} 项：{', '.join(bad)}；`k3dge milestone seal-check {milestone_id}` 可随时复查")
+    return "\n".join(lines)
 
 
 def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:

@@ -15,7 +15,9 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-_SIGN_KEYS = ("审计人", "透镜来源")
+#: 报告必填的署名/来源/锚点。`基线` 是**可验的内容锚点**：它让"报告对应当前内容"
+#: 有 durable 依据（随报告入库；`audit_jobs.json` 是 gitignored 的本地状态，不能依赖）。
+_SIGN_KEYS = ("审计人", "透镜来源", "基线")
 
 
 def _field(text: str, key: str) -> str:

@@ -431,3 +431,87 @@ class TestDocsNormalizedGate(unittest.TestCase):
         _write_task(ws / "docs/tasks/x.md", "done", "M10")
         _set_seal_gates(ws, "docs_normalized")
         self.assertIsNone(seal_preconditions_error(ws, "M10"))
+
+
+def _no_prompt():
+    """非交互 prompter（回答 y）：seal 流程里"要不要封"的提示不该挡测试。"""
+    from k3dge.engine.prompt import Prompt
+
+    return Prompt(answers=["y"])
+
+
+class TestSealChecklist(unittest.TestCase):
+    """封板前置清单：全量投影（#3）。
+
+    为何：`seal_preconditions_error` 只报**首个**失败（闸的语义是"停"），操作者实际是
+    "跑 seal → 修一个 → 再跑 → 又发现一个"的试错。清单让"封板前必须做的事"一次看清，
+    且 `[NEXT]` blockers / seal 拒绝信息 / `seal-check` 三处同源。
+    """
+
+    def setUp(self) -> None:
+        self.ws = pathlib.Path(tempfile.mkdtemp())
+        (self.ws / ".agent").mkdir(parents=True, exist_ok=True)
+        (self.ws / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
+        (self.ws / "docs" / "reviews").mkdir(parents=True, exist_ok=True)
+
+    def test_lists_every_declared_gate_in_order(self) -> None:
+        from k3dge.engine import gates
+        from k3dge.engine.seal import seal_checklist
+
+        rows = seal_checklist(self.ws, "M10")
+        self.assertEqual([gid for gid, _ok, _m in rows], gates.preconditions(self.ws, "seal"))
+        self.assertTrue(all(isinstance(ok, bool) for _g, ok, _m in rows))
+
+    def test_unmet_is_derived_from_checklist(self) -> None:
+        from k3dge.engine.seal import seal_checklist, unmet_seal_preconditions
+
+        rows = seal_checklist(self.ws, "M10")
+        unmet = unmet_seal_preconditions(self.ws, "M10")
+        self.assertEqual(unmet, [(g, m) for g, ok, m in rows if not ok])
+
+    def test_render_marks_pass_and_fail(self) -> None:
+        from k3dge.engine.seal import render_checklist
+
+        _write_task(self.ws / "docs/tasks/x.md", "done", "M10")
+        _set_seal_gates(self.ws, "tasks_all_done", "audit_closed")
+        text = render_checklist(self.ws, "M10")
+        self.assertIn("✅ tasks_all_done", text)
+        self.assertIn("❌ audit_closed", text)
+        self.assertIn("1/2 通过", text)
+        self.assertIn("先清 1 项", text)
+
+    def test_missing_provenance_baseline_blocks_evidence_chain(self) -> None:
+        """#1：`基线` 进必填署名/来源项 ⇒ 缺它时 evidence_chain 不过（清单里可见 ❌）。"""
+        from k3dge.engine.seal import render_checklist
+
+        _write_task(self.ws / "docs/tasks/x.md", "done", "M10")
+        (self.ws / "docs" / "reviews" / "2026-09-13-M10-audit.md").write_text(
+            "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+            "- **审计人**: k3dit\n- **透镜来源**: k3dit\n", encoding="utf-8")
+        _set_seal_gates(self.ws, "evidence_chain")
+        self.assertIn("❌ evidence_chain", render_checklist(self.ws, "M10"))
+
+    def test_seal_rejection_carries_the_whole_checklist(self) -> None:
+        """seal 拒绝时给全量清单，而不是只给首个失败。"""
+        from k3dge.engine.seal_flow import run_seal_flow
+
+        _write_task(self.ws / "docs/tasks/x.md", "done", "M10")
+        # 非审计类的失败（走 _archive 的拒绝路径）：align_pass 缺 marker
+        _set_seal_gates(self.ws, "tasks_all_done", "align_pass")
+        status, msg = run_seal_flow(self.ws, "M10", prompter=_no_prompt())
+        self.assertEqual(status, "rejected")
+        self.assertIn("封板前置清单（M10）", msg)
+        self.assertIn("❌ align_pass", msg)
+        self.assertIn("✅ tasks_all_done", msg)
+
+    def test_audit_needed_rejection_also_carries_the_checklist(self) -> None:
+        """审计未闭环的早返回路径同样给全量清单（否则补完审计才发现还有未过闸）。"""
+        from k3dge.engine.seal_flow import run_seal_flow
+
+        _write_task(self.ws / "docs/tasks/x.md", "done", "M10")
+        _set_seal_gates(self.ws, "tasks_all_done", "audit_closed")
+        status, msg = run_seal_flow(self.ws, "M10", prompter=_no_prompt())
+        self.assertEqual(status, "audit_needed")
+        self.assertIn("封板前置清单（M10）", msg)
+        self.assertIn("❌ audit_closed", msg)

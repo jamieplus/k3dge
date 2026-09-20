@@ -764,8 +764,12 @@ scan_unfilled_guides(workspace: Path) -> List[str]
     # doc: Names of guide stubs in docs/guides/ still carrying `<!-- k3dge:guide-stub -->`.
 seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gates.Rejection]
     # doc: 策略层：按「硬闸契约」`[checks.seal].preconditions` 求值全部前置闸，返回首个拒绝（None=全绿）。
+seal_checklist(workspace: Path, milestone_id: str) -> list
+    # doc: **全量**封板前置清单：`[(gate_id, ok, message)]`，顺序＝声明序。
 unmet_seal_preconditions(workspace: Path, milestone_id: str) -> list
-    # doc: **全量**报出未过的封板前置闸 `[(gate_id, message)]`（顺序＝声明序）。
+    # doc: 未过的前置闸 `[(gate_id, message)]`（由 `seal_checklist` 派生，单一判据源）。
+render_checklist(workspace: Path, milestone_id: str) -> str
+    # doc: 清单的人读投影（✓/✗ + 原因），供 seal 拒绝信息与 `seal-check` 共用。
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
     # doc: 纯归档动作：id 合法 + 有任务 + 状态合法 → `_seal_archive`。策略闸在 `seal_preconditions_error`。
 # seal_flow.py
