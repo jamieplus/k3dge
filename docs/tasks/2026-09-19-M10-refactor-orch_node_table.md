@@ -3,7 +3,6 @@ status: idea
 milestone: M10
 priority: P2
 date: 2026-09-19
-blocking: 2026-09-19-M10-refactor-orch_converge_gate_facts 2026-09-18-M10-fix-pipelines_stages_dead_config
 ---
 
 # 编排骨架收敛·节点表：pipeline.toml [checks.*] 单一声明面 + 五属性 + ctx + 单执行器（下游可配）
@@ -22,16 +21,29 @@ blocking: 2026-09-19-M10-refactor-orch_converge_gate_facts 2026-09-18-M10-fix-pi
 4. C 线归约为 A 的入口特例（自主单位调用声明式接口）；不建"交付面契约表"。残渣只留一条约束：**不经接口的交付（直接改盘上事实）必须有验证器**，验证器就是 B 线的闸。
 5. D 线（自主↔自主）不进表：k3dge 只做状态可见 / 事实供给 / 幂等步进，**不得编排**（不变量落 ADR-0026，见 `adr0026_d_line_and_downstream` 票）。
 
-## 现状（散落度实测）
+## 现状（2026-09-19 更新，散落度实测）
+
+**已做（前两步的产物，本票不再重复）**：
+
+| 项 | 落点 | commit |
+| --- | --- | --- |
+| 声明面收进 `pipeline.toml` 一处（`[checks.*]` + `[gates.*]`），`gates.DEFAULTS` 为代码内缺省 | `gates.REL` + `pipeline.toml`/资产模板 | `15f37e0` |
+| 旧两处声明退休 + 迁移守卫（`.agent/gates.toml` 与 `[pipelines.*]` 存在即红一次） | `pipeline_schema` | `a9601a0` / `15f37e0` |
+| 外部步接通且**执行器真读**（`[checks.audit].stages_produce/stages_verify`，删 `milestone_audit` 硬编码 `streams`） | `gates.stages()` + `run_audit_flow` | `a9601a0` |
+| 未知 id 拒绝 + 声明的 ref 解析不到 ⇒ `PIPELINE_UNRESOLVED_STAGE`（不让声明空转） | `pipeline_schema` | `a9601a0` |
+| 下游可配实测（改声明即换实现；坏配置回落缺省） | `test_gates` / `test_seal_flow` / `test_pipeline_schema` | 同上 |
+
+**仍散落（本票要做）**：
 
 ```
-声明 4 处：gates.DEFAULTS["checks"]（seal: 7 preconditions + 4 actions；align: 1+1）
-          pipeline.toml [pipelines.on_seal_enter/on_pre_seal].stages（**无执行者**）
-          pipeline.toml [roles]/[peers]/[transports]（活的，run_action 消费）
-          nextstep.STATE_OPTIONS（文案）+ evaluator 29 处手拼 Violation（闸红文案）
-          + 5 份 docs/<type>/.schema.json（doc 结构判据，数据化）
-执行器 5 处：seal_flow.registry / seal.gate_fns / align._reg / sync 硬编码链 / task_write 硬编码链
-渲染器 3 处：Violation.render / nextstep.render_cli+render_mcp / pre-commit 的 print
+执行器 3 处（未合一）：seal_flow.registry / seal.gate_fns / align._reg
+                       —— 各自按声明跑内部动作，但注册表与失败语义各写各的
+硬编码链 2 处（未收编）：sync 链（generator.py）/ task done 链（task_write.py）
+                        —— task done 按裁定**有意留**
+节点属性：只有 preconditions / actions / stages_*；缺 kind(projection|fact) /
+          needs-produces(ctx) / on_error(stop|rollback|continue)
+渲染器：闸红侧已单源（gate_facts.render + Violation.format）；[NEXT] 侧仍是
+        nextstep.render_cli/render_mcp 各自调 —— 两投影同形由测试守，未合一实现
 ```
 
 ## 方案
@@ -71,13 +83,24 @@ fact / options / pointers          # B 线文案（与 STATE_OPTIONS 同形，�
 - 桩子先行：先定表 schema + 校验（`pipeline_schema` 扩 `[checks]`/`[[nodes]]`）+ 执行器骨架，用 `seal` 一条线跑通（它已有注册表，迁移成本最低、回归网最厚）；再迁 `align`、`sync`。每步 `pytest` + `check` 绿。
 - 有意留：`task done` 链不迁（裁定 3），届时在 `docs/reviews/LEFTOVERS.md` 记一条，写明"不是没看见，是判过"。
 
-## 验收
+## 验收（2026-09-19 更新：删掉已达成项）
 
-- 声明只剩一处：`grep -rn "DEFAULTS\[.checks.\]"` 仅作为缺省回落存在，仓内权威在 `pipeline.toml`；
-- `[pipelines.*]` 不再存在（迁为 `[checks.seal].stages_enter/stages_pre`），`milestone_audit.py` 的硬编码 `streams` 删除；
-- 执行器只剩一个（`seal_flow.registry` / `seal.gate_fns` / `align._reg` 三处合并）；
-- 下游可配实测：删掉下游副本的 `[checks.seal].actions` 一半 ⇒ 回落缺省且 check 绿；写未知 id ⇒ 红；
-- 契约哈希回写；全量 pytest 绿。
+已达成的两条（原第 1、2 条）已由 `a9601a0` / `15f37e0` 完成，不再作为本票判据：
+`[pipelines.*]` 与 `.agent/gates.toml` 均已废且各有迁移守卫；`milestone_audit` 的硬编码
+`streams` 已删、改读声明。
+
+本票剩余验收：
+
+- 执行器**只剩一个**：`seal_flow.registry` / `seal.gate_fns` / `align._reg` 三处合并为一份
+  （同一动作表 + 同一失败语义入口）；
+- 节点五属性可声明且被真读：`kind`（projection 可幂等重算 / fact 写一次即历史）、
+  `needs`/`produces`（ctx 键，用于拓扑序而非手写顺序）、`on_error`
+  （stop / rollback / continue —— 现在三种语义都存在于仓里但无处声明）；
+- `kind=fact` 的节点须声明 `on_rerun`（append-only / 拒绝重跑）；`kind=projection` 默认幂等；
+- `sync` 链收编进声明面，且**投影重生**与**事实源写入**（`reconcile_supersedes` 改 ADR
+  frontmatter + 移文件）在声明里分型 —— 前者可随便重跑，后者不可；
+- 下游可配仍成立（坏配置回落缺省、未知 id 拒绝），且新增字段都带缺省；
+- 全量 pytest 绿；`k3dge sync` 回写契约哈希；`k3dge check` 绿。
 
 ## Notes
 

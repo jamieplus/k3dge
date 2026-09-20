@@ -3,7 +3,7 @@ status: idea
 milestone: M10
 priority: P2
 date: 2026-09-18
-blocking: 2026-09-18-M10-docs-adr_doc_normalize_strategy 2026-09-19-M10-refactor-orch_node_table
+blocking: 2026-09-19-M10-refactor-orch_node_table
 ---
 
 # doc 策略五点落地：格式硬闸 / 新建重复覆盖确认（并入优先）/ seal 轮规约化（外部优先，降级 k3dge）/ 用现成 checks 编排
@@ -77,3 +77,15 @@ blocking: 2026-09-18-M10-docs-adr_doc_normalize_strategy 2026-09-19-M10-refactor
 - 依赖：`blocking:` 两票——ADR 修正案（策略边界）+ `pipelines.*` 死配置（编排声明面收口）。
 - k3dit 的 Doc Audit 透镜**不废**：它是「不可判定那半」的清单来源，逐条评估后能下沉的下沉，剩下的留 seal 轮/里程碑审计（rules/09 吸收路径）。
 - 实证依据（为什么现路不可留）：`docs/reviews/2026-09-10-doc-audit-docs.md` 是唯一真走通的一次（7 条发现全已修 + 独立回填 + `INC-20260910-CON-audit-merge-doc-drift`），且是**绕开 `k3dge doc-audit` 命令**由席位跑的；命令自身产出的两张票里 09-14 那张自述「过期空壳…无可执行内容」。
+
+## 依赖更新（2026-09-19）
+
+- `blocking:` 去掉 `adr_doc_normalize_strategy`（已关：C1-C6 逐条落地，见该票结案表）。
+  它当初卡的是"策略边界"，现已落进 ADR-0022 §2.2 🅰1 / ADR-0005 §2.7 🅰1。
+- 仍挂在 `orch_node_table` 上：本票的 ③（`docs_normalized` + `doc_normalize`）要挂进统一节点表，
+  而那张表正在补五属性与 ctx。
+- 票内「方案骨架」里的 `DOC_FIX_RULES` 应改名对齐现状：确定性可修清单的**唯一源**已是
+  `gate_facts` 的 `fix=deterministic`（实测 10 个：`DOC_INDEX_STALE`/`CONTRACT_DRIFT`/
+  `CONTRACT_HASH_MISSING`/`VERSION_MISMATCH`/`ADR_SUPERSEDE_UNRECONCILED`/`MD_CRLF`/
+  `MD_ENCODING`/`MD_NO_FINAL_NEWLINE`/`MD_TRAILING_WS`/`TASK_BODY_META_REDUNDANT`），
+  不再另建一张规则表（避免第二源）。

@@ -3,7 +3,6 @@ status: idea
 milestone: M10
 priority: P3
 date: 2026-09-19
-blocking: -
 ---
 
 # 闸红声明面收尾：pure_* 检查器产结构化事实（3-tuple），Violation.message 降为兜底
