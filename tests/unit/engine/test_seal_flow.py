@@ -688,7 +688,9 @@ class TestGateIdDispatch(TestCase):
     """
 
     def _sidecar(self, ws) -> dict:
-        return json.loads((ws / ".k3dge" / "next.json").read_text(encoding="utf-8"))
+        """侧车形状 `{"next": [...], "primary": ...}` ⇒ 返回**主处理点**卡片。"""
+        data = json.loads((ws / ".k3dge" / "next.json").read_text(encoding="utf-8"))
+        return data["next"][0] if data.get("next") else data
 
     def test_audit_flow_rejection_routes_by_gate_id(self) -> None:
         ws = _ws_oneshot()  # 无 12 列报告 ⇒ gate_id=audit_report_missing

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - 统一 [NEXT] 通道：stdout + sidecar 双投递
 - 提取器生成器：`.agent/extractors.toml` + `k3dge extractor sync`
+- 多处理点交付：sidecar 单槽 → 列表 + STATE_OPTIONS priority（[NEXT] 复数处理点）
 ### Changed
 - 归档 Rust memo（ADR-0001 §2.9 已否决重写）；gap-trap proven-red 进审计协议 Pass 4；可检规则配闸进 `AGENTS.md` §12
 - 删除 `engine.milestone` 兼容门面；CLI/测试直连叶子模块

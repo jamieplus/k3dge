@@ -442,5 +442,19 @@ class TestProjectionInvariants(TestCase):
         with_q = {s for s, o in nextstep.STATE_OPTIONS.items() if o.get("question")}
         self.assertEqual(with_q, prompted)
 
+    def test_every_state_declares_a_priority(self) -> None:
+        """`priority` 是闭集声明（同一轮多处理点的"先看哪个"）；缺它 ⇒ 排序退化。"""
+        allowed = {1, 2, 3, 4, 5, 9}
+        for state, opt in nextstep.STATE_OPTIONS.items():
+            self.assertIn("priority", opt, state)
+            self.assertIn(int(opt["priority"]), allowed, state)
+
+    def test_priority_flows_into_both_projections(self) -> None:
+        """priority 进 MCP 投影（读侧要能自己排序）；`[NEXT]` 不打印它（顺序已表达）。"""
+        ns = nextstep.NextStep.from_state("pending_findings", "M7", pending=1)
+        self.assertEqual(ns.priority, 1)
+        self.assertEqual(ns.render_mcp()["priority"], 1)
+        self.assertNotIn("priority", ns.render_cli())
+
     def test_every_state_projects_a_fact(self) -> None:
         self.assertEqual([s for s, o in nextstep.STATE_OPTIONS.items() if not o.get("fact")], [])

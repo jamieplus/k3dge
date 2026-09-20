@@ -506,13 +506,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 from typing import TextIO
-STATE_OPTIONS: dict = {'normal': {'fact': '常规提交门禁通过', 'pointers': ['AGENTS.md §12']}, 'pending_findings': {'fact': '代码/文档里有 findings 钉（`k3dit:pending`）未处置；怎么处置由你决定', 'options': ['修完删 `k3dit:pending <ID>` 标记', '有意留 → 改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）', '本轮不处理（钉仍在，下次照旧提示）'], 'pointers': ['peer_contract §8', 'k3dge ADR-0025']}, 'ratchet_open': {'fact': '有在办棘轮工单（k3dge ADR-0025）：进程不等人，但账必须可见', 'pointers': ['k3dge audit status <id>', 'peer_contract §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）', 'k3dge ADR-0025 §2.7']}, 'doc_audit': {'fact': 'docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断（本轮不改，封板轮也得闭环）', 'pointers': ['k3dge ADR-0022 §2.2', 'k3dge doc-audit']}, 'audit_suggested': {'fact': '里程碑 <id> 命中审计触发条件（reason 见上）；审与不审由你决定', 'options': ['k3dge milestone audit <id>（必审，待修=0 才谈封板）', '不审，继续干活（触发条件仍在，下次照旧提示）'], 'pointers': ['k3dge ADR-0004 §2.1.5', 'k3dge milestone audit <id>']}, 'seal_ready': {'fact': '里程碑 <id> 审计已闭环（待修=0）；封板与否由你决定（封＝归档+版本+指针）', 'question': '里程碑 <id>：封板？', 'options': ['k3dge milestone seal <id>（align→归档+版本+指针）', '不封（里程碑继续挂着，当普通提交结束）'], 'pointers': ['k3dge ADR-0004 §2.1.4', 'docs/reviews/']}, 'audit_needed': {'fact': '里程碑 <id> 未审计，不可封板（封＝归档+版本+指针，非界限）', 'options': ['k3dge milestone audit <id>（先闭环审计）', '不封板，当普通提交结束'], 'pointers': ['k3dge ADR-0004 §2.1.6', 'k3dge milestone audit <id>']}, 'audit_open': {'fact': '里程碑 <id> 审计发现 <n> 项待修，环未闭环；由谁修由你决定', 'question': '里程碑 <id>：<n> 项待修，agent 修？', 'options': ['agent 修 → 修完重跑 k3dge milestone audit <id>（重审）', '不由 agent 修 → stop / 转人工干预'], 'pointers': ['k3dge ADR-0022', 'k3dge milestone audit <id>']}, 'escalated': {'fact': 'verify 连续 >3 次未闭环，已转人工干预（k3dge milestone audit-submit <id> 或人工复核）', 'pointers': ['k3dge milestone audit-submit <id>', 'docs/incidents/']}, 'sealed': {'fact': '已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑', 'pointers': ['docs/reviews/*-closure.md', 'k3dge ADR-0004 §2.1.4']}, 'seal_declined': {'fact': '已放弃封板（当普通提交结束）', 'pointers': ['AGENTS.md §12']}, 'rejected': {'fact': '操作被拒（原因见上）', 'pointers': ['AGENTS.md §12', 'k3dge milestone status <id>']}, 'new_domain': {'fact': '新建 src/ 域未在 manifest 注册（硬闸不红，但有文件级信号）', 'options': ['补 manifest + spec + tests，再 k3dge sync 回写契约哈希', '有意不注册 → 在 manifest `ignore` 里声明'], 'pointers': ['k3dge ADR-0005 §2.8', 'k3dge sync']}}
+STATE_OPTIONS: dict = {'normal': {'priority': 9, 'fact': '常规提交门禁通过', 'pointers': ['AGENTS.md §12']}, 'pending_findings': {'priority': 1, 'fact': '代码/文档里有 findings 钉（`k3dit:pending`）未处置；怎么处置由你决定', 'options': ['修完删 `k3dit:pending <ID>` 标记', '有意留 → 改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）', '本轮不处理（钉仍在，下次照旧提示）'], 'pointers': ['peer_contract §8', 'k3dge ADR-0025']}, 'ratchet_open': {'priority': 5, 'fact': '有在办棘轮工单（k3dge ADR-0025）：进程不等人，但账必须可见', 'pointers': ['k3dge audit status <id>', 'peer_contract §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）', 'k3dge ADR-0025 §2.7']}, 'doc_audit': {'priority': 5, 'fact': 'docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断（本轮不改，封板轮也得闭环）', 'pointers': ['k3dge ADR-0022 §2.2', 'k3dge doc-audit']}, 'audit_suggested': {'priority': 4, 'fact': '里程碑 <id> 命中审计触发条件（reason 见上）；审与不审由你决定', 'options': ['k3dge milestone audit <id>（必审，待修=0 才谈封板）', '不审，继续干活（触发条件仍在，下次照旧提示）'], 'pointers': ['k3dge ADR-0004 §2.1.5', 'k3dge milestone audit <id>']}, 'seal_ready': {'priority': 4, 'fact': '里程碑 <id> 审计已闭环（待修=0）；封板与否由你决定（封＝归档+版本+指针）', 'question': '里程碑 <id>：封板？', 'options': ['k3dge milestone seal <id>（align→归档+版本+指针）', '不封（里程碑继续挂着，当普通提交结束）'], 'pointers': ['k3dge ADR-0004 §2.1.4', 'docs/reviews/']}, 'audit_needed': {'priority': 2, 'fact': '里程碑 <id> 未审计，不可封板（封＝归档+版本+指针，非界限）', 'options': ['k3dge milestone audit <id>（先闭环审计）', '不封板，当普通提交结束'], 'pointers': ['k3dge ADR-0004 §2.1.6', 'k3dge milestone audit <id>']}, 'audit_open': {'priority': 2, 'fact': '里程碑 <id> 审计发现 <n> 项待修，环未闭环；由谁修由你决定', 'question': '里程碑 <id>：<n> 项待修，agent 修？', 'options': ['agent 修 → 修完重跑 k3dge milestone audit <id>（重审）', '不由 agent 修 → stop / 转人工干预'], 'pointers': ['k3dge ADR-0022', 'k3dge milestone audit <id>']}, 'escalated': {'priority': 1, 'fact': 'verify 连续 >3 次未闭环，已转人工干预（k3dge milestone audit-submit <id> 或人工复核）', 'pointers': ['k3dge milestone audit-submit <id>', 'docs/incidents/']}, 'sealed': {'priority': 9, 'fact': '已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑', 'pointers': ['docs/reviews/*-closure.md', 'k3dge ADR-0004 §2.1.4']}, 'seal_declined': {'priority': 9, 'fact': '已放弃封板（当普通提交结束）', 'pointers': ['AGENTS.md §12']}, 'rejected': {'priority': 3, 'fact': '操作被拒（原因见上）', 'pointers': ['AGENTS.md §12', 'k3dge milestone status <id>']}, 'new_domain': {'priority': 4, 'fact': '新建 src/ 域未在 manifest 注册（硬闸不红，但有文件级信号）', 'options': ['补 manifest + spec + tests，再 k3dge sync 回写契约哈希', '有意不注册 → 在 manifest `ignore` 里声明'], 'pointers': ['k3dge ADR-0005 §2.8', 'k3dge sync']}}
 GATE_NEXT: dict = {'audit_closed': ('audit_needed', ''), 'audit_report_missing': ('rejected', 'audit_missing'), 'audit_open_declined': ('rejected', 'audit_open_declined'), 'tasks_all_done': ('rejected', 'tasks_pending')}
 REJECTION_FACTS: dict = {'audit_missing': '审计缺失：先落盘报告（k3dge milestone audit-submit <id>）或 k3dge milestone audit <id>', 'audit_open_declined': 'stop / 转人工干预（待修未修复且 agent 拒绝修复）', 'tasks_pending': '票据未全 done：先干活或改挂里程碑，再谈 align/seal'}
 class NextStep
     state: str
     milestone: str
     pending: Optional[int] = None
+    priority: int = 5
     fact: Optional[str] = None
     options: Optional[list] = None
     question: Optional[str] = None
@@ -524,12 +525,18 @@ class NextStep
     render_cli(self) -> str
         # doc: 纯打印面：**只出 fact + options**（陈述句，无应答通道故不用疑问句）。
     render_mcp(self) -> dict
+begin_run(workspace: Path) -> None
+    # doc: 一轮的开始：清空侧车（处理点集合按轮重置；否则上一条命令的提示会留到这一轮）。
 persist(workspace: Path, ns: NextStep) -> None
-    # doc: Write next-step sidecar to `.k3dge/next.json`. Fire-and-forget; never raises.
+    # doc: **替换**写入（单判定流程用：seal_flow / milestone_audit 各自只判一个下一步）。
 emit(workspace: Path, ns: NextStep, *, stream: Optional[TextIO]=None) -> str
-    # doc: Persist sidecar + render CLI text + optionally print. Returns the CLI text.
+    # doc: 追加/更新本轮的处理点并打印这一块（单点调用用；多源汇总用 `emit_all`）。
+emit_all(workspace: Path, steps: list, *, stream: Optional[TextIO]=None) -> list
+    # doc: 一轮的**多处理点**：按 priority 稳定排序后打印，侧车写全量 + `primary`。
+load_all(workspace: Path) -> list
+    # doc: 读回本轮全部处理点（新形状 `{"next": [...]}`）；旧单条形状 ⇒ 单元素列表。
 load_persisted(workspace: Path) -> Optional[dict]
-    # doc: 读回 `.k3dge/next.json`（MCP 投影形状）。不存在/坏 JSON ⇒ None，永不抛。
+    # doc: 读回**主处理点**（`primary`）——MCP/外来 harness 的单值读法。
 next_for_rejection(milestone: str, message, gate_id: Optional[str]=None) -> NextStep
     # doc: Failure -> action. **闭集派发**：`gate_id` → `GATE_NEXT` → state/fact。
 question_text(state: str, milestone: str, *, n: Optional[int]=None) -> str

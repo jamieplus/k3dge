@@ -137,6 +137,37 @@ def _workspace_hints(workspace: Path) -> list:
     return hints
 
 
+def _collect_hints(workspace: Path) -> list:
+    """本轮全部处理点（**不打印、不写盘**）：生命周期 + 工作区 + doc-audit 三类。"""
+    from k3dge.engine import nextstep
+
+    steps = []
+    ns = _lifecycle_next(workspace)
+    if ns is not None:
+        steps.append(ns)
+    steps.extend(_workspace_hints(workspace))
+    try:
+        from k3dge.engine.doc_audit import _changed_docs
+        from k3dge.engine.milestone_pointer import get_current_milestone
+
+        if _changed_docs(workspace):
+            steps.append(nextstep.NextStep.from_state("doc_audit", get_current_milestone(workspace)))
+    except Exception:
+        pass
+    return steps
+
+
+def _emit_all_hints(workspace: Path, stream) -> None:
+    """多处理点：按 priority 排序后统一打印 + 侧车写全量（`primary` ＝ 最小 priority）。
+
+    实测场景：`k3dge check` 同轮可命中 `pending_findings`(1) + `seal_ready`(4) + `doc_audit`(5)
+    ⇒ 旧实现各自 `emit`，stdout 顺序＝代码顺序、侧车只剩最后一条。
+    """
+    from k3dge.engine import nextstep
+
+    nextstep.emit_all(workspace, _collect_hints(workspace), stream=stream)
+
+
 def _emit_workspace_hints(workspace: Path, stream) -> None:
     from k3dge.engine import nextstep
 
@@ -192,9 +223,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     # top-level tasks are all done, surface it so the operator can choose to seal.
     # Non-blocking and informational only (ADR-0004 §2.1.2 revised).
     if code == 0:
-        _emit_lifecycle_next(workspace, sys.stderr)
-        _emit_workspace_hints(workspace, sys.stderr)
-        _emit_doc_audit_hint(workspace, sys.stderr)
+        _emit_all_hints(workspace, sys.stderr)   # 三类汇总，按 priority 排序
     return code
 
 
@@ -1053,9 +1082,8 @@ def cmd_status(args: argparse.Namespace) -> int:
                 + " —— 观测展示，不参与任何判定",
                 file=sys.stdout,
             )
-        # Persistent one-line next-step hint (single source: engine.nextstep).
-        _emit_lifecycle_next(workspace, sys.stdout)
-        _emit_workspace_hints(workspace, sys.stdout)
+        # Persistent next-step hints (single source: engine.nextstep)；多处理点按 priority 排序
+        _emit_all_hints(workspace, sys.stdout)
     return 0
 
 
@@ -1272,6 +1300,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    try:
+        # 一轮开始的边界：清空侧车，否则上一条命令的处理点会留到这一轮
+        # （观测件：失败不得影响任何命令）
+        from k3dge.engine import nextstep
+
+        nextstep.begin_run(_find_workspace(Path.cwd()))
+    except Exception:
+        pass
     return args.func(args)
 
 

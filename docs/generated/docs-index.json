@@ -673,11 +673,11 @@
       "tokens": "ADR 编号截断：废物理删除、退役单一面 obsolete/、13 个永久退役号入表、分配=max+1、复用可机检"
     },
     {
-      "path": "docs/tasks/2026-09-19-M10-feat-next_multi_decision.md",
+      "path": "docs/tasks/2026-09-19-M10-feat-next_multi_decision.done.md",
       "type": "tasks",
-      "id": "2026-09-19-M10-feat-next_multi_decision",
+      "id": "2026-09-19-M10-feat-next_multi_decision.done",
       "title": "多处理点交付：sidecar 单槽 → 列表 + STATE_OPTIONS priority（[NEXT] 复数处理点）",
-      "status": "idea",
+      "status": "done",
       "tokens": "多处理点交付：sidecar 单槽 → 列表 + STATE_OPTIONS priority（[NEXT] 复数处理点）"
     },
     {

@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M10
 priority: P2
 date: 2026-09-19
@@ -73,3 +73,35 @@ sidecar 实际内容（单槽）：
 - 来源：本轮设计讨论中我提的三问之一，用户裁定「开票」（2026-09-19）。
 - 与 doc 新策略的依赖：一次提交可能同时命中「新建未排查」（`DOC_NEW_UNSCREENED`）与「可自动修偏差」（`doc_normalize`），两类处理点必须并存且有序——本票是那个场景的地基。
 - 有意留（本票不做）：`[NEXT]` 从"每命令各自 emit"改成"命令返回 hints、由统一出口 emit"——那属 `orch_node_table` 的单执行器收编。
+
+## 落地（2026-09-19）
+
+| 项 | 落点 | 实测 |
+| --- | --- | --- |
+| ① 侧车新形状 | `{"next": [card...], "primary": <state>}`；`persist`＝**替换**（单判定流程用），`emit`＝本轮 **upsert**（同 state 去重），`begin_run`＝清空 | `check` 后 `primary=seal_ready`、`next=[(seal_ready,4),(doc_audit,5)]`——**改前只剩 doc_audit** |
+| ② priority（闭集） | `STATE_OPTIONS[*].priority`：1 需人立即介入（pending_findings/escalated）／2 环未闭环（audit_open/audit_needed）／3 被拒／4 决策点／5 在办与后续步／9 播报 | 每态都有；守卫测试锁闭集 |
+| ③ 排序与投影 | `emit_all(steps)` 按 `(priority, 声明序)` 稳定排序后打印；`priority` 进 MCP 投影（读侧要能自己排）；`[NEXT]` 不打印它（顺序已表达） | `check` 的 stdout 顺序＝priority 序 |
+| ④ 一轮边界 | `cli.main()` 调 `begin_run`（**单一入口**；MCP 不调 —— 它的工具各自直接构造 NextStep，不累积） | `task list`（无提示）后侧车清空；`check` 后只有它自己的处理点 |
+| ⑤ 向后兼容 | `load_all()` 读新形状；旧单条形状 ⇒ 单元素列表；`load_persisted()` 返回 `primary`（MCP 的单值读法不变） | 测试 `test_load_persisted_accepts_legacy_single_shape` |
+
+### 途中被自己抓到两处
+
+1. **排序失效**：卡片里没带 `priority` ⇒ `_upsert` 排序全落默认值 5，`primary` 错成 `seal_ready`（应为 `pending_findings`）。修：`render_mcp()` 带上 `priority`（读侧也需要它）。
+2. **测试断言旧形状**：`test_next_sidecar` 与 `seal_flow::_sidecar` 按旧单槽断言 ⇒ 更新为读主卡片。
+
+### 有意留（票内已记）
+
+- `[NEXT]` 从"各命令自己 emit"改成"命令返回 hints、由统一出口 emit"——属 `orch_node_table` 的单执行器收编。
+- MCP 侧不调 `begin_run`：其 14 个工具各自构造并回传 NextStep（不经过侧车累积），故无跨调用污染；若将来有工具改走 `emit`，需在那里补 `begin_run`。
+
+## 验收（实测）
+
+```
+608 passed；k3dge check 绿
+tests/unit/engine/test_next_sidecar.py（11 条）：新形状 / persist 替换 / emit upsert+排序 /
+  同 state 去重 / begin_run 清空 / emit_all 排序+写全量 / stdout 顺序 / 旧形状兼容 / 打印开关
+tests/unit/engine/test_nextstep.py::TestProjectionInvariants：每态有 priority 且在闭集内 /
+  priority 进 MCP 投影且不进 [NEXT]
+端到端：k3dge check ⇒ 两块按 priority 排 + 侧车两条 + primary=seal_ready；
+        k3dge task list（无提示）⇒ 侧车被清空（按轮重置生效）
+```

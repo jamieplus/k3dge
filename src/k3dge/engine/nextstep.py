@@ -41,10 +41,21 @@ from typing import Optional, TextIO
 #   options  合法选项（≥ 2，否则＝只给一条路＝下令）；不替判断主体选
 #   question 疑问句 → **只**给 `prompt.ask`（有 stdin 应答通道），与 fact 同一判定的另一投影
 # `pointers` = 纵深指针（doc id / ADR 节 / 命令），推"去哪取细节"而非灌正文（ADR-0008 §2）。
+#: `priority`（闭集，唯一源）＝同一轮命中多个处理点时的"先看哪个"（**建议，不是执行顺序**；
+#: k3dge 不编排自主工作流，ADR-0026 §2.6）：
+#:   1 需人立即介入（pending_findings 钉未处置 / escalated 转人工）
+#:   2 环未闭环，不处理无法前进（audit_open / audit_needed）
+#:   3 操作被拒（rejected）
+#:   4 决策点，可做可不做（seal_ready / audit_suggested / new_domain）
+#:   5 在办进程 / 后续步（ratchet_open / doc_audit）
+#:   9 播报，无需动作（normal / sealed / seal_declined）
+#:
 #: 播报态（无 options）：只陈述事实 + 指针，不给分支。
 STATE_OPTIONS: dict = {
-    "normal": {"fact": "常规提交门禁通过", "pointers": ["AGENTS.md §12"]},
+    "normal": {
+        "priority": 9,"fact": "常规提交门禁通过", "pointers": ["AGENTS.md §12"]},
     "pending_findings": {
+        "priority": 1,
         "fact": "代码/文档里有 findings 钉（`k3dit:pending`）未处置；怎么处置由你决定",
         "options": [
             "修完删 `k3dit:pending <ID>` 标记",
@@ -54,6 +65,7 @@ STATE_OPTIONS: dict = {
         "pointers": ["peer_contract §8", "k3dge ADR-0025"],
     },
     "ratchet_open": {
+        "priority": 5,
         "fact": "有在办棘轮工单（k3dge ADR-0025）：进程不等人，但账必须可见",
         "pointers": [
             "k3dge audit status <id>",
@@ -62,10 +74,12 @@ STATE_OPTIONS: dict = {
         ],
     },
     "doc_audit": {
+        "priority": 5,
         "fact": "docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断（本轮不改，封板轮也得闭环）",
         "pointers": ["k3dge ADR-0022 §2.2", "k3dge doc-audit"],
     },
     "audit_suggested": {
+        "priority": 4,
         "fact": "里程碑 <id> 命中审计触发条件（reason 见上）；审与不审由你决定",
         "options": [
             "k3dge milestone audit <id>（必审，待修=0 才谈封板）",
@@ -74,6 +88,7 @@ STATE_OPTIONS: dict = {
         "pointers": ["k3dge ADR-0004 §2.1.5", "k3dge milestone audit <id>"],
     },
     "seal_ready": {
+        "priority": 4,
         "fact": "里程碑 <id> 审计已闭环（待修=0）；封板与否由你决定（封＝归档+版本+指针）",
         "question": "里程碑 <id>：封板？",
         "options": [
@@ -83,6 +98,7 @@ STATE_OPTIONS: dict = {
         "pointers": ["k3dge ADR-0004 §2.1.4", "docs/reviews/"],
     },
     "audit_needed": {
+        "priority": 2,
         "fact": "里程碑 <id> 未审计，不可封板（封＝归档+版本+指针，非界限）",
         "options": [
             "k3dge milestone audit <id>（先闭环审计）",
@@ -91,6 +107,7 @@ STATE_OPTIONS: dict = {
         "pointers": ["k3dge ADR-0004 §2.1.6", "k3dge milestone audit <id>"],
     },
     "audit_open": {
+        "priority": 2,
         "fact": "里程碑 <id> 审计发现 <n> 项待修，环未闭环；由谁修由你决定",
         "question": "里程碑 <id>：<n> 项待修，agent 修？",
         "options": [
@@ -100,20 +117,25 @@ STATE_OPTIONS: dict = {
         "pointers": ["k3dge ADR-0022", "k3dge milestone audit <id>"],
     },
     "escalated": {
+        "priority": 1,
         "fact": "verify 连续 >3 次未闭环，已转人工干预（k3dge milestone audit-submit <id> 或人工复核）",
         "pointers": ["k3dge milestone audit-submit <id>", "docs/incidents/"],
     },
     "sealed": {
+        "priority": 9,
         "fact": "已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑",
         "pointers": ["docs/reviews/*-closure.md", "k3dge ADR-0004 §2.1.4"],
     },
-    "seal_declined": {"fact": "已放弃封板（当普通提交结束）", "pointers": ["AGENTS.md §12"]},
+    "seal_declined": {
+        "priority": 9,"fact": "已放弃封板（当普通提交结束）", "pointers": ["AGENTS.md §12"]},
     # 兜底态：闸/动作拒绝且其 gate_id 不在 `GATE_NEXT` 路由表内。原文照登，不猜。
-    "rejected": {"fact": "操作被拒（原因见上）", "pointers": ["AGENTS.md §12", "k3dge milestone status <id>"]},
+    "rejected": {
+        "priority": 3,"fact": "操作被拒（原因见上）", "pointers": ["AGENTS.md §12", "k3dge milestone status <id>"]},
     # `new_domain` is a cross-cutting trigger the hard gate does not turn red on
     # but has a file-level signal. Architecture/overview updates are intentionally
     # NOT a hook — they are done inside the milestone closure note (ADR-0004).
     "new_domain": {
+        "priority": 4,
         "fact": "新建 src/ 域未在 manifest 注册（硬闸不红，但有文件级信号）",
         "options": [
             "补 manifest + spec + tests，再 k3dge sync 回写契约哈希",
@@ -147,6 +169,7 @@ class NextStep:
     state: str
     milestone: str
     pending: Optional[int] = None
+    priority: int = 5
     fact: Optional[str] = None
     options: Optional[list] = None
     question: Optional[str] = None
@@ -160,6 +183,7 @@ class NextStep:
             state=state,
             milestone=milestone,
             pending=pending,
+            priority=int(opt.get("priority", 5)),
             fact=opt.get("fact"),
             options=list(opt["options"]) if opt.get("options") else None,
             question=opt.get("question"),
@@ -197,7 +221,9 @@ class NextStep:
         return "\n".join(lines)
 
     def render_mcp(self) -> dict:
-        d: dict = {"state": self.state, "milestone": self.milestone}
+        # `priority` 进投影：读侧（外来 harness / MCP）需要它才能自己排序；
+        # 也是 `_upsert` 排序的依据（卡片里没有它 ⇒ 排序全落默认值）。
+        d: dict = {"state": self.state, "milestone": self.milestone, "priority": self.priority}
         if self.pending is not None:
             d["pending"] = self.pending
         if self.reasons:
@@ -219,42 +245,114 @@ class NextStep:
 _SIDECAR_REL = ".k3dge/next.json"
 
 
-def persist(workspace: Path, ns: NextStep) -> None:
-    """Write next-step sidecar to `.k3dge/next.json`. Fire-and-forget; never raises."""
+def _card(ns: "NextStep") -> dict:
+    return ns.render_mcp()
+
+
+def _write_cards(workspace: Path, cards: list, primary: Optional[str]) -> None:
+    """侧车＝**当前轮的处理点集合**：`{"next": [card...], "primary": <state>}`。
+
+    单条时仍写这个形状（读侧兼容旧单条形状，见 `load_persisted`）。
+    """
     try:
         path = workspace / _SIDECAR_REL
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(ns.render_mcp(), ensure_ascii=False) + "\n", encoding="utf-8")
+        payload = {"next": list(cards), "primary": primary}
+        path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
     except OSError:
         pass
+
+
+def begin_run(workspace: Path) -> None:
+    """一轮的开始：清空侧车（处理点集合按轮重置；否则上一条命令的提示会留到这一轮）。"""
+    _write_cards(workspace, [], None)
+
+
+def persist(workspace: Path, ns: NextStep) -> None:
+    """**替换**写入（单判定流程用：seal_flow / milestone_audit 各自只判一个下一步）。"""
+    _write_cards(workspace, [_card(ns)], ns.state)
     from k3dge.engine import events
     events.emit(workspace, "next", state=ns.state, milestone=ns.milestone)
 
 
+def _upsert(workspace: Path, ns: NextStep) -> list:
+    """本轮内 upsert：同 state 去重（后到的合并 reasons），返回本轮全部 card（按 priority 稳定排序）。"""
+    existing = load_all(workspace) or []
+    by_state = {c.get("state"): c for c in existing if isinstance(c, dict)}
+    by_state[ns.state] = _card(ns)
+    cards = sorted(by_state.values(), key=lambda c: c.get("priority", 5))
+    return cards
+
+
 def emit(workspace: Path, ns: NextStep, *, stream: Optional[TextIO] = None) -> str:
-    """Persist sidecar + render CLI text + optionally print. Returns the CLI text."""
-    persist(workspace, ns)
+    """追加/更新本轮的处理点并打印这一块（单点调用用；多源汇总用 `emit_all`）。"""
+    cards = _upsert(workspace, ns)
+    _write_cards(workspace, cards, cards[0]["state"] if cards else None)
+    from k3dge.engine import events
+    events.emit(workspace, "next", state=ns.state, milestone=ns.milestone)
     text = ns.render_cli()
     if stream is not None:
         print(text, file=stream)
     return text
 
 
-def load_persisted(workspace: Path) -> Optional[dict]:
-    """读回 `.k3dge/next.json`（MCP 投影形状）。不存在/坏 JSON ⇒ None，永不抛。
+def emit_all(workspace: Path, steps: list, *, stream: Optional[TextIO] = None) -> list:
+    """一轮的**多处理点**：按 priority 稳定排序后打印，侧车写全量 + `primary`。
 
-    用途：流程（`run_seal_flow` / `run_audit_flow`）已自己判定并 `persist` 过下一步；
-    MCP 层直接投影**同一个判定**，而不是拿返回的散文消息重新猜一遍。
+    为何排序：同一轮可能命中多个处理点（实测 `k3dge check` 同轮命中 `seal_ready` 与
+    `doc_audit`），stdout 顺序应表达"先看哪个"；侧车是给读侧（外来 harness / MCP）的，
+    单槽会丢信息。
     """
+    seen = {}
+    for ns in steps:
+        if ns is not None:
+            seen[ns.state] = ns          # 同 state 去重（后到者胜）
+    ordered = sorted(seen.values(), key=lambda n: (n.priority, list(STATE_OPTIONS).index(n.state)))
+    cards = [_card(n) for n in ordered]
+    _write_cards(workspace, cards, ordered[0].state if ordered else None)
+    from k3dge.engine import events
+    for n in ordered:
+        events.emit(workspace, "next", state=n.state, milestone=n.milestone)
+        if stream is not None:
+            print(n.render_cli(), file=stream)
+    return [n.render_cli() for n in ordered]
+
+
+def load_all(workspace: Path) -> list:
+    """读回本轮全部处理点（新形状 `{"next": [...]}`）；旧单条形状 ⇒ 单元素列表。"""
     try:
         raw = (Path(workspace) / _SIDECAR_REL).read_text(encoding="utf-8")
     except OSError:
-        return None
+        return []
     try:
         data = json.loads(raw)
     except ValueError:
+        return []
+    if not isinstance(data, dict):
+        return []
+    if isinstance(data.get("next"), list):
+        return [c for c in data["next"] if isinstance(c, dict)]
+    return [data] if data.get("state") else []          # 旧形状（单条）兼容
+
+
+def load_persisted(workspace: Path) -> Optional[dict]:
+    """读回**主处理点**（`primary`）——MCP/外来 harness 的单值读法。
+
+    流程（`run_seal_flow` / `run_audit_flow`）已自己判定并 persist 过下一步；MCP 层直接
+    投影**同一个判定**，而不是拿返回的散文消息重新猜一遍。
+    """
+    cards = load_all(workspace)
+    if not cards:
         return None
-    return data if isinstance(data, dict) and data.get("state") else None
+    try:
+        raw = json.loads((Path(workspace) / _SIDECAR_REL).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return cards[0]
+    primary = raw.get("primary") if isinstance(raw, dict) else None
+    for c in cards:
+        if c.get("state") == primary:
+            return c
+    return cards[0]
 
 
 def next_for_rejection(milestone: str, message, gate_id: Optional[str] = None) -> NextStep:
