@@ -1,5 +1,4 @@
 ---
-id: INC-20260827-CON-M6-5pass-full
 type: CON
 severity: P2
 target_milestone: M6

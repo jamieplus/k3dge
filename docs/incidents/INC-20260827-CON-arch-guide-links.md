@@ -1,5 +1,4 @@
 ---
-id: INC-20260827-CON-arch-guide-links
 type: CON
 severity: P3
 target_milestone: M6

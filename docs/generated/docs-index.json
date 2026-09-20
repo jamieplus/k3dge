@@ -697,11 +697,11 @@
       "tokens": "闸红声明面收尾：pure_* 检查器产结构化事实（3-tuple），Violation.message 降为兜底"
     },
     {
-      "path": "docs/tasks/2026-09-19-M10-refactor-incident_id_single_source.md",
+      "path": "docs/tasks/2026-09-19-M10-refactor-incident_id_single_source.done.md",
       "type": "tasks",
-      "id": "2026-09-19-M10-refactor-incident_id_single_source",
+      "id": "2026-09-19-M10-refactor-incident_id_single_source.done",
       "title": "incidents frontmatter id 双写收成单一源（文件名）",
-      "status": "idea",
+      "status": "done",
       "tokens": "incidents frontmatter id 双写收成单一源（文件名）"
     },
     {

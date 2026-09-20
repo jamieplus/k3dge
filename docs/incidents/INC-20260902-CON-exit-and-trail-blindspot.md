@@ -1,5 +1,4 @@
 ---
-id: INC-20260902-CON-exit-and-trail-blindspot
 type: CON
 severity: P2
 target_milestone: M7

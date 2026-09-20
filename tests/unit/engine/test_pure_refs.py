@@ -615,3 +615,37 @@ class TestScreenTargetExists(unittest.TestCase):
             ws = Path(td)
             (ws / "docs" / "adr").mkdir(parents=True)
             self.assertFalse(pure_refs.screen_target_exists(ws, "docs/adr"))
+
+
+class TestIncidentIdSingleSource(unittest.TestCase):
+    """incidents 身份唯一源＝文件名（票 incident_id_single_source）。
+
+    实测病灶：11 份里 10 份的 `id:` 与文件名一致（纯副本），1 份**不一致**——
+    `INC-20260826-REG-m3-task-truncate.md` 的 `id: INC-20260826-REG-01`，且没有任何消费者
+    读它（`_card_id` 用 `path.stem`，schema 无 id 规则）⇒ 漂了无人知。
+    """
+
+    REL = "docs/incidents/INC-20260919-REG-x.md"
+
+    def test_redundant_id_blocks(self):
+        out = pure_refs.check_incident_id_redundant(
+            self.REL, "---\nid: INC-20260919-REG-x\ntype: REG\n---\n# Incident: x\n")
+        self.assertEqual([c for c, _ in out], ["INCIDENT_ID_REDUNDANT"])
+
+    def test_without_id_passes(self):
+        self.assertEqual(pure_refs.check_incident_id_redundant(
+            self.REL, "---\ntype: REG\nseverity: P2\nstatus: open\n---\n# Incident: x\n"), [])
+
+    def test_aux_and_non_incident_skipped(self):
+        bad = "---\nid: whatever\n---\n# x\n"
+        self.assertEqual(pure_refs.check_incident_id_redundant("docs/incidents/README.md", bad), [])
+        self.assertEqual(pure_refs.check_incident_id_redundant("docs/incidents/AUTHORING.md", bad), [])
+        self.assertEqual(pure_refs.check_incident_id_redundant("docs/tasks/x.md", bad), [])
+
+    def test_repo_has_single_source(self):
+        """自举：本仓 incident 全部无 `id`（迁移后应恒成立）。"""
+        offenders = []
+        for p in sorted((REPO / "docs" / "incidents").glob("INC-*.md")):
+            rel = f"docs/incidents/{p.name}"
+            offenders += [m for _c, m in pure_refs.check_incident_id_redundant(rel, p.read_text(encoding="utf-8"))]
+        self.assertEqual(offenders, [])

@@ -1,5 +1,4 @@
 ---
-id: INC-20260827-CON-agents-route-05
 type: CON
 severity: P2
 target_milestone: M6

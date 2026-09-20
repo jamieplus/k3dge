@@ -1,5 +1,4 @@
 ---
-id: INC-20260827-AST-template-sync-protocols
 type: AST
 severity: P2
 target_milestone: M6

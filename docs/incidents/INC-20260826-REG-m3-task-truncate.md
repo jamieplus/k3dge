@@ -1,5 +1,4 @@
 ---
-id: INC-20260826-REG-01
 type: REG
 severity: P0
 target_milestone: M2

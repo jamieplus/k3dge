@@ -119,6 +119,14 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
                     "确属有意留（纯降权留档）→ 不处理，本条只观测不拦"],
         "pointers": ["docs/adr/0023-low-authority-archive-tier.md", "docs/*/AUTHORING.md"],
     },
+    "INCIDENT_ID_REDUNDANT": {
+        "fix": "deterministic", "fix_hint": "删掉 frontmatter 的 `id:` 行（身份唯一源＝文件名）",
+        "severity": "block",
+        "fact": "`{path}` 的 frontmatter 有 `id`，它是文件名的副本——没有任何消费者读它"
+                "（卡片 id 取 `path.stem`，schema 也无 id 规则）⇒ 只能漂移",
+        "options": ["删掉 `id:` 行（身份走文件名）", "文件名本身该改 → `git mv` 改名，别只改 id"],
+        "pointers": ["docs/incidents/AUTHORING.md", "docs/incidents/README.md"],
+    },
     # --- ADR 编号退役账本（obsolete/README.md 的表是唯一源）---
     "ADR_NUMBER_REUSE": {
         "fix": "judgment", "severity": "block",

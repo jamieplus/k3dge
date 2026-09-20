@@ -592,3 +592,25 @@ def find_unguarded_archives(workspace: Path, changed_rels) -> List[Ref]:
             continue
         out.append(("ARCHIVE_NO_DEST", f"{rel}: 归档但未写去向标记（Superseded-by / Legacy note，ADR-0023 §2.2）"))
     return out
+
+
+# --- incidents 身份单一源（文件名；frontmatter 不放复写字段）---
+
+
+def check_incident_id_redundant(rel: str, text: str) -> List[Ref]:
+    """`docs/incidents/*.md` 的 frontmatter 不得有 `id:` —— 身份的唯一源是文件名。
+
+    实测（2026-09-19）：11 份 incident 里 10 份的 `id:` 与文件名一致（纯副本），
+    1 份**不一致**——`INC-20260826-REG-m3-task-truncate.md` 的 `id: INC-20260826-REG-01`。
+    没有任何消费者读它（`doc_catalog._card_id` 用 `path.stem`；`.schema.json` 也没有 id 规则）
+    ⇒ 漂了无人知。与 tasks 正文 `- **Status**:` 副本同类（那批已收：`TASK_BODY_META_REDUNDANT`）。
+    """
+    if not rel.startswith("docs/incidents/") or not rel.endswith(".md"):
+        return []
+    if Path(rel).name in AUX_NAMES:
+        return []
+    fm = {k.strip().lower() for k, _v in parse_frontmatter_pairs(text)}
+    if "id" not in fm:
+        return []
+    return [("INCIDENT_ID_REDUNDANT",
+             f"{rel}: frontmatter 的 `id` 是文件名的副本（身份唯一源＝文件名）；删掉它")]
