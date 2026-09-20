@@ -7,10 +7,12 @@ from pathlib import Path
 
 from k3dge.engine.doc_catalog import (
     analyze_adr_coverage,
+    build_docs_index,
     check_section_order,
     grep_docs,
     list_docs,
     validate_docs,
+    where_doc,
 )
 
 
@@ -224,3 +226,56 @@ class TestCardTitleSkipsFrontmatter(unittest.TestCase):
         self.assertTrue(cards)
         bad = [c["id"] for c in cards if not c["title"].startswith(c["id"])]
         self.assertEqual(bad, [])
+
+
+class TestRetiredAdrVisibility(unittest.TestCase):
+    """退役 ADR 必须**可寻址**（票 adr_number_cutline 的漏项）。
+
+    病灶：账本里的 13 个号没有墓碑文件，`doc where ADR-0020` 只说 "not found"
+    ⇒ 退役号在寻址面彻底隐身，人只能靠闸报错时偶然得知去向。
+    """
+
+    def test_repo_retired_ledger_is_resolvable(self):
+        ws = Path(__file__).resolve().parents[3]
+        rows = where_doc(ws, "ADR-0020")
+        self.assertEqual(len(rows), 1)
+        c = rows[0]
+        self.assertTrue(c["retired"])
+        self.assertEqual(c["id"], "ADR-0020")
+        self.assertIn("harness-responsibility-split", c["title"])
+        self.assertIn("ADR-0005", c["dest"])                  # 去向量可读
+
+    def test_live_id_still_resolves_to_live_file(self):
+        ws = Path(__file__).resolve().parents[3]
+        rows = where_doc(ws, "ADR-0025")
+        self.assertEqual([c["path"] for c in rows], ["docs/adr/0025-hall-harness-topology.md"])
+        self.assertFalse(rows[0].get("retired"))
+
+    def test_default_list_excludes_retired(self):
+        ws = Path(__file__).resolve().parents[3]
+        self.assertFalse(any(c.get("retired") for c in list_docs(ws, typ="adr")))
+        with_retired = list_docs(ws, typ="adr", include_retired=True)
+        self.assertTrue(any(c.get("retired") for c in with_retired))
+        self.assertEqual(len(with_retired) - len(list_docs(ws, typ="adr")), 13)   # 账本 13 号
+
+    def test_stored_projection_stays_live_only(self):
+        """存盘投影（docs-index.json）保持现行视图，不被退役面污染（DOC_INDEX_STALE 语义不变）。"""
+        ws = Path(__file__).resolve().parents[3]
+        self.assertFalse(any(c.get("retired") for c in build_docs_index(ws)["docs"]))
+
+    def test_obsolete_file_is_marked_with_destination(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            obs = ws / "docs" / "adr" / "obsolete"
+            obs.mkdir(parents=True)
+            (obs / "0042-old.md").write_text(
+                "---\nStatus: Superseded\nmerged-into: ADR-0005 §2.7\n---\n\n# ADR-0042: 旧决策\n",
+                encoding="utf-8")
+            # `where` 默认含退役面（退役号要查得到），且标 retired + 去向
+            rows = where_doc(ws, "ADR-0042")
+            self.assertEqual(len(rows), 1)
+            self.assertTrue(rows[0]["retired"])
+            self.assertIn("ADR-0005", rows[0]["dest"])
+            # 但默认**列表**不含退役面（现行视图不被污染）
+            self.assertEqual(list_docs(ws, typ="adr"), [])
+            self.assertEqual(len(list_docs(ws, typ="adr", include_retired=True)), 1)

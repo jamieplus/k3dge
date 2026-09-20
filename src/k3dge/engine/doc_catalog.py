@@ -61,7 +61,14 @@ def _is_aux(path: Path) -> bool:
     return path.name in AUX_NAMES
 
 
-def iter_managed_files(workspace: Path, typ: str, *, include_archive: bool = False) -> List[Path]:
+def iter_managed_files(workspace: Path, typ: str, *, include_archive: bool = False,
+                       include_retired: bool = False) -> List[Path]:
+    """受管文件；`archive/` 与 `obsolete/` 默认**排除**（低权威/退役面）。
+
+    `obsolete/` 是退役面（ADR 合并/被取代的去处）：默认不出现在现行视图里，
+    但要**可寻址**——`--include-retired` 时纳入，卡片带 `retired: True` + 去向，
+    免得退役 ADR 在寻址面上彻底隐身（票 adr_number_cutline 的漏项）。
+    """
     d = _type_dir(workspace, typ)
     if not d.is_dir():
         return []
@@ -69,7 +76,10 @@ def iter_managed_files(workspace: Path, typ: str, *, include_archive: bool = Fal
     for p in sorted(d.rglob("*.md")):
         if _is_aux(p):
             continue
-        if not include_archive and "archive" in p.relative_to(d).parts:
+        parts = p.relative_to(d).parts
+        if not include_archive and "archive" in parts:
+            continue
+        if not include_retired and "obsolete" in parts:
             continue
         files.append(p)
     return files
@@ -122,7 +132,7 @@ def build_card(workspace: Path, typ: str, path: Path) -> dict:
     title = (tm.group(1).strip() if tm else path.stem)[:200]
     status = fm.get("Status") or fm.get("status") or headers.get("Status") or ""
     ident = _card_id(typ, path)
-    return {
+    card = {
         "path": rel,
         "type": typ,
         "id": ident,
@@ -130,15 +140,49 @@ def build_card(workspace: Path, typ: str, path: Path) -> dict:
         "status": status,
         "tokens": _tokens(text, title),
     }
+    if "obsolete" in Path(rel).parts:
+        # 退役面：带上"这条去哪了"，否则读者只知道文件躺在这儿
+        card["retired"] = True
+        dest = (fm.get("merged-into") or fm.get("merged_into")
+                or fm.get("superseded_by") or fm.get("Superseded-by") or "")
+        card["dest"] = str(dest).strip()
+    return card
 
 
-def build_docs_index(workspace: Path, *, include_archive: bool = False) -> dict:
+def build_docs_index(workspace: Path, *, include_archive: bool = False,
+                     include_retired: bool = False) -> dict:
     docs = []
     for typ in iter_doc_types(workspace):
-        for path in iter_managed_files(workspace, typ, include_archive=include_archive):
+        for path in iter_managed_files(workspace, typ, include_archive=include_archive,
+                                       include_retired=include_retired):
             docs.append(build_card(workspace, typ, path))
     docs.sort(key=lambda c: (c["type"], c["path"]))
     return {"docs": docs}
+
+
+def retired_ledger_cards(workspace: Path) -> List[dict]:
+    """退役账本（`docs/adr/obsolete/README.md` 的表）→ 卡片。
+
+    这 13 个号**没有墓碑文件**（baseline 之前被物理删除），若不在此投影，
+    `doc where ADR-0020` 只会说"not found"——退役号在寻址面彻底隐身。
+    """
+    from k3dge.engine import pure_refs
+
+    ledger_rel = "docs/adr/obsolete/README.md"
+    out: List[dict] = []
+    for num, info in sorted(pure_refs.retired_adr_numbers(workspace).items()):
+        out.append({
+            "path": ledger_rel,
+            "type": "adr",
+            "id": f"ADR-{num}",
+            "title": f"（已退役）{info.get('was', '')}".strip(),
+            "status": "Retired",
+            "tokens": str(info.get("dest", "")),
+            "retired": True,
+            "dest": str(info.get("dest", "")),
+            "ledger": ledger_rel,
+        })
+    return out
 
 
 def write_docs_index(workspace: Path) -> Path:
@@ -156,8 +200,13 @@ def list_docs(
     ident: Optional[str] = None,
     q: Optional[str] = None,
     include_archive: bool = False,
+    include_retired: bool = False,
 ) -> List[dict]:
-    cards = build_docs_index(workspace, include_archive=include_archive)["docs"]
+    cards = build_docs_index(workspace, include_archive=include_archive,
+                             include_retired=include_retired)["docs"]
+    if include_retired and typ in (None, "adr"):
+        seen = {c["id"] for c in cards}
+        cards = cards + [c for c in retired_ledger_cards(workspace) if c["id"] not in seen]
     if typ:
         cards = [c for c in cards if c["type"] == typ]
     if ident:
@@ -182,8 +231,12 @@ def list_docs(
     return cards
 
 
-def where_doc(workspace: Path, ident: str) -> List[dict]:
-    return list_docs(workspace, ident=ident)
+def where_doc(workspace: Path, ident: str, *, include_retired: bool = True) -> List[dict]:
+    """按 id 解析路径。**默认含退役面**——退役号要能查到"曾是/去向"，而不是 not found。"""
+    rows = list_docs(workspace, ident=ident, include_retired=include_retired)
+    if rows or not include_retired:
+        return rows
+    return list_docs(workspace, ident=ident, include_retired=True)
 
 
 # Body scan: coordinates only. Never attach snippet/text (context hygiene).

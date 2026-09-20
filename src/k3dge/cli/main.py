@@ -336,16 +336,20 @@ def cmd_doc(args: argparse.Namespace) -> int:
             ident=getattr(args, "doc_id", None),
             q=getattr(args, "q", None),
             include_archive=getattr(args, "include_archive", False),
+            include_retired=getattr(args, "include_retired", False),
         )
         if getattr(args, "as_json", False):
             print(json.dumps({"ok": True, "count": len(rows), "docs": rows}, indent=2, ensure_ascii=False))
         else:
             if getattr(args, "include_archive", False):
                 print("[DOC] 低权威层：archive/ 仅为低权威留档，判定以现行视图为准")
+            if getattr(args, "include_retired", False):
+                print("[DOC] 退役面：obsolete/ 与退役账本（号已永久退役，无墓碑文件的看账本表）")
             if not rows:
                 print("[DOC] no matches")
             for c in rows:
-                print(f"{c['id']}\t{c['path']}\t{c['title']}")
+                mark = "\t[retired]" + (f" → {c['dest']}" if c.get("dest") else "") if c.get("retired") else ""
+                print(f"{c['id']}\t{c['path']}\t{c['title']}{mark}")
         return 0
     if action == "where":
         from k3dge.engine.doc_catalog import where_doc
@@ -1144,6 +1148,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_doc_list.add_argument("--id", dest="doc_id", default=None, help="exact id (ADR-0001, INC-...)")
     p_doc_list.add_argument("-q", dest="q", default=None, help="substring on id/title/tokens")
     p_doc_list.add_argument("--include-archive", action="store_true")
+    p_doc_list.add_argument("--include-retired", dest="include_retired", action="store_true",
+                            help="含退役面（obsolete/ 文件 + 退役账本表；默认只列现行）")
     p_doc_list.add_argument("--json", dest="as_json", action="store_true")
     p_doc_list.set_defaults(func=cmd_doc)
     p_doc_where = doc_sub.add_parser("where", help="resolve a doc id to path")

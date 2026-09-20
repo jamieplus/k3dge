@@ -673,6 +673,30 @@
       "tokens": "ADR 编号截断：废物理删除、退役单一面 obsolete/、13 个永久退役号入表、分配=max+1、复用可机检"
     },
     {
+      "path": "docs/tasks/2026-09-19-M10-feat-next_multi_decision.md",
+      "type": "tasks",
+      "id": "2026-09-19-M10-feat-next_multi_decision",
+      "title": "多处理点交付：sidecar 单槽 → 列表 + STATE_OPTIONS priority（[NEXT] 复数处理点）",
+      "status": "idea",
+      "tokens": "多处理点交付：sidecar 单槽 → 列表 + STATE_OPTIONS priority（[NEXT] 复数处理点）"
+    },
+    {
+      "path": "docs/tasks/2026-09-19-M10-refactor-gate_facts_pure_structured.md",
+      "type": "tasks",
+      "id": "2026-09-19-M10-refactor-gate_facts_pure_structured",
+      "title": "闸红声明面收尾：pure_* 检查器产结构化事实（3-tuple），Violation.message 降为兜底",
+      "status": "idea",
+      "tokens": "闸红声明面收尾：pure_* 检查器产结构化事实（3-tuple），Violation.message 降为兜底"
+    },
+    {
+      "path": "docs/tasks/2026-09-19-M10-refactor-incident_id_single_source.md",
+      "type": "tasks",
+      "id": "2026-09-19-M10-refactor-incident_id_single_source",
+      "title": "incidents frontmatter id 双写收成单一源（文件名）",
+      "status": "idea",
+      "tokens": "incidents frontmatter id 双写收成单一源（文件名）"
+    },
+    {
       "path": "docs/tasks/2026-09-19-M10-refactor-orch_converge_gate_facts.done.md",
       "type": "tasks",
       "id": "2026-09-19-M10-refactor-orch_converge_gate_facts.done",

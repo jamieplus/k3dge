@@ -270,12 +270,16 @@ AUTHORING_FILE = 'AUTHORING.md'
 AUX_NAMES = frozenset({'README.md', '_template.md', 'AUTHORING.md', 'summary.md', 'SUMMARY.md', 'LEFTOVERS.md', 'leftovers.md'})
 SKIP_TYPES = frozenset({'generated'})
 iter_doc_types(workspace: Path) -> List[str]
-iter_managed_files(workspace: Path, typ: str, *, include_archive: bool=False) -> List[Path]
+iter_managed_files(workspace: Path, typ: str, *, include_archive: bool=False, include_retired: bool=False) -> List[Path]
+    # doc: 受管文件；`archive/` 与 `obsolete/` 默认**排除**（低权威/退役面）。
 build_card(workspace: Path, typ: str, path: Path) -> dict
-build_docs_index(workspace: Path, *, include_archive: bool=False) -> dict
+build_docs_index(workspace: Path, *, include_archive: bool=False, include_retired: bool=False) -> dict
+retired_ledger_cards(workspace: Path) -> List[dict]
+    # doc: 退役账本（`docs/adr/obsolete/README.md` 的表）→ 卡片。
 write_docs_index(workspace: Path) -> Path
-list_docs(workspace: Path, *, typ: Optional[str]=None, ident: Optional[str]=None, q: Optional[str]=None, include_archive: bool=False) -> List[dict]
-where_doc(workspace: Path, ident: str) -> List[dict]
+list_docs(workspace: Path, *, typ: Optional[str]=None, ident: Optional[str]=None, q: Optional[str]=None, include_archive: bool=False, include_retired: bool=False) -> List[dict]
+where_doc(workspace: Path, ident: str, *, include_retired: bool=True) -> List[dict]
+    # doc: 按 id 解析路径。**默认含退役面**——退役号要能查到"曾是/去向"，而不是 not found。
 GREP_MAX_FILES = 20
 GREP_MAX_LINES_PER_FILE = 8
 grep_docs(workspace: Path, query: str, *, typ: Optional[str]=None, line: bool=False, include_archive: bool=False, max_files: int=GREP_MAX_FILES, ignore_case: bool=True) -> List[dict]

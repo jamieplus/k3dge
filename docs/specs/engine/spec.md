@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:12d88965ed8d3bc2121cd20395e4ad52b6a380ff814f3b6e615f1d4d12e948b5`
+- **Contract Hash**: `sha256:b7664596fd2ac1df6b03bd9b2e0873298932b8ee70a6782cd6239fda2a656d42`
 - **Last Updated**: 2026-09-19
 
 ## 1. Domain Boundary & Responsibilities
@@ -135,12 +135,13 @@ AUTHORING_FILE = 'AUTHORING.md'
 AUX_NAMES = frozenset({'README.md', '_template.md', 'AUTHORING.md', 'summary.md', 'SUMMARY.md', 'LEFTOVERS.md', 'leftovers.md'})
 SKIP_TYPES = frozenset({'generated'})
 iter_doc_types(workspace: Path) -> List[str]
-iter_managed_files(workspace: Path, typ: str, *, include_archive: bool=False) -> List[Path]
+iter_managed_files(workspace: Path, typ: str, *, include_archive: bool=False, include_retired: bool=False) -> List[Path]
 build_card(workspace: Path, typ: str, path: Path) -> dict
-build_docs_index(workspace: Path, *, include_archive: bool=False) -> dict
+build_docs_index(workspace: Path, *, include_archive: bool=False, include_retired: bool=False) -> dict
+retired_ledger_cards(workspace: Path) -> List[dict]
 write_docs_index(workspace: Path) -> Path
-list_docs(workspace: Path, *, typ: Optional[str]=None, ident: Optional[str]=None, q: Optional[str]=None, include_archive: bool=False) -> List[dict]
-where_doc(workspace: Path, ident: str) -> List[dict]
+list_docs(workspace: Path, *, typ: Optional[str]=None, ident: Optional[str]=None, q: Optional[str]=None, include_archive: bool=False, include_retired: bool=False) -> List[dict]
+where_doc(workspace: Path, ident: str, *, include_retired: bool=True) -> List[dict]
 GREP_MAX_FILES = 20
 GREP_MAX_LINES_PER_FILE = 8
 grep_docs(workspace: Path, query: str, *, typ: Optional[str]=None, line: bool=False, include_archive: bool=False, max_files: int=GREP_MAX_FILES, ignore_case: bool=True) -> List[dict]

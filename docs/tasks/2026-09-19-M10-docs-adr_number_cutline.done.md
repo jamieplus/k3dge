@@ -106,3 +106,30 @@ tests/unit/engine/test_pure_refs.py::TestAdrNumberRetirement（9 条）
   自举：本仓账本 13 号、现役 14 条无一占用退役号
 575 passed；k3dge check 绿；adr_landed / adrs_all_accepted 未退化
 ```
+
+## 重开补漏（2026-09-19）：未做项已补
+
+**漏项**：本票「方案」里的**配套**一句（`docs/generated/docs-index.json` 加 `retired` 维度 / `--include-retired`）在首次关票时**没做**。实测确认漏了：
+
+```
+docs/generated/docs-index.json 条目键 = [path, type, id, title, status, tokens]   ← 无 retired
+obsolete/ 条目 0 条（账本 13 号没有墓碑文件）
+$ k3dge doc where ADR-0020   →   [DOC] not found: ADR-0020
+```
+
+后果：退役 ADR 在**寻址面彻底隐身**——只有闸报错（`ADR_REF_RETIRED`）撞上时才知道它存在与去向。
+
+**补法**（选择：可寻址优先，不动存盘投影）：
+
+| 面 | 改法 | 实测 |
+| --- | --- | --- |
+| `iter_managed_files` | `obsolete/` 与 `archive/` 一样**默认排除**退役面；`include_retired=True` 时纳入 | — |
+| `build_card` | `obsolete/` 里的文件标 `retired: True` + `dest`（读 frontmatter `merged-into`/`superseded_by`） | — |
+| `retired_ledger_cards()` | 账本表 → 卡片（13 个无墓碑文件的号） | `doc where` 查原 0020 → 账本路径 + `（已退役）harness-responsibility-split` + 去向 `ADR-0005 §2.7` |
+| `where_doc` | **默认含退役面**（可寻址优先）；现役命中则仍返现役 | 现役号 → 现役文件；退役号（如原 0013）→ 账本 |
+| `list_docs` / CLI | 新增 `--include-retired`；默认列表**不含**退役面（现行视图不污染） | 默认 14 条，`--include-retired` 27 条（+13 账本） |
+| **存盘投影** | `write_docs_index()` **保持现行视图**（不含退役面） | `DOC_INDEX_STALE` 语义不变；退役面按需查 |
+
+**有意偏离票面**：票写的是"docs-index.json 加 retired 维度"，落地改为"**寻址面可查 + 存盘投影保持现行**"。理由：存盘投影是门禁的新鲜度判据（`DOC_INDEX_STALE` 比对其与重建结果），把退役面塞进去会让"现行视图"与"历史面"混在一份文件里；而"退役号不隐身"这个诉求由 `where`（默认含退役）+ `list --include-retired` 更直接地满足。
+
+测试 5 条（`TestRetiredAdrVisibility`）：账本可解析到去向 / 现役 id 仍指向现役文件 / 默认列表不含退役而 `--include-retired` 多出 13 条 / **存盘投影保持现行** / `obsolete/` 文件标 `retired` 且带去向。
