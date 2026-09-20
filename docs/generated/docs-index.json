@@ -681,6 +681,14 @@
       "tokens": "多处理点交付：sidecar 单槽 → 列表 + STATE_OPTIONS priority（[NEXT] 复数处理点）"
     },
     {
+      "path": "docs/tasks/2026-09-19-M10-refactor-adr_merge_retirement_gap.md",
+      "type": "tasks",
+      "id": "2026-09-19-M10-refactor-adr_merge_retirement_gap",
+      "title": "ADR 合并退役：reconcile 不覆盖合并路径 + obsolete/ 去向字段无闸（merged-into 无人写无人验）",
+      "status": "idea",
+      "tokens": "ADR 合并退役：reconcile 不覆盖合并路径 + obsolete/ 去向字段无闸（merged-into 无人写无人验）"
+    },
+    {
       "path": "docs/tasks/2026-09-19-M10-refactor-gate_facts_pure_structured.md",
       "type": "tasks",
       "id": "2026-09-19-M10-refactor-gate_facts_pure_structured",
