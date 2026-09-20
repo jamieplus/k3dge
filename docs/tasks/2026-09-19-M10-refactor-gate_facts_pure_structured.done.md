@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M10
 priority: P3
 date: 2026-09-19
@@ -66,3 +66,49 @@ date: 2026-09-19
 - 来源：`docs/tasks/2026-09-19-M10-refactor-orch_converge_gate_facts.done.md` 的「有意留」第 1 条。本票是它的**下一批**（当时判"改 ~20 个检查器返回形状 + 全部测试，收益低于当轮风险"）。
 - 与 `orch_node_table` 无依赖：那张表管"走哪些步"，本票管"每步的事实字段"。
 - 优先级 P3 的依据：现状**不产生错误行为**（文案仍来自声明，只是字段粒度粗）；收益是可机检的"字段级单源"。
+
+## 落地（2026-09-19）——**定形修正：3-tuple 改造经实测为零收益，改为做真正缺的两件**
+
+### 实测（本票的前提被推翻）
+
+```
+逐 code 量：声明里需要 `path` 之外字段的有 18 个
+  AUDIT_TRAIL_APPEND_ONLY / CONTRACT_DRIFT / CONTRACT_EXTRACT_FAILED / CONTRACT_HASH_MISSING /
+  DOC_INDEX_STALE / DOMAIN_IMPORT_VIOLATION / GIT_UNAVAILABLE / MANIFEST_INVALID /
+  MATRIX_TEST_UNRESOLVED / MISSING_TEST_FILE / PIPELINE_SCHEMA_INVALID / SPEC_DECODE_FAILED /
+  SPEC_MISSING_SECTION / SPEC_NOT_FOUND / TEMPLATE_DRIFT / TEST_ENV_MISSING / TEST_FAILURE /
+  VERSION_MISMATCH
+⇒ **这 18 个全在 evaluator 侧，且早已结构化**（各构造点给 `detail=`，由 `TestProducersFeedDeclaredFacts`
+  的 AST 守卫锁着）
+只需 `{path}` 的 28 个：path 由**调用方**本来就知道（staged 文件的 rel）
+无占位符的 2 个：NO_DOMAINS / DUP_CHECK
+```
+⇒ 「pure_* 返回 3-tuple 以便填字段」在**数据上无对象**：需要多字段的都已结构化，剩下的只用 path。
+按规则 12（不单独扩基建、要有实证正向作用），**不做** 3-tuple 改造（改 ~20 个检查器 + 全部测试
+换取零行为差异）。
+
+### 真正缺的两件（已落）
+
+| 项 | 内容 |
+| --- | --- |
+| **检查器只产事实**（消掉散文解析） | `check_markdown_bytes` / `find_orphan_specs` / `find_orphan_tests` / `find_orphan_adrs` / `find_unguarded_archives` 的第二项由 message 改为**事实（路径）**；`pre-commit` 的 `_add` 删掉 `msg.split(": ")[-1]` / `msg.split(":")[0]` 两处散文解析，`path` 一律显式传（`where=` / `facts=`） |
+| **棘轮两条** | ①`TestMessageDoesNotRestateFact`：已声明 code 的静态 message 不得复述声明 fact 的**含中文散文片段**（字段名/标识符重叠不算——那本身就是事实；实测当前 0 命中，原先 2 处 `NO_DOMAINS` 命中是字段名，已按此收窄）②`TestFactsAreProducedNotParsed`：hook 源码里不得再出现 `msg.split`（非注释行） |
+| `Violation.message` 降为事实摘要 | 已由上一票完成（静态最长 25 字符）+ `TestNoProseBackflow` 守着（≤100 字符、不含补救散文） |
+
+### 有意留（记此）
+
+- **pure_* 的 `(code, msg)` 形状保留**（未改三元组）：见上，零收益；若将来某个 pure_* 检查
+  需要声明里 path 之外的字段（如"哪一行/哪个值"），**那时**再按实际需要改它一个，不必全量重构。
+- `Violation.message` 未删：仍是 JSON/MCP 消费者与未声明 code 的兜底（同上票记录）。
+
+## 验收（实测）
+
+```
+632 passed；k3dge check 绿
+tests/unit/engine/test_gate_facts.py::TestMessageDoesNotRestateFact（0 命中）
+tests/unit/engine/test_gate_facts.py::TestFactsAreProducedNotParsed
+  hook 无非注释的 `msg.split`；抽样断言 MD_CRLF / ARCHIVE_NO_DEST 返回的第二项就是路径
+渲染实测（文案仍正确）：
+  ORPHAN_TEST → `fact: tests/x.py 没有被任何 Verification Matrix 行引用…`
+  MD_CRLF     → `fact: docs/x.md 用了 CRLF 行尾——纯格式偏差，进程可按固定规则修`
+```

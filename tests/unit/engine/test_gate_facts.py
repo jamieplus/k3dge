@@ -225,3 +225,83 @@ class TestNoProseBackflow(unittest.TestCase):
                             offenders.append(f"{py.relative_to(root)}:{node.lineno} {code} "
                                              f"message 里出现补救散文 {word!r}（应归 options）")
         self.assertEqual(offenders, [])
+
+
+class TestMessageDoesNotRestateFact(unittest.TestCase):
+    """棘轮：已声明 code 的构造点 `message` 不得**复述声明 fact 的散文片段**。
+
+    detail（检查器原文）与 fact（声明文案）是两层；message 只该是"事实摘要"，
+    复述 fact 的措辞会立刻产生第二个文案源（改一处忘一处）。
+    字段名/标识符的重叠不算（那本身就是事实），故只查**含中文的散文片段**。
+    """
+
+    MIN_SEG = 10
+
+    def _segments(self, text: str):
+        import re
+
+        t = re.sub(r"\{[^}]*\}", "", text or "")
+        parts = re.split(r"[，。；、（）()\[\]`：:…——\s]+", t)
+        return [s.strip() for s in parts
+                if len(s.strip()) >= self.MIN_SEG and re.search(r"[\u4e00-\u9fff]", s)]
+
+    def test_static_messages_do_not_restate_facts(self):
+        import ast
+
+        root = Path(__file__).resolve().parents[3] / "src" / "k3dge"
+        offenders = []
+        for py in sorted(root.rglob("*.py")):
+            tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fn = node.func
+                name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+                if name != "Violation" or len(node.args) < 2:
+                    continue
+                code = node.args[0].value if isinstance(node.args[0], ast.Constant) else None
+                msg = node.args[1]
+                if not (isinstance(code, str) and gate_facts.is_declared(code)):
+                    continue
+                if not (isinstance(msg, ast.Constant) and isinstance(msg.value, str)):
+                    continue
+                fact = (gate_facts.GATE_FACTS.get(code) or {}).get("fact", "")
+                for seg in self._segments(fact):
+                    if seg in msg.value:
+                        offenders.append(f"{py.relative_to(root)}:{node.lineno} {code}: "
+                                         f"message 复述 fact 片段 {seg!r}")
+        self.assertEqual(offenders, [])
+
+
+class TestFactsAreProducedNotParsed(unittest.TestCase):
+    """棘轮：已声明 code 的事实字段，其消费者**不得**从 message 里切（散文解析）。
+
+    实测前科：pre-commit 用 `msg.split(": ")[-1]` / `msg.split(":")[0]` 从检查器的
+    message 里取 path——检查器一改措辞就静默取错。现在检查器只产 (code, 事实)，
+    path 由调用方显式给（`where=`）。
+    """
+
+    def test_hook_does_not_split_messages(self):
+        hook = (Path(__file__).resolve().parents[3] / "scripts" / "pre-commit").read_text(encoding="utf-8")
+        code_lines = [ln for ln in hook.splitlines()
+                      if "msg.split" in ln and not ln.strip().startswith("#")]
+        self.assertEqual(code_lines, [], f"hook 仍在从 message 里切字段：{code_lines}")
+
+    def test_pure_checks_return_facts_for_declared_codes(self):
+        """抽样：`ORPHAN_*` / `MD_CRLF` / `ARCHIVE_NO_DEST` 返回的第二项就是**事实**（路径）。"""
+        import tempfile
+
+        from k3dge.engine import pure_refs
+
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            p = ws / "docs" / "memo" / "a.md"
+            p.parent.mkdir(parents=True)
+            p.write_text("# t\r\n", encoding="utf-8")
+            self.assertEqual(pure_refs.check_markdown_bytes(p.read_bytes(), "docs/memo/a.md"),
+                             [("MD_CRLF", "docs/memo/a.md")])
+            arch = ws / "docs" / "memo" / "archive"
+            arch.mkdir(parents=True)
+            (arch / "x.md").write_text("# 归档但没写去向标记\n", encoding="utf-8")
+            self.assertEqual(pure_refs.find_unguarded_archives(ws, ["docs/memo/archive/x.md"]),
+                             [("ARCHIVE_NO_DEST", "docs/memo/archive/x.md")])

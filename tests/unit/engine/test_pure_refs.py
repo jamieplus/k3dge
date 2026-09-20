@@ -283,7 +283,8 @@ class TestOrphans(unittest.TestCase):
                      tests=[("unit/test_a.py", "def test_a(): pass\n"),
                             ("unit/test_lonely.py", "def test_x(): pass\n")])
             out = pure_refs.find_orphan_tests(ws)
-            self.assertEqual([m for _c, m in out], ["tests/unit/test_lonely.py: no Verification Matrix references this test file"])
+            # 收成事实：第二项就是**路径**（文案归 gate_facts 声明表渲染，不再在检查器里拼）
+            self.assertEqual(out, [("ORPHAN_TEST", "tests/unit/test_lonely.py")])
 
     def test_orphan_adr(self):
         with tempfile.TemporaryDirectory() as d:

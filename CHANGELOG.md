@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ADR 合并退役：reconcile 不覆盖合并路径 + obsolete/ 去向字段无闸（merged-into 无人写无人验）
 - 编排骨架收敛·节点表：pipeline.toml [checks.*] 单一声明面 + 五属性 + ctx + 单执行器（下游可配）
 - incidents frontmatter id 双写收成单一源（文件名）
+- 闸红声明面收尾：pure_* 检查器产结构化事实（3-tuple），Violation.message 降为兜底
 ### Fixed
 - seal/align 任务扫描不含 archive/<M>/：提前归档的 done 里程碑任务致封板被拒（No tasks found）
 

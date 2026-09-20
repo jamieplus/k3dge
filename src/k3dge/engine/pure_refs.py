@@ -6,7 +6,8 @@ B4 orphan files. Wired into `scripts/pre-commit`; the engine does not call these
 (pre-commit sees every staged file, so commit-time coverage is complete without
 double-reporting).
 
-Return convention: `[(code, message)]`. B4 codes are warnings (`ORPHAN_*`) —
+Return convention: `[(code, message_or_path)]` —— 已声明进 `gate_facts` 的 code 一律返回**事实**
+（多数情况就是路径），文案由声明表渲染；B4 codes 是 warnings (`ORPHAN_*`) —
 callers print them without failing until the false-positive rate is observed.
 """
 
@@ -229,14 +230,18 @@ def check_adr_consistency(rel: str, text: str) -> List[Ref]:
 
 
 def check_markdown_bytes(raw: bytes, rel: str) -> List[Ref]:
-    """Encoding-level checks on raw bytes. Returns [] when undecodable (caller reports)."""
+    """字节级检查。返回 `(code, rel)` —— **只产事实**，文案由 `gate_facts` 声明表渲染。
+
+    （旧版把 `rel` 拼进 message，消费方（pre-commit）再用 `msg.split(': ')` 切回来；
+    那是对散文的解析。收成事实后 hook 直接 `where=rel`。）
+    """
     out: List[Ref] = []
     try:
         raw.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        return [("MD_ENCODING", f"{rel}: not valid UTF-8 ({exc})")]
+    except UnicodeDecodeError:
+        return [("MD_ENCODING", rel)]
     if b"\r\n" in raw or b"\r" in raw.replace(b"\r\n", b""):
-        out.append(("MD_CRLF", f"{rel}: CRLF line endings (use LF)"))
+        out.append(("MD_CRLF", rel))
     return out
 
 
@@ -276,7 +281,7 @@ def find_orphan_specs(workspace: Path, manifest_spec_paths: List[str]) -> List[R
         if "_template" in p.parts or "archive" in p.parts:
             continue
         if rel not in known:
-            out.append(("ORPHAN_SPEC", f"{rel}: no manifest domain references this spec"))
+            out.append(("ORPHAN_SPEC", rel))
     return out
 
 
@@ -301,7 +306,7 @@ def find_orphan_tests(workspace: Path) -> List[Ref]:
             continue
         rel = str(p.relative_to(workspace)).replace("\\", "/")
         if rel not in refs:
-            out.append(("ORPHAN_TEST", f"{rel}: no Verification Matrix references this test file"))
+            out.append(("ORPHAN_TEST", rel))
     return out
 
 
@@ -321,7 +326,7 @@ def find_orphan_adrs(workspace: Path) -> List[Ref]:
         if not m or p.name in ("README.md", "AUTHORING.md", "_template.md"):
             continue
         if m.group(1) not in listed:
-            out.append(("ORPHAN_ADR", f"docs/adr/{p.name}: ADR-{m.group(1)} not listed in README Topics"))
+            out.append(("ORPHAN_ADR", f"docs/adr/{p.name}"))
     return out
 
 
@@ -590,7 +595,7 @@ def find_unguarded_archives(workspace: Path, changed_rels) -> List[Ref]:
             continue
         if any(m in text for m in _ARCHIVE_MARKERS):
             continue
-        out.append(("ARCHIVE_NO_DEST", f"{rel}: 归档但未写去向标记（Superseded-by / Legacy note，ADR-0023 §2.2）"))
+        out.append(("ARCHIVE_NO_DEST", rel))
     return out
 
 

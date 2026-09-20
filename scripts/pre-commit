@@ -131,7 +131,10 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -
         sev = gate_facts.severity(code) if gate_facts else "block"
         text = ""
         if gate_facts is not None and gate_facts.is_declared(code):
-            f = {"path": where or msg.split(":")[0]}
+            # `path` 由调用方显式给（不使用 `msg.split(":")` —— 那是对散文的解析）
+            f: dict = {}
+            if where:
+                f["path"] = where
             f.update(facts or {})
             # 检查器原文作为 detail 带出（过渡约定：尚未结构化的检查器不丢信息）
             text = gate_facts.render(code, f, where=where, detail=msg)
@@ -157,7 +160,7 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -
             continue
         # B3 bytes first: undecodable files cannot be text-checked
         for code, msg in pure_refs.check_markdown_bytes(raw, rel):
-            _add(code, msg.split(': ', 1)[-1], where=rel)
+            _add(code, msg, where=rel)
         try:
             text = raw.decode("utf-8")
         except UnicodeDecodeError:
@@ -180,7 +183,7 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -
                     _add(code, msg, where=rel)
         # B1 dangling refs (block)
         for code, msg in pure_refs.check_dangling_adr(WS, rel, text):
-            _add(code, msg)
+            _add(code, msg, where=rel)
         for code, msg in pure_refs.check_adr_ref_retired(WS, rel, text):
             _add(code, msg, facts={"path": rel})
         for code, msg in pure_refs.check_adr_number_reuse(WS, rel):
@@ -190,26 +193,26 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -
         for code, msg in pure_refs.check_incident_id_redundant(rel, text):
             _add(code, msg, facts={"path": rel})
         for code, msg in pure_refs.check_report_pointer(WS, rel, text):
-            _add(code, msg)
+            _add(code, msg, where=rel)
         for code, msg in pure_refs.check_footnotes(rel, text):
-            _add(code, msg)
+            _add(code, msg, where=rel)
         # B2 name/content consistency (block)
         for code, msg in pure_refs.check_task_consistency(rel, text):
-            _add(code, msg)
+            _add(code, msg, where=rel)
         for code, msg in pure_refs.check_adr_consistency(rel, text):
-            _add(code, msg)
+            _add(code, msg, where=rel)
         for code, msg in pure_refs.check_supersede_unreconciled(WS, rel, text):
-            _add(code, msg)
+            _add(code, msg, where=rel)
         # B3 text markdown
         for code, msg in pure_refs.check_markdown_text(text, rel):
-            _add(code, msg)
+            _add(code, msg, where=rel)
     # B4 orphans：档位查表（声明为 warn），不在这里写死"WARN-only"
     if any(f.startswith(("docs/", "tests/")) or f == ".agent/manifest.json" for f in files):
         for code, msg, facts in _orphan_warnings(pure_refs):
             _add(code, msg, facts=facts)
     # 归档去向标记（warn 档，ADR-0023 §2.2）：只对本轮 staged 增量
     for code, msg in pure_refs.find_unguarded_archives(WS, files):
-        _add(code, msg, facts={"path": msg.split(":")[0]})
+        _add(code, msg, facts={"path": msg})
     return errs, warns
 
 
@@ -262,12 +265,12 @@ def _orphan_warnings(pure_refs) -> list[tuple[str, str, dict]]:
             for cfg in (data.get("domains") or {}).values():
                 if isinstance(cfg, dict) and cfg.get("spec"):
                     spec_paths.append(str(cfg["spec"]))
-        for code, msg in pure_refs.find_orphan_specs(WS, spec_paths):
-            out.append((code, msg, {"path": msg.split(":")[0]}))
-        for code, msg in pure_refs.find_orphan_tests(WS):
-            out.append((code, msg, {"path": msg.split(":")[0]}))
-        for code, msg in pure_refs.find_orphan_adrs(WS):
-            out.append((code, msg, {"path": msg.split(":")[0]}))
+        for code, fact in pure_refs.find_orphan_specs(WS, spec_paths):
+            out.append((code, fact, {"path": fact}))
+        for code, fact in pure_refs.find_orphan_tests(WS):
+            out.append((code, fact, {"path": fact}))
+        for code, fact in pure_refs.find_orphan_adrs(WS):
+            out.append((code, fact, {"path": fact}))
     except Exception as exc:
         out.append(("ORPHAN_SCAN", f"skipped ({exc})", {}))
     return out

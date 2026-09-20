@@ -657,7 +657,7 @@ check_supersede_unreconciled(workspace: Path, rel: str, text: str) -> List[Ref]
 check_adr_consistency(rel: str, text: str) -> List[Ref]
     # doc: ADR filename number vs `# ADR-NNNN` heading (checked only when both present).
 check_markdown_bytes(raw: bytes, rel: str) -> List[Ref]
-    # doc: Encoding-level checks on raw bytes. Returns [] when undecodable (caller reports).
+    # doc: 字节级检查。返回 `(code, rel)` —— **只产事实**，文案由 `gate_facts` 声明表渲染。
 check_markdown_text(text: str, rel: str) -> List[Ref]
     # doc: Unclosed fences, conflict markers, trailing whitespace, missing final newline.
 find_orphan_specs(workspace: Path, manifest_spec_paths: List[str]) -> List[Ref]

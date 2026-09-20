@@ -689,11 +689,11 @@
       "tokens": "ADR 合并退役：reconcile 不覆盖合并路径 + obsolete/ 去向字段无闸（merged-into 无人写无人验）"
     },
     {
-      "path": "docs/tasks/2026-09-19-M10-refactor-gate_facts_pure_structured.md",
+      "path": "docs/tasks/2026-09-19-M10-refactor-gate_facts_pure_structured.done.md",
       "type": "tasks",
-      "id": "2026-09-19-M10-refactor-gate_facts_pure_structured",
+      "id": "2026-09-19-M10-refactor-gate_facts_pure_structured.done",
       "title": "闸红声明面收尾：pure_* 检查器产结构化事实（3-tuple），Violation.message 降为兜底",
-      "status": "idea",
+      "status": "done",
       "tokens": "闸红声明面收尾：pure_* 检查器产结构化事实（3-tuple），Violation.message 降为兜底"
     },
     {
