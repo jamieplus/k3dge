@@ -86,14 +86,14 @@ STATE_OPTIONS: dict = {
         "priority": 4,
         # 基础事实；**封板前置**由 `seal_ready_for()` 追加（同表另存一句，避免占位符从
         # 其它构造点漏出——`from_state("seal_ready")` 仍可单独用）
-        "fact": "里程碑 <id> 审计已闭环（待修=0）；封板与否由你决定（封＝归档+版本+指针）",
-        "fact_with_blockers": "；封板前置：<blockers>",
+        "fact": "里程碑 <id> 形式闸与票已齐；是否收这一章由你决定（seal 会跑：预审 → 审计 → 收摊）",
+        "fact_with_blockers": "；预审待办：<blockers>",
         "question": "里程碑 <id>：封板？",
         "options": [
-            "k3dge milestone seal <id>（align→归档+版本+指针）",
+            "k3dge milestone seal <id>（预审 → 审计 → 归档+版本+指针）",
             "不封（里程碑继续挂着，当普通提交结束）",
         ],
-        "pointers": ["k3dge ADR-0004 §2.1.4", "docs/reviews/"],
+        "pointers": ["k3dge ADR-0004 §2.1.9", "docs/reviews/"],
     },
     "doc_fix": {
         "priority": 2,
@@ -105,15 +105,6 @@ STATE_OPTIONS: dict = {
             "不处理（偏差留着，封板前会被闸拦）",
         ],
         "pointers": ["docs/tasks/AUTHORING.md", "k3dge ADR-0022 §2.2"],
-    },
-    "audit_needed": {
-        "priority": 2,
-        "fact": "里程碑 <id> 未审计，不可封板（封＝归档+版本+指针，非界限）",
-        "options": [
-            "k3dge milestone audit <id>（先闭环审计）",
-            "不封板，当普通提交结束",
-        ],
-        "pointers": ["k3dge ADR-0004 §2.1.6", "k3dge milestone audit <id>"],
     },
     "audit_open": {
         "priority": 2,
@@ -159,7 +150,8 @@ STATE_OPTIONS: dict = {
 #: `[checks.*].preconditions/actions` + `gates.INTERNAL_GATE_IDS`。
 GATE_NEXT: dict = {
     # 封板前置闸：未审计 ⇒ 回审计入口
-    "audit_closed": ("audit_needed", ""),
+    # 注：`audit_closed` 的派发项已随该闸一并退除（ADR-0004 §2.1.3：报告降为可选
+    # 产物、审计由 `seal` 自己跑）——留着会是一个永不出现的键。
     "audit_report_missing": ("rejected", "audit_missing"),
     "audit_noop": ("rejected", "audit_noop"),
     "audit_degraded_unsigned": ("rejected", "audit_degraded_unsigned"),
@@ -380,10 +372,10 @@ def load_persisted(workspace: Path) -> Optional[dict]:
 def seal_ready_for(workspace: Path, milestone_id: str) -> "NextStep":
     """`seal_ready` 的**唯一生产构造入口**：把"剩余封板前置闸"填进事实。
 
-    为何：`[NEXT]` 此前只说"审计已闭环"就让人去封板，而 `seal` 还要过 8 个前置闸
-    （tasks_all_done / align_pass marker / adrs_all_accepted / docs_normalized …）
+    为何：`[NEXT]` 此前只说"审计已闭环"就让人去封板，而 `seal` 还要过预审的
+    形式闸（tasks_all_done / align_pass marker / adrs_all_accepted / docs_normalized …）
     ⇒ 投影与判据不同源，操作者跑到 seal 才发现。本函数让两者同源（都问
-    `seal.unmet_seal_preconditions`）。
+    `seal.unmet_seal_preconditions`）。告警面＝**需人先办**的项（`satisfies` 的 ⚙️ 项不列）。
     """
     from k3dge.engine.seal import unmet_seal_preconditions
 

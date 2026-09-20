@@ -1,7 +1,9 @@
 """封版闸 + 纯归档动作：`seal_preconditions_error`（策略层）+ `seal_milestone`（归档动作）。
 
 Extracted from `engine/milestone.py` (A-1 第十一块).
-`audit_closed` imported lazily (audit_trigger imports milestone → avoid cycle).
+
+预审清单（ADR-0004 §2.1.9 相位 1）＝形式闸那一批：报告存在性/新鲜度已移出
+（报告降为可选产物、边界改由 `tag <M>=<B>` 表达），审计本身由 `seal` 的 `audit` 动作跑。
 """
 from __future__ import annotations
 
@@ -10,7 +12,7 @@ import shutil
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from k3dge.engine import adr_gate, gates, process_audit
+from k3dge.engine import adr_gate, gates
 from k3dge.engine.align import _ALIGN_STUB_MARKER, _align_pass_marker
 from k3dge.engine.milestone_files import _has_milestone_token
 from k3dge.engine.milestone_pointer import _validate_milestone_id, bump_milestone
@@ -168,62 +170,6 @@ def _seal_archive(workspace: Path, milestone_id: str, tasks: List[MilestoneTask]
         return True, f"{sealed} (milestone bump failed)"
 
 
-def _audit_fresh_error(workspace: Path, milestone_id: str) -> Optional[str]:
-    """`audit_fresh` 前置闸：闭环审计报告的**基线**必须覆盖当前内容。
-
-    为何：`audit_closed` 只问"有没有一份该里程碑的报告且待修=0"，**不比对内容**——实测本仓
-    M10 的报告基线是 `0cb1b42`，其后 40+ 个 commit（删模块、改契约、退休机制）照样"闭环"。
-    报告里的 `- **基线**: <sha>` 是 durable 锚点（随报告入库；`.agent/audit_jobs.json` 是
-    gitignored 本地状态，不能作判据）⇒ 基线须是 HEAD 的祖先，且基线之后**无未审改动**。
-
-    豁免面＝`[checks.audit].fresh_ignore`（审计自家产物 `docs/reviews/`、隐藏配置 `.agent/`、
-    本地/派生态）。**其余一律算**——含 `docs/tasks/**`（票是里程碑的事实源）。
-    """
-    import subprocess
-
-    from k3dge.engine.audit_report import _find_report
-    from k3dge.engine.process_audit import _field
-
-    found = _find_report(workspace, milestone_id, "audit")
-    if found is None:
-        return f"[SEAL REJECTED] 无 12 列报告 ⇒ 无从谈新鲜度（先 k3dge milestone audit {milestone_id}）。"
-    path, text = found
-    base = (_field(text, "基线") or "").strip()
-    if not base:
-        return f"[SEAL REJECTED] 报告缺 `基线`（{path.name}）——无法判定它对应哪一版内容。"
-    base = base.split()[0].strip("`")          # 容忍 `sha（说明）` 形态
-
-    def _git(*args: str) -> tuple[int, str]:
-        try:
-            r = subprocess.run(["git", "-C", str(workspace), *args],
-                               capture_output=True, text=True)
-        except OSError as exc:
-            return 127, str(exc)
-        return r.returncode, (r.stdout or "").strip()
-
-    rc, _out = _git("rev-parse", "--verify", f"{base}^{{commit}}")
-    if rc != 0:
-        return (f"[SEAL REJECTED] 报告基线 `{base}` 在本仓不可解析（浅克隆？）——"
-                f"取全历史（fetch --unshallow / fetch-depth: 0）后重试。")
-    if _git("merge-base", "--is-ancestor", base, "HEAD")[0] != 0:
-        return f"[SEAL REJECTED] 报告基线 `{base}` 不是 HEAD 的祖先（报告来自别的分支？）。"
-
-    # 豁免面（声明面可配）：审计自家产物 + 隐藏配置 + 本地/派生态；**其余一律算**
-    ignore = gates.load(workspace).get("checks", {}).get("audit", {}).get(
-        "fresh_ignore", ["docs/reviews/", ".agent/", "logs/", "tmp/", ".k3dge/", "dist/"])
-    rc, out = _git("diff", "--name-only", f"{base}..HEAD")
-    if rc != 0:
-        return f"[SEAL REJECTED] 无法计算 `{base}..HEAD` 的改动集（{out[:120]}）。"
-    changed = [p for p in out.splitlines()
-               if p.strip() and not any(p.startswith(ig) for ig in ignore)]
-    if not changed:
-        return None
-    head = ", ".join(changed[:5])
-    more = f"（另 {len(changed) - 5} 处）" if len(changed) > 5 else ""
-    return (f"[SEAL REJECTED] 审计已过期：报告的基线 `{base[:12]}` 之后有 {len(changed)} 处未审改动"
-            f"（{head}{more}）⇒ 重跑 `k3dge milestone audit {milestone_id}`。")
-
-
 def _docs_normalized_error(workspace: Path) -> Optional[str]:
     """`docs_normalized` 前置闸：docs 可确定修的规约偏差必须归零（ADR-0022 §2.2 🅰1.4）。
 
@@ -250,8 +196,6 @@ def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gat
     与 `seal_milestone`（纯归档动作）分离：**何时可封＝策略（本函数）**，封板归档＝动作。
     未实现的 id 视为配置错（拒绝，不让声明空转）。
     """
-    from k3dge.engine.audit_trigger import audit_closed
-
     from k3dge.engine import nodes
 
     refs = _seal_gate_registry(workspace, milestone_id)
@@ -261,8 +205,6 @@ def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gat
 
 def _seal_gate_registry(workspace: Path, milestone_id: str) -> dict:
     """seal 前置闸的注册表 + ctx（**唯一构造处**：单错报告与全量查询共用一份判据）。"""
-    from k3dge.engine.audit_trigger import audit_closed
-
     tasks = scan_milestone_tasks(workspace, milestone_id)
     pending = [t for t in tasks if t.status != "done"]
     unfilled = scan_unfilled_guides(workspace)
@@ -271,11 +213,6 @@ def _seal_gate_registry(workspace: Path, milestone_id: str) -> dict:
             f"Cannot seal milestone '{milestone_id}'. Tasks not done: "
             f"{[t.path.name for t in pending]}" if pending else None
         ),
-        "audit_closed": lambda _ctx: (
-            None if audit_closed(workspace, milestone_id)
-            else f"[SEAL REJECTED] Milestone '{milestone_id}' audit not closed（无 12 列报告 / 待修≠0）。"
-        ),
-        "evidence_chain": lambda _ctx: process_audit.evidence_chain_error(workspace, milestone_id),
         "align_pass": lambda _ctx: _seal_review_gate(workspace, milestone_id, tasks),
         "guides_filled": lambda _ctx: (
             f"[SEAL REJECTED] Unfilled guide stubs detected in docs/guides/: {unfilled}.\n"
@@ -284,7 +221,6 @@ def _seal_gate_registry(workspace: Path, milestone_id: str) -> dict:
         "adrs_all_accepted": lambda _ctx: adr_gate.adrs_all_accepted(workspace),
         "adr_landed": lambda _ctx: adr_gate.adr_landed(workspace),
         "docs_normalized": lambda _ctx: _docs_normalized_error(workspace),
-        "audit_fresh": lambda _ctx: _audit_fresh_error(workspace, milestone_id),
     }
     ctx = {"workspace": workspace, "milestone_id": milestone_id,
            "tasks": tasks, "pending": pending, "unfilled": unfilled}

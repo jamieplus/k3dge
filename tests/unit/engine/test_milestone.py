@@ -290,12 +290,14 @@ class TestMilestone(unittest.TestCase):
         self.assertIsNotNone(err)
         self.assertIn("align-pass", err)
 
-    def test_seal_gate_audit_closed(self) -> None:
+    def test_seal_gate_audit_closed_is_retired(self) -> None:
+        """`audit_closed` 已退休（ADR-0004 §2.1.3/§2.1.9）：报告降为可选产物、审计由 seal
+        相位 2 自己跑 ⇒ 声明里再写它就是**配置错**（闸不静默空转）。"""
         _write_task(self.ws / "docs/tasks/x.md", "done", "M17")
         _set_seal_gates(self.ws, "audit_closed")
         err = seal_preconditions_error(self.ws, "M17")
         self.assertIsNotNone(err)
-        self.assertIn("audit not closed", err)
+        self.assertEqual(getattr(err, "gate_id", None), "unknown_gate_id")
 
     def test_seal_rejects_unfilled_guides(self) -> None:
         _write_task(self.ws / "docs/tasks/x.md", "done", "M12")
@@ -523,13 +525,18 @@ class TestSealChecklist(unittest.TestCase):
         self.assertEqual(auto_pending_seal_gates(self.ws, "M10"), ["align_pass"])
         self.assertEqual(unmet_seal_preconditions(self.ws, "M10"), [])   # 无需人先办
 
-    def test_audit_needed_rejection_also_carries_the_checklist(self) -> None:
-        """审计未闭环的早返回路径同样给全量清单（否则补完审计才发现还有未过闸）。"""
+    def test_audit_refusal_also_carries_the_checklist(self) -> None:
+        """相位 2 审计被拒（refused）的路径同样给全量清单——否则操作者修完审计才发现
+        预审那边还有别的未过闸（本会话的真实体验：一次看清 > 试错）。"""
+        from unittest import mock
+
         from k3dge.engine.seal_flow import run_seal_flow
 
         _write_task(self.ws / "docs/tasks/x.md", "done", "M10")
-        _set_seal_gates(self.ws, "tasks_all_done", "audit_closed")
-        status, msg = run_seal_flow(self.ws, "M10", prompter=_no_prompt())
-        self.assertEqual(status, "audit_needed")
+        _set_seal_gates(self.ws, "tasks_all_done", "align_pass")
+        with mock.patch("k3dge.engine.milestone_audit.run_audit_flow",
+                        return_value=("refused", "跳被跳过")):
+            status, msg = run_seal_flow(self.ws, "M10", prompter=_no_prompt())
+        self.assertEqual(status, "rejected")
         self.assertIn("封板前置清单（M10）", msg)
-        self.assertIn("❌ audit_closed", msg)
+        self.assertIn("✅ tasks_all_done", msg)

@@ -53,10 +53,13 @@ def test_seal_preconditions_default_and_override():
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d)
         # `docs_normalized` 是耐久闸（ADR-0022 §2.2 🅰1.4）：规约化须在封板前做完
+        # 预审＝进审计的门槛（ADR-0004 §2.1.9 相位 1）：报告存在性/新鲜度已移出
+        # （报告降为可选产物、边界改由 `tag <M>=<B>` 表达）
         assert gates.preconditions(ws, "seal") == [
-            "tasks_all_done", "audit_closed", "evidence_chain", "align_pass", "guides_filled",
-            "adrs_all_accepted", "adr_landed", "docs_normalized", "audit_fresh",
+            "tasks_all_done", "align_pass", "guides_filled",
+            "adrs_all_accepted", "adr_landed", "docs_normalized",
         ]
+        assert gates.actions(ws, "seal") == ["full_matrix", "audit", "archive", "closure_note", "prune"]
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d, "[checks.seal]\npreconditions = []\n")
         assert gates.preconditions(ws, "seal") == []

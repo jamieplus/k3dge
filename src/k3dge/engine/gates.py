@@ -83,10 +83,14 @@ DEFAULTS: Dict[str, Any] = {
     # 见 ADR-0001 §2 第 8 条。
     "checks": {
         # 耐久＝闸（ADR-0022 §2.2 🅰1.4）：docs 规约化必须在封板**之前**做完
-        "seal": {"preconditions": ["tasks_all_done", "audit_closed", "evidence_chain", "align_pass", "guides_filled",
-                                   "adrs_all_accepted", "adr_landed", "docs_normalized",
-                                   "audit_fresh"],
-                 "actions": ["full_matrix", "archive", "closure_note", "prune"]},
+        # 预审＝进**审计**的门槛（ADR-0004 §2.1.9 相位 1）：形式闸在此，不卡在封板收尾。
+        # `align_pass` 虽在列，却由本单元第一个动作 `full_matrix` 满足（`[nodes.*].satisfies`）
+        # ⇒ 清单显示 ⚙️，不要求人预先手跑 align。
+        # 已移出（ADR-0004 §2.1.3/§2.1.9/§2.1.10）：报告存在性（`audit_closed`/`evidence_chain`）
+        # 与基线新鲜度（`audit_fresh`）——报告降为可选产物，边界由 `tag <M>=<B>` 表达。
+        "seal": {"preconditions": ["tasks_all_done", "align_pass", "guides_filled",
+                                   "adrs_all_accepted", "adr_landed", "docs_normalized"],
+                 "actions": ["full_matrix", "audit", "archive", "closure_note", "prune"]},
         "align": {"preconditions": ["tasks_all_done"], "actions": ["full_matrix"]},
         # sync 链：顺序＝声明序；各步性质（投影/事实源）见 nodes.NODE_DEFAULTS
         "sync": {"actions": ["sync_extractors", "reconcile_adrs", "sync_domains",
@@ -96,11 +100,7 @@ DEFAULTS: Dict[str, Any] = {
         # ref 用**角色名**（audit.*），不写死 peer 名：下游把 [roles.audit] bind 到
         # 别的实现时，声明不用改（pipeline.toml 的既定口径：新流程一律走角色名）。
         "audit": {"stages_produce": ["audit.actions.audit"],
-                  "stages_verify": ["audit.actions.verify"],
-                  # audit_fresh 的豁免面：审计自家产物 + 隐藏配置 + 本地/派生态。
-                  # **默认全算**（含 docs/tasks/**：票是里程碑的事实源）⇒ 快照过期的审计挡封板。
-                  "fresh_ignore": ["docs/reviews/", ".agent/", "logs/", "tmp/",
-                                   ".k3dge/", "dist/", ".ua/"]},
+                  "stages_verify": ["audit.actions.verify"]},
     },
 }
 

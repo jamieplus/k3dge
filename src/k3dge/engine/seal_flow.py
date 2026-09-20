@@ -114,26 +114,28 @@ def run_seal_flow(
     prompter: Optional[_Prompt] = None,
     skip_enter_prompt: bool = False,
 ) -> Tuple[str, str]:
-    """Seal = archive + version + pointer. Requires a *closed* audit first.
+    """封板＝三相位（ADR-0004 §2.1.9）：**预审 → 审计 → 审核后自动**。
 
-    The boundary is not "when does a milestone end" (no ruler) — it is the audit
-    loop closing (12-col, 待修==0). Only after that do we ask "封板?", which is
-    really "要不要压缩上下文并收摊". status ∈ {sealed, seal_declined, audit_needed}.
+    唯一入口：人发起 `seal` 就是在宣布"要收这一章"；幂等重入（预审失败可修完再 seal）。
+    审计是封板的**主体**（相位 2，本流程自己跑，不靠外部 hook 先跑一遍）；审计正常返回
+    ⇒ 版号前进（ADR-0004 §2.1.11），不管有没有报告。status ∈ {sealed, seal_declined, rejected}。
     """
     from k3dge.engine import nextstep
-    from k3dge.engine.audit_trigger import audit_closed
+    from k3dge.engine.seal import render_checklist, unmet_seal_preconditions
 
     prompt = prompter or _Prompt.default()
 
-    if "audit_closed" in gates.preconditions(workspace, "seal") and not audit_closed(workspace, milestone_id):
-        msg = f"Milestone {milestone_id}: 未审计（待修未归零或无 12 列报告），不可封板。"
-        _ns = nextstep.NextStep.from_state("audit_needed", milestone_id)
+    # 相位 1·预审（进审计的**门槛**）：形式闸先过——不进审计就不必审（ADR-0004 §2.1.9）。
+    # `align_pass` 虽在清单里，却由本单元第一个动作 `full_matrix` 满足
+    # （`[nodes.full_matrix].satisfies`）⇒ `unmet_*` 已按声明排除 auto 项，此处只看"需人先办"。
+    unmet = unmet_seal_preconditions(workspace, milestone_id)
+    if unmet:
+        gid, gmsg = unmet[0]
+        rej = gates.Rejection(gid, gmsg)
+        _ns = nextstep.next_for_rejection(milestone_id, rej)
         nextstep.persist(workspace, _ns)
-        # 同 `_archive` 的拒绝路径：给**全量清单**（否则操作者只看到审计这一项，
-        # 补完审计再跑 seal 才发现还有别的未过闸）
-        from k3dge.engine.seal import render_checklist
-
-        return "audit_needed", msg + "\n" + render_checklist(workspace, milestone_id) + "\n" + _ns.render_cli()
+        # 同 `_archive` 的拒绝路径：给**全量清单**（否则操作者只看到第一项，补完再跑又发现下一项）
+        return "rejected", str(rej) + "\n" + render_checklist(workspace, milestone_id) + "\n" + _ns.render_cli()
 
     # enter-seal prompt — NO countdown; N = keep milestone open. Skipped with --yes.
     # 文案单源：STATE_OPTIONS["seal_ready"].question（与 [NEXT] 的 fact 同一判定的两个投影）；通道行为（default_yes）留在此处。
@@ -156,6 +158,26 @@ def run_seal_flow(
         _strip_align_stub(workspace, milestone_id)
         return True, ""
 
+    def _audit(ctx):
+        """相位 2：**审计是封板的主体**（ADR-0004 §2.1.9）。
+
+        只有闭集里的 `closed` / `degraded-manual` 能过（§2.1.11）——`skip`/空转会在
+        `run_audit_flow` 里被拦成 `refused`；结果写入 ctx，供相位 3 记入封版提交 trailer。
+        """
+        from k3dge.engine.audit_flow import SEALABLE_AUDIT_RESULTS, audit_result_of
+        from k3dge.engine.milestone_audit import run_audit_flow
+
+        status, amsg = run_audit_flow(workspace, milestone_id, prompter=prompt)
+        result = audit_result_of(status)
+        if result not in SEALABLE_AUDIT_RESULTS:
+            return False, gates.Rejection(
+                "audit_noop",
+                f"审计未正常返回（status={status}，result={result}）：封板停下。\n{amsg}",
+            )
+        ctx["audit_result"] = result
+        ctx["audit_status"] = status
+        return True, f"\n  审计: {result}（{status}）"
+
     def _archive(_ctx):
         err = seal_preconditions_error(workspace, milestone_id)
         if err:
@@ -177,7 +199,7 @@ def run_seal_flow(
             pass
         return True, ""
 
-    registry = {"full_matrix": _full_matrix, "archive": _archive,
+    registry = {"full_matrix": _full_matrix, "audit": _audit, "archive": _archive,
                 "closure_note": _closure_note, "prune": _prune}
     ctx = {"workspace": workspace, "milestone_id": milestone_id}
     ok, out = nodes.run_phase(workspace, "seal", "actions", registry, ctx)
@@ -191,7 +213,8 @@ def run_seal_flow(
         return "rejected", str(rej) + "\n" + render_checklist(workspace, milestone_id) + "\n" + _ns.render_cli()
     msg = str(out)
     from k3dge.engine import events
-    events.emit(workspace, "sealed", milestone=milestone_id)
+    events.emit(workspace, "sealed", milestone=milestone_id,
+                audit_result=ctx.get("audit_result"))
     _ns = nextstep.NextStep.from_state("sealed", milestone_id)
     nextstep.persist(workspace, _ns)
     return "sealed", msg + "\n" + _ns.render_cli()

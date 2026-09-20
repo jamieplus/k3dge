@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M10
 priority: P1
 date: 2026-09-20
@@ -60,3 +60,32 @@ nodes 表：无 full_matrix.satisfies；run_phase 相位顺序与 §2.1.9 一致
 ## Notes
 
 - 建议顺序：`fix-audit_no_noop` → 本票 → `feat-seal_boundary_tag`；`refactor-report_demote` 可与本票同轮落。
+
+## 落地（2026-09-20）
+
+| 项 | 落点 | 实测 |
+| --- | --- | --- |
+| ① 三相位 | `run_seal_flow`：**预审**（`seal.unmet_seal_preconditions`，只列"需人先办"）→ 动作序 `full_matrix` → `audit` → `archive`/`closure_note`/`prune` | `test_seal_runs_the_audit_itself_and_refusal_stops_it`：`refused` ⇒ `seal_milestone` 不被调 |
+| ② 声明面 | `[checks.seal]`：preconditions 收窄为 `tasks_all_done, align_pass, guides_filled, adrs_all_accepted, adr_landed, docs_normalized`；actions 插 `audit`（顺序即相位） | `test_seal_preconditions_default_and_override` 断言两份清单 |
+| ③ 审计节点 | `nodes.NODE_DEFAULTS["audit"]`（fact/append）；`seal_flow._audit` 读 `SEALABLE_AUDIT_RESULTS`，非闭集 ⇒ 拒 | 结果写 `ctx["audit_result"]`，`events.emit("sealed", audit_result=…)` 带上 |
+| ④ 前置闸重排 | 移出 `audit_closed` / `evidence_chain` / `audit_fresh` + `fresh_ignore`（含 `gates.DEFAULTS` 与模板镜像）；`seal._audit_fresh_error` 删除、`process_audit` 依赖随之摘掉 | `test_seal_gate_audit_closed_is_retired`：声明里再写 ⇒ `unknown_gate_id`（闸不静默空转） |
+| ⑤ 落点闸 | 形式闸由 `_archive` 的 `seal_preconditions_error` 在合并前后统一复核（既有机制，本票未改语义） | 预审已提前拦，`archive` 是第二道（belt & braces） |
+| ⑥ `[NEXT]` 改述 | `seal_ready`：事实改"形式闸与票已齐；是否收这一章由你决定（seal 会跑：预审 → 审计 → 收摊）"、`fact_with_blockers` 改"预审待办"；**删 `audit_needed` 态与 `GATE_NEXT["audit_closed"]`**（该闸已退休 ⇒ 留着是永不出现的键） | `test_gate_next_vocabulary_is_closed` + `test_repo_reports_only_operator_actionable_blockers`（本仓实际只剩 `tasks_all_done`/`adrs_all_accepted`） |
+| ⑦ 散文同步 | `AGENTS.md` §12（＋模板镜像）、`.agent/rules/04-milestone.md`（＋镜像）、`pipeline.toml` 头部执行模型（＋模板）——"seal 不触发审计 / audit_closed 当前置闸 / 未闭环→audit_needed"三处相抵表述全部改写 | PAIRS 逐份 `diff` 一致 |
+
+测试：`test_audit_fresh.py` 随闸退休删除；seal 侧测试统一注入审计桩 `_audit_ok()`。
+**653 passed, 2 skipped**；`k3dge check` 绿。
+
+### 有意偏离票面（附理由）
+
+1. **保留 `full_matrix.satisfies=["align_pass"]`**（票面写"删 satisfies"）。理由：预审用
+   `unmet_seal_preconditions`，它按 `satisfies` 声明把 ⚙️ 项排除在"需人先办"之外；若删掉声明，
+   `align_pass` 就会在 align 跑之前被预审拒 ⇒ **新里程碑永远无法进入审计**（死锁）。
+   证据：`test_align_pass_is_marked_auto_not_todo`（清单显示 ⚙️ 且 `unmet == []`）。
+2. **`audit_fresh` 在本票删除**（票面把它归给 `feat-seal_boundary_tag`）。理由：本票重写的正是
+   这一批声明/注册表行，留到下一票会把同一处改两遍；`tag <M>=<B>` 边界由 T3 补上。
+
+### 边界（有意留）
+
+预审里的 `adrs_all_accepted` 对 ADR-0026（`Proposed`）仍会拦——那是**内容裁定**（要人定 Accepted
+与否），不是本票能替判的；`[NEXT]` 如实列出，不静默放行。

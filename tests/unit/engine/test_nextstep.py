@@ -16,7 +16,8 @@ class TestNextStepRender(TestCase):
         cli = nextstep.NextStep.from_state("seal_ready", "M7").render_cli()
         self.assertTrue(cli.startswith("[NEXT] state=seal_ready milestone=M7"))
         # 陈述式事实 + 成对选项；[NEXT] 无应答通道 ⇒ 不出疑问句、不出 y/N
-        self.assertIn("fact: 里程碑 M7 审计已闭环（待修=0）；封板与否由你决定", cli)
+        self.assertIn("fact: 里程碑 M7 形式闸与票已齐；是否收这一章由你决定"
+                      "（seal 会跑：预审 → 审计 → 收摊）", cli)
         self.assertIn("option: k3dge milestone seal M7", cli)
         self.assertIn("option: 不封", cli)
         self.assertNotIn("？", cli)
@@ -56,7 +57,7 @@ class TestNextStepRender(TestCase):
     def test_mcp_isomorphic(self) -> None:
         d = nextstep.NextStep.from_state("seal_ready", "M7").render_mcp()
         self.assertEqual(d["state"], "seal_ready")
-        self.assertIn("封板与否由你决定", d["fact"])
+        self.assertIn("是否收这一章由你决定", d["fact"])
         self.assertNotIn("？", d["fact"])
         self.assertIn("k3dge milestone seal M7", d["options"][0])
         self.assertGreaterEqual(len(d["options"]), 2)
@@ -70,14 +71,16 @@ class TestNextStepRender(TestCase):
         n = nextstep.next_for_rejection(
             "M7", gates.Rejection("audit_report_missing", "no 12-col audit report found"))
         self.assertIn("k3dge milestone audit-submit M7", n.fact)
-        n2 = nextstep.next_for_rejection(
-            "M7", gates.Rejection("audit_closed", "audit not closed"))
-        self.assertEqual(n2.state, "audit_needed")
-        self.assertIn("未审计", n2.fact)
+        # `audit_closed` 已退休（ADR-0004 §2.1.3：报告降为可选产物、审计由 seal 自己跑）
+        # ⇒ 派发表里不得留它的项（留着就是永不出现的野生键）
+        self.assertNotIn("audit_closed", nextstep.GATE_NEXT)
+        for gone in ("audit_closed", "evidence_chain", "audit_fresh"):
+            self.assertNotIn(gone, nextstep.GATE_NEXT, gone)
+        n2 = nextstep.NextStep.from_state("seal_ready", "M7")
         # 命令在 options（成对选项），不再塞进 fact；占位符在渲染时填（filled_options）
         self.assertGreaterEqual(len(n2.options or []), 2)
-        self.assertIn("k3dge milestone audit M7", n2.filled_options()[0])
-        self.assertIn("option: k3dge milestone audit M7", n2.render_cli())
+        self.assertIn("k3dge milestone seal M7", n2.filled_options()[0])
+        self.assertIn("option: k3dge milestone seal M7", n2.render_cli())
         self.assertNotIn("<id>", n2.render_cli())
 
     def test_rejection_without_gate_id_does_not_guess(self) -> None:
@@ -140,7 +143,7 @@ class TestDecisionSingleSource(TestCase):
 
     def test_question_text_falls_back_to_fact(self) -> None:
         """无 question 的态（不交互）回落 fact；未知态返回空串。"""
-        self.assertIn("不可封板", nextstep.question_text("audit_needed", "M7"))
+        self.assertIn("待修", nextstep.question_text("audit_open", "M7"))
         self.assertEqual(nextstep.question_text("no_such_state", "M7"), "")
 
     def test_no_hardcoded_ask_literals_in_src(self) -> None:
@@ -166,8 +169,8 @@ class TestDecisionSingleSource(TestCase):
 class TestPersistedProjection(TestCase):
     def test_roundtrip(self) -> None:
         ws = Path(tempfile.mkdtemp())
-        nextstep.persist(ws, nextstep.NextStep.from_state("audit_needed", "M7"))
-        self.assertEqual(nextstep.load_persisted(ws)["state"], "audit_needed")
+        nextstep.persist(ws, nextstep.NextStep.from_state("audit_open", "M7"))
+        self.assertEqual(nextstep.load_persisted(ws)["state"], "audit_open")
 
     def test_missing_or_corrupt_is_none(self) -> None:
         ws = Path(tempfile.mkdtemp())
@@ -363,10 +366,10 @@ class TestNextStepPointers(TestCase):
         cli = ns.render_cli()
         self.assertIn("pointers:", cli)
         # 自限定：下游不自带 k3dge 的 ADR，裸引会指错靶（见 test_reference_portability）
-        self.assertIn("k3dge ADR-0004 §2.1.4", cli)
+        self.assertIn("k3dge ADR-0004 §2.1.9", cli)
         d = ns.render_mcp()
         self.assertIn("pointers", d)
-        self.assertIn("k3dge ADR-0004 §2.1.4", d["pointers"])
+        self.assertIn("k3dge ADR-0004 §2.1.9", d["pointers"])
 
     def test_pointers_fill_id(self) -> None:
         d = nextstep.NextStep.from_state("audit_suggested", "M7").render_mcp()
@@ -469,44 +472,53 @@ class TestSealReadyStatesItsBlockers(TestCase):
     ADR 全 Accepted / docs_normalized …）⇒ 操作者跑到 seal 才发现。
     """
 
-    def _ws(self, preconditions: list) -> Path:
+    def _ws(self, preconditions: list, pending_task: bool = False) -> Path:
+        """空仓里大部分形式闸都"过"（无 guides/无 ADR 就是没有偏差）；要隔离"未过闸被列出"
+        就得放一个**真会失败**的事实：一张未 done 的 M10 票（`tasks_all_done` 会拒）。"""
         ws = Path(tempfile.mkdtemp())
         (ws / ".agent").mkdir(parents=True)
         body = ", ".join(f'"{p}"' for p in preconditions)
         (ws / ".agent" / "pipeline.toml").write_text(
             f"[checks.seal]\npreconditions = [{body}]\n", encoding="utf-8")
+        if pending_task:
+            (ws / "docs" / "tasks").mkdir(parents=True)
+            (ws / "docs" / "tasks" / "2026-09-01-M10-feat-x.md").write_text(
+                "---\nstatus: idea\nmilestone: M10\npriority: P2\ndate: 2026-09-01\n---\n\n# X\n",
+                encoding="utf-8")
         return ws
 
     def test_lists_unmet_preconditions(self) -> None:
-        # `audit_closed` 在空仓必失败（无 12 列报告）；用它隔离"未过闸被列出"这一行为
-        ws = self._ws(["audit_closed"])
+        # 空仓里形式闸几乎都"过"（无 guides/无 ADR ＝ 无偏差）⇒ 放一张未 done 的票，
+        # 让 `tasks_all_done` 真失败，隔离"未过闸被列出"这一行为
+        ws = self._ws(["tasks_all_done"], pending_task=True)
         ns = nextstep.seal_ready_for(ws, "M10")
         cli = ns.render_cli()
-        self.assertIn("封板前置：audit_closed", cli)
+        self.assertIn("预审待办：tasks_all_done", cli)
         self.assertNotIn("<blockers>", cli)
-        self.assertTrue(ns.reasons and "audit_closed" in ns.reasons[0])
+        self.assertTrue(ns.reasons and "tasks_all_done" in ns.reasons[0])
 
     def test_says_all_green_when_clean(self) -> None:
         ws = self._ws([])
         ns = nextstep.seal_ready_for(ws, "M10")
-        self.assertIn("封板前置：全绿", ns.render_cli())
+        self.assertIn("预审待办：全绿", ns.render_cli())
 
     def test_repo_reports_only_operator_actionable_blockers(self) -> None:
-        """自举：本仓 M10 需人先办的是 adrs_all_accepted（0026 Proposed）/ audit_fresh（报告过期）。
+        """自举：本仓 M10 需人先办的是 adrs_all_accepted（0026 Proposed）。
 
         `align_pass` **不列入**——seal 的第一个动作就是 `full_matrix`（跑 align + 写 marker），
         把它列成"需你先办"会误导（本会话发现并修正的真实误报）。
+        `audit_fresh` 已退休（ADR-0004 §2.1.9：边界由 tag 表达）⇒ 也不得再出现。
         """
         ns = nextstep.seal_ready_for(REPO, "M10")
         self.assertIn("adrs_all_accepted", ns.fact)
-        self.assertIn("audit_fresh", ns.fact)
+        self.assertNotIn("audit_fresh", ns.fact)
         self.assertNotIn("align_pass", ns.fact)
 
     def test_base_fact_has_no_placeholder_leak(self) -> None:
         """`from_state("seal_ready")` 仍可单独用 ⇒ 基础 fact 不得含占位符。"""
         cli = nextstep.NextStep.from_state("seal_ready", "M7").render_cli()
         self.assertNotIn("<blockers>", cli)
-        self.assertNotIn("封板前置", cli)
+        self.assertNotIn("预审待办", cli)
 
 
 class TestSealReadyHasOneConstructionEntry(TestCase):

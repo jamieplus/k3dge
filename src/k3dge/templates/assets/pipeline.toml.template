@@ -3,11 +3,12 @@
 # Connection endpoints live in .mcp.json (k3dge mcp sync); this file defines flows only.
 #
 # EXECUTION MODEL: k3dge invokes the lens, it does NOT audit or score (sidecar, ADR-0006).
-# `k3dge milestone seal` drives the lifecycle:
-#   align (Full Matrix, no prompt) -> enter-seal prompt (NO countdown; N = normal commit)
-#     -> [on_seal_enter] k3dit.actions.audit (MANDATORY, no skip)
-#     -> parse 待修/有意留/已修; 待修>0 -> "agent 修?" prompt (countdown, timeout = fix) -> re-audit
-#     -> [on_pre_seal] k3dit.actions.verify (待修==0 closure) -> seal
+# `k3dge milestone seal` drives the lifecycle in THREE phases (ADR-0004 §2.1.9, one entry point):
+#   phase 1 预审: align (Full Matrix, no prompt) + form gates; failure => fix and seal again
+#   phase 2 审计: [checks.seal].actions 的 `audit` 节点 (MANDATORY) —— 版本前进定在此刻
+#                 （审计正常返回即 bump，不管有没有报告；`skip`/空转一律 refused）
+#   phase 3 审核后: archive + version + pointer + 记录（封版提交 trailer / tag）
+# `k3dge milestone audit <id>` 仍是独立主动入口（同样的审计步骤，不封板）。
 # Action-level only (ADR-0006 §2.3.8): the audit tool is `k3dit_run_audit_flow` — one call =
 # "audit this target". k3dge never drives pass numbers; how many lenses k3dit runs is
 # k3dit's private implementation. Per-call args come from the caller (scope/milestone).
@@ -101,11 +102,14 @@ transports = [
 #   stages_<phase>          = 外部 peer 的 action ref（用**角色名**，换 bind 即换实现）
 
 [checks.seal]
-preconditions = ["tasks_all_done", "audit_closed", "evidence_chain", "align_pass",
-                 "guides_filled", "adrs_all_accepted", "adr_landed",
-                 "docs_normalized",   # 耐久＝闸：规约化须在封板前做完（k3dge doc fix）
-                 "audit_fresh"]       # 报告基线须覆盖当前内容（否则审计已过期 ⇒ 重审）
-actions = ["full_matrix", "archive", "closure_note", "prune"]
+# 预审＝进**审计**的门槛（ADR-0004 §2.1.9 相位 1）。`align_pass` 由第一个动作
+# `full_matrix` 满足（[nodes.full_matrix].satisfies）⇒ 清单显示 ⚙️，不需预先手跑 align。
+preconditions = ["tasks_all_done", "align_pass", "guides_filled", "adrs_all_accepted",
+                 "adr_landed", "docs_normalized"]   # 耐久＝闸：规约化须在封板前做完
+# 顺序＝三相位：预审(full_matrix) → 审计(audit) → 审核后(archive + 收摊清单 + 派生件清理)
+# 已移出前置闸：audit_closed / evidence_chain（报告降为可选产物）、audit_fresh（边界改由
+# `tag <M>=<B>` 表达）——见 ADR-0004 §2.1.3/§2.1.9/§2.1.10。
+actions = ["full_matrix", "audit", "archive", "closure_note", "prune"]
 
 [checks.align]
 preconditions = ["tasks_all_done"]
@@ -114,11 +118,6 @@ actions = ["full_matrix"]
 [checks.audit]
 stages_produce = ["audit.actions.audit"]   # 一份必做（合并审计模块，ADR-0025）
 stages_verify = ["audit.actions.verify"]   # 待修==0 的二次核对
-# audit_fresh 的豁免面：报告基线之后的改动**除这些前缀外全部算未审**。
-#   docs/reviews/ 审计自家产物（否则报告一落地就把自己算成未审改动）
-#   .agent/ 隐藏配置（ADR-0025 §2.7 送检 scope 明确不含）；其余本地/派生态同此
-# 注意：**不含 docs/tasks/** —— 票是里程碑的事实源，改了就该重审。
-fresh_ignore = ["docs/reviews/", ".agent/", "logs/", "tmp/", ".k3dge/", "dist/", ".ua/"]
 
 [checks.sync]
 actions = ["sync_extractors", "reconcile_adrs", "sync_domains",

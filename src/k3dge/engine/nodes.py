@@ -30,20 +30,20 @@ from k3dge.engine import gates
 
 #: 节点属性缺省（唯一源；必须完整——下游删掉声明段也要能跑，ADR-0026 §2.7）。
 NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {
-    # --- seal 前置闸（只读判定；不写盘 ⇒ projection）---
+    # --- seal 前置闸（**预审**：只读判定；不写盘 ⇒ projection）---
     "tasks_all_done": {"kind": "projection", "on_error": "stop"},
-    "audit_closed": {"kind": "projection", "on_error": "stop"},
-    "evidence_chain": {"kind": "projection", "on_error": "stop"},
     "align_pass": {"kind": "projection", "on_error": "stop"},
     "guides_filled": {"kind": "projection", "on_error": "stop"},
     "adrs_all_accepted": {"kind": "projection", "on_error": "stop"},
     "adr_landed": {"kind": "projection", "on_error": "stop"},
     "docs_normalized": {"kind": "projection", "on_error": "stop"},   # 只读检测（doc_fix.scan）
-    "audit_fresh": {"kind": "projection", "on_error": "stop"},       # 只读检测（报告基线 vs HEAD）
-    # --- seal 动作 ---
+    # --- seal 动作（顺序＝声明序＝ADR-0004 §2.1.9 的三相位）---
     # `satisfies`：该动作会满足哪个前置闸（声明式，供"封板清单"区分
     # "seal 自己会跑" vs "需人先办"——`align_pass` 由本动作（跑 align + 写 marker）满足）
     "full_matrix": {"kind": "projection", "on_error": "stop", "satisfies": ["align_pass"]},
+    # 审计是封板的**主体**（相位 2）：seal 自己调它，不再靠外部 hook 先跑一遍。
+    # 只有闭集里的 closed / degraded-manual 能过（ADR-0004 §2.1.11）。
+    "audit": {"kind": "fact", "on_error": "stop", "on_rerun": "append"},
     "archive": {"kind": "fact", "on_error": "rollback", "on_rerun": "reject",
                 "produces": ["archived_paths"]},                        # 归档＝写一次即历史
     "closure_note": {"kind": "projection", "on_error": "continue"},     # 清单可重生成

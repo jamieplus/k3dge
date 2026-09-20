@@ -32,6 +32,13 @@ from k3dge.engine.pipeline_runner import (
 _OK_MANUAL = TransportResult(True, "manual", "ok")
 
 
+def _audit_ok(status: str = "audited"):
+    """seal 相位 2 的审计桩：`run_audit_flow` 自身的语义由 TestAuditFlow/TestAuditNoNoop 管，
+    seal 这边只关心"审计返回了什么 ⇒ 封板走不走"（ADR-0004 §2.1.9/§2.1.11）。"""
+    return mock.patch("k3dge.engine.milestone_audit.run_audit_flow",
+                      return_value=(status, f"audit {status}"))
+
+
 def _mk_task(ws, mid="M1"):
     """Create a done task so the seal checklist reports eligibility."""
     ws.joinpath("docs", "tasks").mkdir(parents=True, exist_ok=True)
@@ -222,12 +229,19 @@ class TestAuditFlow(TestCase):
 
 
 class TestSealFlow(TestCase):
-    def test_seal_requires_closed_audit(self) -> None:
+    def test_seal_runs_the_audit_itself_and_refusal_stops_it(self) -> None:
+        """相位 2（ADR-0004 §2.1.9）：审计由 **seal 自己**跑（不再靠外部 hook 先跑）。
+        审计没正常返回（refused/escalated）⇒ 不归档、不前进版号。"""
         ws = _ws()
-        _mk_task(ws)  # no report -> audit not closed
-        with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed")) as seal:
-            status, _ = run_seal_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
-        self.assertEqual(status, "audit_needed")
+        _mk_task(ws)
+        with mock.patch("k3dge.engine.milestone_audit.run_audit_flow",
+                        return_value=("refused", "审计未成（跳被跳过）")) as audit, \
+             mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])), \
+             mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed")) as seal:
+            status, msg = run_seal_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
+        self.assertEqual(status, "rejected")
+        self.assertIn("refused", msg)
+        audit.assert_called_once()
         seal.assert_not_called()
 
     def test_seal_declined_when_operator_says_no(self) -> None:
@@ -243,7 +257,8 @@ class TestSealFlow(TestCase):
         ws = _ws()
         _mk_task(ws)
         _clean_report(ws)
-        with mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
+        with _audit_ok(), \
+             mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
             with mock.patch("k3dge.engine.seal_flow.seal_preconditions_error", return_value=None):
                 with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed M1")) as seal:
                     status, msg = run_seal_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
@@ -256,7 +271,8 @@ class TestSealFlow(TestCase):
         ws = _ws()
         _mk_task(ws)
         _clean_report(ws)
-        with mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
+        with _audit_ok(), \
+             mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
             with mock.patch("k3dge.engine.seal_flow.seal_preconditions_error", return_value=None):
                 with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed M1")) as seal:
                     status, _ = run_seal_flow(ws, "M1", skip_enter_prompt=True, prompter=_Prompt(answers=[]))
@@ -625,18 +641,22 @@ class TestGateIdDispatch(TestCase):
 
         ws = _ws()
         _mk_task(ws)
+        (ws / "docs" / "guides").mkdir(parents=True)
+        (ws / "docs" / "guides" / "g.md").write_text(
+            "# G\n<!-- k3dge:guide-stub -->\n", encoding="utf-8")
         (ws / ".agent" / "pipeline.toml").write_text(
-            '[checks.seal]\npreconditions = ["audit_closed"]\n', encoding="utf-8")
+            '[checks.seal]\npreconditions = ["guides_filled"]\n', encoding="utf-8")
         err = seal_preconditions_error(ws, "M1")
         self.assertIsInstance(err, gates.Rejection)
-        self.assertEqual(err.gate_id, "audit_closed")   # id == 契约里声明的那个
-        self.assertIn("audit not closed", str(err))     # 仍是 str：既有断言/print 不破
+        self.assertEqual(err.gate_id, "guides_filled")   # id == 契约里声明的那个
+        self.assertIn("Unfilled guide stubs", str(err))   # 仍是 str：既有断言/print 不破
 
     def test_seal_flow_rejection_is_table_driven(self) -> None:
         ws = _ws()
         _mk_task(ws)
         _clean_report(ws)
-        with mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
+        with _audit_ok(), \
+             mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
             with mock.patch(
                 "k3dge.engine.seal_flow.seal_preconditions_error",
                 return_value=gates.Rejection("tasks_all_done", "票没干完"),
@@ -655,7 +675,8 @@ class TestGateIdDispatch(TestCase):
         _mk_task(ws)
         _clean_report(ws)
         out = io.StringIO()
-        with mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
+        with _audit_ok(), \
+             mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
             with mock.patch("k3dge.engine.seal_flow.seal_preconditions_error", return_value=None):
                 with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed")):
                     status, _ = run_seal_flow(

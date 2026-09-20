@@ -3,7 +3,7 @@
 * **Milestone cursor**：`.agent/milestone` 纯文本 `M0`→`M1`…，`scaffold` 默认写 `M0`，`seal` 成功后原子 `bump`。
 * **任务编码**：`docs/tasks/YYYY-MM-DD-<type>-<slug>.md`（`type` ∈ {audit, feat, fix, docs, chore, refactor}，`slug` 内 `_`），`Status: done` 时后缀 `.done.md`；有 `Milestone: M1` 时文件名中加入 `M1`。
 
-* **两问拆开：审计是界限，封板只是收摊。** 「结束里程碑」没有尺子（全 done、硬闸绿、没 task 都能被说成可封）；真正的界限是**审计环收口**（**合并审计模块一份 12 列报告到 待修=0**、有意留进表）。所以自动触发只服务「要不要审」，「要不要封」只在审计闭环后出现一次。
+* **一次声明 + 一条链（审计是封板的主体）。** 「结束里程碑」没有尺子（全 done、硬闸绿、没 task 都能被说成可封）；**审计**才是封板的主体与界限。人发起 `k3dge milestone seal <id>`（唯一入口，幂等重入）＝同时开启三相位：**预审**（align + 形式闸；失败⇒修完再 seal）→ **审计**（对**基线版本**跑；正常返回⇒**版号前进**，不管有没有报告）→ **审核后自动**（归档+版本+指针+记录）。`[NEXT] state=seal_ready` 只说"形式闸与票已齐、要不要收这一章由你决定"。
 
 * **问题一 · 要不要审（可量化触发，k3dge 能自量，不连 MCP/LLM）** —— `k3dge check`(绿) / `task done` / `align` / `status` 命中任一信号时附 `[NEXT] state=audit_suggested` + reasons；`[NEXT]` 只出**陈述式 `fact` + 成对 `option`**（审 / 不审），不出疑问句（ADR-0026 §2.2 语法维：纯打印面无应答通道）。人只答要不要审：
   * 账齐：当前里程碑顶层任务 N>0 且 in-progress/idea = 0（本批活干完）。
@@ -16,7 +16,7 @@
 
 * **1 report = 1 task（ADR-0022）** —— 一份审计报告对应**恰好一个** `audit` task，task frontmatter 带 `report: docs/reviews/<file>.md` 指针；findings 只是报告里的 12 列行，**不再逐条建 task**。`k3dge task done <report-task>` 要求该报告 `待修==0` 才放行（关 task = 审计闭环，同一闸）。特别大的单条才在 `处置` 写 `转 sub-task <id>` 例外拆出。`_auto_backfill_reviews`（标题匹配）降为无 `report:` 指针旧 task 的遗留兜底。
 
-* **问题二 · 要不要封（唯一在审计闭环后）** —— **该审计报告 待修=0** 时 `check`/`status` 给 `[NEXT] state=seal_ready`；`k3dge milestone seal <id>` 的 prompt 侧才问一次（无倒计时，N=不封）；`[NEXT] seal_ready` 只给 fact + 成对 option。未闭环先调 → `audit_needed`（指回 audit）。答「是」→ align（若还没跑）→ **归档 + 版本 + 里程碑指针**；答「否」→ 不封，里程碑继续挂着。
+* **要不要封（人发起，只问一次）** —— `check`/`status` 给 `[NEXT] state=seal_ready`（事实陈述 + 成对 option：seal / 不封）；`k3dge milestone seal <id>` 的 prompt 侧才问一次（无倒计时，N=不封）。**未审不是"不可封"**：审计由 seal 相位 2 自己跑。答「是」→ 预审 → 审计 → **归档 + 版本 + 里程碑指针**；答「否」→ 不封，里程碑继续挂着。
 
 * **封板动作 = 收摊（上下文压缩）** —— `seal` 机械部分只完成归档+版本+指针；真正的收摊写 `docs/reviews/<date>-<id>-closure.md` 清单，由人/agent 补齐：落盘**失败/未采用的方案**（ADR/INCIDENT）、清理无关上下文、**更新 `docs/architecture/overview.md` 与设计文档**、最后提交里程碑。k3dge 不替判内容——这就是 architecture 更新该待的地方，不是命令钩子。
 
@@ -26,12 +26,12 @@
 
 * **外来审计源落盘** —— 人贴/agent 转发的报告经 `k3dge milestone audit-submit <id> [--file <报告.md> | -]`（或 MCP `k3dge_submit_audit_report`）落盘为 `docs/reviews/YYYY-MM-DD-<id>-<scope>-audit.md` 本版报告（缺 12 列表头自动补；最新覆盖旧）。该报告 待修=0 才算闭环。（`--kind quality` 保留为 legacy，不再有独立质量腿。）
 
-* **审计条件 Checklist（不是封板 checklist）** —— `.agent/audit_checklist.json` 记**审计条件达成 + 审计环状态**：量化触发快照（账齐/C2/体积 + reasons）、该审计报告的 `待修`（closure）、`verify_attempts`（>3 升级用）、`audit_started_at`；以当前里程碑任务状态 hash 为键缓存（任务集不变 `check` 不重算）。**`k3dge milestone audit <id>` 发起审计时重置**（verify 预算归零 + 打 started_at，重跑拿新的 3 次预算）。封板资格不在此，由 `audit_trigger.audit_closed` 判。`k3dge milestone checklist <id>` 查看。
+* **审计条件 Checklist（不是封板 checklist）** —— `.agent/audit_checklist.json` 记**审计条件达成 + 审计环状态**：量化触发快照（账齐/C2/体积 + reasons）、该审计报告的 `待修`（closure）、`verify_attempts`（>3 升级用）、`audit_started_at`；以当前里程碑任务状态 hash 为键缓存（任务集不变 `check` 不重算）。**`k3dge milestone audit <id>` 发起审计时重置**（verify 预算归零 + 打 started_at，重跑拿新的 3 次预算）。**它是运行态投影，不作封板判据**（判据只认 git 事实：基线 hash / `tag <M>` / 封版提交 trailer）。`k3dge milestone checklist <id>` 查看。
 
-* **钩子链（消费者＝`milestone audit`，不是 seal）** —— `seal` **不触发审计**：它只把 `audit_closed` 当**前置闸**（有报告 + 待修=0），缺则拒并给 `[NEXT] audit_needed`；审计由 `k3dge milestone audit <id>`（或外部报告 `k3dge milestone audit-submit`）显式发起。外部步声明在 `[checks.audit]`：`stages_produce` = `k3dit.actions.audit`（一份必做）；`stages_verify` = `k3dit.actions.verify`（核对本报告）。缺省在 `engine/gates.DEFAULTS`，**声明面唯一**＝`.agent/pipeline.toml`（`[checks.*]`/`[gates.*]`），下游可配、坏配置回落缺省；`.agent/gates.toml` 已废（存在即红一次逼迁移）；声明了却解析不到 peer action ⇒ `PIPELINE_UNRESOLVED_STAGE`（不让声明空转）。原 `[pipelines.on_seal_enter]` / `[on_pre_seal]` **已废**：那两处只有 schema 校验、没有执行者。`transports` 链 `mcp→cli→manual`/`skip`，`skip` 记 `HARNESS_SKIP` 于 `logs/k3dge.log`。k3dge 只调透镜、不自己审/打分（sidecar，ADR-0006）。
+* **钩子链（`seal` 相位 2 是消费者）** —— `seal` **自己跑审计**（声明面 `[checks.seal].actions` 里的 `audit` 节点，位在 `full_matrix` 之后、`archive` 之前）；`k3dge milestone audit <id>` / 外部报告 `k3dge milestone audit-submit <id>` 是**独立的主动入口**，语义不变。审计结果只认**闭集** `closed` / `degraded-manual`（须署名）/ `escalated` / `refused`：只有前两者推进版号，**`skip` 与空转一律 `refused`**（先判"这一跳真跑过"，再谈报告在不在）。外部步声明在 `[checks.audit]`：`stages_produce` = `k3dit.actions.audit`（一份必做）；`stages_verify` = `k3dit.actions.verify`（核对本报告）。缺省在 `engine/gates.DEFAULTS`，**声明面唯一**＝`.agent/pipeline.toml`（`[checks.*]`/`[gates.*]`），下游可配、坏配置回落缺省；`.agent/gates.toml` 已废（存在即红一次逼迁移）；声明了却解析不到 peer action ⇒ `PIPELINE_UNRESOLVED_STAGE`（不让声明空转）。原 `[pipelines.on_seal_enter]` / `[on_pre_seal]` **已废**：那两处只有 schema 校验、没有执行者。`transports` 链 `mcp→cli→manual`/`skip`，`skip` 记 `HARNESS_SKIP` 于 `logs/k3dge.log`。k3dge 只调透镜、不自己审/打分（sidecar，ADR-0006）。
 
 * **`[NEXT]` 提示（命令结果附下一跳）** —— 单一事实源 `engine/nextstep.STATE_OPTIONS` + `engine/audit_trigger.py`，与 `pipeline.toml`/`AGENTS.md §12` 同一张表。优先级：`pending_findings`（有钉的 pending）> `seal_ready`（审计报告闭环）> `audit_suggested`（量化触发）。只报合法下一步、不替人决定；`reasons` 可数。`new_domain` 仍单独报；`overview` 更新已移出钩子。
 
-* **门禁** —— `seal` 机器闸是 `align-pass`、无 `align-stub`、无 `guide-stub`、正文列出该里程碑全部任务，缺一即 `SEAL REJECTED`。不读 `SUMMARY.md`（ADR-0018）。未闭环（缺报告或 `待修>0`）`run_seal_flow` 返回 `audit_needed`，不进封板。
+* **门禁（两道机械）** —— ①**预审**（进审计的门槛）：`tasks_all_done` + `align-pass`/无 `align-stub`/正文列出全部任务 + `docs/guides/` 无 stub + ADR 全 Accepted 且带落地指针 + `docs_normalized`；②**落点闸**：审计线合并回主干时跑 `sync + check + doc-gate + pytest`，红则回滚主干（先验后并）。不读 `SUMMARY.md`（ADR-0018）。**报告降为可选产物**（存在则须合格：12 列 + `审计人`/`透镜来源`/`基线`），不再作封板前置；边界由 `tag <M>=<B>` 表达。
 
 * **归档** —— `seal` 将 tasks 移入 `docs/tasks/archive/<id>/`；将本里程碑 reviews（文件名含该 id，或正文含 align-pass 标记；他里程碑文件名不动）移入 `docs/reviews/archive/<id>/`，并改写 `docs/reviews/LEFTOVERS.md` 相对链接。失败回滚移动并还原 LEFTOVERS.md。

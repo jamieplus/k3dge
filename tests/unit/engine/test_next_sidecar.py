@@ -35,7 +35,7 @@ def test_persist_writes_sidecar():
         assert card["state"] == "seal_ready"
         assert card["milestone"] == "M10"
         # 陈述式事实 + 成对选项（ADR-0026 §2.2）；question 只给有应答通道的消费者
-        assert "封板与否由你决定" in card["fact"]
+        assert "是否收这一章由你决定" in card["fact"]
         assert not card["fact"].rstrip().endswith(("？", "?"))
         assert len(card["options"]) >= 2
         assert "封板？" in card["question"]

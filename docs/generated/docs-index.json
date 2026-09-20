@@ -761,11 +761,11 @@
       "tokens": "报告降级为可选产物：`audit_closed`/`evidence_chain` 不再卡门、`audit-submit` 只补证据、运行态明标投影"
     },
     {
-      "path": "docs/tasks/2026-09-20-M10-refactor-seal_phases.md",
+      "path": "docs/tasks/2026-09-20-M10-refactor-seal_phases.done.md",
       "type": "tasks",
-      "id": "2026-09-20-M10-refactor-seal_phases",
+      "id": "2026-09-20-M10-refactor-seal_phases.done",
       "title": "封版三相位重排：预审（align+形式闸）→ 审计 → 审核后自动；`full_matrix` 移出封板动作、删 `satisfies`",
-      "status": "idea",
+      "status": "done",
       "tokens": "封版三相位重排：预审（align+形式闸）→ 审计 → 审核后自动；`full_matrix` 移出封板动作、删 `satisfies`"
     }
   ]
