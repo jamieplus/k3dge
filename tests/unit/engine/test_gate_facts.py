@@ -63,9 +63,9 @@ class TestFixClassification(unittest.TestCase):
         det = {c for c in gate_facts.GATE_FACTS if gate_facts.fix_kind(c) == "deterministic"}
         for code in ("TASK_BODY_META_REDUNDANT", "ADR_SUPERSEDE_UNRECONCILED", "DOC_INDEX_STALE",
                      "CONTRACT_DRIFT", "CONTRACT_HASH_MISSING", "VERSION_MISMATCH",
-                     "MD_TRAILING_WS", "MD_CRLF", "MD_NO_FINAL_NEWLINE", "MD_ENCODING"):
+                     "MD_TRAILING_WS", "MD_CRLF", "MD_NO_FINAL_NEWLINE"):
             self.assertIn(code, det, code)
-        for code in ("ADR_NUMBER_MISMATCH", "TEMPLATE_DRIFT", "MD_CONFLICT_MARKER",
+        for code in ("ADR_NUMBER_MISMATCH", "TEMPLATE_DRIFT", "MD_CONFLICT_MARKER", "MD_ENCODING",
                      "MD_FENCE_UNCLOSED", "DOC_SECTION_ORDER", "DOC_NEW_UNSCREENED",
                      "DOC_SCHEMA_INVALID", "DANGLING_ADR_REF", "TASK_STATUS_MISMATCH"):
             self.assertEqual(gate_facts.fix_kind(code), "judgment", code)

@@ -172,8 +172,9 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "pointers": ["docs/branches/AUTHORING.md"],
     },
     "MD_ENCODING": {
-        "severity": "block", "fix": "deterministic",
-        "fix_hint": "转 UTF-8（字节级，无需判断）",
+        # 分类修正（2026-09-19）：曾标 deterministic，但**源编码判断不了**——猜错会损坏文件
+        # （latin-1 解码永不失败，重编码成 UTF-8 会把非 ASCII 字节改义）⇒ 属判断类
+        "severity": "block", "fix": "judgment",
         "fact": "`{path}` 不是合法 UTF-8——受管文档一律 UTF-8",
         "options": ["转成 UTF-8 后重新提交", "该文件不该是文本 → 移出 docs/ 或声明排除"],
         "pointers": ["scripts/pre-commit"],

@@ -97,6 +97,17 @@ STATE_OPTIONS: dict = {
         ],
         "pointers": ["k3dge ADR-0004 §2.1.4", "docs/reviews/"],
     },
+    "doc_fix": {
+        "priority": 2,
+        "fact": "docs/ 有 <n> 处**可确定修**的规约偏差（<rules>）；改与不改由你决定"
+                "（不改则封板前置 `docs_normalized` 会拦）",
+        "options": [
+            "k3dge doc fix --dry-run（先看要改哪里）",
+            "k3dge doc fix（按闭集规则改；改完自己 review diff 再提交）",
+            "不处理（偏差留着，封板前会被闸拦）",
+        ],
+        "pointers": ["docs/tasks/AUTHORING.md", "k3dge ADR-0022 §2.2"],
+    },
     "audit_needed": {
         "priority": 2,
         "fact": "里程碑 <id> 未审计，不可封板（封＝归档+版本+指针，非界限）",

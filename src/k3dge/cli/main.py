@@ -154,6 +154,18 @@ def _collect_hints(workspace: Path) -> list:
             steps.append(nextstep.NextStep.from_state("doc_audit", get_current_milestone(workspace)))
     except Exception:
         pass
+    try:
+        # 可确定修的规约偏差 ⇒ 主动动作（ADR-0022 §2.2：内容规约化，封板前做完）
+        from k3dge.engine import doc_fix
+
+        dev = doc_fix.scan(workspace)
+        if dev:
+            ns = nextstep.NextStep.from_state("doc_fix", get_current_milestone(workspace) or "")
+            ns.fact = (ns.fact or "").replace("<n>", str(len(dev))).replace(
+                "<rules>", "、".join(sorted({d["rule"] for d in dev})))
+            steps.append(ns)
+    except Exception:
+        pass
     return steps
 
 
@@ -432,6 +444,24 @@ def cmd_doc(args: argparse.Namespace) -> int:
         print(f"      {rel} 本次提交放行；回执是 ephemeral（.protocol-ack/，不入库）")
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc screen -> {rel} -> {concl}")
         return 0
+    if action == "fix":
+        # 主动动作：按闭集规则规范化受管文档（幂等；--dry-run 只报不改）
+        from k3dge.engine import doc_fix
+
+        dry = bool(getattr(args, "dry_run", False))
+        report = doc_fix.apply(workspace, dry_run=dry)
+        n = len(report["fixed"])
+        files = report["changed_files"]
+        print(f"[DOC] {'dry-run：将修' if dry else '已修'} {n} 处（{len(files)} 个文件）"
+              + ("" if dry else "；请 review diff 后提交"))
+        for f in report["fixed"][:20]:
+            print(f"  - [{f['rule']}] {f['path']}")
+        if len(report["fixed"]) > 20:
+            print(f"  … {len(report['fixed']) - 20} more")
+        if report.get("remaining"):
+            print(f"  ! {report['remaining']} 处检测到但未能改（需人处理）")
+        _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc fix -> fixed={n} dry_run={dry}")
+        return 0 if not report.get("remaining") else 1
     if args.doc_action == "sync":
         from k3dge.sync.generator import sync_all
 
@@ -1206,6 +1236,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_doc_grep.add_argument("--include-archive", action="store_true")
     p_doc_grep.add_argument("--json", dest="as_json", action="store_true")
     p_doc_grep.set_defaults(func=cmd_doc)
+    p_doc_fix = doc_sub.add_parser(
+        "fix",
+        help="按闭集规则规范化受管文档（幂等；--dry-run 预览）——解 seal 前置 docs_normalized",
+    )
+    p_doc_fix.add_argument("--dry-run", dest="dry_run", action="store_true", help="只报不改")
+    p_doc_fix.set_defaults(func=cmd_doc)
     p_doc_screen = doc_sub.add_parser(
         "screen",
         help="新建受管文档的重复/覆盖排查回执（解 pre-commit 的 DOC_NEW_UNSCREENED 阻断）",

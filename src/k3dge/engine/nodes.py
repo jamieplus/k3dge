@@ -38,6 +38,7 @@ NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {
     "guides_filled": {"kind": "projection", "on_error": "stop"},
     "adrs_all_accepted": {"kind": "projection", "on_error": "stop"},
     "adr_landed": {"kind": "projection", "on_error": "stop"},
+    "docs_normalized": {"kind": "projection", "on_error": "stop"},   # 只读检测（doc_fix.scan）
     # --- seal 动作 ---
     "full_matrix": {"kind": "projection", "on_error": "stop"},          # 跑矩阵 + 抹 align stub
     "archive": {"kind": "fact", "on_error": "rollback", "on_rerun": "reject",

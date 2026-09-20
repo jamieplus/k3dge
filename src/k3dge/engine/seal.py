@@ -168,6 +168,23 @@ def _seal_archive(workspace: Path, milestone_id: str, tasks: List[MilestoneTask]
         return True, f"{sealed} (milestone bump failed)"
 
 
+def _docs_normalized_error(workspace: Path) -> Optional[str]:
+    """`docs_normalized` 前置闸：docs 可确定修的规约偏差必须归零（ADR-0022 §2.2 🅰1.4）。
+
+    为何是**前置闸**而不是 seal 的动作：规约化若在审计闭环之后改文档，刚闭环的审计证据
+    （审的是旧文档）就失效了 ⇒ 必须在封板前做完，由 `k3dge doc fix`（[NEXT] 引导的主动动作）
+    完成；seal 只验"做没做"。语义类偏差（要读懂内容的）不在此闸，归里程碑轮的外部透镜。
+    """
+    from k3dge.engine import doc_fix
+
+    dev = doc_fix.scan(workspace)
+    if not dev:
+        return None
+    rules = sorted({d["rule"] for d in dev})
+    return (f"[SEAL REJECTED] docs/ 有 {len(dev)} 处可确定修的规约偏差（{', '.join(rules)}）；"
+            f"先跑 `k3dge doc fix`（可加 --dry-run 预览），再封板。")
+
+
 def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gates.Rejection]:
     """策略层：按「硬闸契约」`[checks.seal].preconditions` 求值全部前置闸，返回首个拒绝（None=全绿）。
 
@@ -201,6 +218,7 @@ def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gat
         ),
         "adrs_all_accepted": lambda _ctx: adr_gate.adrs_all_accepted(workspace),
         "adr_landed": lambda _ctx: adr_gate.adr_landed(workspace),
+        "docs_normalized": lambda _ctx: _docs_normalized_error(workspace),
     }
     ctx = {"workspace": workspace, "milestone_id": milestone_id,
            "tasks": tasks, "pending": pending, "unfilled": unfilled}

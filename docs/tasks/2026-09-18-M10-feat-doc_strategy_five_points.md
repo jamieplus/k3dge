@@ -1,5 +1,5 @@
 ---
-status: idea
+status: in-progress
 milestone: M10
 priority: P2
 date: 2026-09-18
@@ -97,3 +97,30 @@ date: 2026-09-18
 （规约化改写写盘 ⇒ `kind=fact` 还是 `projection` 取决于是否幂等——**先定形再落**）。
 
 `blocking:` 已清空（原指向的票已关；task_dag 的观测面会把它报成"指向已关票"）。
+
+## 进度（2026-09-19）：③ 的 k3dge 侧已落（`doc_fix` + `docs_normalized` 闸 + [NEXT] 主动动作）
+
+| 项 | 落点 | 实测 |
+| --- | --- | --- |
+| 确定性修复器 | `engine/doc_fix.py`：闭集 4 条文件级规则（`MD_TRAILING_WS` / `MD_CRLF` / `MD_NO_FINAL_NEWLINE` / `TASK_BODY_META_REDUNDANT`）+ `scan()` / `apply(dry_run)` | 幂等（再跑零改动）；`--dry-run` 不写盘；扫描面排除 aux/archive/generated/obsolete |
+| 与声明表对齐 | 守卫测试：`FIXABLE_RULES` 每条都必须在 `gate_facts` 里声明为 `deterministic`（两处状态机不得分叉） | — |
+| **分类修正** | `MD_ENCODING` 由 `deterministic` 改判 **judgment** | 理由：源编码判断不了，猜错会损坏文件（latin-1 解码永不失败 ⇒ 重编码成 UTF-8 会改义） |
+| 耐久闸 | `[checks.seal].preconditions += "docs_normalized"`（三处：代码缺省 / `pipeline.toml` / 资产模板）+ `[nodes.docs_normalized]` 声明 + `seal._docs_normalized_error` | 造一处行尾空白 ⇒ 闸红且 `gate_id=docs_normalized`、提示 `k3dge doc fix`；修完 ⇒ 过 |
+| 主动动作 | `k3dge doc fix [--dry-run]` + `[NEXT] state=doc_fix`（priority 2） | 提示实测：`fact: docs/ 有 1 处**可确定修**的规约偏差（MD_TRAILING_WS）…`，3 个成对选项 |
+
+### 定形记录（本票 ③ 的两处"先定形"结论）
+
+1. **规约化是前置闸 + 主动动作，不是 seal 的动作环里的自动改**。理由（比 ADR-0022 🅰1.3 的原措辞更严）：
+   若在 seal 的动作环里改文档，那是在**审计闭环之后**动手 ⇒ 刚闭环的审计证据（审的是旧文档）失效。
+   故必须在封板前做完，由 `[NEXT]` 引导的 `k3dge doc fix` 完成，seal 只验"做没做"。
+   ADR-0022 §2.2 里"放 seal 轮"应读作**封板前必须做完**（该 ADR 的措辞是否需要一句澄清，另行裁定）。
+2. **"外部透镜优先"不适用于本步**：外部透镜**判**（出报告），不做改写。故本步只做 k3dge 的闭集
+   确定性修；语义类偏差（要读懂内容的）留给同轮的外部透镜判 —— 与 ADR-0005 §2.7 🅰1.1「可判定的
+   形式规约归 k3dge、语义质量归外部透镜」一致。
+
+### 剩余（本票未完）
+
+- **退休 `run_doc_audit`**（报告 + 票路径）：`cli/main.py` 的 `doc-audit` 命令、`AGENTS.md §12`
+  那一行、`rules/04` 的 doc-audit 段、`docs/protocols/audit_default.md` 的 Doc Audit 节
+  （共约 16 处仍把它写成现行机制）
+- `.ack` 的 `--into` 目标存在性校验（C 线残渣）

@@ -395,3 +395,39 @@ def test_closure_has_tsv_trail(tmp_path):
     txt = p.read_text(encoding="utf-8")
     assert "ts\tphase\tdecision\twhy\tevidence\tresult" in txt
     assert "2026-09-04-M9-audit.md" in txt
+
+
+class TestDocsNormalizedGate(unittest.TestCase):
+    """`docs_normalized` 前置闸（ADR-0022 §2.2 🅰1.4：耐久＝闸）。
+
+    为何是前置闸而不是 seal 的动作：规约化若在审计闭环**之后**改文档，刚闭环的审计证据
+    （审的是旧文档）就失效了 ⇒ 必须在封板前做完，由 `k3dge doc fix` 完成，seal 只验"做没做"。
+    """
+
+    def setUp(self) -> None:
+        self.ws = pathlib.Path(tempfile.mkdtemp())
+        (self.ws / ".agent").mkdir(parents=True, exist_ok=True)
+        (self.ws / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
+        (self.ws / "docs" / "reviews").mkdir(parents=True, exist_ok=True)
+
+    def test_blocks_when_fixable_deviation_exists(self) -> None:
+        from k3dge.engine import doc_fix
+
+        ws = self.ws
+        _write_task(ws / "docs/tasks/x.md", "done", "M10")
+        (ws / "docs" / "memo").mkdir(parents=True, exist_ok=True)
+        (ws / "docs" / "memo" / "a.md").write_text("# t\n\n正文   \n", encoding="utf-8")
+        _set_seal_gates(ws, "docs_normalized")
+        err = seal_preconditions_error(ws, "M10")
+        self.assertIsNotNone(err)
+        self.assertEqual(getattr(err, "gate_id", None), "docs_normalized")
+        self.assertIn("k3dge doc fix", str(err))
+        # 修完 ⇒ 过闸
+        doc_fix.apply(ws)
+        self.assertIsNone(seal_preconditions_error(ws, "M10"))
+
+    def test_passes_when_clean(self) -> None:
+        ws = self.ws
+        _write_task(ws / "docs/tasks/x.md", "done", "M10")
+        _set_seal_gates(ws, "docs_normalized")
+        self.assertIsNone(seal_preconditions_error(ws, "M10"))

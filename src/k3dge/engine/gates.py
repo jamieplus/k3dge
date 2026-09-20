@@ -80,8 +80,9 @@ DEFAULTS: Dict[str, Any] = {
     # 两类 id 不混一张词表（ADR-0026 §2.1：席位原子调用 vs k3dge 自身的步）。
     # 见 ADR-0001 §2 第 8 条。
     "checks": {
+        # 耐久＝闸（ADR-0022 §2.2 🅰1.4）：docs 规约化必须在封板**之前**做完
         "seal": {"preconditions": ["tasks_all_done", "audit_closed", "evidence_chain", "align_pass", "guides_filled",
-                                   "adrs_all_accepted", "adr_landed"],
+                                   "adrs_all_accepted", "adr_landed", "docs_normalized"],
                  "actions": ["full_matrix", "archive", "closure_note", "prune"]},
         "align": {"preconditions": ["tasks_all_done"], "actions": ["full_matrix"]},
         # sync 链：顺序＝声明序；各步性质（投影/事实源）见 nodes.NODE_DEFAULTS

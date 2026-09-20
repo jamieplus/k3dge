@@ -102,7 +102,8 @@ transports = [
 
 [checks.seal]
 preconditions = ["tasks_all_done", "audit_closed", "evidence_chain", "align_pass",
-                 "guides_filled", "adrs_all_accepted", "adr_landed"]
+                 "guides_filled", "adrs_all_accepted", "adr_landed",
+                 "docs_normalized"]   # 耐久＝闸：规约化须在封板前做完（k3dge doc fix）
 actions = ["full_matrix", "archive", "closure_note", "prune"]
 
 [checks.align]
