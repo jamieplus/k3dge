@@ -40,7 +40,7 @@ def test_unmet_exits_one_and_lists_reason(tmp_path, monkeypatch):
     out = buf.getvalue()
     assert rc == 1
     assert "❌ audit_closed" in out
-    assert "先清 1 项" in out
+    assert "需你先办 1 项" in out
 
 
 def test_read_only_does_not_touch_state(tmp_path, monkeypatch):

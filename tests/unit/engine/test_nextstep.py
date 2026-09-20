@@ -491,11 +491,16 @@ class TestSealReadyStatesItsBlockers(TestCase):
         ns = nextstep.seal_ready_for(ws, "M10")
         self.assertIn("封板前置：全绿", ns.render_cli())
 
-    def test_repo_reports_the_two_real_blockers(self) -> None:
-        """自举：本仓 M10 的阻塞项就是 align_pass（无 marker）与 adrs_all_accepted（0026 Proposed）。"""
+    def test_repo_reports_only_operator_actionable_blockers(self) -> None:
+        """自举：本仓 M10 需人先办的是 adrs_all_accepted（0026 Proposed）/ audit_fresh（报告过期）。
+
+        `align_pass` **不列入**——seal 的第一个动作就是 `full_matrix`（跑 align + 写 marker），
+        把它列成"需你先办"会误导（本会话发现并修正的真实误报）。
+        """
         ns = nextstep.seal_ready_for(REPO, "M10")
-        self.assertIn("align_pass", ns.fact)
         self.assertIn("adrs_all_accepted", ns.fact)
+        self.assertIn("audit_fresh", ns.fact)
+        self.assertNotIn("align_pass", ns.fact)
 
     def test_base_fact_has_no_placeholder_leak(self) -> None:
         """`from_state("seal_ready")` 仍可单独用 ⇒ 基础 fact 不得含占位符。"""

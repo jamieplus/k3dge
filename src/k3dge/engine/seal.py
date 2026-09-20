@@ -299,36 +299,59 @@ def seal_checklist(workspace: Path, milestone_id: str) -> list:
     "封板前必须做的事"一次看清（`k3dge milestone seal-check <id>`），
     `[NEXT]` 的 blockers 与 seal 的拒绝信息都从这一份数据投影。
     """
+    from k3dge.engine import nodes
+
     refs = _seal_gate_registry(workspace, milestone_id)
+    auto = nodes.satisfied_ids(workspace, "seal")
     out = []
     for gid in gates.preconditions(workspace, "seal"):
         fn = refs["fns"].get(gid)
         if fn is None:
-            out.append((gid, False, f"gate contract references unknown gate id: '{gid}'"))
+            out.append((gid, False, f"gate contract references unknown gate id: '{gid}'", False))
             continue
         err = fn(refs["ctx"])
-        out.append((gid, not err, "" if not err else str(err)))
+        # `auto`：现在不过，但 seal 自己的动作会先跑它（如 `full_matrix` → 写 align-pass marker）
+        out.append((gid, not err, "" if not err else str(err), bool(err) and gid in auto))
     return out
 
 
 def unmet_seal_preconditions(workspace: Path, milestone_id: str) -> list:
-    """未过的前置闸 `[(gate_id, message)]`（由 `seal_checklist` 派生，单一判据源）。"""
-    return [(gid, msg) for gid, ok, msg in seal_checklist(workspace, milestone_id) if not ok]
+    """**需人先办**的未过闸 `[(gate_id, message)]`（由 `seal_checklist` 派生，单一判据源）。
+
+    不含"seal 自己会跑"的项（`auto_satisfied_ids`）——把 `align_pass` 列成"需你先办"是
+    误导：`seal` 的第一个动作就是 `full_matrix`（跑 align + 写 marker），前置闸是在它之后
+    才评估的。这类项在清单里以 ⚙️ 呈现（跑失败则以 align 的理由拒）。
+    """
+    return [(gid, msg) for gid, ok, msg, auto in seal_checklist(workspace, milestone_id)
+            if not ok and not auto]
+
+
+def auto_pending_seal_gates(workspace: Path, milestone_id: str) -> list:
+    """"seal 会自己跑、但现在还没跑"的前置闸 id（清单里的 ⚙️ 项）。"""
+    return [gid for gid, ok, _m, auto in seal_checklist(workspace, milestone_id) if auto]
 
 
 def render_checklist(workspace: Path, milestone_id: str) -> str:
     """清单的人读投影（✓/✗ + 原因），供 seal 拒绝信息与 `seal-check` 共用。"""
     rows = seal_checklist(workspace, milestone_id)
-    bad = [gid for gid, ok, _ in rows if not ok]
-    lines = [f"封板前置清单（{milestone_id}）：{len(rows) - len(bad)}/{len(rows)} 通过"]
-    for gid, ok, msg in rows:
+    ok_ids = [gid for gid, ok, _m, _a in rows if ok]
+    auto = [gid for gid, ok, _m, a in rows if a]
+    bad = [gid for gid, ok, _m, a in rows if not ok and not a]
+    lines = [f"封板前置清单（{milestone_id}）：{len(ok_ids)}/{len(rows)} 通过"
+             + (f"，{len(auto)} 项由 seal 自动完成" if auto else "")]
+    for gid, ok, msg, is_auto in rows:
+        first = msg.splitlines()[0] if msg else ""
         if ok:
             lines.append(f"  ✅ {gid}")
+        elif is_auto:
+            lines.append(f"  ⚙️ {gid} —— seal 会先跑它（{first[:90]}）；跑失败则以该理由拒")
         else:
-            first = msg.splitlines()[0] if msg else ""
             lines.append(f"  ❌ {gid} —— {first[:110]}")
     if bad:
-        lines.append(f"  ⇒ 先清 {len(bad)} 项：{', '.join(bad)}；`k3dge milestone seal-check {milestone_id}` 可随时复查")
+        lines.append(f"  ⇒ 需你先办 {len(bad)} 项：{', '.join(bad)}；"
+                     f"`k3dge milestone seal-check {milestone_id}` 可随时复查")
+    if auto:
+        lines.append(f"  ⇒ ⚙️ {'、'.join(auto)} 由 seal 自己的动作完成，无需你预先处理")
     return "\n".join(lines)
 
 
@@ -360,3 +383,10 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
     if ok:
         return True, out
     return False, gates.rejection(out, "archive_failed")
+
+
+def auto_satisfied_ids(workspace: Path, op: str) -> set:
+    """兼容别名 → `nodes.satisfied_ids`（归属在节点声明层）。"""
+    from k3dge.engine import nodes
+
+    return nodes.satisfied_ids(workspace, op)

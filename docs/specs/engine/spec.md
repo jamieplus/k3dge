@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:e655f0ac0f5ddd4723aeb97a3b7c7f26beabc8d12616ba558c38dd797f7d6e8a`
+- **Contract Hash**: `sha256:1ef5b636e74eb7cd47af2fe7c62b065788d785a8b9cdcfe5fdb8c1710f445070`
 - **Last Updated**: 2026-09-20
 
 ## 1. Domain Boundary & Responsibilities
@@ -354,10 +354,11 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 from k3dge.engine import gates
-NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {'tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'audit_closed': {'kind': 'projection', 'on_error': 'stop'}, 'evidence_chain': {'kind': 'projection', 'on_error': 'stop'}, 'align_pass': {'kind': 'projection', 'on_error': 'stop'}, 'guides_filled': {'kind': 'projection', 'on_error': 'stop'}, 'adrs_all_accepted': {'kind': 'projection', 'on_error': 'stop'}, 'adr_landed': {'kind': 'projection', 'on_error': 'stop'}, 'docs_normalized': {'kind': 'projection', 'on_error': 'stop'}, 'audit_fresh': {'kind': 'projection', 'on_error': 'stop'}, 'full_matrix': {'kind': 'projection', 'on_error': 'stop'}, 'archive': {'kind': 'fact', 'on_error': 'rollback', 'on_rerun': 'reject', 'produces': ['archived_paths']}, 'closure_note': {'kind': 'projection', 'on_error': 'continue'}, 'prune': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'align_tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'sync_extractors': {'kind': 'projection', 'on_error': 'continue'}, 'reconcile_adrs': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append', 'produces': ['adr_report']}, 'sync_domains': {'kind': 'projection', 'on_error': 'stop', 'produces': ['changed']}, 'sync_manual_docs': {'kind': 'projection', 'on_error': 'stop', 'produces': ['docs_updated']}, 'sync_docs_index': {'kind': 'projection', 'on_error': 'stop'}}
+NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {'tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'audit_closed': {'kind': 'projection', 'on_error': 'stop'}, 'evidence_chain': {'kind': 'projection', 'on_error': 'stop'}, 'align_pass': {'kind': 'projection', 'on_error': 'stop'}, 'guides_filled': {'kind': 'projection', 'on_error': 'stop'}, 'adrs_all_accepted': {'kind': 'projection', 'on_error': 'stop'}, 'adr_landed': {'kind': 'projection', 'on_error': 'stop'}, 'docs_normalized': {'kind': 'projection', 'on_error': 'stop'}, 'audit_fresh': {'kind': 'projection', 'on_error': 'stop'}, 'full_matrix': {'kind': 'projection', 'on_error': 'stop', 'satisfies': ['align_pass']}, 'archive': {'kind': 'fact', 'on_error': 'rollback', 'on_rerun': 'reject', 'produces': ['archived_paths']}, 'closure_note': {'kind': 'projection', 'on_error': 'continue'}, 'prune': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'align_tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'sync_extractors': {'kind': 'projection', 'on_error': 'continue'}, 'reconcile_adrs': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append', 'produces': ['adr_report']}, 'sync_domains': {'kind': 'projection', 'on_error': 'stop', 'produces': ['changed']}, 'sync_manual_docs': {'kind': 'projection', 'on_error': 'stop', 'produces': ['docs_updated']}, 'sync_docs_index': {'kind': 'projection', 'on_error': 'stop'}}
 decl(workspace: Path, node_id: str) -> Dict[str, Any]
 kind(workspace: Path, node_id: str) -> str
 on_error(workspace: Path, node_id: str) -> str
+satisfied_ids(workspace: Path, op: str) -> set
 NodeFn = Callable[[Dict[str, Any]], Any]
 run_phase(workspace: Path, op: str, phase: str, registry: Dict[str, NodeFn], ctx: Dict[str, Any]) -> Tuple[bool, Any]
 from __future__ import annotations
@@ -502,8 +503,10 @@ scan_unfilled_guides(workspace: Path) -> List[str]
 seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gates.Rejection]
 seal_checklist(workspace: Path, milestone_id: str) -> list
 unmet_seal_preconditions(workspace: Path, milestone_id: str) -> list
+auto_pending_seal_gates(workspace: Path, milestone_id: str) -> list
 render_checklist(workspace: Path, milestone_id: str) -> str
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
+auto_satisfied_ids(workspace: Path, op: str) -> set
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional

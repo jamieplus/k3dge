@@ -41,7 +41,9 @@ NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {
     "docs_normalized": {"kind": "projection", "on_error": "stop"},   # 只读检测（doc_fix.scan）
     "audit_fresh": {"kind": "projection", "on_error": "stop"},       # 只读检测（报告基线 vs HEAD）
     # --- seal 动作 ---
-    "full_matrix": {"kind": "projection", "on_error": "stop"},          # 跑矩阵 + 抹 align stub
+    # `satisfies`：该动作会满足哪个前置闸（声明式，供"封板清单"区分
+    # "seal 自己会跑" vs "需人先办"——`align_pass` 由本动作（跑 align + 写 marker）满足）
+    "full_matrix": {"kind": "projection", "on_error": "stop", "satisfies": ["align_pass"]},
     "archive": {"kind": "fact", "on_error": "rollback", "on_rerun": "reject",
                 "produces": ["archived_paths"]},                        # 归档＝写一次即历史
     "closure_note": {"kind": "projection", "on_error": "continue"},     # 清单可重生成
@@ -74,6 +76,16 @@ def kind(workspace: Path, node_id: str) -> str:
 def on_error(workspace: Path, node_id: str) -> str:
     val = str(decl(workspace, node_id).get("on_error") or "stop")
     return val if val in ("stop", "rollback", "continue") else "stop"
+
+
+def satisfied_ids(workspace: Path, op: str) -> set:
+    """本编排单元里"**由自己的动作满足**"的前置闸 id（读 `[nodes.*].satisfies` 声明）。
+
+    用例：`full_matrix` 跑 align 并写 align-pass marker ⇒ `align_pass` 这个前置闸由 seal
+    自己的第一个动作满足，清单里该显示 ⚙️ 而不是"需你先办"（否则误导操作者去手跑 align）。
+    """
+    aids = gates.actions(workspace, op)
+    return {str(gid) for aid in aids for gid in (decl(workspace, aid).get("satisfies") or [])}
 
 
 NodeFn = Callable[[Dict[str, Any]], Any]

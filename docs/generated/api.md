@@ -556,11 +556,13 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 from k3dge.engine import gates
-NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {'tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'audit_closed': {'kind': 'projection', 'on_error': 'stop'}, 'evidence_chain': {'kind': 'projection', 'on_error': 'stop'}, 'align_pass': {'kind': 'projection', 'on_error': 'stop'}, 'guides_filled': {'kind': 'projection', 'on_error': 'stop'}, 'adrs_all_accepted': {'kind': 'projection', 'on_error': 'stop'}, 'adr_landed': {'kind': 'projection', 'on_error': 'stop'}, 'docs_normalized': {'kind': 'projection', 'on_error': 'stop'}, 'audit_fresh': {'kind': 'projection', 'on_error': 'stop'}, 'full_matrix': {'kind': 'projection', 'on_error': 'stop'}, 'archive': {'kind': 'fact', 'on_error': 'rollback', 'on_rerun': 'reject', 'produces': ['archived_paths']}, 'closure_note': {'kind': 'projection', 'on_error': 'continue'}, 'prune': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'align_tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'sync_extractors': {'kind': 'projection', 'on_error': 'continue'}, 'reconcile_adrs': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append', 'produces': ['adr_report']}, 'sync_domains': {'kind': 'projection', 'on_error': 'stop', 'produces': ['changed']}, 'sync_manual_docs': {'kind': 'projection', 'on_error': 'stop', 'produces': ['docs_updated']}, 'sync_docs_index': {'kind': 'projection', 'on_error': 'stop'}}
+NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {'tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'audit_closed': {'kind': 'projection', 'on_error': 'stop'}, 'evidence_chain': {'kind': 'projection', 'on_error': 'stop'}, 'align_pass': {'kind': 'projection', 'on_error': 'stop'}, 'guides_filled': {'kind': 'projection', 'on_error': 'stop'}, 'adrs_all_accepted': {'kind': 'projection', 'on_error': 'stop'}, 'adr_landed': {'kind': 'projection', 'on_error': 'stop'}, 'docs_normalized': {'kind': 'projection', 'on_error': 'stop'}, 'audit_fresh': {'kind': 'projection', 'on_error': 'stop'}, 'full_matrix': {'kind': 'projection', 'on_error': 'stop', 'satisfies': ['align_pass']}, 'archive': {'kind': 'fact', 'on_error': 'rollback', 'on_rerun': 'reject', 'produces': ['archived_paths']}, 'closure_note': {'kind': 'projection', 'on_error': 'continue'}, 'prune': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'align_tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'sync_extractors': {'kind': 'projection', 'on_error': 'continue'}, 'reconcile_adrs': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append', 'produces': ['adr_report']}, 'sync_domains': {'kind': 'projection', 'on_error': 'stop', 'produces': ['changed']}, 'sync_manual_docs': {'kind': 'projection', 'on_error': 'stop', 'produces': ['docs_updated']}, 'sync_docs_index': {'kind': 'projection', 'on_error': 'stop'}}
 decl(workspace: Path, node_id: str) -> Dict[str, Any]
     # doc: 节点属性：`NODE_DEFAULTS` ← `pipeline.toml [nodes.<id>]`（下游可覆盖）。
 kind(workspace: Path, node_id: str) -> str
 on_error(workspace: Path, node_id: str) -> str
+satisfied_ids(workspace: Path, op: str) -> set
+    # doc: 本编排单元里"**由自己的动作满足**"的前置闸 id（读 `[nodes.*].satisfies` 声明）。
 NodeFn = Callable[[Dict[str, Any]], Any]
 run_phase(workspace: Path, op: str, phase: str, registry: Dict[str, NodeFn], ctx: Dict[str, Any]) -> Tuple[bool, Any]
     # doc: 跑一个相位的全部节点（**单一执行器**）。返回 `(ok, 首个失败或末节点输出)`。
@@ -767,11 +769,15 @@ seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gates.R
 seal_checklist(workspace: Path, milestone_id: str) -> list
     # doc: **全量**封板前置清单：`[(gate_id, ok, message)]`，顺序＝声明序。
 unmet_seal_preconditions(workspace: Path, milestone_id: str) -> list
-    # doc: 未过的前置闸 `[(gate_id, message)]`（由 `seal_checklist` 派生，单一判据源）。
+    # doc: **需人先办**的未过闸 `[(gate_id, message)]`（由 `seal_checklist` 派生，单一判据源）。
+auto_pending_seal_gates(workspace: Path, milestone_id: str) -> list
+    # doc: "seal 会自己跑、但现在还没跑"的前置闸 id（清单里的 ⚙️ 项）。
 render_checklist(workspace: Path, milestone_id: str) -> str
     # doc: 清单的人读投影（✓/✗ + 原因），供 seal 拒绝信息与 `seal-check` 共用。
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
     # doc: 纯归档动作：id 合法 + 有任务 + 状态合法 → `_seal_archive`。策略闸在 `seal_preconditions_error`。
+auto_satisfied_ids(workspace: Path, op: str) -> set
+    # doc: 兼容别名 → `nodes.satisfied_ids`（归属在节点声明层）。
 # seal_flow.py
 from __future__ import annotations
 from pathlib import Path

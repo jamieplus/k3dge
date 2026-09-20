@@ -459,15 +459,16 @@ class TestSealChecklist(unittest.TestCase):
         from k3dge.engine.seal import seal_checklist
 
         rows = seal_checklist(self.ws, "M10")
-        self.assertEqual([gid for gid, _ok, _m in rows], gates.preconditions(self.ws, "seal"))
-        self.assertTrue(all(isinstance(ok, bool) for _g, ok, _m in rows))
+        self.assertEqual([r[0] for r in rows], gates.preconditions(self.ws, "seal"))
+        self.assertTrue(all(isinstance(r[1], bool) and isinstance(r[3], bool) for r in rows))
 
     def test_unmet_is_derived_from_checklist(self) -> None:
         from k3dge.engine.seal import seal_checklist, unmet_seal_preconditions
 
         rows = seal_checklist(self.ws, "M10")
         unmet = unmet_seal_preconditions(self.ws, "M10")
-        self.assertEqual(unmet, [(g, m) for g, ok, m in rows if not ok])
+        # unmet ＝ 未过 **且不是 seal 自己会跑** 的（`align_pass` 属后者 ⇒ 不进 unmet）
+        self.assertEqual(unmet, [(r[0], r[2]) for r in rows if not r[1] and not r[3]])
 
     def test_render_marks_pass_and_fail(self) -> None:
         from k3dge.engine.seal import render_checklist
@@ -478,7 +479,7 @@ class TestSealChecklist(unittest.TestCase):
         self.assertIn("✅ tasks_all_done", text)
         self.assertIn("❌ audit_closed", text)
         self.assertIn("1/2 通过", text)
-        self.assertIn("先清 1 项", text)
+        self.assertIn("需你先办 1 项", text)
 
     def test_missing_provenance_baseline_blocks_evidence_chain(self) -> None:
         """#1：`基线` 进必填署名/来源项 ⇒ 缺它时 evidence_chain 不过（清单里可见 ❌）。"""
@@ -497,13 +498,30 @@ class TestSealChecklist(unittest.TestCase):
         from k3dge.engine.seal_flow import run_seal_flow
 
         _write_task(self.ws / "docs/tasks/x.md", "done", "M10")
-        # 非审计类的失败（走 _archive 的拒绝路径）：align_pass 缺 marker
-        _set_seal_gates(self.ws, "tasks_all_done", "align_pass")
+        # 非审计类的失败（走 _archive 的拒绝路径）：guides 有 stub（❌ 需人办，非 ⚙️）
+        _write_task(self.ws / "docs/tasks/x.md", "done", "M10")
+        (self.ws / "docs" / "guides").mkdir(parents=True, exist_ok=True)
+        (self.ws / "docs" / "guides" / "g.md").write_text(
+            "# G\n<!-- k3dge:guide-stub -->\n", encoding="utf-8")
+        _set_seal_gates(self.ws, "tasks_all_done", "guides_filled")
         status, msg = run_seal_flow(self.ws, "M10", prompter=_no_prompt())
         self.assertEqual(status, "rejected")
         self.assertIn("封板前置清单（M10）", msg)
-        self.assertIn("❌ align_pass", msg)
+        self.assertIn("❌ guides_filled", msg)
         self.assertIn("✅ tasks_all_done", msg)
+
+    def test_align_pass_is_marked_auto_not_todo(self) -> None:
+        """`align_pass` 由 seal 自己的第一个动作（`full_matrix`→跑 align+写 marker）满足
+        ⇒ 清单里是 ⚙️（auto），**不算"需你先办"**（否则误导操作者去手跑 align）。"""
+        from k3dge.engine.seal import auto_pending_seal_gates, render_checklist, unmet_seal_preconditions
+
+        _write_task(self.ws / "docs/tasks/x.md", "done", "M10")
+        _set_seal_gates(self.ws, "align_pass")
+        text = render_checklist(self.ws, "M10")
+        self.assertIn("⚙️ align_pass", text)
+        self.assertNotIn("❌ align_pass", text)
+        self.assertEqual(auto_pending_seal_gates(self.ws, "M10"), ["align_pass"])
+        self.assertEqual(unmet_seal_preconditions(self.ws, "M10"), [])   # 无需人先办
 
     def test_audit_needed_rejection_also_carries_the_checklist(self) -> None:
         """审计未闭环的早返回路径同样给全量清单（否则补完审计才发现还有未过闸）。"""
