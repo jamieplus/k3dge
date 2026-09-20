@@ -303,6 +303,6 @@ def run_audit_flow(
             pass
     ac.reset_verify_attempts(workspace)
     msg = f"Milestone {milestone_id}: 审计闭环（合并审计模块 12 列报告 待修=0），可以谈封板。"
-    _ns = nextstep.NextStep.from_state("seal_ready", milestone_id)
+    _ns = nextstep.seal_ready_for(workspace, milestone_id)
     nextstep.persist(workspace, _ns)
     return "audited", msg + "\n" + _ns.render_cli()

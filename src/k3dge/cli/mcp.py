@@ -405,7 +405,7 @@ def k3dge_milestone_control(
         if not ok:
             nxt = nextstep.next_for_rejection(milestone_id, msg)
         elif audit_closed(ws, milestone_id):
-            nxt = nextstep.NextStep.from_state("seal_ready", milestone_id)
+            nxt = nextstep.seal_ready_for(ws, milestone_id)
         else:
             _, reasons = compute_audit_suggestion(ws)
             nxt = nextstep.NextStep.from_state("audit_suggested", milestone_id, reasons=reasons)

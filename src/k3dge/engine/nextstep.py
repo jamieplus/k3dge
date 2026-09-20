@@ -84,7 +84,10 @@ STATE_OPTIONS: dict = {
     },
     "seal_ready": {
         "priority": 4,
+        # 基础事实；**封板前置**由 `seal_ready_for()` 追加（同表另存一句，避免占位符从
+        # 其它构造点漏出——`from_state("seal_ready")` 仍可单独用）
         "fact": "里程碑 <id> 审计已闭环（待修=0）；封板与否由你决定（封＝归档+版本+指针）",
+        "fact_with_blockers": "；封板前置：<blockers>",
         "question": "里程碑 <id>：封板？",
         "options": [
             "k3dge milestone seal <id>（align→归档+版本+指针）",
@@ -361,6 +364,26 @@ def load_persisted(workspace: Path) -> Optional[dict]:
         if c.get("state") == primary:
             return c
     return cards[0]
+
+
+def seal_ready_for(workspace: Path, milestone_id: str) -> "NextStep":
+    """`seal_ready` 的**唯一生产构造入口**：把"剩余封板前置闸"填进事实。
+
+    为何：`[NEXT]` 此前只说"审计已闭环"就让人去封板，而 `seal` 还要过 8 个前置闸
+    （tasks_all_done / align_pass marker / adrs_all_accepted / docs_normalized …）
+    ⇒ 投影与判据不同源，操作者跑到 seal 才发现。本函数让两者同源（都问
+    `seal.unmet_seal_preconditions`）。
+    """
+    from k3dge.engine.seal import unmet_seal_preconditions
+
+    ns = NextStep.from_state("seal_ready", milestone_id)
+    unmet = unmet_seal_preconditions(workspace, milestone_id)
+    suffix = str(STATE_OPTIONS["seal_ready"].get("fact_with_blockers") or "")
+    ns.fact = (ns.fact or "") + suffix.replace(
+        "<blockers>", "、".join(gid for gid, _ in unmet) or "全绿")
+    if unmet:
+        ns.reasons = [f"{gid}：{msg[:110]}" for gid, msg in unmet[:4]]
+    return ns
 
 
 def next_for_rejection(milestone: str, message, gate_id: Optional[str] = None) -> NextStep:

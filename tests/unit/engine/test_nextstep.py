@@ -8,6 +8,8 @@ from unittest import TestCase, mock
 
 from k3dge.engine import audit_trigger, gates, nextstep
 
+REPO = Path(__file__).resolve().parents[3]
+
 
 class TestNextStepRender(TestCase):
     def test_seal_ready_shape(self) -> None:
@@ -458,3 +460,73 @@ class TestProjectionInvariants(TestCase):
 
     def test_every_state_projects_a_fact(self) -> None:
         self.assertEqual([s for s, o in nextstep.STATE_OPTIONS.items() if not o.get("fact")], [])
+
+
+class TestSealReadyStatesItsBlockers(TestCase):
+    """`[NEXT] seal_ready` 的事实必须与 `seal` 的实际判据同源。
+
+    此前只说"审计已闭环"就让人去封板，而 seal 还要过 8 个前置闸（align marker /
+    ADR 全 Accepted / docs_normalized …）⇒ 操作者跑到 seal 才发现。
+    """
+
+    def _ws(self, preconditions: list) -> Path:
+        ws = Path(tempfile.mkdtemp())
+        (ws / ".agent").mkdir(parents=True)
+        body = ", ".join(f'"{p}"' for p in preconditions)
+        (ws / ".agent" / "pipeline.toml").write_text(
+            f"[checks.seal]\npreconditions = [{body}]\n", encoding="utf-8")
+        return ws
+
+    def test_lists_unmet_preconditions(self) -> None:
+        # `audit_closed` 在空仓必失败（无 12 列报告）；用它隔离"未过闸被列出"这一行为
+        ws = self._ws(["audit_closed"])
+        ns = nextstep.seal_ready_for(ws, "M10")
+        cli = ns.render_cli()
+        self.assertIn("封板前置：audit_closed", cli)
+        self.assertNotIn("<blockers>", cli)
+        self.assertTrue(ns.reasons and "audit_closed" in ns.reasons[0])
+
+    def test_says_all_green_when_clean(self) -> None:
+        ws = self._ws([])
+        ns = nextstep.seal_ready_for(ws, "M10")
+        self.assertIn("封板前置：全绿", ns.render_cli())
+
+    def test_repo_reports_the_two_real_blockers(self) -> None:
+        """自举：本仓 M10 的阻塞项就是 align_pass（无 marker）与 adrs_all_accepted（0026 Proposed）。"""
+        ns = nextstep.seal_ready_for(REPO, "M10")
+        self.assertIn("align_pass", ns.fact)
+        self.assertIn("adrs_all_accepted", ns.fact)
+
+    def test_base_fact_has_no_placeholder_leak(self) -> None:
+        """`from_state("seal_ready")` 仍可单独用 ⇒ 基础 fact 不得含占位符。"""
+        cli = nextstep.NextStep.from_state("seal_ready", "M7").render_cli()
+        self.assertNotIn("<blockers>", cli)
+        self.assertNotIn("封板前置", cli)
+
+
+class TestSealReadyHasOneConstructionEntry(TestCase):
+    """棘轮：生产代码里 `from_state("seal_ready")` 只能用 `seal_ready_for()`。
+
+    否则某条路径会渲染出没有前置信息的 seal_ready（投影与判据分叉）。
+    """
+
+    def test_no_raw_construction_in_src(self) -> None:
+        import ast
+
+        root = Path(__file__).resolve().parents[3] / "src" / "k3dge"
+        offenders = []
+        for py in sorted(root.rglob("*.py")):
+            if py.name == "nextstep.py":
+                continue
+            tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fn = node.func
+                name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+                if name != "from_state" or not node.args:
+                    continue
+                first = node.args[0]
+                if isinstance(first, ast.Constant) and first.value == "seal_ready":
+                    offenders.append(f"{py.relative_to(root)}:{node.lineno}")
+        self.assertEqual(offenders, [], f"用 seal_ready_for() 代替：{offenders}")

@@ -70,7 +70,7 @@ def lifecycle_next(workspace: Path) -> Any:
                 reasons=[f"job {x.get('job_id')}（{x.get('state')}）" for x in open_jobs[:3]],
             )
         if audit_closed(workspace, mid):
-            return nextstep.NextStep.from_state("seal_ready", mid)
+            return nextstep.seal_ready_for(workspace, mid)
         suggested, reasons = compute_audit_suggestion(workspace)
         if suggested:
             return nextstep.NextStep.from_state("audit_suggested", mid, reasons=reasons)

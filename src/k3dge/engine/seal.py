@@ -198,6 +198,15 @@ def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gat
 
     from k3dge.engine import nodes
 
+    refs = _seal_gate_registry(workspace, milestone_id)
+    ok, out = nodes.run_phase(workspace, "seal", "preconditions", refs["fns"], refs["ctx"])
+    return None if ok else out
+
+
+def _seal_gate_registry(workspace: Path, milestone_id: str) -> dict:
+    """seal 前置闸的注册表 + ctx（**唯一构造处**：单错报告与全量查询共用一份判据）。"""
+    from k3dge.engine.audit_trigger import audit_closed
+
     tasks = scan_milestone_tasks(workspace, milestone_id)
     pending = [t for t in tasks if t.status != "done"]
     unfilled = scan_unfilled_guides(workspace)
@@ -222,8 +231,27 @@ def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gat
     }
     ctx = {"workspace": workspace, "milestone_id": milestone_id,
            "tasks": tasks, "pending": pending, "unfilled": unfilled}
-    ok, out = nodes.run_phase(workspace, "seal", "preconditions", gate_fns, ctx)
-    return None if ok else out
+    return {"fns": gate_fns, "ctx": ctx}
+
+
+def unmet_seal_preconditions(workspace: Path, milestone_id: str) -> list:
+    """**全量**报出未过的封板前置闸 `[(gate_id, message)]`（顺序＝声明序）。
+
+    为什么需要：`seal_preconditions_error` 只报**首个**失败，而 `[NEXT] seal_ready` 的
+    事实若只说"审计已闭环"，就与 `seal` 的实际判据不一致（操作者以为可以封，跑 seal 才发现
+    缺 marker / ADR 未 Accepted）。本函数让投影面与实际判据同源。
+    """
+    refs = _seal_gate_registry(workspace, milestone_id)
+    out = []
+    for gid in gates.preconditions(workspace, "seal"):
+        fn = refs["fns"].get(gid)
+        if fn is None:
+            out.append(("unknown_gate_id", f"gate contract references unknown gate id: '{gid}'"))
+            continue
+        err = fn(refs["ctx"])
+        if err:
+            out.append((gid, str(err)))
+    return out
 
 
 def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
