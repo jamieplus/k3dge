@@ -121,6 +121,15 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
                     "这不是新决策 → 按「先并入，后新建」并入既存 ADR（写 Amended-by，不新开号）"],
         "pointers": ["docs/adr/obsolete/README.md（退役账本）", "docs/adr/AUTHORING.md「编号分配」"],
     },
+    "ADR_RETIRED_NO_DEST": {
+        "fix": "judgment", "severity": "block",
+        "fact": "`{path}` 已移入 `obsolete/` 但没写去向——**合并没有自动化**（`reconcile_supersedes` "
+                "只管 `Supersedes:` 与 `Rejected`），忘写就会变成「retired 但不知去哪」",
+        "options": ["补 `merged-into: ADR-XXXX §Y`（并入宿主 ADR 时）",
+                    "补 `superseded_by: ADR-XXXX`（被取代时）",
+                    "该 ADR 是被否决的提议 → 写 `Status: Rejected`（从未生效即其去向）"],
+        "pointers": ["docs/adr/obsolete/README.md（归档约定）", "docs/adr/AUTHORING.md「编号分配/删除/改名」"],
+    },
     "ADR_REF_RETIRED": {
         "fix": "judgment", "severity": "block",
         "fact": "`{path}` 引用了已退役的 ADR 号——那条决策已被合并/改名，引用会静默指错对象",

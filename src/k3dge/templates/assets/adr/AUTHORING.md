@@ -138,7 +138,7 @@ Amend 时在正文被修改处紧跟 Markdown footnote：
 
 - **分配**：下一个号 ＝ max over（`docs/adr/*.md` ∪ `docs/adr/obsolete/*.md` ∪ 退役账本表）+ 1。只增不减 ⇒ 退役号永不再发出。
 - **Numbers are never reused**：号一旦分配就永久绑定那一个决策；被合并/取代/否决后**该号退役**。
-- **退役只有一条路：移入 `obsolete/`**（frontmatter 写清去向：`merged-into` / `superseded-by`），由 `adr_gate.reconcile_supersedes`（挂 `k3dge sync`）执行。**不再物理删除**——物理删除会让退役号从目录消失，于是"本目录最大号 +1"必然把它重新发出（实测：19 个号被删过，其中 6 个被发出两次）。
+- **退役只有一条路：移入 `obsolete/`**，且**必须写清去向**：`merged-into: <宿主与小节>`（合并）/ `superseded_by: ADR-XXXX`（被取代）/ `Status: Rejected`（提议被否，从未生效即其去向）；机验码 `ADR_RETIRED_NO_DEST`。`Supersedes:` 与 `Rejected` 两条由 `adr_gate.reconcile_supersedes`（挂 `k3dge sync`）自动化，**合并没有自动化**（历史上写在宿主 ADR 的 Note + commit message 里）⇒ 用闸兜住'忘写去向'。**不再物理删除**——物理删除会让退役号从目录消失，于是"本目录最大号 +1"必然把它重新发出（实测：19 个号被删过，其中 6 个被发出两次）。
 - **退役账本** = `docs/adr/obsolete/README.md` 的「永久退役号」表。它只承载 baseline（2026-09-19 / `f749e27`）**之前**被物理删除、因而没有墓碑文件的 13 个号；baseline 之后的退役一律是 `obsolete/` 里的真文件，不进表。
 - **存量不追**：baseline 之前已被复用的 6 个号（0008/0009/0010/0022/0023/0026）保持现役、不迁号——迁号会打断全仓与下游仓继承的引用。口径同 ADR-0026 §2.5。
 - **机验码**（别再误信旧说法）：

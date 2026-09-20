@@ -524,3 +524,70 @@ class TestTaskClosureRecord(unittest.TestCase):
             for code, msg in pure_refs.check_task_closure_record(rel, p.read_text(encoding="utf-8")):
                 offenders.append(msg)
         self.assertEqual(offenders, [])
+
+
+class TestRetiredAdrDest(unittest.TestCase):
+    """退役 ADR 必须写清去向（票 adr_merge_retirement_gap）。
+
+    病灶：`reconcile_supersedes` 只自动化 `Supersedes:` 与 `Rejected`；**合并没有自动化**
+    （13 个永久退役号里 12 个是合并），而 `merged-into` 此前全仓只有读、没有写方、没有闸
+    ⇒ 忘写去向时退役卡片显示 retired 但去向空，读者仍找不到"这条去哪了"。
+    """
+
+    REL = "docs/adr/obsolete/0042-old-decisions.md"
+
+    def _fm(self, body: str) -> str:
+        return body
+
+    def test_missing_dest_blocks(self):
+        out = pure_refs.check_retired_adr_dest(self.REL, "---\nStatus: Superseded\n---\n# ADR-0042\n")
+        self.assertEqual([c for c, _ in out], ["ADR_RETIRED_NO_DEST"])
+        self.assertIn("merged-into", out[0][1])          # 提示里给出合法形态
+
+    def test_three_legal_forms_pass(self):
+        for body in ("---\nStatus: Superseded\nmerged-into: ADR-0005 §2.7\n---\n# ADR-0042\n",
+                     "---\nStatus: Superseded\nsuperseded_by: ADR-0005\n---\n# ADR-0042\n",
+                     "---\nStatus: Rejected\n---\n# ADR-0042\n"):
+            self.assertEqual(pure_refs.check_retired_adr_dest(self.REL, body), [], body)
+
+    def test_empty_value_does_not_count(self):
+        """写了键但值为空 ⇒ 仍算没写（不许空壳过关）。"""
+        out = pure_refs.check_retired_adr_dest(self.REL, "---\nmerged-into:\n---\n# ADR-0042\n")
+        self.assertEqual([c for c, _ in out], ["ADR_RETIRED_NO_DEST"])
+
+    def test_ledger_and_non_obsolete_skipped(self):
+        bad = "---\nStatus: Superseded\n---\n# ADR-0042\n"
+        self.assertEqual(pure_refs.check_retired_adr_dest("docs/adr/obsolete/README.md", bad), [])
+        self.assertEqual(pure_refs.check_retired_adr_dest("docs/adr/obsolete/_template.md", bad), [])
+        self.assertEqual(pure_refs.check_retired_adr_dest("docs/adr/0042-x.md", bad), [])
+
+    def test_repo_obsolete_has_no_offender(self):
+        """自举：本仓现状（obsolete/ 只有 README）⇒ 绿，不误伤。"""
+        offenders = []
+        for p in sorted((REPO / "docs" / "adr" / "obsolete").glob("*.md")):
+            rel = f"docs/adr/obsolete/{p.name}"
+            offenders += [m for _c, m in pure_refs.check_retired_adr_dest(rel, p.read_text(encoding="utf-8"))]
+        self.assertEqual(offenders, [])
+
+
+class TestRetiredDestRepoWideWiring(unittest.TestCase):
+    """接线证明：`obsolete/` 默认不在现行视图里（iter_managed_files 排除退役面），
+    所以 `k3dge check` 必须**显式扫**它，否则这条闸在仓库级永远不跑。"""
+
+    def test_validate_docs_reports_obsolete_without_dest(self):
+        import tempfile
+
+        from k3dge.engine.doc_catalog import validate_docs
+
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            obs = ws / "docs" / "adr" / "obsolete"
+            obs.mkdir(parents=True)
+            (obs / "0042-old.md").write_text("---\nStatus: Superseded\n---\n# ADR-0042\n", encoding="utf-8")
+            codes = [v.rule_id for v in validate_docs(ws, types=["adr"])]
+            self.assertIn("ADR_RETIRED_NO_DEST", codes)
+            # 补上去向 ⇒ 绿
+            (obs / "0042-old.md").write_text(
+                "---\nStatus: Superseded\nmerged-into: ADR-0005 §2.7\n---\n# ADR-0042\n", encoding="utf-8")
+            codes2 = [v.rule_id for v in validate_docs(ws, types=["adr"])]
+            self.assertNotIn("ADR_RETIRED_NO_DEST", codes2)

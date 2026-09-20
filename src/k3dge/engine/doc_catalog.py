@@ -402,6 +402,22 @@ def validate_docs(workspace: Path, types: Optional[Iterable[str]] = None) -> Lis
     """Structure-only gate. Types without ``.schema.json`` are skipped."""
     violations: List[Violation] = []
     wanted = list(types) if types is not None else iter_doc_types(workspace)
+    # 退役面：不参与默认视图（iter_managed_files 排除 obsolete/），但**去向必须可验** ⇒ 独立扫。
+    # 注意放在类型循环**之外**：不依赖 adr 有没有 .schema.json，闸不该因为缺 schema 被跳过。
+    if types is None or "adr" in wanted:
+        from k3dge.engine import pure_refs as _pr
+
+        obs = _type_dir(workspace, "adr") / "obsolete"
+        if obs.is_dir():
+            for op in sorted(obs.glob("*.md")):
+                orel = str(op.relative_to(workspace)).replace("\\", "/")
+                try:
+                    otext = op.read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError):
+                    continue
+                for code, msg in _pr.check_retired_adr_dest(orel, otext):
+                    violations.append(Violation(code, msg, file_path=orel, detail={"path": orel}))
+
     for typ in wanted:
         schema, err = _load_schema(workspace, typ)
         if err:

@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M10
 priority: P3
 date: 2026-09-19
@@ -66,3 +66,33 @@ merged-into 的读写面（grep）：
 - 来源：本轮「还剩哪些没做完」清单里我列的 D 项之一（"ADR 合并退役路径：既不自动移入 obsolete/，也没有闸验去向"）。
 - 与 `adr_number_cutline`（已关）的关系：那票把"退役面"建起来了（账本 + 两个编号码），本票补"去向字段"这一格。
 - 优先级 P3：baseline 之后还没有实际发生过合并退役（无存量受害）；它是**防未来**的闸。
+
+## 落地（2026-09-19）
+
+| 项 | 落点 | 说明 |
+| --- | --- | --- |
+| ① 闸 `ADR_RETIRED_NO_DEST` | `pure_refs.check_retired_adr_dest(rel, text)` + `gate_facts` 声明（fix=judgment, severity=block, 三条 options） | 零依赖层，hook 与 `doc_catalog` 共用 |
+| 合法形态（闭集） | `merged-into:` / `superseded_by:` / `Status: Rejected` | 加 `Rejected` 的理由：提议被否＝"从未生效"即其去向，无需指针（否则它会永远红）。**空值不算写了**（`merged-into:` 空 ⇒ 仍红） |
+| 接线 hook | `scripts/pre-commit` 与其它 ADR 检查同处 `_add()` | staged 文件 |
+| 接线仓库级 | `doc_catalog.validate_docs` | 退役面不在 `iter_managed_files` 默认视图里 ⇒ **显式扫 `obsolete/*.md`** |
+| AUTHORING（两份，PAIRS） | 「编号分配/删除/改名」枚举补 `Status: Rejected` + 记闸码；并写明"合并没有自动化，故用闸兜住" | — |
+| ② 自动化合并路径 | **不做**（票内已记理由：合并的声明面不明确，造 `Absorbs:` 属新基建且无第二消费者，规则 12） | — |
+
+### 途中被自家测试抓到一处真缺陷（已修）
+
+初版把 obsolete 扫描放在 `validate_docs` 的 schema 检查**之后** ⇒ 该类型缺 `.schema.json` 时
+`if not schema: continue` 会**把闸一起跳过**。测试 `TestRetiredDestRepoWideWiring` 用无 schema 的
+临时仓复现，据此把扫描移出 schema 依赖路径（放在类型循环之外）。教训：**闸不该因为同类型的
+其它配置缺失而静默失效**。
+
+## 验收（实测）
+
+```
+tests/unit/engine/test_pure_refs.py::TestRetiredAdrDest（5 条）
+  缺去向 ⇒ 红且提示里列出合法形态 / 三选一各绿 / 空值不算写了 / 账本与模板不报 /
+  非 obsolete 不报 / 自举：本仓 obsolete/ 现状绿
+tests/…::TestRetiredDestRepoWideWiring（1 条）
+  仓库级 `validate_docs(types=["adr"])` 真报 obsolete 缺去向；补上后绿（**接线证明**）
+
+600 passed；`k3dge check` 绿；adr 面（adr_landed / 编号闸）未退化
+```

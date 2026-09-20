@@ -514,3 +514,38 @@ def check_task_closure_record(rel: str, text: str) -> List[Ref]:
     return [("TASK_CLOSURE_MISSING",
              f"{rel}: done 票缺结案记录（需 {' / '.join(_CLOSURE_HEADINGS)} 之一且有内容）"
              f"——票是自包含事实源，不写落地痕迹后续就会漂")]
+
+
+# --- 退役 ADR 必须写清去向（合并路径既无自动化也无闸，本函数补后者）---
+
+#: 能被当作"去向"的 frontmatter 键（唯一源）。
+_DEST_KEYS = ("merged-into", "merged_into", "superseded_by", "Superseded-by")
+_DEST_STATUSES = ("Rejected",)   # 被否决＝"从未生效"，status 本身即去向事实（无需指针）
+
+
+def check_retired_adr_dest(rel: str, text: str) -> List[Ref]:
+    """`docs/adr/obsolete/*.md`（非 aux）必须留下"这条去哪了"的事实。
+
+    为何要闸：`reconcile_supersedes` 只自动化 `Supersedes:` 与 `Status: Rejected` 两条路；
+    **合并没有自动化**（历史上写在宿主 ADR 的 Note + commit message 里），而 13 个永久退役号里
+    12 个是合并 ⇒ baseline 之后若忘了写去向，退役卡片会显示 `retired` 但去向为空，
+    读者仍找不到"这条去哪了"——正是退役账本要修的失效模式。`merged-into` 此前**全仓只有读、没有写方、也没有闸**。
+
+    合法形态（闭集）：`merged-into: <宿主与小节>` / `superseded_by: ADR-XXXX` /
+    `Status: Rejected`（提议被否，从未生效——"去哪"就是"没去哪"）。
+    **不判去向对不对**（那要读懂 ADR 内容），只验"写了没写"。
+    """
+    parts = Path(rel).parts
+    if "obsolete" not in parts or not rel.startswith("docs/adr/") or not rel.endswith(".md"):
+        return []
+    if Path(rel).name in AUX_NAMES:      # 账本 README / 模板：承载的是表格与约定，不是单条退役
+        return []
+    fm = {k.strip().lower(): v.strip() for k, v in parse_frontmatter_pairs(text)}
+    for key in _DEST_KEYS:
+        if fm.get(key.lower()):
+            return []
+    if fm.get("status", "").strip() in _DEST_STATUSES:
+        return []
+    return [("ADR_RETIRED_NO_DEST",
+             f"{rel}: 退役 ADR 未写去向（需 `merged-into:` / `superseded_by:` / `Status: Rejected` 之一）"
+             f"——合并没有自动化，忘写就会变成'retired 但不知去哪'")]
