@@ -34,6 +34,48 @@ def blocking_graph(workspace: Path) -> Dict[str, List[str]]:
     return g
 
 
+def blocking_dangling(workspace: Path) -> Dict[str, List[str]]:
+    """`blocking:` 指向**已关票**或**不存在的票**——观测事实，不判定。
+
+    为何需要：`blocking_graph` 只连"仓内已知 task stem"（`p.stem` 对 `X.done.md` 是 `X.done`）
+    ⇒ 某票一关，引用它的票那条边被**静默丢弃**，DAG 只是"忘了"，没人知道该清理引用。
+    实测（2026-09-19）：三张票的 `blocking` 漂了（两张指向已关票、一处写成 `-`），
+    全靠人工扫才发现。
+
+    返回 {"closed": [...引用已关票...], "unknown": [...引用不存在的 stem...]}，各自形如
+    `"<referrer> → <target>"`。**进 status 观测，不进 check 判定集**（AUTHORING：blocking
+    是事实不是闸）。
+    """
+    from k3dge.engine.milestone_files import _is_doc_aux
+    from k3dge.engine.task_index import parse_frontmatter
+
+    d = Path(workspace) / "docs" / "tasks"
+    out: Dict[str, List[str]] = {"closed": [], "unknown": []}
+    if not d.is_dir():
+        return out
+    open_stems, closed_stems = set(), set()
+    for p in sorted(d.glob("*.md")):
+        if _is_doc_aux(p.name):
+            continue
+        if p.name.endswith(".done.md"):
+            closed_stems.add(p.name[: -len(".done.md")])
+        else:
+            open_stems.add(p.stem)
+    for p in sorted(d.glob("*.md")):
+        if _is_doc_aux(p.name) or p.name.endswith(".done.md"):
+            continue
+        try:
+            fm = parse_frontmatter(p.read_text(encoding="utf-8")) or {}
+        except OSError:
+            continue
+        for dep in [x for x in _SPLIT.split(str(fm.get("blocking", "")).strip()) if x]:
+            if dep in open_stems:
+                continue
+            kind = "closed" if dep in closed_stems else "unknown"
+            out[kind].append(f"{p.stem} → {dep}")
+    return out
+
+
 def blocking_cycles(workspace: Path) -> Dict[str, object]:
     """互阻工单＝死锁队列：出事实（`cyclic` + 首个环路径）。"""
     ts = TopologicalSorter(blocking_graph(workspace))
@@ -77,4 +119,6 @@ def summary(workspace: Path) -> Dict[str, object]:
         "blocking_cycles": blocking_cycles(workspace),
         "critical_path": cp["path"],
         "critical_length": cp["length"],
+        # 观测事实：`blocking:` 指向已关/不存在的票（票一关边就被静默丢弃，得有人报）
+        "blocking_dangling": blocking_dangling(workspace),
     }

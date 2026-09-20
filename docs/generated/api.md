@@ -810,6 +810,8 @@ from typing import Dict
 from typing import List
 blocking_graph(workspace: Path) -> Dict[str, List[str]]
     # doc: task → 其 `blocking` 依赖（只连仓内已知 task stem）。
+blocking_dangling(workspace: Path) -> Dict[str, List[str]]
+    # doc: `blocking:` 指向**已关票**或**不存在的票**——观测事实，不判定。
 blocking_cycles(workspace: Path) -> Dict[str, object]
     # doc: 互阻工单＝死锁队列：出事实（`cyclic` + 首个环路径）。
 critical_path(workspace: Path) -> Dict[str, object]

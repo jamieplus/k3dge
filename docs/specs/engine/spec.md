@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:b7664596fd2ac1df6b03bd9b2e0873298932b8ee70a6782cd6239fda2a656d42`
+- **Contract Hash**: `sha256:a5bb199bbff2b100c7958d95dce27bd52c5c26a7807032a6c190462843dc0c90`
 - **Last Updated**: 2026-09-19
 
 ## 1. Domain Boundary & Responsibilities
@@ -543,6 +543,7 @@ from pathlib import Path
 from typing import Dict
 from typing import List
 blocking_graph(workspace: Path) -> Dict[str, List[str]]
+blocking_dangling(workspace: Path) -> Dict[str, List[str]]
 blocking_cycles(workspace: Path) -> Dict[str, object]
 critical_path(workspace: Path) -> Dict[str, object]
 summary(workspace: Path) -> Dict[str, object]

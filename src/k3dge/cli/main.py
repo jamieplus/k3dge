@@ -1030,6 +1030,18 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"  … {len(tasks) - len(shown)} more (k3dge status --deep)")
         else:
             print("Unfinished tasks: none")
+        dag = status_obj.get("task_dag") or {}
+        dangling = dag.get("blocking_dangling") or {}
+        closed_refs = dangling.get("closed") or []
+        unknown_refs = dangling.get("unknown") or []
+        if closed_refs or unknown_refs or (dag.get("blocking_cycles") or {}).get("cyclic"):
+            print("blocking 观测（事实，不判定）：")
+            if (dag.get("blocking_cycles") or {}).get("cyclic"):
+                print(f"  - 有互阻环：{(dag.get('blocking_cycles') or {}).get('detail')}")
+            for r in closed_refs:
+                print(f"  - 指向已关票，引用该清：{r}")
+            for r in unknown_refs:
+                print(f"  - 指向不存在的票：{r}")
         cache = status_obj.get("cache")
         if cache:
             hr = cache.get("hit_rate")
