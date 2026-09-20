@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M10
 priority: P1
 date: 2026-09-20
@@ -59,3 +59,18 @@ milestone_audit.py:215  produced = run_action(...) 之后只读 produced.payload
 
 - 与 ADR-0004 §2.1.11 同源。报告闸 `_SIGN_KEYS` 不动：报告仍是"存在则须合格"（`refactor-report_demote` 票）。
 - 这是重设计的**第一票**：其余票（相位、tag、报告降级、CHANGELOG）都假定"审计正常返回"已可信。
+
+## 落地（2026-09-20）
+
+| 项 | 落点 | 实测 |
+| --- | --- | --- |
+| ① 闭集单源 | `audit_flow.AUDIT_RESULTS` / `SEALABLE_AUDIT_RESULTS` / `_STATUS_RESULTS`；`audit_call_result(produced)` + `audit_result_of(status)` | 单测断言闭集字面量与 in-flight（`ratchet_open`/`audit_open`）⇒ `None`（不推进） |
+| ② 空转先于报告 | `run_audit_flow` produce 循环：`produced.ok ∧ not produced.skipped` 不成立 ⇒ **在 `_find_report` 之前**返回 `refused` | `test_skip_not_closed_even_with_stale_report`：旧报告在场 + `skipped=True` ⇒ `refused`（旧代码会判闭环） |
+| ③ 降级须署名 | `degraded` 累积；报告缺 `_SIGN_KEYS`（`审计人`/`透镜来源`/`基线`）⇒ `refused`；署名齐全 ⇒ `audited_degraded` | `test_downgraded_needs_signature`（拒）/ `test_downgraded_and_signed_is_degraded_manual`（记 `degraded-manual` + 告知行） |
+| ④ 传输层同洞 | `submit_audit` / `collect_audit` 的 `skip` 显式拦（此前只在信封校验处以"未按契约返回"擦边拦下） | 错误码 `NOOP`；`test_audit_flow` 的 stub 补 `skipped` 字段（原先缺字段本身就是隐患） |
+| ⑤ 拒绝码入表 | `gates.INTERNAL_GATE_IDS` += `audit_noop` / `audit_degraded_unsigned`；`nextstep.GATE_NEXT` + `REJECTION_FACTS` 同轮补 | `test_gate_next_vocabulary_is_closed`（GATE_NEXT ⊆ 声明面）绿 ⇒ 追加码必须同轮声明，不能悬空 |
+| ⑥ 消费面 | `cli/main.py` `status.startswith("audited")`；MCP 回包新增 `audit_result` + `audited = result in SEALABLE_AUDIT_RESULTS` | 降级审计不再被 CLI 判失败、也不被 MCP 判"未审" |
+
+测试：`TestAuditNoNoop`（5 条）+ 存量回归；**661 passed, 2 skipped**；`k3dge check` 绿。
+
+**边界（有意留，归后续票）**：本票只让"结果"可判可信，尚未把它写进持久记录（trailer）——那是 `feat-seal_boundary_tag`；`audit-result` 目前只在返回面与 `[NEXT]` 上可见。

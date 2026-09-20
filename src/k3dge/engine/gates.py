@@ -62,6 +62,8 @@ INTERNAL_GATE_IDS: tuple = (
     "unknown_action_id",     # 契约引用了未实现的动作 id（配置错）
     "audit_report_missing",  # 无 12 列报告（审计腿未落盘）
     "audit_open_declined",   # 待修>0 且 agent 拒绝修复
+    "audit_noop",            # 审计跳被跳过/失败（空转不得当闭环，ADR-0004 §2.1.11）
+    "audit_degraded_unsigned",  # 降级到 manual 但报告无署名/来源
     "milestone_id_invalid",
     "no_tasks",
     "invalid_task_status",

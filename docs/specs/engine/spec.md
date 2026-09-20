@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:1ef5b636e74eb7cd47af2fe7c62b065788d785a8b9cdcfe5fdb8c1710f445070`
+- **Contract Hash**: `sha256:f2a808a3957ea0d57445981e373e2c44b998a4d7eaf63d3d0149850b829801b9`
 - **Last Updated**: 2026-09-20
 
 ## 1. Domain Boundary & Responsibilities
@@ -61,6 +61,10 @@ from typing import Optional
 from k3dge.engine import report_table
 from k3dge.engine.pipeline_runner import run_action
 STATE_REL = '.agent/audit_jobs.json'
+AUDIT_RESULTS = ('closed', 'degraded-manual', 'escalated', 'refused')
+SEALABLE_AUDIT_RESULTS = ('closed', 'degraded-manual')
+audit_call_result(produced) -> str
+audit_result_of(status: str) -> Optional[str]
 submit_audit(workspace: Path, milestone_id: str, targets: Optional[list]=None, io=None, role: str='audit') -> dict
 collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str]=None, io=None) -> dict
 push_present(workspace: Path, job_key: str, commit: str='', io=None) -> dict
@@ -213,7 +217,7 @@ class Rejection(str)
 rejection(message: Any, fallback_gate_id: str) -> Rejection
 REL = '.agent/pipeline.toml'
 LEGACY_REL = '.agent/gates.toml'
-INTERNAL_GATE_IDS: tuple = ('unknown_gate_id', 'unknown_action_id', 'audit_report_missing', 'audit_open_declined', 'milestone_id_invalid', 'no_tasks', 'invalid_task_status', 'align_failed', 'archive_failed')
+INTERNAL_GATE_IDS: tuple = ('unknown_gate_id', 'unknown_action_id', 'audit_report_missing', 'audit_open_declined', 'audit_noop', 'audit_degraded_unsigned', 'milestone_id_invalid', 'no_tasks', 'invalid_task_status', 'align_failed', 'archive_failed')
 DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'audit_closed', 'evidence_chain', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed', 'docs_normalized', 'audit_fresh'], 'actions': ['full_matrix', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}, 'sync': {'actions': ['sync_extractors', 'reconcile_adrs', 'sync_domains', 'sync_manual_docs', 'sync_docs_index']}, 'audit': {'stages_produce': ['audit.actions.audit'], 'stages_verify': ['audit.actions.verify'], 'fresh_ignore': ['docs/reviews/', '.agent/', 'logs/', 'tmp/', '.k3dge/', 'dist/', '.ua/']}}}
 load(workspace: Path) -> Dict[str, Any]
 legacy_config_present(workspace: Path) -> bool
@@ -320,8 +324,8 @@ from pathlib import Path
 from typing import Optional
 from typing import TextIO
 STATE_OPTIONS: dict = {'normal': {'priority': 9, 'fact': '常规提交门禁通过', 'pointers': ['AGENTS.md §12']}, 'pending_findings': {'priority': 1, 'fact': '代码/文档里有 findings 钉（`k3dit:pending`）未处置；怎么处置由你决定', 'options': ['修完删 `k3dit:pending <ID>` 标记', '有意留 → 改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）', '本轮不处理（钉仍在，下次照旧提示）'], 'pointers': ['peer_contract §8', 'k3dge ADR-0025']}, 'ratchet_open': {'priority': 5, 'fact': '有在办棘轮工单（k3dge ADR-0025）：进程不等人，但账必须可见', 'pointers': ['k3dge audit status <id>', 'peer_contract §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）', 'k3dge ADR-0025 §2.7']}, 'audit_suggested': {'priority': 4, 'fact': '里程碑 <id> 命中审计触发条件（reason 见上）；审与不审由你决定', 'options': ['k3dge milestone audit <id>（必审，待修=0 才谈封板）', '不审，继续干活（触发条件仍在，下次照旧提示）'], 'pointers': ['k3dge ADR-0004 §2.1.5', 'k3dge milestone audit <id>']}, 'seal_ready': {'priority': 4, 'fact': '里程碑 <id> 审计已闭环（待修=0）；封板与否由你决定（封＝归档+版本+指针）', 'fact_with_blockers': '；封板前置：<blockers>', 'question': '里程碑 <id>：封板？', 'options': ['k3dge milestone seal <id>（align→归档+版本+指针）', '不封（里程碑继续挂着，当普通提交结束）'], 'pointers': ['k3dge ADR-0004 §2.1.4', 'docs/reviews/']}, 'doc_fix': {'priority': 2, 'fact': 'docs/ 有 <n> 处**可确定修**的规约偏差（<rules>）；改与不改由你决定（不改则封板前置 `docs_normalized` 会拦）', 'options': ['k3dge doc fix --dry-run（先看要改哪里）', 'k3dge doc fix（按闭集规则改；改完自己 review diff 再提交）', '不处理（偏差留着，封板前会被闸拦）'], 'pointers': ['docs/tasks/AUTHORING.md', 'k3dge ADR-0022 §2.2']}, 'audit_needed': {'priority': 2, 'fact': '里程碑 <id> 未审计，不可封板（封＝归档+版本+指针，非界限）', 'options': ['k3dge milestone audit <id>（先闭环审计）', '不封板，当普通提交结束'], 'pointers': ['k3dge ADR-0004 §2.1.6', 'k3dge milestone audit <id>']}, 'audit_open': {'priority': 2, 'fact': '里程碑 <id> 审计发现 <n> 项待修，环未闭环；由谁修由你决定', 'question': '里程碑 <id>：<n> 项待修，agent 修？', 'options': ['agent 修 → 修完重跑 k3dge milestone audit <id>（重审）', '不由 agent 修 → stop / 转人工干预'], 'pointers': ['k3dge ADR-0022', 'k3dge milestone audit <id>']}, 'escalated': {'priority': 1, 'fact': 'verify 连续 >3 次未闭环，已转人工干预（k3dge milestone audit-submit <id> 或人工复核）', 'pointers': ['k3dge milestone audit-submit <id>', 'docs/incidents/']}, 'sealed': {'priority': 9, 'fact': '已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑', 'pointers': ['docs/reviews/*-closure.md', 'k3dge ADR-0004 §2.1.4']}, 'seal_declined': {'priority': 9, 'fact': '已放弃封板（当普通提交结束）', 'pointers': ['AGENTS.md §12']}, 'rejected': {'priority': 3, 'fact': '操作被拒（原因见上）', 'pointers': ['AGENTS.md §12', 'k3dge milestone status <id>']}, 'new_domain': {'priority': 4, 'fact': '新建 src/ 域未在 manifest 注册（硬闸不红，但有文件级信号）', 'options': ['补 manifest + spec + tests，再 k3dge sync 回写契约哈希', '有意不注册 → 在 manifest `ignore` 里声明'], 'pointers': ['k3dge ADR-0005 §2.8', 'k3dge sync']}}
-GATE_NEXT: dict = {'audit_closed': ('audit_needed', ''), 'audit_report_missing': ('rejected', 'audit_missing'), 'audit_open_declined': ('rejected', 'audit_open_declined'), 'tasks_all_done': ('rejected', 'tasks_pending')}
-REJECTION_FACTS: dict = {'audit_missing': '审计缺失：先落盘报告（k3dge milestone audit-submit <id>）或 k3dge milestone audit <id>', 'audit_open_declined': 'stop / 转人工干预（待修未修复且 agent 拒绝修复）', 'tasks_pending': '票据未全 done：先干活或改挂里程碑，再谈 align/seal'}
+GATE_NEXT: dict = {'audit_closed': ('audit_needed', ''), 'audit_report_missing': ('rejected', 'audit_missing'), 'audit_noop': ('rejected', 'audit_noop'), 'audit_degraded_unsigned': ('rejected', 'audit_degraded_unsigned'), 'audit_open_declined': ('rejected', 'audit_open_declined'), 'tasks_all_done': ('rejected', 'tasks_pending')}
+REJECTION_FACTS: dict = {'audit_missing': '审计缺失：先落盘报告（k3dge milestone audit-submit <id>）或 k3dge milestone audit <id>', 'audit_noop': '审计未真跑：这一跳被跳过或失败——空转不得当闭环（ADR-0004 §2.1.11）；检查传输链/透镜可达后重跑 k3dge milestone audit <id>', 'audit_degraded_unsigned': '审计降级到 manual 但报告无署名/来源——降级不静默：补署名后可记 degraded-manual（ADR-0004 §2.1.11）', 'audit_open_declined': 'stop / 转人工干预（待修未修复且 agent 拒绝修复）', 'tasks_pending': '票据未全 done：先干活或改挂里程碑，再谈 align/seal'}
 class NextStep
     state: str
     milestone: str

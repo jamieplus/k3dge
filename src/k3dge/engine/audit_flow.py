@@ -19,6 +19,40 @@ from k3dge.engine.pipeline_runner import run_action
 STATE_REL = ".agent/audit_jobs.json"
 _REPORT_HEADER_TOKEN = report_table.TABLE_HEADER
 
+#: 审计结果的**闭集**（ADR-0004 §2.1.11）。唯一源：CLI / MCP / seal / 封版提交 trailer
+#: 都读这里，不得各自写字符串。前两个允许推进版号，后两个不许。
+AUDIT_RESULTS = ("closed", "degraded-manual", "escalated", "refused")
+SEALABLE_AUDIT_RESULTS = ("closed", "degraded-manual")
+
+#: `run_audit_flow` 的状态 → 闭集。in-flight 态（`ratchet_open` / `audit_open`）**不在**表里：
+#: 它们表示"审计还没正常返回"，自然不推进版号。
+_STATUS_RESULTS = {
+    "audited": "closed",
+    "audited_degraded": "degraded-manual",
+    "escalated": "escalated",
+    "rejected": "refused",
+    "refused": "refused",
+}
+
+
+def audit_call_result(produced) -> str:
+    """一跳传输的结果 → `AUDIT_RESULTS` 里的一档（ADR-0004 §2.1.11）。
+
+    先判"这一跳是否真跑过"，再谈报告在不在——否则仓里一份旧报告就能把"什么都没跑"
+    兜成闭环（本会话 M10 实测过这个洞）。`skip` 与 `ok=False` 一律 `refused`；
+    `downgrades` 非空 ⇒ `degraded-manual`（降级不静默，由调用方要求署名）。
+    """
+    if not getattr(produced, "ok", False) or getattr(produced, "skipped", False):
+        return "refused"
+    if getattr(produced, "downgrades", None):
+        return "degraded-manual"
+    return "closed"
+
+
+def audit_result_of(status: str) -> Optional[str]:
+    """审计流程状态 → 闭集值；in-flight（尚未正常返回）⇒ None。"""
+    return _STATUS_RESULTS.get(status)
+
 
 # ---------- 编排状态（k3dge 自己的事实，不是 peer 的） ----------
 
@@ -118,8 +152,10 @@ def submit_audit(workspace: Path, milestone_id: str, targets: Optional[list] = N
             # 落点（本仓 pre-commit `check` + CI `pytest`/`check --with-tests`），k3dit Hall 不执行。
         },
     )
-    if not res.ok:
-        return {"state": "failed", "detail": res.detail, "downgrades": res.downgrades}
+    if res.skipped or not res.ok:
+        why = "跳被跳过（skip）" if res.skipped else res.detail
+        return {"state": "failed", "detail": f"{role}.submit 未真跑：{why}",
+                "downgrades": res.downgrades}
     env = _parse_envelope(res)
     if not env.get("ok") or env.get("kind") != "job":
         return {
@@ -186,6 +222,11 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
         return {"state": "failed", "error": "FORMAT", "detail": id_err}
 
     res = run_action(workspace, f"{role}.collect", io=io, arguments={"job_id": job["job_id"]})
+    if res.skipped:
+        job["state"] = "failed"
+        _save_state(workspace, state)
+        return {"state": "failed", "error": "NOOP",
+                "detail": f"{role}.collect 未真跑：跳被跳过（skip）——空转不得当闭环（ADR-0004 §2.1.11）"}
     env = _parse_envelope(res)
     if not env.get("ok"):
         err = str(env.get("error") or "")

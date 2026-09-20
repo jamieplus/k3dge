@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - doc-audit 改动集只看未提交：先提交即集体失明（并回单一源 diff.get_changed_files）
 - pipelines.on_seal_enter/on_pre_seal 无执行者：AGENTS.md §12 声称的 seal hook 机制不存在（接通或废声明，只留一套声明面）
 - doc-audit: 文档作者合规审计（adr, architecture, guides 等 11 处）
+- 保证审计不可空转：`run_audit_flow` 必须看 `ok/skipped`，`audit-result` 闭集落进封版提交 trailer
 ## [0.1.11] - 2026-09-13
 
 ### Fixed

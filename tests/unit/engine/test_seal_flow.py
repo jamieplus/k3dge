@@ -138,6 +138,9 @@ class TestPipelineRunner(TestCase):
 
 _AUDIT_CLEAN = _AUDIT.replace("待修", "已修").replace("有意留", "已修")
 
+#: 报告署名/来源/锚点（ADR-0017 的 `_SIGN_KEYS`）：`degraded-manual` 的前提。
+_SIGNS = "\n- **审计人**: k3dit@seat\n- **透镜来源**: k3dit\n- **基线**: deadbeef\n"
+
 
 def _clean_report(ws, mid="M1"):
     """Single merged audit report (ADR-0025) with 待修=0; a stray quality file must be ignored."""
@@ -728,3 +731,60 @@ class TestStagesAreDeclaredNotHardcoded(TestCase):
             lines = (root / rel).read_text(encoding="utf-8").splitlines()
             sections = [ln.strip() for ln in lines if ln.strip().startswith("[pipelines.")]
             self.assertEqual(sections, [], f"{rel} 仍有已废段：{sections}")
+
+
+class TestAuditNoNoop(TestCase):
+    """ADR-0004 §2.1.11：先判"这一跳是否真跑过"，再谈报告在不在。
+
+    回归的洞：传输层把 skip 与 manual 都报 `ok=True`，而 `run_audit_flow` 只看
+    `_find_report` ⇒ 仓里一份**旧报告**就能把"什么都没跑"兜成闭环（M10 实测过）。
+    """
+
+    def _refused(self, produced, answers=("y",)):
+        ws = _ws_oneshot()
+        _clean_report(ws)  # 旧报告在场——这正是旧代码会误判闭环的条件
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=produced):
+            return ws, run_audit_flow(ws, "M1", prompter=_Prompt(answers=list(answers)))
+
+    def test_skip_not_closed_even_with_stale_report(self) -> None:
+        ws, (status, msg) = self._refused(TransportResult(True, "skip", "skipped", skipped=True))
+        self.assertEqual(status, "refused")
+        self.assertIn("skip", msg)
+        from k3dge.engine.audit_flow import audit_result_of
+        self.assertEqual(audit_result_of(status), "refused")
+
+    def test_transport_failure_not_closed_even_with_stale_report(self) -> None:
+        _ws, (status, _msg) = self._refused(TransportResult(False, "mcp", "boom"))
+        self.assertEqual(status, "refused")
+
+    def test_downgraded_needs_signature(self) -> None:
+        ws = _ws_oneshot()
+        _clean_report(ws)  # 无署名（_AUDIT_CLEAN 不含 _SIGNS）
+        prod = TransportResult(True, "manual", "ok", downgrades=["mcp→manual"])
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=prod):
+            status, msg = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
+        self.assertEqual(status, "refused")
+        self.assertIn("署名", msg)
+
+    def test_downgraded_and_signed_is_degraded_manual(self) -> None:
+        ws = _ws_oneshot()
+        _clean_report(ws)
+        p = ws / "docs" / "reviews" / "2026-09-01-M1-audit.md"
+        p.write_text(p.read_text(encoding="utf-8") + _SIGNS, encoding="utf-8")
+        prod = TransportResult(True, "manual", "ok", downgrades=["mcp→manual"])
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=prod):
+            status, msg = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
+        self.assertEqual(status, "audited_degraded")
+        from k3dge.engine.audit_flow import SEALABLE_AUDIT_RESULTS, audit_result_of
+        self.assertEqual(audit_result_of(status), "degraded-manual")
+        self.assertIn("degraded-manual", SEALABLE_AUDIT_RESULTS)
+        self.assertIn("降级", msg)
+
+    def test_skip_does_not_advance_but_closed_does(self) -> None:
+        """闭集纪律：只有 closed / degraded-manual 允许推进版号。"""
+        from k3dge.engine.audit_flow import AUDIT_RESULTS, SEALABLE_AUDIT_RESULTS, audit_result_of
+        self.assertEqual(AUDIT_RESULTS, ("closed", "degraded-manual", "escalated", "refused"))
+        self.assertEqual(SEALABLE_AUDIT_RESULTS, ("closed", "degraded-manual"))
+        self.assertIsNone(audit_result_of("ratchet_open"))   # in-flight：未正常返回 ⇒ 不推进
+        self.assertIsNone(audit_result_of("audit_open"))
+        self.assertNotIn("refused", SEALABLE_AUDIT_RESULTS)

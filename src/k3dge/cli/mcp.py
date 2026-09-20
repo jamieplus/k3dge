@@ -426,10 +426,15 @@ def k3dge_milestone_control(
         from k3dge.engine import nextstep
 
         status, msg = run_audit_flow(ws, milestone_id)
+        # 审计结果闭集（ADR-0004 §2.1.11）：只有 closed / degraded-manual 算"审成了"。
+        from k3dge.engine.audit_flow import SEALABLE_AUDIT_RESULTS, audit_result_of
+
+        result = audit_result_of(status)
         # 流程已自己判定并 persist 了下一步：直接投影同一个判定，不拿散文消息重猜。
         nxt = nextstep.load_persisted(ws)
         if nxt is None:
-            nxt_state = {"audited": "seal_ready", "escalated": "escalated"}.get(status)
+            nxt_state = {"audited": "seal_ready", "audited_degraded": "seal_ready",
+                         "escalated": "escalated"}.get(status)
             nxt = (
                 nextstep.NextStep.from_state(nxt_state, milestone_id).render_mcp()
                 if nxt_state
@@ -439,7 +444,8 @@ def k3dge_milestone_control(
             {
                 "milestone_id": milestone_id,
                 "status": status,
-                "audited": status == "audited",
+                "audit_result": result,
+                "audited": result in SEALABLE_AUDIT_RESULTS,
                 "message": msg,
                 "next": nxt,
             },

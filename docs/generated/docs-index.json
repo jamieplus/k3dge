@@ -737,11 +737,11 @@
       "tokens": "封板边界与标识：`tag <M> = B`、封版提交 trailer（四键）、版号在审计正常返回后前进"
     },
     {
-      "path": "docs/tasks/2026-09-20-M10-fix-audit_no_noop.md",
+      "path": "docs/tasks/2026-09-20-M10-fix-audit_no_noop.done.md",
       "type": "tasks",
-      "id": "2026-09-20-M10-fix-audit_no_noop",
+      "id": "2026-09-20-M10-fix-audit_no_noop.done",
       "title": "保证审计不可空转：`run_audit_flow` 必须看 `ok/skipped`，`audit-result` 闭集落进封版提交 trailer",
-      "status": "idea",
+      "status": "done",
       "tokens": "保证审计不可空转：`run_audit_flow` 必须看 `ok/skipped`，`audit-result` 闭集落进封版提交 trailer"
     },
     {

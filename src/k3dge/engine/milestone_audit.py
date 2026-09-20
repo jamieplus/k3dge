@@ -179,7 +179,7 @@ def run_audit_flow(
     report. Returns (status, message); status ∈ {audited, rejected, escalated}.
     Seal unlocks only after this closes (`run_seal_flow`).
     """
-    from k3dge.engine import audit_checklist as ac, nextstep
+    from k3dge.engine import audit_checklist as ac, audit_flow, nextstep
     from k3dge.engine.pipeline_runner import run_action
 
     prompt = prompter or _Prompt.default()
@@ -214,6 +214,7 @@ def run_audit_flow(
         streams.pop("audit", None)
 
     # mandatory audit + fix loop, capped at `max_verify_attempts` verifies.
+    degraded = False  # 任一跳降级（downgrades 非空）⇒ 结果记 degraded-manual（ADR-0004 §2.1.11）
     while True:
         attempts = ac.get_verify_attempts(workspace)
         if attempts >= max_verify_attempts:
@@ -234,6 +235,22 @@ def run_audit_flow(
                 io=prompt.out_stream,
                 arguments={"target_scope": f"milestone {milestone_id}", "milestone_id": milestone_id},
             )
+            # 先判"这一跳是否真跑过"，再谈报告在不在（ADR-0004 §2.1.11）。少了这一步，
+            # 仓里一份旧报告就能把 skip / 传输失败兜成闭环——"保证 audit"的第一道。
+            call = audit_flow.audit_call_result(produced)
+            if call == "refused":
+                why = "被跳过（skip 传输）" if produced.skipped else "未成功"
+                msg = (
+                    f"审计未成：{produce_action} 这一跳{why}（provider={produced.provider}；"
+                    f"{produced.detail[:80]}）——空转不得被仓里已有的报告兜成闭环"
+                    "（ADR-0004 §2.1.11）；确认传输链与透镜可达后重跑。"
+                )
+                _ns = nextstep.next_for_rejection(
+                    milestone_id, gates.Rejection("audit_noop", msg)
+                )
+                nextstep.persist(workspace, _ns)
+                return "refused", msg + "\n" + _ns.render_cli()
+            degraded = degraded or (call == "degraded-manual")
             found = _find_report(workspace, milestone_id, kind)
             if found is None:
                 hint = ""
@@ -261,6 +278,20 @@ def run_audit_flow(
                 nextstep.persist(workspace, _ns)
                 return "rejected", msg + "\n" + _ns.render_cli()
             report_path, report_text = found
+            if degraded:  # 降级不静默：署名是降级可接受的前提（ADR-0004 §2.1.11）
+                from k3dge.engine.process_audit import _SIGN_KEYS, _field
+
+                missing = [k for k in _SIGN_KEYS if not _field(report_text, k)]
+                if missing:
+                    msg = (
+                        f"审计降级到 manual 但报告缺署名/来源 {missing}（{report_path.name}）——"
+                        "降级不静默：署名后可记 `degraded-manual` 继续（ADR-0004 §2.1.11）。"
+                    )
+                    _ns = nextstep.next_for_rejection(
+                        milestone_id, gates.Rejection("audit_degraded_unsigned", msg)
+                    )
+                    nextstep.persist(workspace, _ns)
+                    return "refused", msg + "\n" + _ns.render_cli()
             stats = _parse_audit_stats(report_text)
             _ensure_leftovers(workspace, report_text, report_path)
             pending_total += stats["待修"]
@@ -302,7 +333,14 @@ def run_audit_flow(
         except Exception:
             pass
     ac.reset_verify_attempts(workspace)
-    msg = f"Milestone {milestone_id}: 审计闭环（合并审计模块 12 列报告 待修=0），可以谈封板。"
+    result = "degraded-manual" if degraded else "closed"
+    status = "audited_degraded" if degraded else "audited"
+    msg = (
+        f"Milestone {milestone_id}: 审计闭环（{result}；合并审计模块 12 列报告 待修=0），可以谈封板。"
+    )
+    if degraded:
+        msg += ("\n[降级告知] 本轮走了 manual 协议（非独立透镜）且报告已署名，"
+                "结果记为 degraded-manual（ADR-0004 §2.1.11）。")
     _ns = nextstep.seal_ready_for(workspace, milestone_id)
     nextstep.persist(workspace, _ns)
-    return "audited", msg + "\n" + _ns.render_cli()
+    return status, msg + "\n" + _ns.render_cli()

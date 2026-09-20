@@ -252,7 +252,7 @@ def test_collect_role_naming_and_kind_guard(tmp_path):
          "baseline": "sha256:mine", "ticket_task": None}]}), encoding="utf-8")
 
     class _R:
-        ok, detail, downgrades, payload = True, "", [], ""
+        ok, detail, downgrades, payload, skipped = True, "", [], "", False
 
     env = {"ok": True, "kind": "report",
            "payload": {"report_markdown": "<!-- k3dge:kind: quality -->\n# 质量签署件\n\n" + hdr +

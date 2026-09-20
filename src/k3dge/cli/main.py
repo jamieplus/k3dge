@@ -714,7 +714,7 @@ def cmd_milestone(args: argparse.Namespace) -> int:
         status, msg = run_audit_flow(workspace, m_id, prompter=_Prompt.default())
         print(msg)
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone audit -> {m_id} status={status}")
-        return 0 if status == "audited" else 1
+        return 0 if status.startswith("audited") else 1
 
     if action == "seal":
         status, msg = run_seal_flow(
