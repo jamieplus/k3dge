@@ -112,6 +112,13 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         ],
         "pointers": ["AGENTS.md §12", "docs/adr/AUTHORING.md「先并入，后新建」", "k3dge doc list --type <type>"],
     },
+    "ARCHIVE_NO_DEST": {
+        "fix": "judgment", "severity": "warn",
+        "fact": "`{path}` 进了 `archive/` 但没写去向标记——归档是有意动作，「为什么归档」应留在文件里（ADR-0023 §2.2）",
+        "options": ["补 `Superseded-by: <新文档>` 或 `Legacy note: <一句话>`",
+                    "确属有意留（纯降权留档）→ 不处理，本条只观测不拦"],
+        "pointers": ["docs/adr/0023-low-authority-archive-tier.md", "docs/*/AUTHORING.md"],
+    },
     # --- ADR 编号退役账本（obsolete/README.md 的表是唯一源）---
     "ADR_NUMBER_REUSE": {
         "fix": "judgment", "severity": "block",

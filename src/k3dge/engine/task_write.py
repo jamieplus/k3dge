@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime
 import re
 from pathlib import Path
+import json
 from typing import List, Optional, Tuple
 
 from k3dge.engine import report_table
@@ -137,7 +138,7 @@ def create_task(
     to reach 待修==0 before the task can close.
 
     `context`: body for `## 上下文/切入点`. Callers that already know the concrete
-    scope (e.g. which files triggered a doc-audit) must pass it — omitting it makes
+    scope (e.g. the files a scan reported) must pass it — omitting it makes
     all three body sections repeat the title, producing a ticket nobody can execute.
     """
     if typ not in _TASK_TYPES:
@@ -335,3 +336,35 @@ def mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Pat
     except (OSError, UnicodeDecodeError) as exc:
         return False, str(exc), target
     return _finalize_task_done(workspace, target, content, parse_frontmatter(content))
+
+
+def _similar_task_hints(workspace: Path, title: str, exclude: Optional[Path] = None) -> List[Tuple[str, str]]:
+    """k3che 相似/历史提示——service 语义：skip/失败/坏信封 ⇒ 无提示，**永不阻断创建**。
+
+    语料含 tasks/archive（CacheIndex.rglob 覆盖归档子目录）——历史文件正是重复的
+    本体。只提示，不判定：是不是真重复由看的人决定（规则 08：观测≠裁决）。
+    """
+    from k3dge.engine.pipeline_runner import run_action
+
+    try:
+        res = run_action(workspace, "cache.search", arguments={"query": title, "top_k": 6})
+    except Exception:  # pragma: no cover - 观测件绝不误伤创建
+        return []
+    if not res.ok or res.provider != "mcp":
+        return []
+    try:
+        env = json.loads(res.payload or "")
+    except ValueError:
+        return []
+    if not isinstance(env, dict) or not env.get("ok"):
+        return []
+    excl = exclude.relative_to(workspace).as_posix() if exclude is not None else None
+    out: List[Tuple[str, str]] = []
+    for r in env.get("results") or []:
+        p = str(r.get("path") or "")
+        if not p or p == excl:
+            continue
+        out.append((p, str(r.get("title") or "")))
+        if len(out) >= 3:
+            break
+    return out

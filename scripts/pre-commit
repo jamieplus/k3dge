@@ -205,6 +205,9 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -
     if any(f.startswith(("docs/", "tests/")) or f == ".agent/manifest.json" for f in files):
         for code, msg, facts in _orphan_warnings(pure_refs):
             _add(code, msg, facts=facts)
+    # 归档去向标记（warn 档，ADR-0023 §2.2）：只对本轮 staged 增量
+    for code, msg in pure_refs.find_unguarded_archives(WS, files):
+        _add(code, msg, facts={"path": msg.split(":")[0]})
     return errs, warns
 
 

@@ -138,22 +138,15 @@ def _workspace_hints(workspace: Path) -> list:
 
 
 def _collect_hints(workspace: Path) -> list:
-    """本轮全部处理点（**不打印、不写盘**）：生命周期 + 工作区 + doc-audit 三类。"""
+    """本轮全部处理点（**不打印、不写盘**）：生命周期 + 工作区 + 规约化三类。"""
     from k3dge.engine import nextstep
+    from k3dge.engine.milestone_pointer import get_current_milestone
 
     steps = []
     ns = _lifecycle_next(workspace)
     if ns is not None:
         steps.append(ns)
     steps.extend(_workspace_hints(workspace))
-    try:
-        from k3dge.engine.doc_audit import _changed_docs
-        from k3dge.engine.milestone_pointer import get_current_milestone
-
-        if _changed_docs(workspace):
-            steps.append(nextstep.NextStep.from_state("doc_audit", get_current_milestone(workspace)))
-    except Exception:
-        pass
     try:
         # 可确定修的规约偏差 ⇒ 主动动作（ADR-0022 §2.2：内容规约化，封板前做完）
         from k3dge.engine import doc_fix
@@ -172,7 +165,7 @@ def _collect_hints(workspace: Path) -> list:
 def _emit_all_hints(workspace: Path, stream) -> None:
     """多处理点：按 priority 排序后统一打印 + 侧车写全量（`primary` ＝ 最小 priority）。
 
-    实测场景：`k3dge check` 同轮可命中 `pending_findings`(1) + `seal_ready`(4) + `doc_audit`(5)
+    实测场景：`k3dge check` 同轮可命中 `pending_findings`(1) + `doc_fix`(2) + `seal_ready`(4)
     ⇒ 旧实现各自 `emit`，stdout 顺序＝代码顺序、侧车只剩最后一条。
     """
     from k3dge.engine import nextstep
@@ -185,31 +178,6 @@ def _emit_workspace_hints(workspace: Path, stream) -> None:
 
     for h in _workspace_hints(workspace):
         nextstep.emit(workspace, h, stream=stream)
-
-
-def _emit_doc_audit_hint(workspace: Path, stream) -> None:
-    # T-01: `check` is a static hard gate and never calls the lens. Doc-audit is a
-    # NON-BLOCKING follow-up after the gate — surface it here, do not run it inline.
-    try:
-        from k3dge.engine import nextstep
-        from k3dge.engine.doc_audit import _changed_docs
-        from k3dge.engine.milestone_pointer import get_current_milestone
-
-        if _changed_docs(workspace):
-            nextstep.emit(workspace, nextstep.NextStep.from_state("doc_audit", get_current_milestone(workspace)), stream=stream)
-    except Exception:
-        pass
-
-
-def cmd_doc_audit(args: argparse.Namespace) -> int:
-    """Non-blocking post-check doc authoring audit: report (k3dit) + milestone task."""
-    from k3dge.engine.doc_audit import run_doc_audit
-
-    workspace = _find_workspace(Path.cwd())
-    status, msg = run_doc_audit(workspace, io=sys.stderr)
-    print(f"[DOC-AUDIT] {msg}")
-    _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc-audit -> {status}")
-    return 0  # non-blocking by design (runs after check, never inside it)
 
 
 def cmd_check(args: argparse.Namespace) -> int:
@@ -430,7 +398,11 @@ def cmd_doc(args: argparse.Namespace) -> int:
         return 0
     if action == "screen":
         # 新建受管文档的排查回执：判定归 agent（进程判不了语义覆盖），此处只记事实。
-        from k3dge.engine.pure_refs import is_screenable_new_doc, record_screen_ack
+        from k3dge.engine.pure_refs import (
+            is_screenable_new_doc,
+            record_screen_ack,
+            screen_target_exists,
+        )
 
         rel = args.path.strip().replace("\\", "/")
         while rel.startswith("./"):
@@ -438,7 +410,12 @@ def cmd_doc(args: argparse.Namespace) -> int:
         if not is_screenable_new_doc(rel):
             print(f"[DOC] 不在排查面（确定性流程生成 / aux / archive / 非 docs）：{rel}")
             return 0
-        ack = record_screen_ack(workspace, rel, into=getattr(args, "into", None))
+        into = getattr(args, "into", None)
+        if into and not screen_target_exists(workspace, into):
+            # 回执声称"并入 X"，X 必须存在——否则记的是不存在的去向（C 线残渣）
+            print(f"[DOC] --into 指向的文件不存在：{into}", file=sys.stderr)
+            return 1
+        ack = record_screen_ack(workspace, rel, into=into)
         concl = f"merged-into {args.into}" if getattr(args, "into", None) else "new-no-overlap"
         print(f"[DOC] 排查回执已记（{concl}）：{ack.relative_to(workspace)}")
         print(f"      {rel} 本次提交放行；回执是 ephemeral（.protocol-ack/，不入库）")
@@ -487,7 +464,7 @@ def cmd_task(args: argparse.Namespace) -> int:
 
     workspace = _find_workspace(Path.cwd())
     if args.task_action == "create":
-        from k3dge.engine.doc_audit import _similar_task_hints
+        from k3dge.engine.task_write import _similar_task_hints
         from k3dge.engine.task_write import create_task
 
         title = args.title
@@ -1180,12 +1157,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="for seal: skip the enter-seal prompt and enter the flow immediately (audit still mandatory)",
     )
     p_milestone.set_defaults(func=cmd_milestone)
-
-    p_doc_audit = sub.add_parser(
-        "doc-audit",
-        help="non-blocking doc authoring audit that runs AFTER check: k3dit report + milestone task",
-    )
-    p_doc_audit.set_defaults(func=cmd_doc_audit)
 
     p_version = sub.add_parser("version", help="show or bump project version (pyproject.toml ↔ manifest ↔ __init__)")
     p_version.add_argument("version_action", choices=["show", "bump"], help="show current version or bump it")

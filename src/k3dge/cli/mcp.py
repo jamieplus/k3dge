@@ -27,7 +27,7 @@ from k3dge.cli.main import _find_workspace, _to_json
 from k3dge.engine import contract
 from k3dge.engine.align import run_milestone_alignment
 from k3dge.engine.contract import _ExtractError
-from k3dge.engine.doc_audit import _similar_task_hints
+from k3dge.engine.task_write import _similar_task_hints
 from k3dge.engine.milestone_audit import persist_external_audit_report, run_audit_flow
 from k3dge.engine.seal_flow import run_seal_flow
 from k3dge.engine.task_index import list_tasks, scan_milestone_tasks

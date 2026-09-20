@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 milestone: M10
 priority: P2
 date: 2026-09-18
@@ -118,9 +118,27 @@ date: 2026-09-18
    确定性修；语义类偏差（要读懂内容的）留给同轮的外部透镜判 —— 与 ADR-0005 §2.7 🅰1.1「可判定的
    形式规约归 k3dge、语义质量归外部透镜」一致。
 
-### 剩余（本票未完）
+### 收尾（2026-09-19）：退休 `run_doc_audit` + `.ack --into` 校验（剩余两项已落）
 
-- **退休 `run_doc_audit`**（报告 + 票路径）：`cli/main.py` 的 `doc-audit` 命令、`AGENTS.md §12`
-  那一行、`rules/04` 的 doc-audit 段、`docs/protocols/audit_default.md` 的 Doc Audit 节
-  （共约 16 处仍把它写成现行机制）
-- `.ack` 的 `--into` 目标存在性校验（C 线残渣）
+**退休 doc-audit 的报告+票路径**（ADR-0022 §2.2 🅰1.1 的落地）：
+
+| 面 | 处置 |
+| --- | --- |
+| `engine/doc_audit.py` | **删整个模块**（`run_doc_audit` / `_ensure_doc_audit_task` / `_attach_k3che_hints` / `_related_doc_hints` / `_changed_docs` 均为该路径专用） |
+| `_similar_task_hints`（task DUP-CHECK 在用） | **迁出**到 `engine/task_write.py`（它属 task 创建域，不属 doc-audit） |
+| `_new_archive_without_note`（ADR-0023 §2.2 归档去向标记，warn 级） | **迁到** `pure_refs.find_unguarded_archives()`，由 **pre-commit 消费**（口径改显式传本轮 staged 列表）+ `gate_facts` 新码 `ARCHIVE_NO_DEST`(warn)。**不静默丢能力** |
+| CLI | 删 `cmd_doc_audit` 与 `doc-audit` 子命令；`[NEXT]` 的 `doc_audit` 提示与 `STATE_OPTIONS["doc_audit"]` 一并撤 |
+| 文档面 | `AGENTS.md §12` 该行改述为三层（提交闸 / `doc_fix` 主动动作 / 里程碑审计）；`rules/04` 的 doc-audit 段重写；`audit_default.md` 的"触发"句改指里程碑审计（其 scope 含 `docs`）；`peer_contract` 的 k3che 消费者去掉已退休那项（各两份 PAIRS 同步） |
+| 规格 | `k3dge sync` 重生后 `docs/specs/{cli,engine}/spec.md` 已无 `cmd_doc_audit` / `run_doc_audit` |
+
+**`.ack --into` 校验**：新增 `pure_refs.screen_target_exists()`；CLI 在写回执前校验，
+目标不存在则拒记并退 1（此前可写 `merged-into docs/adr/9999-nope.md` 而无人发现）。
+
+### 途中两次自伤（记录，防再犯）
+
+1. **切片删函数删错范围**：删 `_emit_doc_audit_hint` 时用 `index(下一个 def)` 定位，
+   而那个 def 在文件很远的后方 ⇒ 连带删掉 `cmd_check` / `_read_submit_input` / `_lifecycle_next`
+   （98 行）。已回滚重做，改成"删到**下一个顶层 def**"的辅助函数。
+2. **宽 `except Exception: pass` 掩盖真错**：退休那段时删掉了 `get_current_milestone` 的 import
+   （它当时在被删的 doc_audit 块里），新代码 `NameError` 被 `_collect_hints` 的兜底 try 吞掉，
+   表现是"提示消失但无任何报错"。已补 import；教训：**观测件的兜底不得静默**。

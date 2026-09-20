@@ -63,10 +63,10 @@ def test_emit_upserts_and_orders_by_priority():
         ws = Path(d)
         begin_run(ws)
         emit(ws, _ns("seal_ready"))                 # priority 4
-        emit(ws, _ns("doc_audit"))                  # priority 5
+        emit(ws, _ns("ratchet_open"))                  # priority 5
         emit(ws, NextStep.from_state("pending_findings", "M10", pending=2))   # priority 1
         data = _raw(ws)
-        assert [c["state"] for c in data["next"]] == ["pending_findings", "seal_ready", "doc_audit"]
+        assert [c["state"] for c in data["next"]] == ["pending_findings", "seal_ready", "ratchet_open"]
         assert data["primary"] == "pending_findings"
         assert [c["priority"] for c in data["next"]] == [1, 4, 5]
 
@@ -95,10 +95,10 @@ def test_emit_all_orders_and_writes_all():
     with tempfile.TemporaryDirectory() as d:
         ws = Path(d)
         begin_run(ws)
-        emit_all(ws, [_ns("seal_ready"), _ns("doc_audit"),
+        emit_all(ws, [_ns("seal_ready"), _ns("ratchet_open"),
                       NextStep.from_state("audit_open", "M10", pending=3)])
         data = _raw(ws)
-        assert [c["state"] for c in data["next"]] == ["audit_open", "seal_ready", "doc_audit"]
+        assert [c["state"] for c in data["next"]] == ["audit_open", "seal_ready", "ratchet_open"]
         assert data["primary"] == "audit_open"
 
 

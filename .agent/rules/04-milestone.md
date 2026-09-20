@@ -14,7 +14,7 @@
 
 * **钉＝写源（不是"只读指针"）** —— 判读四格（严重度/优先级/类型/描述）写源＝树上钉；账本、12 列报告＝钉的投影（每轮 harvest 重生成）。审计/修/核只增/翻 kind：修席翻 `fixnote`、复核背书翻 `fixed`、有意留翻 `leftover`，**拔钉归 Hall**。`k3dge` 扫 `src/`+`docs/`（跳过 archive/reviews/generated），在 `check`/`status` 的 `[NEXT] state=pending_findings pending=N` 报出。详见 peer_contract §8 / ADR-0025 §2.7。
 
-* **1 report = 1 task（ADR-0022）** —— 一份审计报告对应**恰好一个** `audit` task，task frontmatter 带 `report: docs/reviews/<file>.md` 指针；findings 只是报告里的 12 列行，**不再逐条建 task**。`k3dge task done <report-task>` 要求该报告 `待修==0` 才放行（关 task = 审计闭环，同一闸）。特别大的单条才在 `处置` 写 `转 sub-task <id>` 例外拆出。doc-audit 已按此建一个里程碑 task（幂等）。`_auto_backfill_reviews`（标题匹配）降为无 `report:` 指针旧 task 的遗留兜底。
+* **1 report = 1 task（ADR-0022）** —— 一份审计报告对应**恰好一个** `audit` task，task frontmatter 带 `report: docs/reviews/<file>.md` 指针；findings 只是报告里的 12 列行，**不再逐条建 task**。`k3dge task done <report-task>` 要求该报告 `待修==0` 才放行（关 task = 审计闭环，同一闸）。特别大的单条才在 `处置` 写 `转 sub-task <id>` 例外拆出。`_auto_backfill_reviews`（标题匹配）降为无 `report:` 指针旧 task 的遗留兜底。
 
 * **问题二 · 要不要封（唯一在审计闭环后）** —— **该审计报告 待修=0** 时 `check`/`status` 给 `[NEXT] state=seal_ready`；`k3dge milestone seal <id>` 的 prompt 侧才问一次（无倒计时，N=不封）；`[NEXT] seal_ready` 只给 fact + 成对 option。未闭环先调 → `audit_needed`（指回 audit）。答「是」→ align（若还没跑）→ **归档 + 版本 + 里程碑指针**；答「否」→ 不封，里程碑继续挂着。
 
@@ -22,7 +22,7 @@
 
 * **人工入口** —— `k3dge milestone audit <id>` / `k3dge milestone seal [--yes] <id>` 都是人工主动入口，走同一套流程。`--yes` 跳过「要不要封」的提问，但不跳过审计。
 
-* **doc-audit（后置、非阻断，T-01）** —— `check` 保持静态硬闸，**不跑透镜**。docs 改动时 `check` 绿后给 `[NEXT] doc_audit`，由 `k3dge doc-audit` 承接：路由 `k3dit.actions.audit` 做 **authoring 合规**（k3dit/人出报告，k3dge 不伪造），并机械建一个带 `Milestone` 的 `doc-audit` task（幂等）。恒返回 0，但 task 进里程碑 backlog → **本轮不改，封板「全 done」闸也会逼它闭环**。ADR 冲突/覆盖不在这，仍只在里程碑审计（ADR-0005）。详见 ADR-0022。
+* **文档合规（三层，T-01）** —— `check` 保持静态硬闸、**不跑透镜**。①**提交时**：结构/schema 硬闸 + 新建受管文档首次筛查闸 `DOC_NEW_UNSCREENED`（阻断一次，判定归 agent）；②**可确定修的偏差**：`[NEXT] doc_fix` 引导 `k3dge doc fix`（闭集规则、幂等、`--dry-run`），封板前置 `docs_normalized` 验"做没做"——规约化必须在**封板前**完成，否则改在审计闭环之后会让刚闭环的审计证据失效；③**语义质量**（Context 是否写成 timeline、Decision 是否只写不变量、有无过程叙述）：归**里程碑审计**（合并审计模块的 scope 含 `docs`），不进自动修。原「doc-audit 出报告 + 建里程碑票」路径**已退休**（ADR-0022 §2.2 🅰1：`run_doc_audit` 丢弃透镜返回、票绑错报告，实测未走通）。ADR 冲突/覆盖仍在里程碑审计（ADR-0005）。
 
 * **外来审计源落盘** —— 人贴/agent 转发的报告经 `k3dge milestone audit-submit <id> [--file <报告.md> | -]`（或 MCP `k3dge_submit_audit_report`）落盘为 `docs/reviews/YYYY-MM-DD-<id>-<scope>-audit.md` 本版报告（缺 12 列表头自动补；最新覆盖旧）。该报告 待修=0 才算闭环。（`--kind quality` 保留为 legacy，不再有独立质量腿。）
 

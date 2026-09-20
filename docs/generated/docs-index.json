@@ -625,11 +625,11 @@
       "tokens": "ADR 修正案：doc 规约化策略重划（C1-C5：0022 §2.2 时机/产物、0005 §2.7 同形同路、耐久改闸、先并入后新建配闸）"
     },
     {
-      "path": "docs/tasks/2026-09-18-M10-feat-doc_strategy_five_points.md",
+      "path": "docs/tasks/2026-09-18-M10-feat-doc_strategy_five_points.done.md",
       "type": "tasks",
-      "id": "2026-09-18-M10-feat-doc_strategy_five_points",
+      "id": "2026-09-18-M10-feat-doc_strategy_five_points.done",
       "title": "doc 策略五点落地：格式硬闸 / 新建重复覆盖确认（并入优先）/ seal 轮规约化（外部优先，降级 k3dge）/ 用现成 checks 编排",
-      "status": "in-progress",
+      "status": "done",
       "tokens": "doc 策略五点落地：格式硬闸 / 新建重复覆盖确认（并入优先）/ seal 轮规约化（外部优先，降级 k3dge）/ 用现成 checks 编排"
     },
     {

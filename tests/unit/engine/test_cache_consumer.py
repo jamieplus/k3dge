@@ -7,12 +7,7 @@ import unittest
 from tempfile import TemporaryDirectory
 from unittest import mock
 
-from k3dge.engine.doc_audit import (
-    _attach_k3che_hints,
-    _related_doc_hints,
-    _similar_task_hints,
-    run_doc_audit,
-)
+from k3dge.engine.task_write import _similar_task_hints
 from k3dge.engine.pipeline_runner import TransportResult
 
 WS = pathlib.Path(__file__).resolve().parents[3]
@@ -28,108 +23,6 @@ def _ws_with_task(root: pathlib.Path) -> pathlib.Path:
     t = root / "docs" / "tasks" / "2026-09-03-M7-audit-doc-audit-demo.md"
     t.write_text("# doc-audit: demo\n\n- **Status**: idea\n", encoding="utf-8")
     return t
-
-
-class TestHints(unittest.TestCase):
-    def test_hints_parsed_from_mcp_envelope(self):
-        with TemporaryDirectory() as d:
-            ws = pathlib.Path(d)
-            ok = TransportResult(True, "mcp", "x", payload=HITS)
-            with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=ok):
-                hints = _related_doc_hints(ws, ["docs/adr/0006.md"])
-            self.assertEqual(len(hints), 2)
-            self.assertEqual(hints[0][0], "docs/adr/0006-mcp-foreign-harness-injection.md")
-
-    def test_skip_provider_degrades_to_no_hints_never_errors(self):
-        with TemporaryDirectory() as d:
-            ws = pathlib.Path(d)
-            skipped = TransportResult(True, "skip", "skipped", skipped=True)
-            with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=skipped):
-                self.assertEqual(_related_doc_hints(ws, ["docs/x.md"]), [])
-            broken = TransportResult(True, "mcp", "x", payload="not-json")
-            with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=broken):
-                self.assertEqual(_related_doc_hints(ws, ["docs/x.md"]), [])
-
-    def test_attach_writes_and_refreshes_block_idempotently(self):
-        with TemporaryDirectory() as d:
-            ws = pathlib.Path(d)
-            t = _ws_with_task(ws)
-            ok = TransportResult(True, "mcp", "x", payload=HITS)
-            with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=ok):
-                self.assertEqual(_attach_k3che_hints(ws, ["docs/adr/0006.md"]), 2)
-                self.assertEqual(_attach_k3che_hints(ws, ["docs/adr/0006.md"]), 2)  # 再跑一次不叠加
-            body = t.read_text(encoding="utf-8")
-            self.assertEqual(body.count("k3che · 服务性前路由"), 1)
-            self.assertIn("docs/guides/mcp-bridge.md", body)
-            self.assertNotIn("mcp-bridge.md`\n- `docs/guides/mcp-bridge.md", body)
-
-    def test_run_doc_audit_end_to_end_attaches_hints(self):
-        with TemporaryDirectory() as d:
-            ws = pathlib.Path(d)
-            (ws / ".agent").mkdir()
-            (ws / "docs" / "tasks").mkdir(parents=True)
-
-            def fake_action(_ws, ref, **kw):
-                if ref.startswith("cache."):
-                    return TransportResult(True, "mcp", "x", payload=HITS)
-                return TransportResult(True, "manual", "ok")
-
-            with mock.patch("k3dge.engine.pipeline_runner.run_action", side_effect=fake_action), \
-                 mock.patch("k3dge.engine.doc_audit._changed_docs", return_value=["docs/adr/0006.md"]), \
-                 mock.patch("k3dge.engine.milestone_pointer.get_current_milestone", return_value="M1"):
-                status, msg = run_doc_audit(ws)
-            self.assertEqual(status, "reported")
-            tasks = [p for p in (ws / "docs" / "tasks").glob("*.md") if "doc_audit" in p.name or "doc-audit" in p.name]
-            self.assertEqual(len(tasks), 1)
-            self.assertIn("服务性前路由", tasks[0].read_text(encoding="utf-8"))
-
-
-class TestStatusObservability(unittest.TestCase):
-    def _ws(self, root):
-        ws = pathlib.Path(root)
-        (ws / ".agent").mkdir()
-        (ws / ".agent" / "manifest.json").write_text('{"package_root":"src","domains":{}}', encoding="utf-8")
-        (ws / "docs" / "tasks").mkdir(parents=True)
-        return ws
-
-    def test_no_k3che_dir_never_spawns(self):
-        from tempfile import TemporaryDirectory
-        from k3dge.cli.status import workspace_status
-
-        with TemporaryDirectory() as d:
-            ws = self._ws(d)
-            with mock.patch("k3dge.engine.pipeline_runner.run_action", side_effect=AssertionError("不该被调用")):
-                st = workspace_status(ws)
-            self.assertIsNone(st["cache"])
-
-    def test_stats_envelope_surfaces_in_json_and_text(self):
-        import io as _io
-        import contextlib
-        from tempfile import TemporaryDirectory
-
-        from k3dge.cli.main import main
-        from k3dge.cli.status import workspace_status
-
-        stats = json.dumps({"ok": True, "total": 3, "hits": 2, "hit_rate": 0.667, "indexed": 118, "persisted": True})
-        with TemporaryDirectory() as d:
-            ws = self._ws(d)
-            (ws / ".k3che").mkdir()
-            hit = TransportResult(True, "mcp", "x", payload=stats)
-
-            def fake(_ws, ref, **kw):
-                assert ref == "cache.stats", ref
-                return hit
-
-            with mock.patch("k3dge.engine.pipeline_runner.run_action", side_effect=fake):
-                st = workspace_status(ws)
-                self.assertEqual(st["cache"]["total"], 3)
-                buf = _io.StringIO()
-                with contextlib.redirect_stdout(buf):
-                    rc = main(["status"])
-            text = buf.getvalue()
-            self.assertEqual(rc, 0)
-            self.assertIn("Cache (k3che): 3 queries, hits 2, hit_rate 0.67, indexed 118", text)
-            self.assertIn("观测展示，不参与任何判定", text)
 
 
 class TestDupCheck(unittest.TestCase):

@@ -381,8 +381,23 @@ def find_unscreened_new_docs(workspace: Path, added_rels) -> List[Ref]:
     return out
 
 
+def screen_target_exists(workspace: Path, into: str) -> bool:
+    """回执声称"并入 X"时，X 必须真的存在——否则回执记的是一个不存在的去向。
+
+    C 线残渣修复（票 doc_strategy_five_points）：此前 `--into` 不校验，回执可以写
+    `merged-into docs/adr/9999-nope.md` 而无人发现；下一轮读回执的人只会困惑。
+    """
+    target = str(into or "").strip()
+    if not target:
+        return False
+    return (Path(workspace) / target).is_file()
+
+
 def record_screen_ack(workspace: Path, rel: str, *, into: Optional[str] = None) -> Path:
-    """写排查回执（结论二值：并入某目标 / 确认新建）。不做语义判断，只记事实。"""
+    """写排查回执（结论二值：并入某目标 / 确认新建）。不做语义判断，只记事实。
+
+    调用方（CLI）在写入前用 `screen_target_exists()` 校验 `--into`；本函数只记。
+    """
     import datetime
 
     path = screen_ack_path(workspace, rel)
@@ -549,3 +564,31 @@ def check_retired_adr_dest(rel: str, text: str) -> List[Ref]:
     return [("ADR_RETIRED_NO_DEST",
              f"{rel}: 退役 ADR 未写去向（需 `merged-into:` / `superseded_by:` / `Status: Rejected` 之一）"
              f"——合并没有自动化，忘写就会变成'retired 但不知去哪'")]
+
+
+# --- 归档去向标记（ADR-0023 §2.2；warn 档，观察用）---
+
+_ARCHIVE_MARKERS = ("Superseded-by", "Legacy note")
+
+
+def find_unguarded_archives(workspace: Path, changed_rels) -> List[Ref]:
+    """本轮改动集里落进 `docs/**/archive/` 但缺去向标记的文档（ADR-0023 §2.2）。
+
+    **只对本轮增量**（存量不批量灌噪声），warn 档（不阻断）——归档是有意为之的动作，
+    缺标记说明"为什么归档"没写下来，判定归人。
+    原住 `engine/doc_audit._new_archive_without_note`；该模块（doc-audit 报告+票路径）
+    已按 ADR-0022 §2.2 🅰1 退休，此检查迁到零依赖层由 pre-commit 消费。
+    """
+    out: List[Ref] = []
+    for rel in changed_rels:
+        parts = Path(rel).parts
+        if "archive" not in parts or not rel.endswith(".md"):
+            continue
+        try:
+            text = (Path(workspace) / rel).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if any(m in text for m in _ARCHIVE_MARKERS):
+            continue
+        out.append(("ARCHIVE_NO_DEST", f"{rel}: 归档但未写去向标记（Superseded-by / Legacy note，ADR-0023 §2.2）"))
+    return out

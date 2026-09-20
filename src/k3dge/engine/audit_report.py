@@ -48,7 +48,7 @@ def _find_report(workspace: Path, milestone_id: str, kind: str = "audit"):
                 if fn_ms != milestone_id:
                     continue
             elif not _has_milestone_token(text, milestone_id):
-                # 报告既无里程碑文件名、正文也无该里程碑 token（如 doc-audit 通稿）：
+                # 报告既无里程碑文件名、正文也无该里程碑 token（如跨里程碑的通用稿）：
                 # 不得充当任一里程碑的审计闭环（否则 seal_ready 假阳）。
                 continue
         candidates.append((f.stat().st_mtime, f, text))

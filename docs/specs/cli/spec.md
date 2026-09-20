@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/cli`
-- **Contract Hash**: `sha256:14483b3e6d6f29643fe5bd36587b937a1e89a5bf2b5532a839c622315437f330`
+- **Contract Hash**: `sha256:67273b65ebe252b38926e07aa476b1ab21b5f3045552c0a2da327220f12fff0e`
 - **Last Updated**: 2026-09-19
 
 ## 1. Domain Boundary & Responsibilities
@@ -31,7 +31,6 @@ from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.models import GateReport
 from k3dge.cli.mcp_peers import cmd_mcp_probe
 from k3dge.cli.mcp_peers import cmd_mcp_sync
-cmd_doc_audit(args: argparse.Namespace) -> int
 cmd_check(args: argparse.Namespace) -> int
 cmd_sync(args: argparse.Namespace) -> int
 cmd_extractor(args: argparse.Namespace) -> int

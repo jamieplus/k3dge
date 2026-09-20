@@ -8,7 +8,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 from k3dge.cli.main import main
-from k3dge.engine.doc_audit import _new_archive_without_note
+from k3dge.engine.pure_refs import find_unguarded_archives
 
 _ENV = {"PATH": "/usr/bin:/bin", "HOME": "/tmp", "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
         "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
@@ -18,16 +18,21 @@ def _git(ws: Path, *a: str) -> None:
     subprocess.run(["git", "-C", str(ws), *a], check=True, capture_output=True, env=_ENV)
 
 
-def test_new_archive_without_note_only_incremental(tmp_path: Path) -> None:
-    subprocess.run(["git", "init", "-qb", "main", str(tmp_path)], check=True, capture_output=True, env=_ENV)
+def test_unguarded_archive_detected(tmp_path: Path) -> None:
+    """归档去向标记（ADR-0023 §2.2）：本轮增量里进 `archive/` 但缺标记的报出来。
+
+    迁自 `doc_audit._new_archive_without_note`（doc-audit 路径已退休）；口径改为
+    **显式传入本轮改动集**（调用方是 pre-commit 的 staged 列表），不再自己跑 diff。
+    """
     d = tmp_path / "docs" / "memo" / "archive"
     d.mkdir(parents=True)
-    (d / "x.md").write_text("# x\n", encoding="utf-8")               # 新进档，无去向标记
+    (d / "x.md").write_text("# x\n", encoding="utf-8")                # 无去向标记
     (d / "y.md").write_text("# y\nSuperseded-by: z\n", encoding="utf-8")  # 有标记
-    _git(tmp_path, "add", "-A")
-    res = _new_archive_without_note(tmp_path)
-    assert any(p.endswith("archive/x.md") for p in res)
-    assert not any(p.endswith("archive/y.md") for p in res)
+    (tmp_path / "docs" / "memo" / "live.md").write_text("# live\n", encoding="utf-8")
+    res = find_unguarded_archives(
+        tmp_path, ["docs/memo/archive/x.md", "docs/memo/archive/y.md", "docs/memo/live.md"])
+    assert [c for c, _ in res] == ["ARCHIVE_NO_DEST"]
+    assert "archive/x.md" in res[0][1]
 
 
 def test_doc_list_archive_prints_low_authority_header(tmp_path: Path, monkeypatch) -> None:

@@ -591,3 +591,27 @@ class TestRetiredDestRepoWideWiring(unittest.TestCase):
                 "---\nStatus: Superseded\nmerged-into: ADR-0005 §2.7\n---\n# ADR-0042\n", encoding="utf-8")
             codes2 = [v.rule_id for v in validate_docs(ws, types=["adr"])]
             self.assertNotIn("ADR_RETIRED_NO_DEST", codes2)
+
+
+class TestScreenTargetExists(unittest.TestCase):
+    """回执声称"并入 X"时 X 必须存在（C 线残渣：此前不校验）。"""
+
+    def test_missing_target_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            ws = Path(td)
+            self.assertFalse(pure_refs.screen_target_exists(ws, "docs/adr/9999-nope.md"))
+            self.assertFalse(pure_refs.screen_target_exists(ws, ""))
+            self.assertFalse(pure_refs.screen_target_exists(ws, None))   # type: ignore[arg-type]
+
+    def test_existing_target_passes(self):
+        with tempfile.TemporaryDirectory() as td:
+            ws = Path(td)
+            (ws / "docs" / "adr").mkdir(parents=True)
+            (ws / "docs" / "adr" / "0005-x.md").write_text("# ADR-0005\n", encoding="utf-8")
+            self.assertTrue(pure_refs.screen_target_exists(ws, "docs/adr/0005-x.md"))
+
+    def test_directory_is_not_a_target(self):
+        with tempfile.TemporaryDirectory() as td:
+            ws = Path(td)
+            (ws / "docs" / "adr").mkdir(parents=True)
+            self.assertFalse(pure_refs.screen_target_exists(ws, "docs/adr"))

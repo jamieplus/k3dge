@@ -11,7 +11,6 @@ from unittest import TestCase, mock
 from k3dge.engine import audit_checklist as ac
 from k3dge.engine.align import run_milestone_alignment
 from k3dge.engine.audit_report import _find_audit_report, _parse_audit_stats
-from k3dge.engine.doc_audit import _changed_docs, run_doc_audit
 from k3dge.engine.milestone_audit import (
     _audit_mode,
     _ensure_leftovers,
@@ -412,96 +411,6 @@ class TestExternalAuditPersist(TestCase):
         self.assertEqual(first, second)
         found = _find_audit_report(ws, "M1")
         self.assertEqual(_parse_audit_stats(found[1])["待修"], 0)
-
-
-class TestDocAudit(TestCase):
-    def test_clean_when_no_docs(self) -> None:
-        ws = _ws()
-        with mock.patch("k3dge.engine.doc_audit._changed_docs", return_value=[]):
-            status, _ = run_doc_audit(ws, io=io.StringIO())
-        self.assertEqual(status, "clean")
-
-    def test_task_body_lists_the_actual_files(self) -> None:
-        """回归守卫：票体必须带具体文件清单，不得三字段同文。
-
-        旧行为只把 docs 用来拼标题，产出的票无法执行（实例：
-        `2026-09-14-M10-audit-doc_audit_adr_guides_memo_4` 只能当过期空壳关掉）。
-        """
-        ws = _ws()
-        docs = ["docs/adr/0001-x.md", "docs/guides/user_guide.md", "docs/memo/2026-09-14-y.md"]
-        with mock.patch("k3dge.engine.doc_audit._changed_docs", return_value=list(docs)):
-            status, _ = run_doc_audit(ws, io=io.StringIO())
-        self.assertEqual(status, "reported")
-        tasks = [p for p in (ws / "docs" / "tasks").glob("*.md")
-                 if "doc_audit" in p.name and not p.name.startswith(("README", "AUTHORING", "_"))]
-        self.assertEqual(len(tasks), 1)
-        body = tasks[0].read_text(encoding="utf-8")
-        for d in docs:
-            self.assertIn(d, body, f"票体缺文件: {d}")
-        # 「上下文/切入点」不得与标题同文
-        ctx = body.split("## 上下文/切入点", 1)[1].strip()
-        self.assertNotEqual(ctx.splitlines()[0].strip(), body.split("# ", 1)[1].splitlines()[0].strip())
-
-    def test_change_set_includes_committed_docs(self) -> None:
-        """回归守卫：**先提交再跑 doc-audit 不得集体失明**。
-
-        旧实现自跑 `git status --porcelain`（只看未提交）⇒ 分批提交后返回
-        "no managed docs changed"（M10 实测）。改动集的唯一源是
-        `diff.get_changed_files`：未提交 ∪ `K3DGE_BASE_SHA...HEAD`。
-        """
-        import os
-        import subprocess
-
-        ws = Path(tempfile.mkdtemp())
-
-        def git(*a):
-            subprocess.run(["git", *a], cwd=ws, check=True, capture_output=True, text=True)
-
-        git("init", "-q")
-        git("config", "user.email", "t@t")
-        git("config", "user.name", "t")
-        (ws / "docs" / "guides").mkdir(parents=True)
-        (ws / "docs" / "guides" / "a.md").write_text("# a\n", encoding="utf-8")
-        git("add", "-A")
-        git("commit", "-qm", "base")
-        base = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True, text=True
-        ).stdout.strip()
-
-        (ws / "docs" / "guides" / "a.md").write_text("# a2\n", encoding="utf-8")
-        (ws / "docs" / "tasks").mkdir(parents=True)
-        (ws / "docs" / "tasks" / "2026-09-19-M1-fix-x.done.md").write_text("# x\n", encoding="utf-8")
-        git("add", "-A")
-        git("commit", "-qm", "round")   # 已提交 ⇒ 旧实现看不见
-
-        with mock.patch.dict(os.environ, {"K3DGE_BASE_SHA": base}):
-            self.assertEqual(_changed_docs(ws), ["docs/guides/a.md"])  # tasks/ 属进程产物，排除
-
-    def test_creates_one_milestone_task(self) -> None:
-        ws = _ws()
-        created = Path("docs/tasks/2026-09-02-M1-audit-doc-audit.md")
-        with mock.patch("k3dge.engine.doc_audit._changed_docs", return_value=["docs/guides/a.md"]), \
-             mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL), \
-             mock.patch("k3dge.engine.task_index.scan_milestone_tasks", return_value=[]), \
-             mock.patch("k3dge.engine.task_write.create_task", return_value=(True, "ok", created)) as ct:
-            status, _ = run_doc_audit(ws, io=io.StringIO())
-        self.assertEqual(status, "reported")
-        ct.assert_called_once()
-        # milestone-scoped, non-blocking
-        self.assertEqual(ct.call_args.kwargs.get("milestone"), "M1")
-
-    def test_idempotent_when_open_task_exists(self) -> None:
-        ws = _ws()
-        existing = mock.Mock(path=Path("docs/tasks/x-audit-doc-audit.done.md"), status="done")
-        open_task = mock.Mock(path=Path("docs/tasks/y-audit-doc-audit.md"), status="in-progress")
-        with mock.patch("k3dge.engine.doc_audit._changed_docs", return_value=["docs/guides/a.md"]), \
-             mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL), \
-             mock.patch("k3dge.engine.task_index.scan_milestone_tasks", return_value=[existing, open_task]), \
-             mock.patch("k3dge.engine.task_write.create_task") as ct:
-            status, _ = run_doc_audit(ws, io=io.StringIO())
-        self.assertEqual(status, "reported")
-        ct.assert_not_called()  # one task per milestone, not per finding
-
 
 
 class TestRatchetAuditStep(TestCase):

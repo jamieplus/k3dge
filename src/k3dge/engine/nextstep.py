@@ -47,7 +47,7 @@ from typing import Optional, TextIO
 #:   2 环未闭环，不处理无法前进（audit_open / audit_needed）
 #:   3 操作被拒（rejected）
 #:   4 决策点，可做可不做（seal_ready / audit_suggested / new_domain）
-#:   5 在办进程 / 后续步（ratchet_open / doc_audit）
+#:   5 在办进程 / 后续步（ratchet_open）
 #:   9 播报，无需动作（normal / sealed / seal_declined）
 #:
 #: 播报态（无 options）：只陈述事实 + 指针，不给分支。
@@ -72,11 +72,6 @@ STATE_OPTIONS: dict = {
             "peer_contract §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）",
             "k3dge ADR-0025 §2.7",
         ],
-    },
-    "doc_audit": {
-        "priority": 5,
-        "fact": "docs/ 有改动：check 是静态硬闸（T-01），doc-audit 在其**之后**跑、不阻断（本轮不改，封板轮也得闭环）",
-        "pointers": ["k3dge ADR-0022 §2.2", "k3dge doc-audit"],
     },
     "audit_suggested": {
         "priority": 4,
@@ -311,14 +306,16 @@ def emit_all(workspace: Path, steps: list, *, stream: Optional[TextIO] = None) -
     """一轮的**多处理点**：按 priority 稳定排序后打印，侧车写全量 + `primary`。
 
     为何排序：同一轮可能命中多个处理点（实测 `k3dge check` 同轮命中 `seal_ready` 与
-    `doc_audit`），stdout 顺序应表达"先看哪个"；侧车是给读侧（外来 harness / MCP）的，
+    `doc_fix`），stdout 顺序应表达"先看哪个"；侧车是给读侧（外来 harness / MCP）的，
     单槽会丢信息。
     """
     seen = {}
     for ns in steps:
         if ns is not None:
             seen[ns.state] = ns          # 同 state 去重（后到者胜）
-    ordered = sorted(seen.values(), key=lambda n: (n.priority, list(STATE_OPTIONS).index(n.state)))
+    order = list(STATE_OPTIONS)
+    ordered = sorted(seen.values(),
+                     key=lambda n: (n.priority, order.index(n.state) if n.state in order else len(order)))
     cards = [_card(n) for n in ordered]
     _write_cards(workspace, cards, ordered[0].state if ordered else None)
     from k3dge.engine import events
