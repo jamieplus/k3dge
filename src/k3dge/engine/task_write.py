@@ -20,7 +20,6 @@ from k3dge.engine.task_index import MILESTONE_RE, TITLE_RE, parse_frontmatter
 _TASK_TYPES = frozenset({"audit", "feat", "fix", "docs", "chore", "refactor"})
 
 
-# k3dit:fixed value-20 task_write.py:138 `_auto_backfill_reviews` 本体缩为「遍历 + 单份委托」（无 reviews_dir/`_is_review_aux`/异常各自早返），单份处理落 `_backfill_one_review`:113（读失败/非审计表 `_review_has_audit_table`:24/越界 `_review_in_scope`:31/无表头/未改 各早返）；三条模糊命中原样在 `_row_hits_task`:43-45（`title[:15] in 问题描述`、`ID in stem`、`desc[:15] in title`），回填手术在 `_ensure_backfill_section`:103（幂等：`task_name in text` 即返）/`_insert_into_backfill_block`:88/`_new_backfill_lines`:77，`处置` 截 40 字在 `_flip_pending_rows`:70——与 present.md 删行逐条同义（旧 `.replace("|","|")` 空操作、`'fid' in locals()` 兜底均等价保留）。易误翻另加护栏：`_backfill_task_reviews`:313 对有 `report:` 指针的票早返（ADR-0022:35、`rules/04-milestone.md:17`）。Hall 预计算 `facts/scan_facts.json` 对 task_write.py 仅剩 QX47-51，已无 `_auto_backfill_reviews` ⇒ 复杂度落回阈值内。反证：若 `_row_hits_task` 任一条命中或 `_review_in_scope` 回退与旧 diff 不同义，或该符号再出现在复杂度清单，则没修对。（本窗无 tests；`new_tests.json` added=[]，以上为静态核对。）
 def _review_has_audit_table(text: str) -> bool:
     """报告是否像审计报告（宽松表头判定，不改口径）。"""
     if "ID|严重度|优先级|类型|问题描述|位置|状态|处置|验证" in text.replace(" ", ""):

@@ -109,6 +109,5 @@ k3dge mcp probe --json     # 同上的机读形态；全活 exit 0，有死 exit
 ## 相关
 
 * 实现：`src/k3dge/cli/mcp.py`
-<!-- k3dit:fixed doc-1 mcp-bridge.md:113 契约指针由 `src/k3dge/engine/milestone.py` 改为 `src/k3dge/engine/seal_flow.py`（run_seal_flow 三相位）+`src/k3dge/engine/seal.py`；milestone.py 已不存在（drop_milestone_facade）。反证：若仍指 milestone.py 或指向不存在的模块即没修对。 -->
 * 契约：`src/k3dge/engine/contract.py`（`include_doc` 与哈希正交）、`src/k3dge/engine/seal_flow.py`（`run_seal_flow` 三相位：预审 → 审计 → 审核后自动）、`src/k3dge/engine/seal.py`（封板前置清单与归档）
 * 验证：`k3dge check --force-full --with-tests` / `pytest -q`

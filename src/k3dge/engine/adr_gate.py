@@ -164,7 +164,6 @@ def _mark_superseded(text: str, by_id: str) -> str:
     """Replace Status line with Superseded + inject superseded_by field."""
     text = re.sub(r"^Status:\s*\S+", "Status: Superseded", text, count=1, flags=re.M)
     # Inject superseded_by after Supersedes line (or after Status if no Supersedes)
-# k3dit:fixed code-4 adr_gate.py:170 改用 re.search(r"^superseded_by:", text, re.M) 真按行锚查字段（旧写法把 "^superseded_by:" 当字面量子串找，恒真）。反证：对已含 superseded_by: 的旧 ADR 调 _mark_superseded 仍追加第二行即没修对。
     # 旧写法 `"^superseded_by:" not in text` 把正则锚当纯文本找，永远找不到 ⇒ 守卫恒真，
     # 对已有该字段的旧 ADR 再注入一行（frontmatter 重复键）。
     if not re.search(r"^superseded_by:", text, re.M):

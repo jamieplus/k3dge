@@ -467,7 +467,6 @@ def k3dge_milestone_control(
             except Exception:  # 版本读不到不影响封板事实，回执里留空即可
                 return ""
 
-# k3dit:fixed code-2 mcp.py:475 传 skip_enter_prompt=True；seal_flow.py:159 `if not skip_enter_prompt and not prompt.ask(...)` 短路交互，绕开 prompt.py:48 非 tty 恒返回 default_yes=False（旧写法必 seal_declined）。反证：非 tty 下 MCP seal 仍返回 status=seal_declined 即没修对。
         # MCP 出口没有交互通道：`_Prompt.ask(default_yes=False)` 在非 tty 恒返回 False
         # （prompt.py:48），旧写法每次必 `seal_declined`，MCP 永远封不了板。工具调用本身就是
         # "要封"的显式意图 ⇒ 走 CLI `--yes` 的等价开关；确认语义由调用方（宿主/人）承担。
@@ -492,7 +491,6 @@ def k3dge_milestone_control(
                 indent=2,
                 ensure_ascii=False,
             )
-# k3dit:fixed code-1 mcp.py:495-514 MCP seal 只 _read_version() 读前后版号做回执，已无 bump_version/consume_unreleased/append_changelog；版号唯一前进点是 seal_flow.run_seal_flow 相位3 _version_bump（seal_flow.py:208-231），与 CLI main.py:746-755 同判定。反证：MCP 封板后版号仍 +2 patch 或 CHANGELOG 出现双段即没修对。
         # 版号前进是 `run_seal_flow` **相位 3**（`version_bump`）的职责（ADR-0004 §2.1.9/§2.1.11），
         # CLI 同判定也只让它 bump 一次（main.py:747）。此处旧代码在封版提交**之后**又跑一遍
         # `bump_version`+`consume_unreleased`+`append_changelog` ⇒ 每次前进两个 patch、CHANGELOG

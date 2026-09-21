@@ -883,7 +883,6 @@ def cmd_search(args: argparse.Namespace) -> int:
     if getattr(args, "path", None):
         # Path-listing mode: list files matching the glob (scoped alternative to `find`).
         matches = []
-# k3dit:fixed code-3 main.py:889-893 用 list(workspace.glob(args.path)) 包 try，捕 ValueError/NotImplementedError/re.error 后返回 1；list() 使迭代期抛出的异常也被接住，早于 SEC-01 _rel_within_workspace。反证：--path '/etc/*' 仍崩栈或越过收敛继续跑即没修对。
         # 绝对或非法 pattern（`/etc/*`）在 pathlib 里以 ValueError / NotImplementedError 抛出，
         # 且抛在 `SEC-01` 收敛（_rel_within_workspace）**之前** ⇒ 旧代码直接崩栈。
         try:

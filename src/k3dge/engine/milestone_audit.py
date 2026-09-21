@@ -234,7 +234,6 @@ def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str =
     return "progress", f"工单 {j['job_id']} 对端态 {st.get('state')}，open={st.get('open', [])}。"
 
 
-# k3dit:fixed value-23 milestone_audit.py 五处拒绝分支收拢到 _reject_step（:238-255，统一 next_for_rejection→persist→render_cli，:332/355/367/387 及 run_audit_flow:475 调用）；棘轮腿 _ratchet_audit_leg（:258）、oneshot 尾 _oneshot_audit_leg（:286）各归其函数，run_audit_flow（:420）只留前置事实+路由。反证：任一拒绝分支仍各自 render+persist，或两套审计形状仍同处一函数即没修对。
 def _reject_step(
     workspace: Path,
     milestone_id: str,

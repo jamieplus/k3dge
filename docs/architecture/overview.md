@@ -134,7 +134,6 @@ sequenceDiagram
 
 > 命令结果末尾统一附 `[NEXT] state=… milestone=…` 一行提示（MCP 同构 JSON `next` 字段），只给合法下一步、不替人决定；优先级 `pending_findings > ratchet_open > seal_ready > audit_suggested`，状态与 reasons 的唯一来源在 `engine/nextstep.STATE_OPTIONS` + `engine/audit_trigger.py`，与本节同一张状态机。新建 `src/` 域给 `new_domain`（是否算持久设计、写得对不对仍归 k3dit/人）；`overview.md` 更新已移出钩子、进 closure。
 >
-<!-- k3dit:fixed doc-3 overview.md:138 T-01 段改为「doc 合规三层」并写明原 doc-audit 出报告+建票路径已退休，与 ADR-0022:5/45-56（Amended-by 🅰1）及 docs/protocols/audit_default.md:40 同指。反证：若仍写「check 绿后给 [NEXT] doc_audit」为现行机制即没修对。 -->
 > **T-01 边界（doc 合规，ADR-0022 §2.2 🅰1）**：`check` 恒静态、不跑透镜。原「docs 改动 → `check` 绿后 `[NEXT] doc_audit` → `k3dge doc-audit`（非阻断）出报告 + 建带 `Milestone` 的 task」路径**已退休**（实测未走通：透镜说明/落点被丢弃、票绑错报告）。文档改动现在由**三层**承接：① 提交时结构闸（`.schema.json` + pre-commit）与**新建首次排查**（`DOC_NEW_UNSCREENED`，阻断一次，判定归 agent）；② `k3dge doc fix` 的确定性规约化（闭集规则、幂等；seal 轮跑）；③ 作者合规透镜（**里程碑审计**轮，`docs/protocols/audit_default.md` Doc Audit 节）。耐久＝**闸**不是票：封板前置 `docs_normalized` 要求 detector 零偏差。ADR 冲突/覆盖同样只在里程碑审计（`k3dge_adr_index` 出事实 + k3dit 判），不进每次 commit。
 
 ## 8. 决策与有意留索引

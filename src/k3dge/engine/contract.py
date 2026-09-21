@@ -191,7 +191,6 @@ def register_extractor(ext: ContractExtractor, *, override: bool = False) -> Non
         _EXTRACTORS.append(ext)
 
 
-# k3dit:fixed value-21 contract.py:196-270 拆出 _load_manifest_extractors/_load_dropin_extractors，幂等缓存由函数属性挪到模块级 _PLUGIN_ATTEMPTED（:172，测试可清），manifest 分支改用 register_extractor(ext)（:212）不再直 append _EXTRACTORS。反证：插件幂等仍靠 _load_plugin_extractors._attempted 或 manifest 分支绕过 register_extractor 即没修对。
 # 幂等缓存从函数属性挪到模块级 `_PLUGIN_ATTEMPTED`（可测、可清），单函数不再混装三件事。
 def _load_manifest_extractors(specs: object) -> None:
     """Source 1: `extractors: ["mod" | "mod:attr", ...]` — explicit, out-of-repo/pip."""
