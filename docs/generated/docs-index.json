@@ -489,6 +489,14 @@
       "tokens": "架构总览补全流程与状态变迁 + 状态集覆盖闸 `ARCH_STATE_DOC_DRIFT`"
     },
     {
+      "path": "docs/tasks/2026-09-21-M11-docs-docs_align_m11.done.md",
+      "type": "tasks",
+      "id": "2026-09-21-M11-docs-docs_align_m11.done",
+      "title": "文档对齐：downstream 手册跟上 hooks 下发 + 六条持久设计并入 ADR-0004/0018",
+      "status": "done",
+      "tokens": "文档对齐：downstream 手册跟上 hooks 下发 + 六条持久设计并入 ADR-0004/0018"
+    },
+    {
       "path": "docs/tasks/2026-09-21-M11-feat-arch_table_gate.done.md",
       "type": "tasks",
       "id": "2026-09-21-M11-feat-arch_table_gate.done",

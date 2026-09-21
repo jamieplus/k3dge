@@ -11,7 +11,7 @@
 | 层 | 是什么 | 升什么 |
 | --- | --- | --- |
 | **判定核** | `.venv` 里按 `K3DGE_SOURCE` 装上的包 | `k3dge` CLI、`python -m k3dge.cli.mcp`、门禁/`task list`/`sync` 全部走这里 |
-| **拷进仓的协议与包装** | `AGENTS.md`、`scripts/gate.*`、`scripts/init.sh`、`.pre-commit-config.yaml`、docs 模板 | init **不会覆盖**已有文件（`_write_if_missing`） |
+| **拷进仓的协议与包装** | `AGENTS.md`、`scripts/gate.*`、**`scripts/pre-commit`、`scripts/commit-msg`**（git hooks 薄壳，闸逻辑在判定核的 `engine/doc_gate`）、`scripts/init.sh`、`.pre-commit-config.yaml`、docs 类型模板（含各类型 `README.md`/`AUTHORING.md`） | init **不会覆盖**已有文件（`_write_if_missing`） |
 
 ## 用的是哪一份 k3dge（K3DGE_SOURCE 统管裁决表）
 
@@ -36,11 +36,12 @@ Agent 用的索引工具（`k3dge task list`、MCP `k3dge_task_list` / `k3dge_sy
 - 再执行 `pip install -e "${K3DGE_SOURCE}[mcp]"` → 判定核换成当前源（含 MCP）
 - scaffold 只**补当时还不存在的新模板文件**（例如后来才有的 `docs/guides/mcp-bridge.md`、`.gitignore`）
 - `manifest.domains` 仍为空时，写入第一条域（ADR-0005）
-- `k3dge sync`、`pre-commit install`（含 `--hook-type commit-msg`）
+- `k3dge sync`（**下游第一次提交前先跑一次**：`Contract Hash` 与 `docs/generated/*` 由它落盘，否则会被 `CONTRACT_HASH_MISSING` / `DOC_INDEX_STALE` 拦）、补上 `scripts/pre-commit` 与 `scripts/commit-msg`（可执行）
+- hooks 激活按 `AGENTS.md` 的口径：`git config core.hooksPath scripts`（两条 hook 都在 `scripts/`）；若你更愿意用 `pre-commit` 框架，`.pre-commit-config.yaml` 的 local hook 也指向同一个 `scripts/pre-commit`——**两条路都收敛到同一份实现**，别各写一套
 
 **不会做**
 
-- 覆盖已有 `AGENTS.md`、`scripts/gate.*`、`scripts/init.sh`、overview、已有的 mcp-bridge 旧稿
+- 覆盖已有 `AGENTS.md`、`scripts/gate.*`、`scripts/pre-commit`、`scripts/commit-msg`、`scripts/init.sh`、overview、已有的 mcp-bridge 旧稿（缺的会补——hooks 因此可从旧版本升上来）
 - 把本仓的 `docs/adr/` 或 reviews 审计目录拷过来
 
 这是刻意的：init 幂等，避免把项目改过的协议冲掉。协议升级要**另同步**，不是 init 行为回退（ADR-0006）。

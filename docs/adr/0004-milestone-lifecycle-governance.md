@@ -2,6 +2,7 @@
 Status: Accepted
 Supersedes: -
 Amended-by:
+  - 🅰3 | Core Maintainer | 2026-09-21 | 相位 3 先刷**纯投影**、不跑整条 `sync`（事实源写归审前）；派生件新鲜度归闸（`DOC_INDEX_STALE`/`DOCS_GENERATED_STALE`/`SYMBOL_INDEX_STALE`/`EXTRACTOR_PLUGIN_STALE`）+ `k3dge where` 自愈
   - 🅰2 | Core Maintainer | 2026-09-20 | `degraded-manual` 的定义扩到「**manual 传输**（不论它在链里是不是首选）」——判"有没有独立透镜"（事实），不判"相对预期链的位置"
   - 🅰1 | Core Maintainer | 2026-09-20 | 审计＝封版主体：唯一入口 `seal`（预审 align → 审计 → 审核后自动化）；版号由**审计正常返回**推进；边界＝审计基线（`tag <M> = <B>`），基线之后归下一里程碑；报告降级为可选产物；完成记录＝封版提交 trailer；运行态与 durable 分层；CHANGELOG 由提交区间生成
 Landed-by: src/k3dge/engine/seal_flow.py
@@ -100,8 +101,9 @@ Note: 修订痕迹见 git 历史。
      + 形式闸（`docs/guides/` 无 stub / ADR 全 `Accepted` 且带可解析 `Landed-by` / docs 规约化）。
   2. **审计**：对**基线版本**跑（棘轮或 oneshot）；**审计正常返回 ⇒ 版号前进**（闭集见 §2.1.11），
      **不管有没有报告**。
-  3. **审核后（自动）**：封版提交（提版 + 归档 + 收摊清单 + 记录 trailer，见 §2.1.10）
-     → `tag <M> = <B>` → 指针前进 → 交接（打印待执行命令）。
+  3. **审核后（自动）**：**先刷纯投影**（`docs/generated/{api,domains}.md`、`docs-index.json`、符号索引、README 自动块——全部派生、幂等），**再**写收摊清单
+     → 封版提交（提版 + 归档 + 收摊清单 + 记录 trailer，见 §2.1.10）→ `tag <M> = <B>` → 指针前进 → 交接（打印待执行命令）。
+     相位 3 **不跑整条 `sync`**：spec 接口块/契约哈希与 ADR reconcile 是**事实源写**，审计之后动它们等于改审计看过的内容；派生件的新鲜度另有闸（`DOC_INDEX_STALE` / `DOCS_GENERATED_STALE` / `SYMBOL_INDEX_STALE` / `EXTRACTOR_PLUGIN_STALE`），`k3dge where` 遇陈旧索引自愈。[^🅰3.1]
 - **机械验证两道**：相位 1 的预审，以及**落点闸**（审计线的修复合并回主干时跑
   sync/check/doc-gate/pytest，红则回滚主干——先验后并）。
 - **边界与标识**：审计的输入标识＝**基线 B 的 git hash**（不用 job id 作标识）；
@@ -186,3 +188,10 @@ Note: 修订痕迹见 git 历史。
     ——于是"把 manual 排在 transports 首位"就成了绕开署名要求的路（`downgrades` 为空 ⇒ 判 `closed`）。
     裁定：判据是**事实**（有没有独立透镜），不是**相对位置**（链里排在哪儿）。故 `provider == "manual"`
     一律 `degraded-manual`、一律须署名；本仓 `[mcp, manual]` 不受影响（本就落在降级位）。
+
+[^🅰3.1]: 修改（🅰3）：新增"相位 3 先刷纯投影"。为什么不是整条 `sync`：`sync` 链里 `sync_domains`
+    （spec 接口块 + `Contract Hash`）与 `reconcile_adrs`（ADR frontmatter + 移文件）是**事实源写**，
+    审计之后执行等于让"审的那一版"与封版内容脱钩（§2.1.9「审哪版封哪版」）。纯投影刷新与新鲜度闸
+    是同一件事的两半：**闸管发现**（重算比对，红了给重生命令）、**刷管及时**（封版那一刻与 `k3dge where` 自愈）。
+    落地：`src/k3dge/engine/seal_flow.py::_refresh_projections`、`engine/evaluator.py`（三闸）、
+    `engine/search.py::_is_stale_cheaply`；见 `docs/tasks/2026-09-21-M11-feat-projection_refresh.done.md`。
