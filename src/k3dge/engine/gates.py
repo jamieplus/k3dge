@@ -90,7 +90,8 @@ DEFAULTS: Dict[str, Any] = {
         # 与基线新鲜度（`audit_fresh`）——报告降为可选产物，边界由 `tag <M>=<B>` 表达。
         "seal": {"preconditions": ["tasks_all_done", "align_pass", "guides_filled",
                                    "adrs_all_accepted", "adr_landed", "docs_normalized"],
-                 "actions": ["full_matrix", "audit", "archive", "closure_note", "prune"]},
+                 "actions": ["full_matrix", "audit", "archive", "version_bump",
+                             "seal_record", "closure_note", "prune"]},
         "align": {"preconditions": ["tasks_all_done"], "actions": ["full_matrix"]},
         # sync 链：顺序＝声明序；各步性质（投影/事实源）见 nodes.NODE_DEFAULTS
         "sync": {"actions": ["sync_extractors", "reconcile_adrs", "sync_domains",

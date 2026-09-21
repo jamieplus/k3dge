@@ -383,7 +383,7 @@ rejection(message: Any, fallback_gate_id: str) -> Rejection
 REL = '.agent/pipeline.toml'
 LEGACY_REL = '.agent/gates.toml'
 INTERNAL_GATE_IDS: tuple = ('unknown_gate_id', 'unknown_action_id', 'audit_report_missing', 'audit_open_declined', 'audit_noop', 'audit_degraded_unsigned', 'milestone_id_invalid', 'no_tasks', 'invalid_task_status', 'align_failed', 'archive_failed')
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed', 'docs_normalized'], 'actions': ['full_matrix', 'audit', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}, 'sync': {'actions': ['sync_extractors', 'reconcile_adrs', 'sync_domains', 'sync_manual_docs', 'sync_docs_index']}, 'audit': {'stages_produce': ['audit.actions.audit'], 'stages_verify': ['audit.actions.verify']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed', 'docs_normalized'], 'actions': ['full_matrix', 'audit', 'archive', 'version_bump', 'seal_record', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}, 'sync': {'actions': ['sync_extractors', 'reconcile_adrs', 'sync_domains', 'sync_manual_docs', 'sync_docs_index']}, 'audit': {'stages_produce': ['audit.actions.audit'], 'stages_verify': ['audit.actions.verify']}}}
 load(workspace: Path) -> Dict[str, Any]
     # doc: 缺省 ∪ `.agent/pipeline.toml` 的 `[gates.*]` + `[checks.*]`；缺失/坏 ⇒ 缺省。
 legacy_config_present(workspace: Path) -> bool
@@ -562,7 +562,7 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 from k3dge.engine import gates
-NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {'tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'align_pass': {'kind': 'projection', 'on_error': 'stop'}, 'guides_filled': {'kind': 'projection', 'on_error': 'stop'}, 'adrs_all_accepted': {'kind': 'projection', 'on_error': 'stop'}, 'adr_landed': {'kind': 'projection', 'on_error': 'stop'}, 'docs_normalized': {'kind': 'projection', 'on_error': 'stop'}, 'full_matrix': {'kind': 'projection', 'on_error': 'stop', 'satisfies': ['align_pass']}, 'audit': {'kind': 'fact', 'on_error': 'stop', 'on_rerun': 'append'}, 'archive': {'kind': 'fact', 'on_error': 'rollback', 'on_rerun': 'reject', 'produces': ['archived_paths']}, 'closure_note': {'kind': 'projection', 'on_error': 'continue'}, 'prune': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'align_tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'sync_extractors': {'kind': 'projection', 'on_error': 'continue'}, 'reconcile_adrs': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append', 'produces': ['adr_report']}, 'sync_domains': {'kind': 'projection', 'on_error': 'stop', 'produces': ['changed']}, 'sync_manual_docs': {'kind': 'projection', 'on_error': 'stop', 'produces': ['docs_updated']}, 'sync_docs_index': {'kind': 'projection', 'on_error': 'stop'}}
+NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {'tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'align_pass': {'kind': 'projection', 'on_error': 'stop'}, 'guides_filled': {'kind': 'projection', 'on_error': 'stop'}, 'adrs_all_accepted': {'kind': 'projection', 'on_error': 'stop'}, 'adr_landed': {'kind': 'projection', 'on_error': 'stop'}, 'docs_normalized': {'kind': 'projection', 'on_error': 'stop'}, 'full_matrix': {'kind': 'projection', 'on_error': 'stop', 'satisfies': ['align_pass']}, 'audit': {'kind': 'fact', 'on_error': 'stop', 'on_rerun': 'append'}, 'archive': {'kind': 'fact', 'on_error': 'rollback', 'on_rerun': 'reject', 'produces': ['archived_paths']}, 'version_bump': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'seal_record': {'kind': 'fact', 'on_error': 'stop', 'on_rerun': 'append', 'produces': ['audit_baseline', 'audit_seal_commit']}, 'closure_note': {'kind': 'projection', 'on_error': 'continue'}, 'prune': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'align_tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'sync_extractors': {'kind': 'projection', 'on_error': 'continue'}, 'reconcile_adrs': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append', 'produces': ['adr_report']}, 'sync_domains': {'kind': 'projection', 'on_error': 'stop', 'produces': ['changed']}, 'sync_manual_docs': {'kind': 'projection', 'on_error': 'stop', 'produces': ['docs_updated']}, 'sync_docs_index': {'kind': 'projection', 'on_error': 'stop'}}
 decl(workspace: Path, node_id: str) -> Dict[str, Any]
     # doc: 节点属性：`NODE_DEFAULTS` ← `pipeline.toml [nodes.<id>]`（下游可覆盖）。
 kind(workspace: Path, node_id: str) -> str
@@ -779,6 +779,17 @@ auto_pending_seal_gates(workspace: Path, milestone_id: str) -> list
     # doc: "seal 会自己跑、但现在还没跑"的前置闸 id（清单里的 ⚙️ 项）。
 render_checklist(workspace: Path, milestone_id: str) -> str
     # doc: 清单的人读投影（✓/✗ + 原因），供 seal 拒绝信息与 `seal-check` 共用。
+SEAL_TRAILER_KEYS = ('seal-milestone', 'audit-baseline', 'audit-seat', 'audit-result')
+head_commit(workspace: Path) -> str
+    # doc: 当前 HEAD 的完整 hash（审计基线 B 的取值：**审计前**取一次，之后不再动）。
+format_seal_trailers(milestone_id: str, baseline: str, seat: str, result: str) -> str
+    # doc: 封版提交 trailer 文本（git 认 `Key: value`；键用 `SEAL_TRAILER_KEYS`）。
+parse_seal_trailers(text: str) -> dict
+    # doc: `git log --format=%(trailers)` / 提交正文 → `{key: value}`（键小写）。
+tag_audit_baseline(workspace: Path, milestone_id: str, baseline: str) -> Tuple[bool, str]
+    # doc: `tag <M> = B`（annotated）：边界＝审的那一版（ADR-0004 §2.1.9）。
+seal_record(workspace: Path, milestone_id: str, *, baseline: str, seat: str='', result: str='', subject: str='') -> Tuple[bool, str]
+    # doc: 相位 3 的持久记录：**封版提交**（归档/提版/收摊/审计产出一起进）+ 边界 tag。
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
     # doc: 纯归档动作：id 合法 + 有任务 + 状态合法 → `_seal_archive`。策略闸在 `seal_preconditions_error`。
 auto_satisfied_ids(workspace: Path, op: str) -> set
@@ -790,9 +801,10 @@ from typing import Optional
 from typing import Tuple
 from k3dge.engine import gates
 from k3dge.engine.align import run_milestone_alignment
+from k3dge.engine import seal_mod
 from k3dge.engine.seal import seal_milestone
 from k3dge.engine.seal import seal_preconditions_error
-run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
+run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False, no_version_bump: bool=False) -> Tuple[str, str]
     # doc: 封板＝三相位（ADR-0004 §2.1.9）：**预审 → 审计 → 审核后自动**。
 # search.py
 from __future__ import annotations

@@ -109,7 +109,8 @@ preconditions = ["tasks_all_done", "align_pass", "guides_filled", "adrs_all_acce
 # 顺序＝三相位：预审(full_matrix) → 审计(audit) → 审核后(archive + 收摊清单 + 派生件清理)
 # 已移出前置闸：audit_closed / evidence_chain（报告降为可选产物）、audit_fresh（边界改由
 # `tag <M>=<B>` 表达）——见 ADR-0004 §2.1.3/§2.1.9/§2.1.10。
-actions = ["full_matrix", "audit", "archive", "closure_note", "prune"]
+actions = ["full_matrix", "audit", "archive", "version_bump",
+           "seal_record", "closure_note", "prune"]
 
 [checks.align]
 preconditions = ["tasks_all_done"]
@@ -159,6 +160,17 @@ on_rerun = "append"
 [nodes.closure_note]
 kind = "projection"        # 收摊清单可重生成
 on_error = "continue"
+
+[nodes.version_bump]
+kind = "fact"              # 版号前进＝写一次即历史（审计正常返回后才走这一步）
+on_error = "continue"      # bump 失败不回滚已归档 tasks，只告警（ADR-0004 §2.3）
+on_rerun = "append"
+
+[nodes.seal_record]
+kind = "fact"              # 封版提交 + 边界 tag：写一次即历史
+on_error = "stop"          # 记录落不下 ⇒ 停（缺记录不得静默当已封）
+on_rerun = "append"
+produces = ["audit_baseline", "audit_seal_commit"]
 
 [nodes.full_matrix]
 kind = "projection"

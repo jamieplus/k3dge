@@ -291,6 +291,139 @@ def render_checklist(workspace: Path, milestone_id: str) -> str:
     return "\n".join(lines)
 
 
+# ── 封版记录：trailer + 边界 tag（ADR-0004 §2.1.9/§2.1.10 的 durable 面）──────
+#: 封版提交的 trailer 键（**唯一格式源**：写入与读回都走本模块的 format/parse）。
+SEAL_TRAILER_KEYS = ("seal-milestone", "audit-baseline", "audit-seat", "audit-result")
+
+
+def _git(workspace: Path, *args: str) -> tuple[int, str]:
+    """`git -C <ws> …` → (rc, stdout)。异常也落成 rc≠0（判定不抛）。"""
+    import subprocess
+
+    try:
+        r = subprocess.run(["git", "-C", str(workspace), *args], capture_output=True, text=True)
+    except OSError as exc:  # pragma: no cover - git 缺失属环境异常
+        return 127, str(exc)
+    return r.returncode, (r.stdout or "").strip()
+
+
+def head_commit(workspace: Path) -> str:
+    """当前 HEAD 的完整 hash（审计基线 B 的取值：**审计前**取一次，之后不再动）。"""
+    rc, out = _git(workspace, "rev-parse", "HEAD")
+    return out if rc == 0 else ""
+
+
+def format_seal_trailers(milestone_id: str, baseline: str, seat: str, result: str) -> str:
+    """封版提交 trailer 文本（git 认 `Key: value`；键用 `SEAL_TRAILER_KEYS`）。"""
+    return "\n".join(
+        [
+            f"Seal-milestone: {milestone_id}",
+            f"Audit-baseline: {baseline or '-'}",
+            f"Audit-seat: {seat or '-'}",
+            f"Audit-result: {result or '-'}",
+        ]
+    )
+
+
+def parse_seal_trailers(text: str) -> dict:
+    """`git log --format=%(trailers)` / 提交正文 → `{key: value}`（键小写）。
+
+    读回与写入同源（`SEAL_TRAILER_KEYS`），故不必猜格式；缺键就是**缺记录**，
+    由消费方决定"缺就提示"还是"缺就拒"。
+    """
+    out: dict = {}
+    for line in (text or "").splitlines():
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        k = key.strip().lower()
+        if k in SEAL_TRAILER_KEYS:
+            out[k] = value.strip()
+    return out
+
+
+def tag_audit_baseline(workspace: Path, milestone_id: str, baseline: str) -> Tuple[bool, str]:
+    """`tag <M> = B`（annotated）：边界＝审的那一版（ADR-0004 §2.1.9）。
+
+    幂等：同指向 ⇒ 绿（已立）；指向不同 ⇒ **拒**（静默移动 tag 会毁掉边界事实）。
+    """
+    id_err = _validate_milestone_id(milestone_id)
+    if id_err:
+        return False, id_err
+    if not baseline or not re.fullmatch(r"[0-9a-fA-F]{7,40}", baseline):
+        return False, f"审计基线不可用（{baseline!r}）：tag 不立，边界不明就不假装有边界。"
+    rc, existing = _git(workspace, "rev-parse", f"refs/tags/{milestone_id}^{{commit}}")
+    if rc == 0 and existing:
+        if existing == baseline:
+            return True, f"边界 tag 已在（{milestone_id} = {baseline[:12]}）"
+        return False, (f"tag {milestone_id} 已存在且指向 {existing[:12]} ≠ 本次基线 "
+                       f"{baseline[:12]}：不移动（边界事实不可改写），请人工裁决。")
+    rc, out = _git(workspace, "tag", "-a", milestone_id, "-m",
+                   f"Seal boundary for {milestone_id}: audited baseline {baseline[:12]}", baseline)
+    if rc != 0:
+        return False, f"建边界 tag 失败：{out[:160]}"
+    return True, f"边界 tag：{milestone_id} = {baseline[:12]}"
+
+
+def _commit_all(workspace: Path, msg: str) -> Tuple[bool, str]:
+    """暂存全部改动并以**进程身份**提交（`--no-verify`：被审仓的 pre-commit 管人的提交，
+    机械件不过它——同 `worktree.advance` 口径）。空改动 ⇒ `(True, "")`（不造空提交）。"""
+    import tempfile
+
+    rc, dirty = _git(workspace, "status", "--porcelain")
+    if rc != 0:
+        return False, f"不是 git 工作树（{dirty[:120]}）"
+    if not dirty.strip():
+        return True, ""
+    rc, out = _git(workspace, "add", "-A")
+    if rc != 0:
+        return False, f"暂存失败：{out[:160]}"
+    with tempfile.NamedTemporaryFile("w", suffix=".msg", delete=False, encoding="utf-8") as fh:
+        fh.write(msg)
+        tmp = fh.name
+    try:
+        rc, out = _git(workspace, "-c", "user.name=k3dge-process",
+                       "-c", "user.email=noreply@k3dge.local",
+                       "commit", "--no-verify", "-F", tmp)
+    finally:
+        try:
+            Path(tmp).unlink()
+        except OSError:
+            pass
+    if rc != 0:
+        return False, f"提交失败：{out[:200]}"
+    return True, head_commit(workspace)
+
+
+def seal_record(
+    workspace: Path,
+    milestone_id: str,
+    *,
+    baseline: str,
+    seat: str = "",
+    result: str = "",
+    subject: str = "",
+) -> Tuple[bool, str]:
+    """相位 3 的持久记录：**封版提交**（归档/提版/收摊/审计产出一起进）+ 边界 tag。
+
+    为什么由 k3dge 自己提交：记录必须落在**必然产生的那次提交**上。审计常常零提交
+    （`worktree.advance` 只在脏时提交；线 tip == 主干头 ⇒ 无新提交），报告也只落在工作树里
+    ⇒ 把记录挂在"审计的提交"上会没有载体（本会话实测）。封版动作本身必然产生改动，
+    所以这里一定有载体。
+    """
+    msg = (subject or f"chore(seal): seal milestone {milestone_id} "
+                       f"(audit {result or '?'}; baseline {(baseline or '?')[:12]})")
+    msg += "\n\n" + format_seal_trailers(milestone_id, baseline, seat, result)
+    ok, out = _commit_all(workspace, msg)
+    if not ok:
+        return False, out
+    committed = out
+    tag_ok, tag_msg = tag_audit_baseline(workspace, milestone_id, baseline)
+    if not tag_ok:
+        return False, tag_msg
+    return True, f"封版提交 {committed[:12] or '(无改动，未提交)'}；{tag_msg}"
+
+
 def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
     """纯归档动作：id 合法 + 有任务 + 状态合法 → `_seal_archive`。策略闸在 `seal_preconditions_error`。"""
     id_err = _validate_milestone_id(milestone_id)

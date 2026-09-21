@@ -729,11 +729,11 @@
       "tokens": "里程碑重挂：`milestone reassign <from> <to>` + 归属闸 + 修子串一致性检查"
     },
     {
-      "path": "docs/tasks/2026-09-20-M10-feat-seal_boundary_tag.md",
+      "path": "docs/tasks/2026-09-20-M10-feat-seal_boundary_tag.done.md",
       "type": "tasks",
-      "id": "2026-09-20-M10-feat-seal_boundary_tag",
+      "id": "2026-09-20-M10-feat-seal_boundary_tag.done",
       "title": "封板边界与标识：`tag <M> = B`、封版提交 trailer（四键）、版号在审计正常返回后前进",
-      "status": "idea",
+      "status": "done",
       "tokens": "封板边界与标识：`tag <M> = B`、封版提交 trailer（四键）、版号在审计正常返回后前进"
     },
     {

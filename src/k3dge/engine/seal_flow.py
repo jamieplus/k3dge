@@ -13,6 +13,7 @@ from k3dge.engine import gates
 from k3dge.engine.align import _ALIGN_STUB_MARKER, run_milestone_alignment
 from k3dge.engine.milestone_files import _has_milestone_token
 from k3dge.engine.prompt import Prompt as _Prompt
+from k3dge.engine import seal as seal_mod
 from k3dge.engine.seal import seal_milestone, seal_preconditions_error
 
 
@@ -47,6 +48,21 @@ def _strip_align_stub(workspace: Path, milestone_id: str) -> None:
         return
     if _ALIGN_STUB_MARKER in text:
         p.write_text(text.replace(_ALIGN_STUB_MARKER, "").strip() + "\n", encoding="utf-8")
+
+
+def _report_seat(workspace: Path, milestone_id: str) -> str:
+    """审计席位（封版提交 trailer 的 `Audit-seat`）：取自落盘报告的 `审计人`。
+
+    报告缺席或没署名 ⇒ 空串（trailer 记 `-`）。不猜、不从本地 job 账里抄——本地账是运行态。
+    """
+    try:
+        from k3dge.engine.audit_report import _find_report
+        from k3dge.engine.process_audit import _field
+
+        found = _find_report(workspace, milestone_id, "audit")
+        return _field(found[1], "审计人") if found else ""
+    except Exception:
+        return ""
 
 
 def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
@@ -113,6 +129,7 @@ def run_seal_flow(
     *,
     prompter: Optional[_Prompt] = None,
     skip_enter_prompt: bool = False,
+    no_version_bump: bool = False,
 ) -> Tuple[str, str]:
     """封板＝三相位（ADR-0004 §2.1.9）：**预审 → 审计 → 审核后自动**。
 
@@ -161,12 +178,14 @@ def run_seal_flow(
     def _audit(ctx):
         """相位 2：**审计是封板的主体**（ADR-0004 §2.1.9）。
 
-        只有闭集里的 `closed` / `degraded-manual` 能过（§2.1.11）——`skip`/空转会在
-        `run_audit_flow` 里被拦成 `refused`；结果写入 ctx，供相位 3 记入封版提交 trailer。
+        只在闭集里的 `closed` / `degraded-manual` 能过（§2.1.11）——`skip`/空转会在
+        `run_audit_flow` 里被拦成 `refused`。基线 B 在审计**之前**取（审哪版封哪版），
+        席位取自落盘报告；两者都进相位 3 的封版提交 trailer。
         """
         from k3dge.engine.audit_flow import SEALABLE_AUDIT_RESULTS, audit_result_of
         from k3dge.engine.milestone_audit import run_audit_flow
 
+        baseline = seal_mod.head_commit(workspace)  # B：审计输入标识（git hash，不用 job id）
         status, amsg = run_audit_flow(workspace, milestone_id, prompter=prompt)
         result = audit_result_of(status)
         if result not in SEALABLE_AUDIT_RESULTS:
@@ -174,15 +193,51 @@ def run_seal_flow(
                 "audit_noop",
                 f"审计未正常返回（status={status}，result={result}）：封板停下。\n{amsg}",
             )
+        ctx["audit_baseline"] = baseline
         ctx["audit_result"] = result
         ctx["audit_status"] = status
-        return True, f"\n  审计: {result}（{status}）"
+        ctx["audit_seat"] = _report_seat(workspace, milestone_id)
+        return True, f"\n  审计: {result}（{status}；基线 {baseline[:12]}）"
 
     def _archive(_ctx):
         err = seal_preconditions_error(workspace, milestone_id)
         if err:
             return False, err
         return seal_milestone(workspace, milestone_id)
+
+    def _version_bump(_ctx):
+        """相位 3①：**版号在审计正常返回后前进**（ADR-0004 §2.1.9/§2.1.11），不管有没有报告。
+
+        失败不中断（ADR-0004 §2.3 失败语义：seal 后 bump 失败不回滚已归档 tasks，只告警）。
+        `--no-version-bump` 是显式逃生口（不动版本文件，其余照旧）。
+        """
+        if no_version_bump:
+            return True, "\n  版本: 跳过（--no-version-bump）"
+        try:
+            from k3dge.engine.version import append_changelog, bump_version, consume_unreleased
+
+            new_v = bump_version(workspace, part="patch")
+            body = consume_unreleased(workspace)
+            append_changelog(workspace, new_v, notes=body or f"Seal milestone {milestone_id}.")
+            return True, f"\n  版本: {new_v}"
+        except Exception as exc:  # 告警而非静默：版本一半的状态必须可见
+            return True, f"\n  版本: bump 失败（{str(exc)[:110]}）——已归档内容不回滚，人工确认"
+
+    def _seal_record(ctx):
+        """相位 3②：**封版提交 + 边界 tag**（ADR-0004 §2.1.9/§2.1.10 的 durable 面）。
+
+        记录挂在**必然发生的这次提交**上（审计常常零提交 ⇒ 挂在"审计的提交"上没有载体），
+        tag 指向审计基线 B（审哪版封哪版）。
+        """
+        ok, rmsg = seal_mod.seal_record(
+            workspace, milestone_id,
+            baseline=str(ctx.get("audit_baseline") or ""),
+            seat=str(ctx.get("audit_seat") or ""),
+            result=str(ctx.get("audit_result") or ""),
+        )
+        if not ok:
+            return False, gates.Rejection("seal_record_failed", rmsg)
+        return True, "\n  记录: " + rmsg
 
     def _closure_note(_ctx):
         p = _write_closure_note(workspace, milestone_id)
@@ -200,6 +255,7 @@ def run_seal_flow(
         return True, ""
 
     registry = {"full_matrix": _full_matrix, "audit": _audit, "archive": _archive,
+                "version_bump": _version_bump, "seal_record": _seal_record,
                 "closure_note": _closure_note, "prune": _prune}
     ctx = {"workspace": workspace, "milestone_id": milestone_id}
     ok, out = nodes.run_phase(workspace, "seal", "actions", registry, ctx)
@@ -212,6 +268,9 @@ def run_seal_flow(
 
         return "rejected", str(rej) + "\n" + render_checklist(workspace, milestone_id) + "\n" + _ns.render_cli()
     msg = str(out)
+    if ctx.get("audit_baseline"):
+        msg += (f"\n  边界: tag {milestone_id} = {str(ctx['audit_baseline'])[:12]}"
+                f"（审哪版封哪版；之后的改动归下一个里程碑，见 ADR-0004 §2.1.9）")
     from k3dge.engine import events
     events.emit(workspace, "sealed", milestone=milestone_id,
                 audit_result=ctx.get("audit_result"))

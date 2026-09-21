@@ -18,6 +18,8 @@
 
 * **要不要封（人发起，只问一次）** —— `check`/`status` 给 `[NEXT] state=seal_ready`（事实陈述 + 成对 option：seal / 不封）；`k3dge milestone seal <id>` 的 prompt 侧才问一次（无倒计时，N=不封）。**未审不是"不可封"**：审计由 seal 相位 2 自己跑。答「是」→ 预审 → 审计 → **归档 + 版本 + 里程碑指针**；答「否」→ 不封，里程碑继续挂着。
 
+* **版号与边界（都落在相位 3）** —— 版号在**审计正常返回后**前进（`--no-version-bump` 逃生）；`seal` 自己写**封版提交**（归档+提版+收摊+审计产出一起进，trailer 四键 `Seal-milestone`/`Audit-baseline`/`Audit-seat`/`Audit-result`）并立 **边界 tag `tag <M> = <B>`**（B＝审计基线，审哪版封哪版）——记录挂在**必然发生的封版提交**上，因为审计常常零提交、报告只落工作树：挂在"审计的提交"上没有载体。**本地账（`audit_jobs.json`/`audit_checklist.json`）是运行态投影，不作判据**（冲突以 git 为准）。
+
 * **封板动作 = 收摊（上下文压缩）** —— `seal` 机械部分只完成归档+版本+指针；真正的收摊写 `docs/reviews/<date>-<id>-closure.md` 清单，由人/agent 补齐：落盘**失败/未采用的方案**（ADR/INCIDENT）、清理无关上下文、**更新 `docs/architecture/overview.md` 与设计文档**、最后提交里程碑。k3dge 不替判内容——这就是 architecture 更新该待的地方，不是命令钩子。
 
 * **人工入口** —— `k3dge milestone audit <id>` / `k3dge milestone seal [--yes] <id>` 都是人工主动入口，走同一套流程。`--yes` 跳过「要不要封」的提问，但不跳过审计。

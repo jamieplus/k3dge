@@ -32,6 +32,12 @@ from k3dge.engine.pipeline_runner import (
 _OK_MANUAL = TransportResult(True, "manual", "ok")
 
 
+def _record_ok():
+    """相位 3 的封版记录桩：真实提交+tag 由 TestSealRecord 用真 git 仓测。"""
+    return mock.patch("k3dge.engine.seal.seal_record",
+                      return_value=(True, "封版提交 abc1234；边界 tag：M1 = deadbeef"))
+
+
 def _audit_ok(status: str = "audited"):
     """seal 相位 2 的审计桩：`run_audit_flow` 自身的语义由 TestAuditFlow/TestAuditNoNoop 管，
     seal 这边只关心"审计返回了什么 ⇒ 封板走不走"（ADR-0004 §2.1.9/§2.1.11）。"""
@@ -244,6 +250,30 @@ class TestSealFlow(TestCase):
         audit.assert_called_once()
         seal.assert_not_called()
 
+    def test_version_advances_after_the_audit_returns(self) -> None:
+        """ADR-0004 §2.1.9/§2.1.11：**版号在审计正常返回后前进**，不管有没有报告；
+        `no_version_bump` 是显式逃生口（不动版本文件，其余照旧）。"""
+        for bump_flag, expected in ((False, "1.2.4"), (True, "1.2.3")):
+            ws2 = _ws()
+            (ws2 / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
+            (ws2 / "docs" / "tasks" / "2026-09-01-M1-feat-x.md").write_text(
+                "---\nstatus: done\nmilestone: M1\npriority: P2\ndate: 2026-09-01\n---\n\n# X\n",
+                encoding="utf-8")
+            (ws2 / "pyproject.toml").write_text(
+                '[project]\nname = "x"\nversion = "1.2.3"\n', encoding="utf-8")
+            with _audit_ok(), _record_ok(), \
+                 mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
+                with mock.patch("k3dge.engine.seal_flow.seal_preconditions_error", return_value=None):
+                    with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed M1")):
+                        status, msg = run_seal_flow(ws2, "M1", skip_enter_prompt=True,
+                                                    prompter=_Prompt(answers=[]),
+                                                    no_version_bump=bump_flag)
+            self.assertEqual(status, "sealed")
+            from k3dge.engine.version import get_version
+
+            self.assertEqual(get_version(ws2), expected, msg)
+            self.assertIn("跳过" if bump_flag else "1.2.4", msg)
+
     def test_seal_declined_when_operator_says_no(self) -> None:
         ws = _ws()
         _mk_task(ws)
@@ -257,7 +287,7 @@ class TestSealFlow(TestCase):
         ws = _ws()
         _mk_task(ws)
         _clean_report(ws)
-        with _audit_ok(), \
+        with _audit_ok(), _record_ok(), \
              mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
             with mock.patch("k3dge.engine.seal_flow.seal_preconditions_error", return_value=None):
                 with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed M1")) as seal:
@@ -271,7 +301,7 @@ class TestSealFlow(TestCase):
         ws = _ws()
         _mk_task(ws)
         _clean_report(ws)
-        with _audit_ok(), \
+        with _audit_ok(), _record_ok(), \
              mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
             with mock.patch("k3dge.engine.seal_flow.seal_preconditions_error", return_value=None):
                 with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed M1")) as seal:
@@ -655,7 +685,7 @@ class TestGateIdDispatch(TestCase):
         ws = _ws()
         _mk_task(ws)
         _clean_report(ws)
-        with _audit_ok(), \
+        with _audit_ok(), _record_ok(), \
              mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
             with mock.patch(
                 "k3dge.engine.seal_flow.seal_preconditions_error",
@@ -675,7 +705,7 @@ class TestGateIdDispatch(TestCase):
         _mk_task(ws)
         _clean_report(ws)
         out = io.StringIO()
-        with _audit_ok(), \
+        with _audit_ok(), _record_ok(), \
              mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
             with mock.patch("k3dge.engine.seal_flow.seal_preconditions_error", return_value=None):
                 with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed")):

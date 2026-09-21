@@ -46,6 +46,11 @@ NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {
     "audit": {"kind": "fact", "on_error": "stop", "on_rerun": "append"},
     "archive": {"kind": "fact", "on_error": "rollback", "on_rerun": "reject",
                 "produces": ["archived_paths"]},                        # 归档＝写一次即历史
+    # 版号在**审计正常返回后**前进（ADR-0004 §2.1.11）：bump 失败不回滚归档，只告警（§2.3）
+    "version_bump": {"kind": "fact", "on_error": "continue", "on_rerun": "append"},
+    # 封版提交 + 边界 tag：记录必须落在**必然产生的那次提交**上（审计常常零提交）
+    "seal_record": {"kind": "fact", "on_error": "stop", "on_rerun": "append",
+                    "produces": ["audit_baseline", "audit_seal_commit"]},
     "closure_note": {"kind": "projection", "on_error": "continue"},     # 清单可重生成
     "prune": {"kind": "fact", "on_error": "continue", "on_rerun": "append"},  # 派生件清理
     # --- align ---

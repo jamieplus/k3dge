@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:da7878cca962d6f4f9bd340bfc8d6353198a46297eeab602fc837532f840aeef`
+- **Contract Hash**: `sha256:736fc14ba485bea3dfca34f0b4157e5947f69b04d6d604c36af0bbd9d7b85e3f`
 - **Last Updated**: 2026-09-20
 
 ## 1. Domain Boundary & Responsibilities
@@ -218,7 +218,7 @@ rejection(message: Any, fallback_gate_id: str) -> Rejection
 REL = '.agent/pipeline.toml'
 LEGACY_REL = '.agent/gates.toml'
 INTERNAL_GATE_IDS: tuple = ('unknown_gate_id', 'unknown_action_id', 'audit_report_missing', 'audit_open_declined', 'audit_noop', 'audit_degraded_unsigned', 'milestone_id_invalid', 'no_tasks', 'invalid_task_status', 'align_failed', 'archive_failed')
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed', 'docs_normalized'], 'actions': ['full_matrix', 'audit', 'archive', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}, 'sync': {'actions': ['sync_extractors', 'reconcile_adrs', 'sync_domains', 'sync_manual_docs', 'sync_docs_index']}, 'audit': {'stages_produce': ['audit.actions.audit'], 'stages_verify': ['audit.actions.verify']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed', 'docs_normalized'], 'actions': ['full_matrix', 'audit', 'archive', 'version_bump', 'seal_record', 'closure_note', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}, 'sync': {'actions': ['sync_extractors', 'reconcile_adrs', 'sync_domains', 'sync_manual_docs', 'sync_docs_index']}, 'audit': {'stages_produce': ['audit.actions.audit'], 'stages_verify': ['audit.actions.verify']}}}
 load(workspace: Path) -> Dict[str, Any]
 legacy_config_present(workspace: Path) -> bool
 get(workspace: Path, section: str, key: str) -> Any
@@ -358,7 +358,7 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 from k3dge.engine import gates
-NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {'tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'align_pass': {'kind': 'projection', 'on_error': 'stop'}, 'guides_filled': {'kind': 'projection', 'on_error': 'stop'}, 'adrs_all_accepted': {'kind': 'projection', 'on_error': 'stop'}, 'adr_landed': {'kind': 'projection', 'on_error': 'stop'}, 'docs_normalized': {'kind': 'projection', 'on_error': 'stop'}, 'full_matrix': {'kind': 'projection', 'on_error': 'stop', 'satisfies': ['align_pass']}, 'audit': {'kind': 'fact', 'on_error': 'stop', 'on_rerun': 'append'}, 'archive': {'kind': 'fact', 'on_error': 'rollback', 'on_rerun': 'reject', 'produces': ['archived_paths']}, 'closure_note': {'kind': 'projection', 'on_error': 'continue'}, 'prune': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'align_tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'sync_extractors': {'kind': 'projection', 'on_error': 'continue'}, 'reconcile_adrs': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append', 'produces': ['adr_report']}, 'sync_domains': {'kind': 'projection', 'on_error': 'stop', 'produces': ['changed']}, 'sync_manual_docs': {'kind': 'projection', 'on_error': 'stop', 'produces': ['docs_updated']}, 'sync_docs_index': {'kind': 'projection', 'on_error': 'stop'}}
+NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {'tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'align_pass': {'kind': 'projection', 'on_error': 'stop'}, 'guides_filled': {'kind': 'projection', 'on_error': 'stop'}, 'adrs_all_accepted': {'kind': 'projection', 'on_error': 'stop'}, 'adr_landed': {'kind': 'projection', 'on_error': 'stop'}, 'docs_normalized': {'kind': 'projection', 'on_error': 'stop'}, 'full_matrix': {'kind': 'projection', 'on_error': 'stop', 'satisfies': ['align_pass']}, 'audit': {'kind': 'fact', 'on_error': 'stop', 'on_rerun': 'append'}, 'archive': {'kind': 'fact', 'on_error': 'rollback', 'on_rerun': 'reject', 'produces': ['archived_paths']}, 'version_bump': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'seal_record': {'kind': 'fact', 'on_error': 'stop', 'on_rerun': 'append', 'produces': ['audit_baseline', 'audit_seal_commit']}, 'closure_note': {'kind': 'projection', 'on_error': 'continue'}, 'prune': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'align_tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'sync_extractors': {'kind': 'projection', 'on_error': 'continue'}, 'reconcile_adrs': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append', 'produces': ['adr_report']}, 'sync_domains': {'kind': 'projection', 'on_error': 'stop', 'produces': ['changed']}, 'sync_manual_docs': {'kind': 'projection', 'on_error': 'stop', 'produces': ['docs_updated']}, 'sync_docs_index': {'kind': 'projection', 'on_error': 'stop'}}
 decl(workspace: Path, node_id: str) -> Dict[str, Any]
 kind(workspace: Path, node_id: str) -> str
 on_error(workspace: Path, node_id: str) -> str
@@ -508,6 +508,12 @@ seal_checklist(workspace: Path, milestone_id: str) -> list
 unmet_seal_preconditions(workspace: Path, milestone_id: str) -> list
 auto_pending_seal_gates(workspace: Path, milestone_id: str) -> list
 render_checklist(workspace: Path, milestone_id: str) -> str
+SEAL_TRAILER_KEYS = ('seal-milestone', 'audit-baseline', 'audit-seat', 'audit-result')
+head_commit(workspace: Path) -> str
+format_seal_trailers(milestone_id: str, baseline: str, seat: str, result: str) -> str
+parse_seal_trailers(text: str) -> dict
+tag_audit_baseline(workspace: Path, milestone_id: str, baseline: str) -> Tuple[bool, str]
+seal_record(workspace: Path, milestone_id: str, *, baseline: str, seat: str='', result: str='', subject: str='') -> Tuple[bool, str]
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
 auto_satisfied_ids(workspace: Path, op: str) -> set
 from __future__ import annotations
@@ -516,9 +522,10 @@ from typing import Optional
 from typing import Tuple
 from k3dge.engine import gates
 from k3dge.engine.align import run_milestone_alignment
+from k3dge.engine import seal_mod
 from k3dge.engine.seal import seal_milestone
 from k3dge.engine.seal import seal_preconditions_error
-run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False) -> Tuple[str, str]
+run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False, no_version_bump: bool=False) -> Tuple[str, str]
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path

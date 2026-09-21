@@ -717,33 +717,20 @@ def cmd_milestone(args: argparse.Namespace) -> int:
         return 0 if status.startswith("audited") else 1
 
     if action == "seal":
+        # 版号前进在**相位 3**（审计正常返回之后，ADR-0004 §2.1.9/§2.1.11）：
+        # 不再由 CLI 在流程返回后另跑一次 bump——那会把"版号时机"与"审计返回"错开。
         status, msg = run_seal_flow(
             workspace,
             m_id,
             prompter=_Prompt.default(),
             skip_enter_prompt=getattr(args, "yes", False),
+            no_version_bump=getattr(args, "no_version_bump", False),
         )
         print(msg)
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone seal -> {m_id} status={status}")
-        if status != "sealed":
-            # seal_declined (normal commit) or audit_needed/rejected -> no version bump
-            return 0 if status == "seal_declined" else 1
-        # Auto-bump patch version on successful seal (unless --no-bump)
-        if getattr(args, "no_version_bump", False):
+        if status == "sealed" or status == "seal_declined":
             return 0
-        try:
-            from k3dge.engine.version import append_changelog, bump_version, consume_unreleased
-
-            new_v = bump_version(workspace, part="patch")
-            body = consume_unreleased(workspace)
-            notes = body if body else f"Seal milestone {m_id}."
-            append_changelog(workspace, new_v, notes=notes)
-            print(f"[VERSION] auto-bumped to {new_v} and updated CHANGELOG.md")
-            _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] version auto-bump -> {new_v} milestone={m_id}")
-        except Exception as exc:
-            print(f"[VERSION] auto-bump failed: {exc}", file=sys.stderr)
-            # Seal itself succeeded; bump failure is non-blocking warning
-        return 0
+        return 1
 
     return 1
 
