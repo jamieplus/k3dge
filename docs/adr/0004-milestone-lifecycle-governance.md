@@ -2,6 +2,7 @@
 Status: Accepted
 Supersedes: -
 Amended-by:
+  - 🅰2 | Core Maintainer | 2026-09-20 | `degraded-manual` 的定义扩到「**manual 传输**（不论它在链里是不是首选）」——判"有没有独立透镜"（事实），不判"相对预期链的位置"
   - 🅰1 | Core Maintainer | 2026-09-20 | 审计＝封版主体：唯一入口 `seal`（预审 align → 审计 → 审核后自动化）；版号由**审计正常返回**推进；边界＝审计基线（`tag <M> = <B>`），基线之后归下一里程碑；报告降级为可选产物；完成记录＝封版提交 trailer；运行态与 durable 分层；CHANGELOG 由提交区间生成
 Landed-by: src/k3dge/engine/seal_flow.py
 Date: 2026-08-23
@@ -120,8 +121,8 @@ Note: 修订痕迹见 git 历史。
 ### 2.1.11 保证审计不可空转（🅰1）
 
 - "审计正常返回"是**闭集**，逐条落进封版提交 trailer 的 `audit-result`：
-  `closed`（真实执行且闭环）| `degraded-manual`（降级到 manual 协议，**须带签名/席位**）
-  | `escalated`（转人工）| `refused`（skip / 无可达透镜）。
+  `closed`（真实执行且闭环）| `degraded-manual`（**走了 manual 传输**：没有独立透镜审过，
+  **须带签名/席位**）[^🅰2.1] | `escalated`（转人工）| `refused`（skip / 无可达透镜）。
 - **只有 `closed` 与带签名的 `degraded-manual` 允许推进版号**；`escalated` 交人；
   `refused` 拒绝且不推进。
 - 禁止把"跳过/降级"当成功：审计失败、席未到位、透镜不可达，都不得表现为"时间到了就前进"。
@@ -180,3 +181,8 @@ Note: 修订痕迹见 git 历史。
 [^🅰1.8]: 修改（🅰1）：`audit-submit` 只**补证据**（落盘报告），**不推进版号、不触发封板**——版号前进由"审计正常返回"决定（§2.1.11）。
 
 [^🅰1.9]: 修改（🅰1）：版本在**审计正常返回后**前进（不再等"seal 成功"）；CHANGELOG 改由**提交区间**生成（§2.1.12），闸只验不漏项，语义润色归人。
+
+[^🅰2.1]: 修改（🅰2）：`degraded-manual` 原表述是"降级到 manual 协议"，容易被读成"只有**降级**才算"
+    ——于是"把 manual 排在 transports 首位"就成了绕开署名要求的路（`downgrades` 为空 ⇒ 判 `closed`）。
+    裁定：判据是**事实**（有没有独立透镜），不是**相对位置**（链里排在哪儿）。故 `provider == "manual"`
+    一律 `degraded-manual`、一律须署名；本仓 `[mcp, manual]` 不受影响（本就落在降级位）。

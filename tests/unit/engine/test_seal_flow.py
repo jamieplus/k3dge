@@ -29,6 +29,9 @@ from k3dge.engine.pipeline_runner import (
     run_action,
 )
 
+#: 真透镜（mcp/cli）跑通：审计结果 `closed`（ADR-0004 §2.1.11）。
+_OK_MCP = TransportResult(True, "mcp", "ok")
+#: manual **传输**（不论降级位还是首选位）：结果 `degraded-manual`、报告须署名（🅰2）。
 _OK_MANUAL = TransportResult(True, "manual", "ok")
 
 
@@ -206,27 +209,27 @@ class TestAuditFlow(TestCase):
     def test_audited_when_clean(self) -> None:
         ws = _ws_oneshot()
         _clean_report(ws)
-        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "audited")
 
     def test_rejected_when_audit_missing(self) -> None:
         ws = _ws_oneshot()  # no report
-        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "rejected")
 
     def test_declined_fix_rejects(self) -> None:
         ws = _ws_oneshot()
         _open_report(ws)
-        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["n"]))
         self.assertEqual(status, "rejected")
 
     def test_escalates_after_max_verify_attempts(self) -> None:
         ws = _ws_oneshot()
         _open_report(ws)
-        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             # three fix-yes answers -> 4th loop escalates (max=3)
             status, _ = run_audit_flow(
                 ws, "M1", prompter=_Prompt(answers=["y", "y", "y"]), max_verify_attempts=3
@@ -659,7 +662,7 @@ class TestRatchetAuditStep(TestCase):
             {"job_id": "J-9", "milestone_id": "M1", "state": "collected", "merge_ok": True,
              "baseline": head, "report": "docs/reviews/M1-audit.md",
              "counts": {"待修": 0}}]}), encoding="utf-8")
-        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, msg = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "audited", msg)
         self.assertEqual(subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True,
@@ -692,7 +695,7 @@ class TestSingleAuditReport(TestCase):
         """
         ws = _ws_oneshot()
         (ws / "docs" / "reviews" / "2026-09-01-M1-audit.md").write_text(_AUDIT_CLEAN, encoding="utf-8")
-        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, msg = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "audited")  # 单一审计腿闭环即可，无需 quality 票
 
@@ -730,7 +733,7 @@ class TestGateIdDispatch(TestCase):
 
     def test_audit_flow_rejection_routes_by_gate_id(self) -> None:
         ws = _ws_oneshot()  # 无 12 列报告 ⇒ gate_id=audit_report_missing
-        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "rejected")
         self.assertIn("k3dge milestone audit-submit M1", self._sidecar(ws)["fact"])
@@ -738,7 +741,7 @@ class TestGateIdDispatch(TestCase):
     def test_declined_fix_routes_by_gate_id(self) -> None:
         ws = _ws_oneshot()
         _open_report(ws)
-        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["n"]))
         self.assertEqual(status, "rejected")
         self.assertIn("转人工干预", self._sidecar(ws)["fact"])
@@ -798,7 +801,7 @@ class TestGateIdDispatch(TestCase):
         ws = _ws_oneshot()
         _open_report(ws)
         out = io.StringIO()
-        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             run_audit_flow(ws, "M1", prompter=_Prompt(out_stream=out, answers=["n"]))
         text = out.getvalue()
         self.assertIn("发现 1 项待修", text)  # prompt 走 question 投影
@@ -843,7 +846,7 @@ class TestStagesAreDeclaredNotHardcoded(TestCase):
 
         def fake(_ws, ref, *, io=None, timeout_default=60, arguments=None):
             calls.append(ref)
-            return TransportResult(True, "manual", "ok")
+            return TransportResult(True, "mcp", "ok")   # dummy 透镜：真读声明面即可，不是 manual 路径
 
         with mock.patch("k3dge.engine.pipeline_runner.run_action", side_effect=fake):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
@@ -885,6 +888,23 @@ class TestAuditNoNoop(TestCase):
     def test_transport_failure_not_closed_even_with_stale_report(self) -> None:
         _ws, (status, _msg) = self._refused(TransportResult(False, "mcp", "boom"))
         self.assertEqual(status, "refused")
+
+    def test_manual_first_transport_is_also_degraded(self) -> None:
+        """🅰2：判"有没有独立透镜"（事实），不判"链里排第几"。manual 在**首选位**时
+        `downgrades` 为空，但结果仍须记 `degraded-manual` 且报告须署名——否则
+        "把 manual 排第一"就成了绕开署名要求、且 trailer 记成 `closed`（高估）的路。
+        """
+        from k3dge.engine.audit_flow import audit_call_result
+
+        self.assertEqual(audit_call_result(TransportResult(True, "manual", "ok")), "degraded-manual")
+        self.assertEqual(audit_call_result(_OK_MCP), "closed")
+        # 端到端：manual 首选 + 无署名报告 ⇒ 拒
+        ws = _ws_oneshot()
+        _clean_report(ws)                      # _AUDIT_CLEAN 不含署名
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
+            status, msg = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
+        self.assertEqual(status, "refused")
+        self.assertIn("署名", msg)
 
     def test_downgraded_needs_signature(self) -> None:
         ws = _ws_oneshot()

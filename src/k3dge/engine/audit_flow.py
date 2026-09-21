@@ -42,12 +42,16 @@ def audit_call_result(produced) -> str:
     """一跳传输的结果 → `AUDIT_RESULTS` 里的一档（ADR-0004 §2.1.11）。
 
     先判"这一跳是否真跑过"，再谈报告在不在——否则仓里一份旧报告就能把"什么都没跑"
-    兜成闭环（本会话 M10 实测过这个洞）。`skip` 与 `ok=False` 一律 `refused`；
-    `downgrades` 非空 ⇒ `degraded-manual`（降级不静默，由调用方要求署名）。
+    兜成闭环（本会话 M10 实测过这个洞）。`skip` 与 `ok=False` 一律 `refused`。
+
+    `degraded-manual` 判**事实**不判位置（🅰2）：`provider == "manual"` 一律算——不管它是
+    链里的降级位还是首选位。理由：`_run_manual` 自己声明产出"NOT an independent audit"
+    （ADR-0006 §2.4），"没有独立透镜看过这版"是同一个事实；只看 `downgrades` 会把
+    "manual 排第一位"变成绕开署名要求的路（且 trailer 会记成 `closed`＝高估记录）。
     """
     if not getattr(produced, "ok", False) or getattr(produced, "skipped", False):
         return "refused"
-    if getattr(produced, "downgrades", None):
+    if getattr(produced, "provider", None) == "manual" or getattr(produced, "downgrades", None):
         return "degraded-manual"
     return "closed"
 
