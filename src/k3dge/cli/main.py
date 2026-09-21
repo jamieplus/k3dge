@@ -856,18 +856,22 @@ def cmd_commit(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
-    # 3) gate (blocking)
+    # 3) gate (blocking)：先跑**staged 范围**的一致性集（hook 跑的是 worktree 范围；
+    #    两者不同源）。内层只覆盖 `evaluator` 的判据集；引用/名实/markdown/排查闸**不在这里**，
+    #    由第 5 步的 live hook 承担 ⇒ 不得再用 --no-verify 跳过它。
     report = ConsistencyEngine(workspace).evaluate(staged=True, run_tests=args.with_tests)
     if not report.passed:
         print(report.render())
         return 1
-    # 5) commit; --no-verify bypasses the live hook (which would re-run the same gate).
-    #    Self-attach the attestation trailer so k3dge commits are signed like hook commits.
+    # 5) commit：**不跳过 hook**（历史前科：这里曾用 --no-verify，理由写“hook 只会重跑同一个
+    #    gate”——实际 hook 跑得更多，doc-gate/schema/引用/排查闸 全在 hook 里，绕过它等于
+    #    新文档的引用面无人验，PRE-01 实例）。同理**不得改成 `git commit --no-verify`**。
+    #    自附 attestation trailer：hook 的 commit-msg 会看到已有该行而不再重复附。
     msg = args.message
     if _ATTEST_PREFIX not in msg:
         msg = _attest.append_to_message(workspace, msg)
     res = subprocess.run(
-        ["git", "commit", "-m", msg, "--no-verify"],
+        ["git", "commit", "-m", msg],
         cwd=workspace,
         capture_output=True,
         text=True,
@@ -1181,7 +1185,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_index = sub.add_parser("index", help="rebuild the symbol index (docs/generated/symbol-index.json)")
     p_index.set_defaults(func=cmd_index)
 
-    p_commit = sub.add_parser("commit", help="convenience commit: gate + attestation sign")
+    p_commit = sub.add_parser("commit", help="convenience commit: staged gate + live git hooks + attestation sign")
     p_commit.add_argument("files", nargs="*", default=[], help="files to stage (else use --all)")
     p_commit.add_argument("-m", dest="message", required=True, help="conventional commit message")
     p_commit.add_argument("-a", dest="all", action="store_true", help="stage all tracked modifications")

@@ -505,6 +505,14 @@
       "tokens": "合线 rebase 后 `_baseline_covers` 把本轮审计判成旧单，再建单死锁封板"
     },
     {
+      "path": "docs/tasks/2026-09-21-M11-fix-commit_runs_hooks.done.md",
+      "type": "tasks",
+      "id": "2026-09-21-M11-fix-commit_runs_hooks.done",
+      "title": "`k3dge commit` 用 `--no-verify` 绕过 hook：引用/排查闸在便利入口上失效（PRE-01）",
+      "status": "done",
+      "tokens": "`k3dge commit` 用 `--no-verify` 绕过 hook：引用/排查闸在便利入口上失效（PRE-01）"
+    },
+    {
       "path": "docs/tasks/2026-09-21-M11-fix-memo_review_landing.done.md",
       "type": "tasks",
       "id": "2026-09-21-M11-fix-memo_review_landing.done",

@@ -39,7 +39,7 @@ engine/worktree.py        _run_landing_gate（:168）：sync → check → doc-g
   - **`check` 侧的同族覆盖只有一处**：`doc_catalog.validate_docs` 对 `docs/adr/obsolete/*` 跑 `check_retired_adr_dest`（`doc_catalog.py:429-440`）。
   - **两边都有**：`.schema.json` 结构（pre-commit 看 staged 内容，`check` 经 `doc_catalog.validate_docs` 看全量）、README/AUTHORING 存在性（pre-commit doc-gate / 落点闸与 CI 的 `--scan`）、域契约与 L2。
 - **兜底声称与实际不符（待实测）**：进程机械提交明确绕过 hook（`worktree.py:104`、`seal.py:408` 用 `--no-verify`，注释称「仍须 attestation，CI 全量验」），但 CI 的「全量」＝`check --force-full --with-tests`＝`evaluator` 的检查集，**不含**上面那批只由 pre-commit 触发的判据（`grep -n pure_refs src/k3dge/engine/evaluator.py` 零命中）。⇒ 这两类判据在机械提交路径上目前无第二触发点。
-  - **实例（2026-09-21，本仓自己的提交）**：用 `k3dge commit -a`（内部 `--no-verify`）提交两份新 memo 时，memo 里作例子的 `ADR-9xxx` 字面**没被拦**——`k3dge commit` 只跑一致性 `check`，不跑引用闸；是提交后手工调 `pure_refs` 才扫出来的。
+  - **实例（2026-09-21，本仓自己的提交）**：用 `k3dge commit -a`（当时内部 `--no-verify`）提交两份新 memo 时，memo 里作例子的 `ADR-9xxx` 字面**没被拦**——旧 `k3dge commit` 只跑一致性 `check`，不跑引用闸；是提交后手工调 `pure_refs` 才扫出来的。**已于同日晚收口**（去 `--no-verify`，让 live hook 承担；见 `LEFTOVERS` `PRE-01` 与票 `2026-09-21-M11-fix-commit_runs_hooks`）。
   - **覆盖面比“提交那一刻”更窄**：闸只扫**当次 staged 的受管（非 aux、非 archive）文档**，已入库文件永不复扫；而 `check_adr_ref_retired` 另有 dir 豁免（`docs/reviews/` + `archive/` 一律不扇，理由＝append-only 证据）。收口后全量复扇余 **14 处 `DANGLING_ADR_REF`**：13 在 `archive/`（低权威留档），1 在 `docs/reviews/2026-09-10-doc-audit-docs.md` 的发现正文（引用已不存在的裸号作为问题本身，非活指针）。
     ```
     .venv/bin/python - <<'PY'
