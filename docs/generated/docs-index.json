@@ -385,12 +385,12 @@
       "tokens": "里程碑对齐与验收报告: M10"
     },
     {
-      "path": "docs/reviews/2026-09-20-M10-closure.md",
+      "path": "docs/reviews/2026-09-20-M10-audit.md",
       "type": "reviews",
-      "id": "2026-09-20-M10-closure",
-      "title": "封板收摊清单（上下文压缩）: M10",
+      "id": "2026-09-20-M10-audit",
+      "title": "审计：src,docs（milestone M10）",
       "status": "",
-      "tokens": "封板收摊清单（上下文压缩）: M10"
+      "tokens": "审计：src,docs（milestone M10）"
     },
     {
       "path": "docs/specs/_template/spec.md",
@@ -745,11 +745,11 @@
       "tokens": "编排骨架收敛·节点表：pipeline.toml [checks.*] 单一声明面 + 五属性 + ctx + 单执行器（下游可配）"
     },
     {
-      "path": "docs/tasks/2026-09-20-M10-audit-audit_job_1e408cbd4c78.md",
+      "path": "docs/tasks/2026-09-20-M10-audit-audit_job_1e408cbd4c78.done.md",
       "type": "tasks",
-      "id": "2026-09-20-M10-audit-audit_job_1e408cbd4c78",
+      "id": "2026-09-20-M10-audit-audit_job_1e408cbd4c78.done",
       "title": "audit job 1e408cbd4c78: src,docs",
-      "status": "idea",
+      "status": "done",
       "tokens": "audit job 1e408cbd4c78: src,docs"
     },
     {

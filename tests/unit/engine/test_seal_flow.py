@@ -313,6 +313,28 @@ class TestSealFlow(TestCase):
         seal.assert_called_once()
 
 
+class TestSealReviewGate(TestCase):
+    def test_audit_report_without_marker_does_not_mask_align(self) -> None:
+        """12 列审计稿没有 align-pass marker，不得把「align 已写、清单缺票」误报成无 marker。"""
+        from k3dge.engine.seal import _seal_review_gate
+        from k3dge.engine.task_index import scan_milestone_tasks
+
+        ws = _ws()
+        (ws / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
+        (ws / "docs" / "tasks" / "2026-09-01-M1-feat-x.md").write_text(
+            "---\nstatus: done\nmilestone: M1\npriority: P2\ndate: 2026-09-01\n---\n\n# X\n",
+            encoding="utf-8")
+        reviews = ws / "docs" / "reviews"
+        reviews.mkdir(parents=True, exist_ok=True)
+        (reviews / "2026-09-01-M1-audit.md").write_text("# 审计\n", encoding="utf-8")
+        (reviews / "2026-09-01-M1-align.md").write_text(
+            "# 对齐\n<!-- k3dge:align-pass:M1 -->\n- [x] `2026-09-01-M1-feat-x.md`\n",
+            encoding="utf-8",
+        )
+        tasks = scan_milestone_tasks(ws, "M1")
+        self.assertIsNone(_seal_review_gate(ws, "M1", tasks))
+
+
 class TestPrematureArchive(TestCase):
     """M9 实战：任务提前归档 ⇒ align/seal 顶扫不到；提示应可操作（batch archive at seal）。"""
 
@@ -621,8 +643,49 @@ class TestRatchetAuditStep(TestCase):
             st, msg = _ratchet_audit_step(ws, "M1", fresh_baseline=fresh)
         sub.assert_called_once()             # 陈旧 ⇒ 去建新单，而不是接受
         assert st == "stalled"
-        assert "旧内容" in msg or "早于本轮基线" in msg
+        assert "旧内容" in msg or "不覆盖本轮基线" in msg or "早于本轮基线" in msg
         assert old_baseline is ws
+
+    def test_rebased_collected_job_covers_landed_head(self):
+        """合线 rebase 后 pre-rebase oid 与 HEAD 无祖先关系：有 `landed_head==B` 仍覆盖本轮。
+
+        真跑实测：M10 collect 走 rebase 合线，seal 相位 2 把刚闭环的单判成「旧内容」
+        又建新单，新票再挡 `tasks_all_done` —— 封板死锁。
+        """
+        import json as _json
+        import subprocess
+
+        ws, first = self._ws_r_git(report="signed")
+        (ws / "later.txt").write_text("y", encoding="utf-8")
+        subprocess.run(["git", "add", "-A"], cwd=ws, capture_output=True)
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit",
+                        "-q", "--no-verify", "-m", "round work M1"], cwd=ws, capture_output=True)
+        landed = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True,
+                                text=True).stdout.strip()
+        self.assertNotEqual(first, landed)
+        (ws / "docs" / "reviews" / "M1-audit.md").write_text(
+            _AUDIT_CLEAN + f"\n- **审计人**: seat\n- **透镜来源**: k3dit\n- **基线**: {first}\n",
+            encoding="utf-8")
+        (ws / ".agent" / "audit_jobs.json").write_text(_json.dumps({"jobs": [
+            {"job_id": "J-rebased", "milestone_id": "M1", "state": "collected", "merge_ok": True,
+             "baseline": first, "landed_head": landed, "report": "docs/reviews/M1-audit.md",
+             "counts": {"待修": 0}}]}), encoding="utf-8")
+        with mock.patch("k3dge.engine.audit_flow.submit_audit",
+                        side_effect=AssertionError("合线后不应再建单")):
+            st, msg = _ratchet_audit_step(ws, "M1", fresh_baseline=landed)
+        assert st == "closed" and "M1-audit.md" in msg
+        # 主干再走一步 ⇒ landed_head 不再等于 B，仍拒（与 INC-20260920 同形）
+        (ws / "after.txt").write_text("z", encoding="utf-8")
+        subprocess.run(["git", "add", "-A"], cwd=ws, capture_output=True)
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit",
+                        "-q", "--no-verify", "-m", "feat: after audit"], cwd=ws, capture_output=True)
+        later = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True,
+                               text=True).stdout.strip()
+        with mock.patch("k3dge.engine.audit_flow.submit_audit",
+                        return_value={"state": "failed", "detail": "透镜不可达"}):
+            st2, msg2 = _ratchet_audit_step(ws, "M1", fresh_baseline=later)
+        assert st2 == "stalled"
+        assert "旧内容" in msg2 or "不覆盖本轮基线" in msg2
 
     def test_missing_report_file_is_not_accepted(self):
         """账里写路径 ≠ 文件存在（报告可能已归档/删除）⇒ 不接受。"""

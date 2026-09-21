@@ -379,6 +379,14 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
     job["merge_ok"] = bool(merged.get("ok", True))
     pinned = False
     if outcome == "closed":
+        if job["merge_ok"]:
+            # rebase 合线后 pre-rebase oid 不在主干祖先链上；记下合线瞬间的主干头，
+            # 供 `_baseline_covers` 认「审的内容已落在 B」（seal 相位 2 不再误建新单）。
+            from k3dge.engine.seal import head_commit as _head
+
+            landed = _head(workspace)
+            if landed:
+                job["landed_head"] = landed
         try:  # 闭环基线留存：报告引用的 commit 经重演可能悬空，钉 ref 防 gc；失败不否决闭环
             from k3dge.engine import worktree as _wt2
 

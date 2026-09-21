@@ -98,15 +98,21 @@ def _ensure_leftovers(workspace: Path, text: str, report_path: Path) -> None:
     leftover_path.write_text(existing + block, encoding="utf-8")
 
 
-def _baseline_covers(workspace: Path, fresh: str, job_baseline: str) -> bool:
-    """`fresh`（本轮封版基线 B）是否被 job 的基线覆盖：相等，或 B 是它的祖先。
+def _baseline_covers(
+    workspace: Path, fresh: str, job_baseline: str, landed_head: str = ""
+) -> bool:
+    """`fresh`（本轮封版基线 B）是否被 job 的基线覆盖。
 
-    相等/祖先 ⇒ 这单是**在 B 之后建的**（本轮的新审计）；反过来（job 基线是 B 的祖先）⇒
-    那单来自更早的内容，**不是本轮审计**（旧报告不得充闭环）。
+    相等，或 B 是 job 基线的祖先 ⇒ 这单审的是 B 当时或之后的内容（本轮）。
+    反过来（job 基线是 B 的祖先）⇒ 更早的内容，**不是本轮**（INC-20260920-AST）。
+
+    `landed_head`：`merge_back` 成功后的主干头。合线走 rebase 时 pre-rebase oid
+    与 HEAD 无祖先关系（hash 被重写）；B 若仍等于合线瞬间的主干头，内容没再走，
+    这一单仍覆盖本轮。主干再有提交 ⇒ B ≠ landed_head，仍拒。
     """
     if not fresh or not job_baseline:
         return False
-    if fresh == job_baseline:
+    if fresh == job_baseline or (landed_head and fresh == landed_head):
         return True
     import subprocess
 
@@ -126,7 +132,7 @@ def _closed_job_evidence(workspace: Path, job: dict, fresh_baseline: str) -> Tup
       ① 报告**文件在盘上**（账里写路径 ≠ 文件存在；报告可能已被归档/删除）
       ② 报告**自身**待修=0 且有序言（`_SIGN_KEYS`）——计数从文件重算，不用账里的 counts
       ③ 报告里的 `基线` 与 job 的 `基线` 一致（记录自洽：报告就是那单的产物）
-      ④ job 的基线覆盖本轮 B（`_baseline_covers`）——否则这是**旧内容**的审计
+      ④ job 的基线覆盖本轮 B（`_baseline_covers`，含合线 `landed_head`）——否则这是**旧内容**的审计
     """
     from k3dge.engine import audit_report as _ar
     from k3dge.engine.process_audit import _SIGN_KEYS, _field
@@ -148,8 +154,11 @@ def _closed_job_evidence(workspace: Path, job: dict, fresh_baseline: str) -> Tup
         return False, f"报告里的基线≠该单基线（{path.name}）"
     if _ar._parse_audit_stats(text)["待修"] != 0:
         return False, f"报告有待修（{path.name}）"
-    if not _baseline_covers(workspace, fresh_baseline, str(job.get("baseline") or "")):
-        return False, (f"该单基线 {str(job.get('baseline'))[:12]} 早于本轮基线 "
+    if not _baseline_covers(
+        workspace, fresh_baseline, str(job.get("baseline") or ""),
+        landed_head=str(job.get("landed_head") or ""),
+    ):
+        return False, (f"该单基线 {str(job.get('baseline'))[:12]} 不覆盖本轮基线 "
                        f"{str(fresh_baseline)[:12]} ⇒ 是旧内容的审计")
     return True, f"本里程碑签署报告已闭环（{rel}；待修 0）"
 

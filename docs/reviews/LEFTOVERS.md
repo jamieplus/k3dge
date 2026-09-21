@@ -51,3 +51,4 @@ Denial reason and reopen condition live here only.
 | INTRO-01 | 规则 12「引入纪律」prose-only 无闸：判据是决策质量非文件事实。曾试把筛子 2（接入点）机检——实测 20 子命令中 13 个无到达路径（65% 误报），不可用 | [memo §S9](../memo/archive/2026-09-16-orchestration-form-exploration.md) |
 | ADR-01 | 12 条 ADR 的 `Note` 仍是旧式修订日志（①②③…）；AUTHORING 已定「修订痕迹全进 `Amended-by`」——迁移未做，无实测危害 | [0006](../adr/0006-mcp-foreign-harness-injection.md)（已迁样板） |
 | NEXT-01 | `[NEXT] state=seal_ready` 与 `seal_preconditions_error` 是两份源：前者不读封板前置，故 Proposed ADR / 未 done 任务仍在时仍报「可封板」 | [0026](../adr/0026-projection-contract.md) |
+| value-22 | `cli/main.py` 单模块超千行（ADR-0003）：体积属实，按 A-1 分块逐程消化，本轮有意留 | [2026-09-20-M10-audit.md](archive/M10/2026-09-20-M10-audit.md) |

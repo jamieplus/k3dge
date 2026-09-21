@@ -57,6 +57,10 @@ def _seal_review_gate(workspace: Path, milestone_id: str, tasks: List[MilestoneT
         for f in reviews_dir.iterdir():
             if not f.is_file() or not _has_milestone_token(f.name, milestone_id):
                 continue
+            # 只验对齐报告：12 列审计稿没有 align-pass marker，拿它们充 missing_pass
+            # 会在「align 已写、只是任务清单缺一张票」时误报「无 marker」（真跑相位 3）。
+            if "-align.md" not in f.name:
+                continue
             try:
                 content = f.read_text(encoding="utf-8")
             except UnicodeDecodeError:

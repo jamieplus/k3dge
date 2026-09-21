@@ -88,39 +88,40 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
     if gate_err:
         return False, gate_err, tasks
 
-    # 生成极简对齐评审报告
+    # 生成极简对齐评审报告（每次重写：它是结构桩，任务集会变；写一次就会让后补的
+    # 审计票进不了清单，archive 闸 `_seal_review_gate` 再把别的 M10 报告误判成「无
+    # align-pass marker」——真跑 seal 相位 3 撞过）。
     today = datetime.date.today().isoformat()
     review_file = workspace / "docs" / "reviews" / f"{today}-{milestone_id}-align.md"
-    if not review_file.exists():
-        review_file.parent.mkdir(parents=True, exist_ok=True)
-        lines = [
-            f"# 里程碑对齐与验收报告: {milestone_id}",
-            _ALIGN_STUB_MARKER,
-            _align_pass_marker(milestone_id),
-            "",
-            f"- **Date**: {today}",
-            "- **Regression**: PASS (k3dge milestone align Full Matrix)",
-            f"- **Completed Tasks**: {len(tasks)}",
-            "",
-            "## 1. 目标达成清单",
-            "",
-        ]
-        for t in tasks:
-            lines.append(f"- [x] `{t.path.name}`")
-        lines.extend([
-            "",
-            "## 2. 重构准入评估",
-            "> 仅在存在阻塞后续扩展的设计缺陷时启动重构；常规情况下跳过大重构。",
-            "",
-            "- [ ] 是否存在阻塞后续阶段的架构/接口缺陷？(Yes/No)",
-            "- [ ] 是否存在超出阈值的深层嵌套坏味道？(Yes/No)",
-            "- 处置结论: 跳过重构直接封板 / 触发定向微调",
-            "",
-            "## 3. 验收结论",
-            "目标达成，契约一致，准予封板压缩。",
-            "",
-        ])
-        review_file.write_text("\n".join(lines), encoding="utf-8")
+    review_file.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        f"# 里程碑对齐与验收报告: {milestone_id}",
+        _ALIGN_STUB_MARKER,
+        _align_pass_marker(milestone_id),
+        "",
+        f"- **Date**: {today}",
+        "- **Regression**: PASS (k3dge milestone align Full Matrix)",
+        f"- **Completed Tasks**: {len(tasks)}",
+        "",
+        "## 1. 目标达成清单",
+        "",
+    ]
+    for t in tasks:
+        lines.append(f"- [x] `{t.path.name}`")
+    lines.extend([
+        "",
+        "## 2. 重构准入评估",
+        "> 仅在存在阻塞后续扩展的设计缺陷时启动重构；常规情况下跳过大重构。",
+        "",
+        "- [ ] 是否存在阻塞后续阶段的架构/接口缺陷？(Yes/No)",
+        "- [ ] 是否存在超出阈值的深层嵌套坏味道？(Yes/No)",
+        "- 处置结论: 跳过重构直接封板 / 触发定向微调",
+        "",
+        "## 3. 验收结论",
+        "目标达成，契约一致，准予封板压缩。",
+        "",
+    ])
+    review_file.write_text("\n".join(lines), encoding="utf-8")
 
     # 指南完成度扫描（预警非阻断）：docs/guides/ 残留的 TODO 桩在 seal 时会被硬拦
     unfilled = scan_unfilled_guides(workspace)
