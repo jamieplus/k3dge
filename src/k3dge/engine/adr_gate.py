@@ -164,6 +164,7 @@ def _mark_superseded(text: str, by_id: str) -> str:
     """Replace Status line with Superseded + inject superseded_by field."""
     text = re.sub(r"^Status:\s*\S+", "Status: Superseded", text, count=1, flags=re.M)
     # Inject superseded_by after Supersedes line (or after Status if no Supersedes)
+# k3dit:pending code-4 sev=低 prio=P2 type=缺陷 _mark_superseded 用字面量 "^superseded_by:"（正则锚当文本）判断字段是否已存在 ⇒ 守卫恒真，对已含 superseded_by: 的旧 ADR 会再注入一行，frontmatter 重复键 evidence=k3dge sync 跑两次同一 Supersedes 链后 grep superseded_by
     if "^superseded_by:" not in text:
         if re.search(r"^Supersedes:", text, re.M):
             text = re.sub(

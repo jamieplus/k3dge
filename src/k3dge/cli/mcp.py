@@ -460,6 +460,7 @@ def k3dge_milestone_control(
         # `audit_needed` pointing back at the audit entry.
         from k3dge.engine import nextstep
 
+# k3dit:pending code-2 sev=高 prio=P1 type=缺陷 MCP seal 未传 skip_enter_prompt，_Prompt.default() 读 stdio 非 tty ⇒ Prompt.ask(default_yes=False) 恒返回 False（prompt.py:48）⇒ 该工具恒返回 seal_declined，MCP 出口永远封不了板（CLI 有 --yes，MCP 无等价开关）evidence=非 tty 下调用 k3dge_milestone_control(action='seal') 返回 status=seal_declined
         status, msg = run_seal_flow(ws, milestone_id)
         if status != "sealed":
             nxt = nextstep.load_persisted(ws)
@@ -485,6 +486,7 @@ def k3dge_milestone_control(
 
             prev = get_version(ws)
             new_v = bump_version(ws, part="patch")
+# k3dit:pending code-1 sev=高 prio=P1 type=正确性 MCP seal 在 run_seal_flow 已由相位3 version_bump 前进版号后再次 bump_version+consume_unreleased+append_changelog（mcp.py:487）⇒ 经 MCP 封板每次前进两个 patch、CHANGELOG 双段，且第二次改动落在封版提交之后使树变脏；CLI 同判定已只 bump 一次（main.py:747）evidence=调用 k3dge_milestone_control(action='seal') 前后 k3dge version show 相差两个 patch
             body = consume_unreleased(ws)
             notes = body if body else f"Seal milestone {milestone_id}."
             append_changelog(ws, new_v, notes=notes)

@@ -883,6 +883,7 @@ def cmd_search(args: argparse.Namespace) -> int:
     if getattr(args, "path", None):
         # Path-listing mode: list files matching the glob (scoped alternative to `find`).
         matches = []
+# k3dit:pending code-3 sev=中 prio=P1 type=缺陷 workspace.glob(args.path) 未包 try：绝对/非法 pattern（如 '/etc/*'）在迭代时抛 NotImplementedError/ValueError 直接崩栈，下游 _rel_within_workspace 的 SEC-01 收敛在其之前够不到 evidence=k3dge search --path '/etc/*'
         for p in workspace.glob(args.path):
             try:
                 safe = _rel_within_workspace(workspace, str(p))
