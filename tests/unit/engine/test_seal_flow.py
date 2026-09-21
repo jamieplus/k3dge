@@ -334,6 +334,41 @@ class TestSealReviewGate(TestCase):
         tasks = scan_milestone_tasks(ws, "M1")
         self.assertIsNone(_seal_review_gate(ws, "M1", tasks))
 
+    def test_audit_job_ticket_is_not_work_pending(self) -> None:
+        from k3dge.engine.seal import unmet_seal_preconditions
+        from k3dge.engine.task_index import is_audit_job_ticket, work_pending, scan_milestone_tasks
+
+        ws = _ws()
+        td = ws / "docs" / "tasks"
+        td.mkdir(parents=True)
+        (td / "2026-09-01-M1-feat-x.done.md").write_text(
+            "---\nstatus: done\nmilestone: M1\npriority: P2\ndate: 2026-09-01\n---\n\n# X\n\n## 结案\n- x\n",
+            encoding="utf-8")
+        (td / "2026-09-01-M1-audit-audit_job_abc.md").write_text(
+            "---\nstatus: idea\nmilestone: M1\npriority: P2\ndate: 2026-09-01\n---\n\n# job\n",
+            encoding="utf-8")
+        self.assertTrue(is_audit_job_ticket("2026-09-01-M1-audit-audit_job_abc.md"))
+        tasks = scan_milestone_tasks(ws, "M1")
+        self.assertEqual(work_pending(tasks), [])
+        unmet = unmet_seal_preconditions(ws, "M1")
+        self.assertFalse(any(gid == "tasks_all_done" for gid, _ in unmet))
+
+
+class TestWriteClosureNote(TestCase):
+    def test_records_current_version_and_archived_report(self) -> None:
+        from k3dge.engine.seal_flow import _write_closure_note
+
+        ws = _ws()
+        (ws / "pyproject.toml").write_text('[project]\nname="x"\nversion="1.2.3"\n', encoding="utf-8")
+        arch = ws / "docs" / "reviews" / "archive" / "M1"
+        arch.mkdir(parents=True)
+        (arch / "2026-09-01-M1-audit.md").write_text("# a\n", encoding="utf-8")
+        p = _write_closure_note(ws, "M1")
+        text = p.read_text(encoding="utf-8")
+        self.assertIn("1.2.3", text)
+        self.assertNotIn("1.2.4", text)
+        self.assertIn("2026-09-01-M1-audit.md", text)
+
 
 class TestPrematureArchive(TestCase):
     """M9 实战：任务提前归档 ⇒ align/seal 顶扫不到；提示应可操作（batch archive at seal）。"""
@@ -365,13 +400,12 @@ class TestClosureNote(TestCase):
         from k3dge.engine import seal_flow
 
         ws = _ws()
-        with mock.patch("k3dge.engine.version.get_version", return_value="0.1.10"), \
-             mock.patch("k3dge.engine.version._next_version", return_value="0.1.11"):
+        with mock.patch("k3dge.engine.version.get_version", return_value="0.1.11"):
             p = seal_flow._write_closure_note(ws, "M1")
         text = p.read_text(encoding="utf-8")
         self.assertIn("审计闭环", text)
         self.assertNotIn("双腿", text)
-        self.assertIn("0.1.11", text)      # 终版（bump 后），非 bump 前值 0.1.10
+        self.assertIn("0.1.11", text)      # bump 已发生，记当前终版，不再 +1
 
 
 class TestAuditChecklist(TestCase):
@@ -686,6 +720,52 @@ class TestRatchetAuditStep(TestCase):
             st2, msg2 = _ratchet_audit_step(ws, "M1", fresh_baseline=later)
         assert st2 == "stalled"
         assert "旧内容" in msg2 or "不覆盖本轮基线" in msg2
+
+    def test_mechanical_commits_after_landed_head_still_cover(self):
+        """合线后再有 round work / k3dge-process 提交，仍覆盖；feat 则拒。"""
+        import json as _json
+        import subprocess
+
+        ws, first = self._ws_r_git(report="signed")
+        (ws / "docs" / "reviews" / "M1-audit.md").write_text(
+            _AUDIT_CLEAN + f"\n- **审计人**: seat\n- **透镜来源**: k3dit\n- **基线**: {first}\n",
+            encoding="utf-8")
+        subprocess.run(["git", "-c", "user.name=k3dge-process",
+                        "-c", "user.email=noreply@k3dge.local",
+                        "commit", "-q", "--allow-empty", "--no-verify",
+                        "-m", "round work M1"], cwd=ws, capture_output=True)
+        landed = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws,
+                                capture_output=True, text=True).stdout.strip()
+        subprocess.run(["git", "-c", "user.name=k3dge-process",
+                        "-c", "user.email=noreply@k3dge.local",
+                        "commit", "-q", "--allow-empty", "--no-verify",
+                        "-m", "chore(seal): seal milestone M1"], cwd=ws, capture_output=True)
+        fresh = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws,
+                               capture_output=True, text=True).stdout.strip()
+        (ws / ".agent" / "audit_jobs.json").write_text(_json.dumps({"jobs": [
+            {"job_id": "J-m", "milestone_id": "M1", "state": "collected", "merge_ok": True,
+             "baseline": first, "landed_head": landed, "report": "docs/reviews/M1-audit.md",
+             "counts": {"待修": 0}}]}), encoding="utf-8")
+        with mock.patch("k3dge.engine.audit_flow.submit_audit",
+                        side_effect=AssertionError("机械件之后不应再建单")):
+            st, _msg = _ratchet_audit_step(ws, "M1", fresh_baseline=fresh)
+        assert st == "closed"
+
+    def test_collected_covers_even_with_inflight_false_submit(self):
+        """误 submit 的 inflight 不得压过本轮 collected。"""
+        import json as _json
+
+        ws, head = self._ws_r_git(report="signed")
+        (ws / ".agent" / "audit_jobs.json").write_text(_json.dumps({"jobs": [
+            {"job_id": "J-done", "milestone_id": "M1", "state": "collected", "merge_ok": True,
+             "baseline": head, "report": "docs/reviews/M1-audit.md", "counts": {"待修": 0}},
+            {"job_id": "J-false", "milestone_id": "M1", "state": "awaiting",
+             "baseline": head},
+        ]}), encoding="utf-8")
+        with mock.patch("k3dge.engine.audit_flow.peer_status",
+                        side_effect=AssertionError("不该探误建单")):
+            st, msg = _ratchet_audit_step(ws, "M1", fresh_baseline=head)
+        assert st == "closed" and "M1-audit.md" in msg
 
     def test_missing_report_file_is_not_accepted(self):
         """账里写路径 ≠ 文件存在（报告可能已归档/删除）⇒ 不接受。"""

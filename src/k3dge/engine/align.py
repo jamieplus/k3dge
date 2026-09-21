@@ -11,7 +11,12 @@ from typing import List, Optional, Tuple
 from k3dge.engine import gates
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.milestone_pointer import _validate_milestone_id
-from k3dge.engine.task_index import _ALLOWED_STATUS, MilestoneTask, scan_milestone_tasks
+from k3dge.engine.task_index import (
+    _ALLOWED_STATUS,
+    MilestoneTask,
+    is_audit_job_ticket as _is_audit_job_ticket,
+    scan_milestone_tasks,
+)
 
 _ALIGN_STUB_MARKER = "<!-- k3dge:align-stub -->"
 
@@ -83,7 +88,7 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
         ), tasks
 
     # 前置闸/动作：读「硬闸契约」`[checks.align]`（ADR-0001 §2 第 8 条）。
-    pending = [t for t in tasks if t.status != "done"]
+    pending = [t for t in tasks if t.status != "done" and not _is_audit_job_ticket(t.path.name)]
     gate_err = _align_run_gates(workspace, milestone_id, tasks, pending)
     if gate_err:
         return False, gate_err, tasks

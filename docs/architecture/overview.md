@@ -91,20 +91,20 @@ C4Context
 ```mermaid
 stateDiagram-v2
     [*] --> DRAFT
-    DRAFT --> ALIGNED: milestone align (Full Matrix, 无人问)
-    ALIGNED --> AUDIT_SUGGESTED: 量化触发(账齐/C2≥5/体积≥8)
-    AUDIT_SUGGESTED --> DRAFT: 要不要审? N（继续干活；无倒计时）
-    AUDIT_SUGGESTED --> AUDITING: k3dge milestone audit
-    AUDITING --> AUDITING: 合并审计模块报告 待修>0 + agent 修（倒计时默认修；重审该报告）
-    AUDITING --> AUDITING: 位置钉 k3dit:pending <ID>（check/status 报 pending=N）
-    AUDITING --> ESCALATED: verify 连续 >3 次未闭环 → 转人工
-    AUDITING --> SEAL_READY: 单份 12 列报告 collected（清零→席**署名**报告→collect 落盘+写回）；审计闭环=真界限
-    SEAL_READY --> DRAFT: 要不要封? N（里程碑继续挂着）
-    SEAL_READY --> SEALED: k3dge milestone seal（align→归档+版本+指针）
-    SEALED --> [*]: 收摊=上下文压缩(closure.md → 设计文档 → 提交)
+    DRAFT --> SEAL_READY: 工作票全 done + 形式闸绿（零 task 空窗不建议封）
+    DRAFT --> AUDIT_SUGGESTED: 量化触发(账齐/C2≥5/体积≥8)（提醒，不是入口）
+    AUDIT_SUGGESTED --> DRAFT: 不审，继续干活
+    SEAL_READY --> DRAFT: 不封（里程碑继续挂着）
+    SEAL_READY --> SEALING: k3dge milestone seal（唯一入口，三相位）
+    SEALING --> SEALING: 预审失败 ⇒ 修完再 seal
+    SEALING --> RATCHET: 相位 2 棘轮在办（进程不等人）
+    RATCHET --> SEALING: 再 seal / milestone audit 幂等步进
+    SEALING --> ESCALATED: verify >3 或合线冲突 ⇒ 转人工
+    SEALING --> SEALED: 审计正常返回 ⇒ 归档+版本+封版提交+tag
+    SEALED --> [*]: 收摊清单已进封版提交；设计文档由人/agent 补
 ```
 
-> **两问拆开**：封板没有尺子（全 done/硬闸绿/零 task 都能说"可封"），界限是**审计环收口 = 合并审计模块（ADR-0025）那一份 12 列报告到 待修=0**；quality 是模块内的价值窗，不是独立 peer、也不另出一份报告。自动触发只服务「要不要审」，「要不要封」只在闭环后出现一次。未审计调 `seal` → `audit_needed`。发现用 `k3dit:pending <ID>` 钉在 `位置` 处（钉＝写源，账本/报告＝其投影；处置仍以报告+tasks 为准），`check`/`status` 报 `pending_findings`。外来审计源经 `k3dge milestone audit-submit`(或 MCP `k3dge_submit_audit_report`) 落盘即计入闭环。架构/`overview.md` 更新**不是钩子**，在 closure 里做。详见 ADR-0004 §2.1.4–§2.1.8。
+> **一次声明 + 一条链**（ADR-0004 §2.1.9）：`k3dge milestone seal <id>` 是唯一入口（预审 → 审计 → 审核后自动）。封板没有尺子；审计正常返回（闭集 `closed` / 带署名的 `degraded-manual`）才推进版号。独立入口 `milestone audit` 只补证据、不封板。`[NEXT] audit_suggested` 是量化提醒，不是「先审才能封」。发现用 `k3dit:pending <ID>` 钉在 `位置` 处，`check`/`status` 报 `pending_findings`。外来源 `k3dge milestone audit-submit`。架构/`overview.md` 更新不是钩子，在 closure 里做。零 task 空窗不投影 `seal_ready`。
 
 ## 7. 审计→封板时序（通用模板）
 
@@ -113,23 +113,16 @@ sequenceDiagram
     participant Agent as Agent Harness (DSH/Codex/Claude/OpenCode)
     participant K3 as k3dge (sidecar MCP；唯一编排者)
     participant Audit as Audit Harness (k3dit, ext MCP)
-    Agent->>K3: read .agent/pipeline.toml (on_seal_enter / on_pre_seal)
     Agent->>K3: k3dge check / status（硬闸绿）
-    K3-->>Agent: [NEXT] audit_suggested + reasons（量化触发；非建议封）
-    Agent->>K3: milestone align（Full Matrix，无人问）
-    K3-->>Agent: 问「要审吗？」(无倒计时；N=继续干活)
-    Agent->>K3: milestone audit <id>
-    K3->>Audit: 调 peer：audit.submit 建单→席位 rounds（文档/代码/价值/复核各窗）→audit.collect 落签署件→写回主干
-    Note over K3,Audit: 唯一编排者=k3dge（agent 不直连 peer）；交换物=审计线（分支+现场，ADR-0025）；sign-report 署名才算结案
-    Note over K3,Audit: quality 是模块内价值窗（ADR-0025 §2.4）：各窗产出 join 成**一份** 12 列，无独立 quality peer/报告
-    Audit-->>K3: 12 列报告（含 待修/有意留/已修）+ 位置钉 k3dit:pending
-    Note over K3,Audit: 外来审计源：人贴报告 → k3dge_submit_audit_report 落盘(--kind audit|quality)
-    K3-->>Agent: [NEXT] 待修>0 → 引导 agent 修（倒计时默认修）；重审该报告；>3 次 → escalated 转人工
-    Agent->>Agent: 改码 + 回填报告（agent 侧唯一动作）
-    K3-->>Agent: [NEXT] seal_ready（那一份报告 待修=0，唯一界限达成）
-    Agent->>K3: milestone seal <id>
-    K3-->>Agent: 问「封板？」(无倒计时；否=不封，里程碑挂着)
-    K3->>K3: align→归档+版本+指针；写 *-closure.md 收摊清单（上下文压缩+设计文档由人/agent 补齐）
+    K3-->>Agent: [NEXT] audit_suggested 或 seal_ready（提醒；零 task 不投影 seal_ready）
+    Agent->>K3: milestone seal <id>（唯一入口；--yes 跳过封板提问，不跳过审计）
+    K3->>K3: 相位 1 预审（full_matrix + 形式闸）
+    K3->>Audit: 相位 2 审计（棘轮 submit→席位→collect，或 oneshot）
+    Note over K3,Audit: 唯一编排者=k3dge；交换物=审计线；sign-report 署名才算结案
+    Note over K3,Audit: quality 是模块内价值窗（ADR-0025）：一份 12 列，无独立 quality peer
+    Audit-->>K3: closed / degraded-manual / ratchet_open / escalated / refused
+    K3-->>Agent: 在办 ⇒ [NEXT] ratchet_open（再 seal 幂等步进）；未闭环不封
+    K3->>K3: 相位 3：归档 → 提版 → 收摊清单 → 封版提交+tag <M>=<B>
 ```
 
 > 命令结果末尾统一附 `[NEXT] state=… milestone=…` 一行提示（MCP 同构 JSON `next` 字段），只给合法下一步、不替人决定；优先级 `pending_findings > ratchet_open > seal_ready > audit_suggested`，状态与 reasons 的唯一来源在 `engine/nextstep.STATE_OPTIONS` + `engine/audit_trigger.py`，与本节同一张状态机。新建 `src/` 域给 `new_domain`（是否算持久设计、写得对不对仍归 k3dit/人）；`overview.md` 更新已移出钩子、进 closure。

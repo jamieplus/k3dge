@@ -501,8 +501,18 @@ class TestSealReadyStatesItsBlockers(TestCase):
 
     def test_says_all_green_when_clean(self) -> None:
         ws = self._ws([])
+        (ws / "docs" / "tasks").mkdir(parents=True)
+        (ws / "docs" / "tasks" / "2026-09-01-M10-feat-x.done.md").write_text(
+            "---\nstatus: done\nmilestone: M10\npriority: P2\ndate: 2026-09-01\n---\n\n# X\n\n## 结案\n- x\n",
+            encoding="utf-8")
         ns = nextstep.seal_ready_for(ws, "M10")
+        self.assertEqual(ns.state, "seal_ready")
         self.assertIn("预审待办：全绿", ns.render_cli())
+
+    def test_empty_milestone_is_not_seal_ready(self) -> None:
+        ws = self._ws([])
+        ns = nextstep.seal_ready_for(ws, "M10")
+        self.assertEqual(ns.state, "normal")
 
     def test_repo_blockers_are_same_source_as_the_gate(self) -> None:
         """自举：`[NEXT]` 列的待办必须与 `seal` 的预审**同源**（同一份判据，不是各写一套）。
@@ -513,9 +523,15 @@ class TestSealReadyStatesItsBlockers(TestCase):
         `align_pass`）不得进"需人先办"；③退休的报告类闸不得出现。
         """
         from k3dge.engine.seal import unmet_seal_preconditions
+        from k3dge.engine.milestone_pointer import get_current_milestone
+        from k3dge.engine.task_index import scan_milestone_tasks
 
-        ns = nextstep.seal_ready_for(REPO, "M10")
-        unmet = [gid for gid, _msg in unmet_seal_preconditions(REPO, "M10")]
+        mid = get_current_milestone(REPO) or "M11"
+        ns = nextstep.seal_ready_for(REPO, mid)
+        if not scan_milestone_tasks(REPO, mid):
+            self.assertEqual(ns.state, "normal")
+            return
+        unmet = [gid for gid, _msg in unmet_seal_preconditions(REPO, mid)]
         self.assertEqual([r.split("：")[0] for r in (ns.reasons or [])], unmet[:4])
         if not unmet:
             self.assertIn("预审待办：全绿", ns.render_cli())

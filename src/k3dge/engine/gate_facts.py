@@ -206,7 +206,7 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "fix": "judgment", "severity": "block",
         "fact": "`{path}` 已翻 done 但没有结案记录——票是自包含事实源，不留落地痕迹，"
                 "后续就会出现「票里说待办、实际已做」的漂移",
-        "options": ["补一个结案类段并写清落地情况（`## 结案` / `## 落地` / `## 关闭理由` / `## 收尾` / `## 回填` / `## 进度`）",
+        "options": ["补一个结案类段并写清落地情况（`## 结案` / `## 落地` / `## 关闭理由` / `## 收尾` / `## 回填` / `## 进度` / `## 回收记录`）",
                     "票其实没做完 → 把 frontmatter status 改回 in-progress 并去掉 .done 后缀"],
         "pointers": ["docs/tasks/AUTHORING.md", "k3dge ADR-0012"],
     },

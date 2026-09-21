@@ -12,6 +12,20 @@ from k3dge.engine.milestone_files import _is_doc_aux
 
 _ALLOWED_STATUS = frozenset({"idea", "deferred", "in-progress", "done"})
 
+#: `submit_audit` 建的工单票（`*-audit-audit_job_<id>.md`）。seal 相位 2 自己跑审计，
+#: 这类票不算「人待办」——算进去会把唯一入口卡在 tasks_all_done（M10 真跑）。
+_AUDIT_JOB_TICKET_MARK = "-audit-audit_job_"
+
+
+def is_audit_job_ticket(name: str) -> bool:
+    """文件名是棘轮工单票（submit 建的），不是人开的 audit 工作项。"""
+    return _AUDIT_JOB_TICKET_MARK in name
+
+
+def work_pending(tasks: List[MilestoneTask]) -> List[MilestoneTask]:
+    """人待办：未 done 且不是审计工单票。"""
+    return [t for t in tasks if t.status != "done" and not is_audit_job_ticket(t.path.name)]
+
 STATUS_RE = re.compile(r"-\s+\*\*Status\*\*:\s*([\w-]+)", re.IGNORECASE)
 MILESTONE_RE = re.compile(r"-\s+\*\*Milestone\*\*:\s*([^\n\r]+)", re.IGNORECASE)
 PRIORITY_RE = re.compile(r"-\s+\*\*Priority\*\*:\s*(\S+)", re.IGNORECASE)

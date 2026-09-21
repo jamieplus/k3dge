@@ -502,7 +502,7 @@ class TestTaskClosureRecord(unittest.TestCase):
         self.assertIn("空的", out[0][1])
 
     def test_any_of_the_closed_set_passes(self):
-        for heading in ("## 结案", "## 落地", "## 关闭理由", "## 收尾", "## 回填", "## 进度"):
+        for heading in ("## 结案", "## 落地", "## 关闭理由", "## 收尾", "## 回填", "## 进度", "## 回收记录"):
             self.assertEqual(
                 pure_refs.check_task_closure_record(self.REL, self._t(f"{heading}\n- 有内容\n")), [],
                 heading)

@@ -338,21 +338,12 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
     report_path.write_text(report_md if report_md.endswith("\n") else report_md + "\n", encoding="utf-8")
 
     counts = _count_status(report_md)
-    ticket = job.get("ticket_task")
-    if ticket:
-        try:
-            tp = workspace / ticket
-            if tp.is_file():
-                tp.write_text(
-                    tp.read_text(encoding="utf-8").rstrip()
-                    + f"\n\n## 回收记录\n\n- 报告：`{report_path.relative_to(workspace).as_posix()}`"
-                    + f"（待修 {counts['待修']} / 有意留 {counts['有意留']} / 已修 {counts['已修']}）\n"
-                    + f"- 席位：{((env.get('provenance') or {}).get('seat')) or '-'}；"
-                    + "本 task 在报告回填闭环（待修=0）后由修复席位 `task done`\n",
-                    encoding="utf-8",
-                )
-        except OSError as exc:  # 回填失败不改判定，但必须可见（工单与审计状态不许静默脱钩）
-            print(f"[WARN][TICKET] 工单回填失败: {exc}", file=__import__("sys").stderr)
+    try:
+        from k3dge.engine.milestone_audit import _ensure_leftovers
+
+        _ensure_leftovers(workspace, report_md, report_path)
+    except Exception as exc:  # 有意留漏登不得否决闭环，但必须可见
+        print(f"[WARN][LEFTOVERS] 有意留未写入 LEFTOVERS.md: {exc}", file=__import__("sys").stderr)
     # 未尽项报告（`<!-- k3dge:incomplete -->`）：无论计数，绝不闭环/不 merge，交人工
     if "<!-- k3dge:incomplete -->" in report_md:
         outcome = "open"
@@ -393,6 +384,28 @@ def collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str] = No
             pinned = bool(_wt2.pin_baseline(workspace, job["job_id"], job["baseline"]))
         except Exception:
             pinned = False
+        ticket = job.get("ticket_task")
+        if ticket and job["merge_ok"]:
+            try:
+                tp = workspace / ticket
+                if tp.is_file():
+                    seat = ((env.get("provenance") or {}).get("seat")) or "-"
+                    rel = report_path.relative_to(workspace).as_posix()
+                    body = tp.read_text(encoding="utf-8")
+                    if "## 结案" not in body:
+                        tp.write_text(body.rstrip() + (
+                            f"\n\n## 结案\n\n"
+                            f"- 报告：`{rel}`"
+                            f"（待修 {counts['待修']} / 有意留 {counts['有意留']} / 已修 {counts['已修']}）\n"
+                            f"- 席位：{seat}\n"
+                        ), encoding="utf-8")
+                from k3dge.engine.task_write import mark_task_done
+
+                ok_d, _m, new_p = mark_task_done(workspace, ticket)
+                if ok_d and new_p is not None:
+                    job["ticket_task"] = new_p.relative_to(workspace).as_posix()
+            except Exception as exc:  # 关票失败不否决闭环
+                print(f"[WARN][TICKET] collect 关票失败: {exc}", file=__import__("sys").stderr)
     _save_state(workspace, state)
     from k3dge.engine import events
     events.emit(
@@ -480,9 +493,18 @@ def advance_line(workspace: Path, job_key: str, by: str = "manual", io=None) -> 
 
 
 def peer_status(workspace: Path, job_id: str, io=None) -> dict:
-    """编排侧探针：`audit.status` 查对端状态机位置与计数（正文不出账本，出货走 collect）。"""
+    """编排侧探针：`audit.status` 查对端状态机位置与计数（正文不出账本，出货走 collect）。
+
+    `job_id` 也可是里程碑 id：本地账里按 milestone 取最新一单再探（CLI `audit status M10`
+    曾把里程碑当 job_id → NOT_FOUND）。
+    """
     state = _load_state(workspace)
     rec = next((j for j in state.get("jobs", []) if j.get("job_id") == job_id), None)
+    if rec is None and job_id:
+        mine = [j for j in state.get("jobs", []) if j.get("milestone_id") == job_id]
+        if mine:
+            rec = mine[-1]
+            job_id = rec.get("job_id") or job_id
     role = rec.get("role", "audit") if rec else "audit"
     res = run_action(workspace, f"{role}.status", io=io, arguments={"job_id": job_id})
     if not res.ok:

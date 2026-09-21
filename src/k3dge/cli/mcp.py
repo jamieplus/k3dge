@@ -456,8 +456,7 @@ def k3dge_milestone_control(
         )
 
     if act == "seal":
-        # Seal requires a closed audit. If not closed, run_seal_flow returns
-        # `audit_needed` pointing back at the audit entry.
+        # Seal 三相位自己跑审计（ADR-0004 🅰1）。在办棘轮单返回 ratchet_open，不是 audit_needed。
         from k3dge.engine import nextstep
         from k3dge.engine.version import get_version
 

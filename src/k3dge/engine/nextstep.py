@@ -376,16 +376,23 @@ def seal_ready_for(workspace: Path, milestone_id: str) -> "NextStep":
     形式闸（tasks_all_done / align_pass marker / adrs_all_accepted / docs_normalized …）
     ⇒ 投影与判据不同源，操作者跑到 seal 才发现。本函数让两者同源（都问
     `seal.unmet_seal_preconditions`）。告警面＝**需人先办**的项（`satisfies` 的 ⚙️ 项不列）。
+    零 task ⇒ 不是 seal_ready（ADR-0004 空窗不建议封）。
     """
     from k3dge.engine.seal import unmet_seal_preconditions
+    from k3dge.engine.task_index import scan_milestone_tasks
 
+    if not scan_milestone_tasks(workspace, milestone_id):
+        return NextStep.from_state("normal", milestone_id)
     ns = NextStep.from_state("seal_ready", milestone_id)
     unmet = unmet_seal_preconditions(workspace, milestone_id)
     suffix = str(STATE_OPTIONS["seal_ready"].get("fact_with_blockers") or "")
-    ns.fact = (ns.fact or "") + suffix.replace(
-        "<blockers>", "、".join(gid for gid, _ in unmet) or "全绿")
+    blockers = "、".join(gid for gid, _ in unmet) or "全绿"
+    ns.fact = (ns.fact or "") + suffix.replace("<blockers>", blockers)
     if unmet:
         ns.reasons = [f"{gid}：{msg[:110]}" for gid, msg in unmet[:4]]
+        # 有人待办时不要说「票已齐」
+        if ns.fact:
+            ns.fact = ns.fact.replace("形式闸与票已齐", "形式闸未齐")
     return ns
 
 

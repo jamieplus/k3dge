@@ -21,7 +21,12 @@ from k3dge.engine.review_archive import (
     _rewrite_leftover_links,
     _safe_archive_dir,
 )
-from k3dge.engine.task_index import _ALLOWED_STATUS, MilestoneTask, scan_milestone_tasks
+from k3dge.engine.task_index import (
+    _ALLOWED_STATUS,
+    MilestoneTask,
+    scan_milestone_tasks,
+)
+from k3dge.engine import task_index
 
 GUIDE_STUB_RE = re.compile(r"<!--\s*k3dge:guide-stub\s*-->", re.IGNORECASE)
 
@@ -210,7 +215,7 @@ def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gat
 def _seal_gate_registry(workspace: Path, milestone_id: str) -> dict:
     """seal 前置闸的注册表 + ctx（**唯一构造处**：单错报告与全量查询共用一份判据）。"""
     tasks = scan_milestone_tasks(workspace, milestone_id)
-    pending = [t for t in tasks if t.status != "done"]
+    pending = task_index.work_pending(tasks)
     unfilled = scan_unfilled_guides(workspace)
     gate_fns = {
         "tasks_all_done": lambda _ctx: (

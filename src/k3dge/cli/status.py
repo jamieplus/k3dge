@@ -75,8 +75,11 @@ def lifecycle_next(workspace: Path) -> Any:
                 reasons=[f"job {x.get('job_id')}（{x.get('state')}）" for x in open_jobs[:3]],
             )
         if not unmet_seal_preconditions(workspace, mid):
-            # 预审全绿 ⇒ 可以收这一章了（seal 会跑审计，ADR-0004 §2.1.9）
-            return nextstep.seal_ready_for(workspace, mid)
+            from k3dge.engine.task_index import scan_milestone_tasks
+
+            # 零 task 空窗不建议封（ADR-0004 §2.1.4）；M10 封完指针到 M11 曾立刻 seal_ready。
+            if scan_milestone_tasks(workspace, mid):
+                return nextstep.seal_ready_for(workspace, mid)
         suggested, reasons = compute_audit_suggestion(workspace)
         if suggested:
             return nextstep.NextStep.from_state("audit_suggested", mid, reasons=reasons)

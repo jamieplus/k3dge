@@ -61,8 +61,8 @@ def test_seal_preconditions_default_and_override():
         ]
         # 三相位＝声明序：预审(full_matrix) → 审计(audit) → 审核后(archive/version_bump/seal_record/…)
         assert gates.actions(ws, "seal") == [
-            "full_matrix", "audit", "archive", "version_bump", "seal_record",
-            "closure_note", "prune",
+            "full_matrix", "audit", "archive", "version_bump", "closure_note",
+            "seal_record", "prune",
         ]
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d, "[checks.seal]\npreconditions = []\n")

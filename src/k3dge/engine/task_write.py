@@ -359,6 +359,17 @@ def _finalize_task_done(workspace: Path, target: Path, content: str, fm: dict) -
             return False, f"no Status field in {target.name}", target
         target.write_text(new_content, encoding="utf-8")
     target = _rename_task_done(target)
+    try:
+        text = target.read_text(encoding="utf-8")
+        from k3dge.engine.pure_refs import _CLOSURE_HEADINGS
+
+        if not any(h in text for h in _CLOSURE_HEADINGS):
+            target.write_text(
+                text.rstrip() + f"\n\n## 结案\n\n- 关票：k3dge task done（{datetime.date.today().isoformat()}）\n",
+                encoding="utf-8",
+            )
+    except (OSError, UnicodeDecodeError):
+        pass
     # CHANGELOG **不在这里写**（ADR-0004 §2.1.12）：它由封版时的提交区间生成——
     # 每票各写一行是双写的来源（票改了 CHANGELOG 没改、没开票的改动漏掉，本会话反复遇到）。
     _backfill_task_reviews(workspace, target)

@@ -98,6 +98,48 @@ def _ensure_leftovers(workspace: Path, text: str, report_path: Path) -> None:
     leftover_path.write_text(existing + block, encoding="utf-8")
 
 
+def _git_is_ancestor(workspace: Path, anc: str, desc: str) -> bool:
+    """`anc` 是 `desc` 的祖先（含相等由调用方先判）。"""
+    import subprocess
+
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(workspace), "merge-base", "--is-ancestor", anc, desc],
+            capture_output=True, text=True,
+        )
+    except OSError:  # pragma: no cover - 环境异常
+        return False
+    return r.returncode == 0
+
+
+def _range_is_mechanical(workspace: Path, a: str, b: str) -> bool:
+    """`a..b` 的提交全是进程机械件（合线 round work / 封版 chore / 作者 k3dge-process）。
+
+    中间夹了人的 feat/fix ⇒ 内容已走出本轮审计（INC-20260920 的 60 提交案）。
+    """
+    import subprocess
+
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(workspace), "log", "--format=%an%x09%s", f"{a}..{b}"],
+            capture_output=True, text=True,
+        )
+    except OSError:  # pragma: no cover
+        return False
+    if r.returncode != 0:
+        return False
+    for ln in r.stdout.splitlines():
+        if not ln.strip():
+            continue
+        author, _, subject = ln.partition("\t")
+        if author.strip() == "k3dge-process":
+            continue
+        if subject.startswith("round work ") or subject.startswith("chore(seal):"):
+            continue
+        return False
+    return True
+
+
 def _baseline_covers(
     workspace: Path, fresh: str, job_baseline: str, landed_head: str = ""
 ) -> bool:
@@ -107,21 +149,17 @@ def _baseline_covers(
     反过来（job 基线是 B 的祖先）⇒ 更早的内容，**不是本轮**（INC-20260920-AST）。
 
     `landed_head`：`merge_back` 成功后的主干头。合线走 rebase 时 pre-rebase oid
-    与 HEAD 无祖先关系（hash 被重写）；B 若仍等于合线瞬间的主干头，内容没再走，
-    这一单仍覆盖本轮。主干再有提交 ⇒ B ≠ landed_head，仍拒。
+    与 HEAD 无祖先关系（hash 被重写）。B 等于它，或 B 在它之后但中间只有机械件
+    ⇒ 仍覆盖；夹了人的提交 ⇒ 仍拒。
     """
     if not fresh or not job_baseline:
         return False
     if fresh == job_baseline or (landed_head and fresh == landed_head):
         return True
-    import subprocess
-
-    try:
-        r = subprocess.run(["git", "-C", str(workspace), "merge-base", "--is-ancestor",
-                            fresh, job_baseline], capture_output=True, text=True)
-    except OSError:  # pragma: no cover - 环境异常
-        return False
-    return r.returncode == 0
+    if landed_head and _git_is_ancestor(workspace, landed_head, fresh) \
+            and _range_is_mechanical(workspace, landed_head, fresh):
+        return True
+    return _git_is_ancestor(workspace, fresh, job_baseline)
 
 
 def _closed_job_evidence(workspace: Path, job: dict, fresh_baseline: str) -> Tuple[bool, str]:
@@ -207,40 +245,41 @@ def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str =
             return "closed", f"写回重试成功（{r.get('mode')}）。"
         return "stalled", f"写回仍未闭（{r.get('mode')}）：{r.get('message', '')[:90]}——人工 rebase 后再跑本命令幂等重试。"
     inflight = [j for j in mine if j.get("state") not in ("collected", "failed")]
-    if not inflight:
-        done = [j for j in mine if j.get("state") == "collected" and j.get("merge_ok", True)]
-        if done:
-            # 报告在场**不代表**闭环，更不代表是**这一轮**的：逐单验磁盘+git 事实（ADR-0004 §2.1.10）。
-            # 陈旧单（基线早于本轮 B）不接受 ⇒ 落到下面去建新单；透镜不可达则 stalled ⇒ escalated。
-            ok, why = _closed_job_evidence(workspace, done[-1], fresh_baseline)
-            if ok:
-                return "closed", f"{why}。"
-            _stale_note = f"本地账里那单不算本轮审计（{why}）⇒ 需要本轮新单。"
-        r = audit_flow.submit_audit(workspace, milestone_id, io=io, role=role)
-        if not r.get("ok"):
-            reason = str(r.get("detail") or r.get("state"))[:120]
-            prefix = locals().get("_stale_note", "")
-            return "stalled", f"{prefix}建单失败：{reason}"
-        return "progress", (f"{locals().get('_stale_note', '')}"
-                            f"棘轮工单已建：{r['job_id']}（{role} 腿判据在机构侧席位，k3dge 不代笔）。")
-    j = inflight[-1]
-    st = audit_flow.peer_status(workspace, j["job_id"], io=io)
-    if not st.get("ok"):
-        return "progress", f"工单 {j['job_id']} 对端不可探：{str(st.get('message', ''))[:80]}"
-    if st.get("escalated"):
-        return "stalled", f"工单 {j['job_id']} 有升级条目 {st['escalated']}：等人 k3dit adjudicate。"
-    if st.get("state") == "done":
-        c = audit_flow.collect_audit(workspace, milestone_id, j["job_id"], io=io)  # role 随工单记录走
-        if c.get("ok"):
-            if c.get("state") == "open":
-                # 报告已落盘但 `待修>0`（未尽项完结 / 未清）⇒ 不闭环、不 merge；交回 [NEXT] audit_open
-                return "open", (f"未尽项报告已落盘 {c.get('report')}（待修 {c.get('pending')}）："
-                                "需人工/CLI agent 处理未关项后重审（如配对文件只需 `k3dge sync`）。")
-            if c.get("merge", {}).get("ok") is False:
-                return "stalled", f"报告已落盘但写回未闭：{c['merge'].get('message', '')[:90]}"
-            return "closed", f"签署报告落盘 {c.get('report')}；写回 {c.get('merge', {}).get('mode', 'n/a')}；待修 {c.get('pending')}。"
-        return "progress", f"collect 未通过：{str(c.get('message') or c.get('error') or c.get('state'))[:100]}"
-    return "progress", f"工单 {j['job_id']} 对端态 {st.get('state')}，open={st.get('open', [])}。"
+    done = [j for j in mine if j.get("state") == "collected" and j.get("merge_ok", True)]
+    if done:
+        # 先认本轮已闭环：误 submit 留下的 inflight 不得压过 collected（M10 真跑死锁）。
+        ok, why = _closed_job_evidence(workspace, done[-1], fresh_baseline)
+        if ok:
+            return "closed", f"{why}。"
+        _stale_note = f"本地账里那单不算本轮审计（{why}）⇒ 需要本轮新单。"
+    else:
+        _stale_note = ""
+    if inflight:
+        j = inflight[-1]
+        st = audit_flow.peer_status(workspace, j["job_id"], io=io)
+        if not st.get("ok"):
+            return "progress", f"工单 {j['job_id']} 对端不可探：{str(st.get('message', ''))[:80]}"
+        if st.get("escalated"):
+            return "stalled", f"工单 {j['job_id']} 有升级条目 {st['escalated']}：等人 k3dit adjudicate。"
+        if st.get("state") == "done":
+            c = audit_flow.collect_audit(workspace, milestone_id, j["job_id"], io=io)
+            if c.get("ok"):
+                if c.get("state") == "open":
+                    return "open", (f"未尽项报告已落盘 {c.get('report')}（待修 {c.get('pending')}）："
+                                    "需人工/CLI agent 处理未关项后重审（如配对文件只需 `k3dge sync`）。")
+                if c.get("merge", {}).get("ok") is False:
+                    return "stalled", f"报告已落盘但写回未闭：{c['merge'].get('message', '')[:90]}"
+                return "closed", (f"签署报告落盘 {c.get('report')}；写回 "
+                                  f"{c.get('merge', {}).get('mode', 'n/a')}；待修 {c.get('pending')}。")
+            return "progress", f"collect 未通过：{str(c.get('message') or c.get('error') or c.get('state'))[:100]}"
+        return "progress", f"工单 {j['job_id']} 对端态 {st.get('state')}，open={st.get('open', [])}。"
+    r = audit_flow.submit_audit(workspace, milestone_id, io=io, role=role)
+    if not r.get("ok"):
+        reason = str(r.get("detail") or r.get("state"))[:120]
+        return "stalled", f"{_stale_note}建单失败：{reason}"
+    return "progress", (
+        f"{_stale_note}棘轮工单已建：{r['job_id']}（{role} 腿判据在机构侧席位，k3dge 不代笔）。"
+    )
 
 
 def _reject_step(

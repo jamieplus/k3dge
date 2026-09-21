@@ -75,21 +75,22 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
     """
     today = datetime.date.today().isoformat()
     try:
-        from k3dge.engine.version import _next_version, get_version
+        from k3dge.engine.version import get_version
 
-        cur = get_version(workspace) or "?"
-        # seal 成功后 cmd 层 auto-bump patch（`--no-version-bump` 例外）；此处记**终版**，
-        # 不记 bump 前值（否则收摊清单版本恒落后一拍）。
-        sealed_version = _next_version(cur, "patch", None) if cur != "?" else "?"
+        # 相位序：version_bump 在本函数之前 ⇒ 记当前终版，不要再 _next_version（M10 写成 0.1.13、实为 0.1.12）。
+        sealed_version = get_version(workspace) or "?"
     except Exception:
         sealed_version = "?"
+    reviews = workspace / "docs" / "reviews"
+    report_files = list(reviews.glob(f"*-{milestone_id}-*.md"))
+    archived = reviews / "archive" / milestone_id
+    if archived.is_dir():
+        report_files.extend(archived.glob(f"*-{milestone_id}-*.md"))
     audit_reports = ",".join(
-        sorted(f.name for f in (workspace / "docs" / "reviews").glob(f"*-{milestone_id}-*.md")
-               if f.name.endswith(("-audit.md", "-quality.md")))) or "-"
-    p = workspace / "docs" / "reviews" / f"{today}-{milestone_id}-closure.md"
+        sorted({f.name for f in report_files if f.name.endswith(("-audit.md", "-quality.md"))})
+    ) or "-"
+    p = reviews / f"{today}-{milestone_id}-closure.md"
     p.parent.mkdir(parents=True, exist_ok=True)
-    if p.exists():
-        return p
     p.write_text(
         "\n".join(
             [
@@ -110,7 +111,7 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
                 "- [ ] 相关 ADR 标注 supersedes / 现行范围",
                 "",
                 "## 4. 提交里程碑",
-                "- [ ] `k3dge check` 绿 → 提交（归档 + 收摊 + 文档一起进一个 commit）",
+                "- [ ] 封版提交已含归档/收摊清单；人补的设计文档另提",
                 "",
                 "## 5. 决策轨迹（TSV：show-me-your-work 洁净室移植——ts/phase/decision/why/evidence/result，evidence=指针非散文）",
                 "ts\tphase\tdecision\twhy\tevidence\tresult",
@@ -188,6 +189,7 @@ def run_seal_flow(
         baseline = seal_mod.head_commit(workspace)  # B：审计输入标识（git hash，不用 job id）
         status, amsg = run_audit_flow(workspace, milestone_id, prompter=prompt)
         result = audit_result_of(status)
+        ctx["audit_status"] = status
         if result not in SEALABLE_AUDIT_RESULTS:
             return False, gates.Rejection(
                 "audit_noop",
@@ -195,7 +197,6 @@ def run_seal_flow(
             )
         ctx["audit_baseline"] = baseline
         ctx["audit_result"] = result
-        ctx["audit_status"] = status
         ctx["audit_seat"] = _report_seat(workspace, milestone_id)
         return True, f"\n  审计: {result}（{status}；基线 {baseline[:12]}）"
 
@@ -248,6 +249,12 @@ def run_seal_flow(
 
     def _closure_note(_ctx):
         p = _write_closure_note(workspace, milestone_id)
+        try:
+            from k3dge.engine.doc_catalog import write_docs_index
+
+            write_docs_index(workspace)
+        except Exception:
+            pass
         return True, f"\n  收摊清单: {p.relative_to(workspace)}"
 
     def _prune(_ctx):
@@ -267,10 +274,15 @@ def run_seal_flow(
     ctx = {"workspace": workspace, "milestone_id": milestone_id}
     ok, out = nodes.run_phase(workspace, "seal", "actions", registry, ctx)
     if not ok:
+        inflight = ctx.get("audit_status")
+        if inflight in ("ratchet_open", "audit_open", "escalated"):
+            # run_audit_flow 已 persist 在办态；再 persist rejected 会双 [NEXT]（M10 真跑）。
+            from k3dge.engine.seal import render_checklist
+
+            return inflight, str(out) + "\n" + render_checklist(workspace, milestone_id)
         rej = gates.rejection(out, "unknown_action_id")
         _ns = nextstep.next_for_rejection(milestone_id, rej)
         nextstep.persist(workspace, _ns)
-        # 全量清单：只报首个失败会让操作者试错（修一个再跑才发现下一个）
         from k3dge.engine.seal import render_checklist
 
         return "rejected", str(rej) + "\n" + render_checklist(workspace, milestone_id) + "\n" + _ns.render_cli()
