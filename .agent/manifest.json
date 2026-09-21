@@ -1,6 +1,6 @@
 {
   "name": "k3dge",
-  "version": "0.1.12",
+  "version": "0.1.11",
   "self_hosting": true,
   "package_root": "src/k3dge",
   "domains": {
