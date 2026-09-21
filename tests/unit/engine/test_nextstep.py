@@ -504,17 +504,23 @@ class TestSealReadyStatesItsBlockers(TestCase):
         ns = nextstep.seal_ready_for(ws, "M10")
         self.assertIn("预审待办：全绿", ns.render_cli())
 
-    def test_repo_reports_only_operator_actionable_blockers(self) -> None:
-        """自举：本仓 M10 需人先办的是 adrs_all_accepted（0026 Proposed）。
+    def test_repo_blockers_are_same_source_as_the_gate(self) -> None:
+        """自举：`[NEXT]` 列的待办必须与 `seal` 的预审**同源**（同一份判据，不是各写一套）。
 
-        `align_pass` **不列入**——seal 的第一个动作就是 `full_matrix`（跑 align + 写 marker），
-        把它列成"需你先办"会误导（本会话发现并修正的真实误报）。
-        `audit_fresh` 已退休（ADR-0004 §2.1.9：边界由 tag 表达）⇒ 也不得再出现。
+        断言**机制**而不是本仓此刻哪些闸红：曾写成"本仓 M10 必有 adrs_all_accepted"
+        ——那是**瞬时状态**，ADR-0026 一转 Accepted 它就红（克隆操演时实测）。不变量是：
+        ①`reasons` 与 `unmet_seal_preconditions` 逐条一致；②⚙️ 项（`satisfies` 声明，如
+        `align_pass`）不得进"需人先办"；③退休的报告类闸不得出现。
         """
+        from k3dge.engine.seal import unmet_seal_preconditions
+
         ns = nextstep.seal_ready_for(REPO, "M10")
-        self.assertIn("adrs_all_accepted", ns.fact)
-        self.assertNotIn("audit_fresh", ns.fact)
-        self.assertNotIn("align_pass", ns.fact)
+        unmet = [gid for gid, _msg in unmet_seal_preconditions(REPO, "M10")]
+        self.assertEqual([r.split("：")[0] for r in (ns.reasons or [])], unmet[:4])
+        if not unmet:
+            self.assertIn("预审待办：全绿", ns.render_cli())
+        for gone in ("align_pass", "audit_fresh", "audit_closed", "evidence_chain"):
+            self.assertNotIn(gone, ns.fact, gone)
 
     def test_base_fact_has_no_placeholder_leak(self) -> None:
         """`from_state("seal_ready")` 仍可单独用 ⇒ 基础 fact 不得含占位符。"""

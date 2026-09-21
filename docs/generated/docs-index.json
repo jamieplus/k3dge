@@ -109,7 +109,7 @@
       "type": "adr",
       "id": "ADR-0026",
       "title": "ADR-0026: 投影契约（对 agent 的三维投影与三层拓扑）",
-      "status": "Proposed",
+      "status": "Accepted",
       "tokens": "ADR-0026: 投影契约（对 agent 的三维投影与三层拓扑）"
     },
     {

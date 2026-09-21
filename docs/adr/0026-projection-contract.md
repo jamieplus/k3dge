@@ -1,5 +1,5 @@
 ---
-Status: Proposed
+Status: Accepted
 Supersedes: -
 Amended-by: -
 Landed-by: src/k3dge/engine/nextstep.py
