@@ -65,6 +65,15 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         ],
         "pointers": ["k3dge sync", "docs/generated/", "AGENTS.md §12"],
     },
+    "ARCH_STATE_DOC_DRIFT": {
+        "severity": "block", "fix": "judgment",
+        "fact": "`{path}` 没列全状态闭集（缺 `{missing}`）——`[NEXT]` 态与 task 态的**唯一源在代码**"
+                "（`engine/nextstep.STATE_OPTIONS` / `engine/state_machine.py`），文档缺项会让新状态"
+                "在架构总览里不存在",
+        "options": ["在 `overview.md` §6.2/§6.3 的表里补上缺的态（反引号写标识符）",
+                    "状态刚改名 → 同步改文档表；确属新增实验态 → 仍要写进表（闭集是给人看的）"],
+        "pointers": ["docs/architecture/overview.md §6", "engine/nextstep.py", "engine/state_machine.py"],
+    },
     "ARCH_TABLE_DRIFT": {
         "severity": "block", "fix": "judgment",
         "fact": "`{path}` 的域表与 `.agent/manifest.json` 不一致（`{domain}` 的 `{col}`）——表行是事实投影"

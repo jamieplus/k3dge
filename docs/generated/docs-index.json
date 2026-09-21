@@ -481,6 +481,14 @@
       "tokens": "合线 rebase 后 `_baseline_covers` 把本轮审计判成旧单，再建单死锁封板"
     },
     {
+      "path": "docs/tasks/2026-09-21-M11-docs-arch_flow_coverage.done.md",
+      "type": "tasks",
+      "id": "2026-09-21-M11-docs-arch_flow_coverage.done",
+      "title": "架构总览补全流程与状态变迁 + 状态集覆盖闸 `ARCH_STATE_DOC_DRIFT`",
+      "status": "done",
+      "tokens": "架构总览补全流程与状态变迁 + 状态集覆盖闸 `ARCH_STATE_DOC_DRIFT`"
+    },
+    {
       "path": "docs/tasks/2026-09-21-M11-feat-arch_table_gate.done.md",
       "type": "tasks",
       "id": "2026-09-21-M11-feat-arch_table_gate.done",

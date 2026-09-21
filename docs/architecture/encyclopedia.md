@@ -67,7 +67,7 @@
 | 术语 | 一句话 | 出处 |
 | --- | --- | --- |
 | **Milestone 状态机** | `DRAFT → ALIGNED → AUDIT_SUGGESTED → AUDITING → SEAL_READY → SEALED`（+`ESCALATED`） | [`overview.md`](overview.md) §6 |
-| **`[NEXT]` 提示** | 命令末尾只给合法下一步；优先级 `pending_findings > ratchet_open > seal_ready > audit_suggested`；唯一来源在 `engine/nextstep` + `engine/audit_trigger` | [`overview.md`](overview.md) §7 |
+| **`[NEXT]` 提示** | 命令末尾只给合法下一步；**12 态闭集 + priority**（1 pending_findings/escalated → 2 audit_open/doc_fix → 3 rejected → 4 audit_suggested/new_domain/seal_ready → 5 ratchet_open → 9 播报态）；唯一来源 `engine/nextstep.STATE_OPTIONS` + `engine/audit_trigger` | [`overview.md`](overview.md) §6.3 |
 | **审计闭环（封板界限）** | audit 单份 **12 列报告**到 `待修=0`；未审计调 seal → `audit_needed` | ADR-0017；[`overview.md`](overview.md) §6 |
 | **钉语法 markers** | `k3dit:<kind> <ID>[@scope] <一句话≤80字>`；kind ∈ `pending/leftover/disputed/fixnote/fixed`；scope ∈ `line/file/repo`；开放 = `pending+disputed+fixnote`（结项须清零；`leftover` 上主干当长期文献、`fixed` 待 Hall 拔，均非 open） | [`docs/protocols/peer_contract.md`](../protocols/peer_contract.md) §8；`engine/markers.py` |
 | **pending_findings** | `k3dit:pending` 钉计数（check/status 报 `pending=N`，最高优先）；**钉＝写源**（判读四格 sev/prio/type/desc 写在钉上），账本与 12 列报告＝钉的投影（每轮 harvest 重生成，非席手填）；处置由修席写 `fixnote` 钉承载，复核背书翻 `fixed`，拔钉归 Hall | AGENTS.md §12；`peer_contract §8`；ADR-0025 §2.7 |
@@ -75,6 +75,11 @@
 | **棘轮 Ratchet** | 一工单 = 一快照，单内审↔修可多程；submit/collect 两态；`claim` 即续租；快照推进一律 `git update-ref` CAS | `peer_contract §1.4` |
 | **席位 seat** | 审计机构经 seat 连接组件上岗；`sign-report` 署名才算结案 | `peer_contract §1.4` / §2 |
 | **doc 合规三层** | ① 提交时结构闸 + 新建首次排查（`DOC_NEW_UNSCREENED`，阻断一次）② seal 轮确定性规约化 `k3dge doc fix`（封板前置 `docs_normalized`＝耐久闸不是票）③ 作者合规透镜（里程碑审计轮）。原「`check` 后非阻断 `k3dge doc-audit` 出报告 + 建票」路径**已退休** | ADR-0022 §2.2 🅰1 |
+| **Task 状态机** | `idea → deferred/in-progress → done`（初始 `IDEA`、终态 `DONE`、六条迁移）；声明表 `state_machine.TRANSITIONS`，合法性校验用 `task_index._ALLOWED_STATUS`（由 `TaskState` 派生） | [`overview.md`](overview.md) §6.2；`engine/state_machine.py` |
+| **同步链 `sync`** | `extractors → reconcile_adrs → domains → manual_docs → docs_index` 五步（顺序＝`[checks.sync].actions` 声明序）；只有 ADR reconcile 是**事实源写**，其余是投影 | [`overview.md`](overview.md) §3.1 |
+| **提交门禁实现面** | doc-gate → schema gate（含 `pure_refs` 引用/名实/markdown）→ screen gate → `check`；另有 commit-msg（前缀+署名）、落点闸、CI 三 job | [`overview.md`](overview.md) §3.2 |
+| **封版三相位的动作闭集** | `full_matrix → audit → archive → version_bump → closure_note → seal_record → prune`（含 `on_error`/`on_rerun` 语义；相位 3 先刷纯投影） | [`overview.md`](overview.md) §7.1 |
+| **事件面 events.jsonl** | `.k3dge/events.jsonl` 操作事实日志（`gate_pass`/`gate_fail` 等，append-only；投影，非判据） | `engine/events.py` |
 | **预筛 Pre-filter** | 人工入口审计的三条件复用（闭环报告 + 基线同 + lens 版本同）；自动入口不预筛 | `peer_contract §7` |
 
 ### 3.3 文档体系

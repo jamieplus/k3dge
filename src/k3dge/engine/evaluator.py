@@ -362,6 +362,8 @@ class ConsistencyEngine:
 
         violations.extend(self._check_architecture_tables(manifest))
 
+        violations.extend(self._check_state_doc_coverage())
+
         report = GateReport(
             passed=not violations,
             changed_files=tuple(files),
@@ -931,6 +933,37 @@ class ConsistencyEngine:
                 )
             )
         return out
+
+    def _check_state_doc_coverage(self) -> List[Violation]:
+        """`docs/architecture/overview.md` 必须列全两个**闭集**：`[NEXT]` 态与 task 态。
+
+        2026-09-21 盘点：这两个闭集是代码里的唯一源，文档里此前只零星出现几个名字 ⇒ 新增/改名
+        状态时文档静默过时。只做**标识符级出现性**检查（要求反引号形式，避免撞普通英文词），
+        不解析表格格式。
+        """
+        rel = "docs/architecture/overview.md"
+        path = self.workspace_root / rel
+        if not path.is_file():
+            return []
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return []
+        from k3dge.engine import nextstep, state_machine
+
+        missing = [s for s in sorted(nextstep.STATE_OPTIONS) if f"`{s}`" not in text]
+        missing += [s.value for s in state_machine.TaskState if f"`{s.value}`" not in text]
+        if not missing:
+            return []
+        return [
+            Violation(
+                "ARCH_STATE_DOC_DRIFT",
+                f"{rel} 未列全状态闭集（缺 {missing}）——状态源在 `engine/nextstep.STATE_OPTIONS` / "
+                f"`engine/state_machine.TaskState`，文档缺项等于静默过时",
+                file_path=rel,
+                detail={"path": rel, "missing": missing},
+            )
+        ]
 
     def _check_architecture_tables(self, manifest: Manifest) -> List[Violation]:
         """设计文档里的**域表**必须与 manifest 对齐（表行是事实，不是散文）。
