@@ -879,7 +879,11 @@ def cmd_commit(args: argparse.Namespace) -> int:
     if res.returncode != 0:
         print(res.stderr or res.stdout, file=sys.stderr)
         return 1
-    print(res.stdout)
+    print(res.stdout)  # git 自己那份摘要（stdout）
+    # 2026-09-21：git 把 **hook 的 stdout 接到 stderr**（实测：`git commit` 摘要走 stdout、
+    # 闸输出走 stderr）⇒ 只看 res.stdout 会把 doc-gate/schema/check 三层输出吞掉。
+    if res.stderr.strip():
+        print(res.stderr, file=sys.stderr)
     return 0
 
 

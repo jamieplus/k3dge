@@ -41,5 +41,6 @@ evaluator 不含 pure_refs：`grep -n pure_refs src/k3dge/engine/evaluator.py` �
 - `cli/main.py::cmd_commit`：`git commit -m <msg>`（不再 `--no-verify`）+ 注释写清「hook 跑得更多、不得回退」；`commit --help` 改为 `staged gate + live git hooks + attestation sign`。
 - **正向验证（探针）**：临时在某 memo 里加 `ADR-42xx`（真编号形态）并 staged 后跑 `k3dge commit` ⇒ **exit=1**，日志第 249 行命中
   `[DANGLING_ADR_REF] docs/memo/…`（改前同一操作会直接提交成功）。探针已清理（`git checkout HEAD --` + `k3dge sync`）。
-- 回归：`k3dge check --with-tests` 绿、`pytest -q` 全绿；真提交走 `k3dge commit`（hook 真跑：doc-gate/schema/check 三层输出可见）。
+- 回归：`k3dge check --with-tests` 绿、`pytest -q` 701 passed。
+- **本票自身的一个更正**：定稿时写了“真提交时 hook 三层输出可见”——实测**不对**：git 把 hook 的 stdout 接到 **stderr**，而旧 `cmd_commit` 成功时只 `print(res.stdout)` ⇒ 闸输出被吞（只有被拦（returncode≠0）时才打印 stderr）。已同轮修：成功路径也回显 `res.stderr`（附实测依据），否则“hook 真跑了”对使用者不可见。
 - 有意留：内层 `evaluate` 与外层 hook 的 `check` 各跑一遍（staged vs worktree 不同源）——若将来成为可感负担，再按 PRE-01 的选项 B（抽库入口）收。
