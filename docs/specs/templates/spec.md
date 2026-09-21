@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/templates`
-- **Contract Hash**: `sha256:fd46b8cc447040ba2c489c34a3f746d18122b5998704030eedab7f93ac9b7b3a`
-- **Last Updated**: 2026-09-18
+- **Contract Hash**: `sha256:e221b623cb80275486a834f0da4f0e549a91f44ae8216df1f0318a190ddf7df2`
+- **Last Updated**: 2026-09-21
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -41,6 +41,8 @@ PIPELINE_TOML_TEMPLATE = _asset('pipeline.toml.template')
 GENERATE_DOCS_SH_TEMPLATE = _asset('generate-docs.sh')
 GENERATE_DOCS_PS1_TEMPLATE = _asset('generate-docs.ps1')
 PRE_COMMIT_TEMPLATE = _asset('pre-commit.yaml.template')
+PRE_COMMIT_HOOK_TEMPLATE = _asset('pre-commit')
+COMMIT_MSG_HOOK_TEMPLATE = _asset('commit-msg')
 ARCHITECTURE_TEMPLATE = _asset('architecture.md.template')
 REVIEWS_README_TEMPLATE = _asset('reviews-readme.md')
 MCP_BRIDGE_TEMPLATE = _asset('mcp-bridge.md.template')
@@ -49,6 +51,7 @@ ADR_README_TEMPLATE = _asset('adr-readme.md.template')
 DOWNSTREAM_GUIDE_TEMPLATE = _asset('downstream.md')
 PROTOCOL_TEMPLATE = _asset('protocols/audit_default.md')
 VERIFY_PROTOCOL_TEMPLATE = _asset('protocols/verify_default.md')
+QUALITY_PROTOCOL_TEMPLATE = _asset('protocols/quality_default.md')
 TASKS_README_TEMPLATE = _asset('tasks-readme.md')
 BRANCHES_README_TEMPLATE = _asset('branches-readme.md')
 MEMO_README_TEMPLATE = _asset('memo-readme.md')
@@ -72,3 +75,6 @@ main(argv: Optional[Sequence[str]]=None) -> int
 | TC-TPL-03 | L0 | assets/rules 与本仓 `.agent/rules` | 字节级一致 | `tests/unit/templates/test_template_sync.py::test_templates_match_repo_scripts` |
 | TC-TPL-04 | L0 | 对空目录执行 init | 写出 `.agent/README.md`（标明进程配置） | `tests/unit/templates/test_scaffold.py::test_generates_tree` |
 | TC-TPL-05 | L0 | 对空目录 scaffold | 至少一域 + mcp-bridge + 空 reviews 索引 + gitignore | `tests/unit/templates/test_scaffold.py::test_generates_tree` |
+| TC-TPL-06 | L0 | 对空目录 scaffold | `scripts/pre-commit` 与 `scripts/commit-msg` 落地且**可执行**（否则 git 静默跳过 hook） | `tests/unit/templates/test_hooks_reach_downstream.py::test_hook_scripts_are_shipped_and_executable` |
+| TC-TPL-07 | L0 | 对空目录 scaffold | `docs/{specs,guides,protocols,architecture,generated}` 各带 README + AUTHORING（否则下游第一次提交被 doc-gate 拦） | `tests/unit/templates/test_hooks_reach_downstream.py::test_governance_files_exist_for_every_docs_type` |
+| TC-TPL-08 | L1 | init 仓按 AGENTS.md 激活 `core.hooksPath scripts` 后提交 | hook 真跑三层闸（doc-gate PASS）；缺 AUTHORING 时 commit 被拦 | `tests/unit/templates/test_hooks_reach_downstream.py::test_missing_authoring_blocks_the_commit` |

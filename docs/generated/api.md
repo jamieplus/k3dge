@@ -327,6 +327,24 @@ scan(workspace: Path) -> List[Dict[str, str]]
     # doc: 当前可确定修的偏差清单（`[{"path", "rule"}]`）；空 ⇒ 规约已满足（`docs_normalized` 过）。
 apply(workspace: Path, *, dry_run: bool=False) -> Dict[str, object]
     # doc: 按闭集规则修；`dry_run=True` 只报不改。返回报告（幂等：再跑一次应为空）。
+# doc_gate.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+AUTHORING = 'AUTHORING.md'
+WS: Path = _detect_workspace()
+set_workspace(workspace: Path) -> None
+    # doc: 显式指定工作区（下游 hook / 测试用；不传则用 git 顶层）。
+staged_files() -> list[str]
+staged_added() -> list[str]
+    # doc: 本次提交**新增**的文件（`--no-renames`：改名算 A+D，新路径须重新排查）。
+relevant_for_check(files: list[str]) -> bool
+check_one(rel: str) -> list[str]
+run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -> tuple[list[str], list[str]]
+    # doc: Returns (blocking, non_blocking). Staged content only.
+run_screen_gate(added: list[str], pure_refs, gate_facts=None) -> list[tuple[str, str]]
+    # doc: 新建受管文档的首次排查闸。返回 [(severity, 渲染文本)]。
+main() -> int
 # evaluator.py
 from __future__ import annotations
 from pathlib import Path
@@ -624,7 +642,7 @@ run_phase(workspace: Path, op: str, phase: str, registry: Dict[str, NodeFn], ctx
     # doc: 跑一个相位的全部节点（**单一执行器**）。返回 `(ok, 首个失败或末节点输出)`。
 # pairs.py
 from __future__ import annotations
-PAIRS: list[tuple[str, str]] = [('gate.py', 'scripts/gate.py'), ('gate.sh', 'scripts/gate.sh'), ('gate.ps1', 'scripts/gate.ps1'), ('init.sh', 'scripts/init.sh'), ('init.ps1', 'scripts/init.ps1'), ('k3dge-init-wrapper.sh', 'k3dge-init.sh'), ('k3dge-init-wrapper.ps1', 'k3dge-init.ps1'), ('generate-docs.sh', 'scripts/generate-docs.sh'), ('generate-docs.ps1', 'scripts/generate-docs.ps1'), ('agents.md', 'AGENTS.md'), ('agent-readme.md', '.agent/README.md'), ('extractors-readme.md', '.agent/extractors/README.md'), ('rules/00-core-discipline.md', '.agent/rules/00-core-discipline.md'), ('rules/01-docs-structure.md', '.agent/rules/01-docs-structure.md'), ('rules/02-simplification.md', '.agent/rules/02-simplification.md'), ('rules/03-self-contained.md', '.agent/rules/03-self-contained.md'), ('rules/04-milestone.md', '.agent/rules/04-milestone.md'), ('rules/05-branches.md', '.agent/rules/05-branches.md'), ('rules/06-memo.md', '.agent/rules/06-memo.md'), ('rules/07-audit.md', '.agent/rules/07-audit.md'), ('rules/08-design-discipline.md', '.agent/rules/08-design-discipline.md'), ('rules/09-absorption.md', '.agent/rules/09-absorption.md'), ('rules/10-structure-over-prose.md', '.agent/rules/10-structure-over-prose.md'), ('rules/11-next-sidecar.md', '.agent/rules/11-next-sidecar.md'), ('rules/12-introduction-discipline.md', '.agent/rules/12-introduction-discipline.md'), ('docs.toml.template', '.agent/docs.toml'), ('pipeline.toml.template', '.agent/pipeline.toml'), ('spec.md.template', 'docs/specs/_template/spec.md'), ('tasks-readme.md', 'docs/tasks/README.md'), ('reviews-readme.md', 'docs/reviews/README.md'), ('tasks/_template.md', 'docs/tasks/_template.md'), ('memo/_template.md', 'docs/memo/_template.md'), ('branches/_template.md', 'docs/branches/_template.md'), ('adr/_template.md', 'docs/adr/_template.md'), ('adr/AUTHORING.md', 'docs/adr/AUTHORING.md'), ('adr/.schema.json', 'docs/adr/.schema.json'), ('tasks/AUTHORING.md', 'docs/tasks/AUTHORING.md'), ('memo/AUTHORING.md', 'docs/memo/AUTHORING.md'), ('branches/AUTHORING.md', 'docs/branches/AUTHORING.md'), ('incidents/AUTHORING.md', 'docs/incidents/AUTHORING.md'), ('tasks/.schema.json', 'docs/tasks/.schema.json'), ('memo/.schema.json', 'docs/memo/.schema.json'), ('branches/.schema.json', 'docs/branches/.schema.json'), ('incidents/.schema.json', 'docs/incidents/.schema.json'), ('pre-commit.yaml.template', '.pre-commit-config.yaml'), ('branches-readme.md', 'docs/branches/README.md'), ('memo-readme.md', 'docs/memo/README.md'), ('downstream.md', 'docs/guides/downstream.md'), ('protocols/audit_default.md', 'docs/protocols/audit_default.md'), ('protocols/verify_default.md', 'docs/protocols/verify_default.md')]
+PAIRS: list[tuple[str, str]] = [('gate.py', 'scripts/gate.py'), ('gate.sh', 'scripts/gate.sh'), ('gate.ps1', 'scripts/gate.ps1'), ('init.sh', 'scripts/init.sh'), ('init.ps1', 'scripts/init.ps1'), ('k3dge-init-wrapper.sh', 'k3dge-init.sh'), ('k3dge-init-wrapper.ps1', 'k3dge-init.ps1'), ('generate-docs.sh', 'scripts/generate-docs.sh'), ('generate-docs.ps1', 'scripts/generate-docs.ps1'), ('agents.md', 'AGENTS.md'), ('agent-readme.md', '.agent/README.md'), ('extractors-readme.md', '.agent/extractors/README.md'), ('rules/00-core-discipline.md', '.agent/rules/00-core-discipline.md'), ('rules/01-docs-structure.md', '.agent/rules/01-docs-structure.md'), ('rules/02-simplification.md', '.agent/rules/02-simplification.md'), ('rules/03-self-contained.md', '.agent/rules/03-self-contained.md'), ('rules/04-milestone.md', '.agent/rules/04-milestone.md'), ('rules/05-branches.md', '.agent/rules/05-branches.md'), ('rules/06-memo.md', '.agent/rules/06-memo.md'), ('rules/07-audit.md', '.agent/rules/07-audit.md'), ('rules/08-design-discipline.md', '.agent/rules/08-design-discipline.md'), ('rules/09-absorption.md', '.agent/rules/09-absorption.md'), ('rules/10-structure-over-prose.md', '.agent/rules/10-structure-over-prose.md'), ('rules/11-next-sidecar.md', '.agent/rules/11-next-sidecar.md'), ('rules/12-introduction-discipline.md', '.agent/rules/12-introduction-discipline.md'), ('docs.toml.template', '.agent/docs.toml'), ('pipeline.toml.template', '.agent/pipeline.toml'), ('spec.md.template', 'docs/specs/_template/spec.md'), ('tasks-readme.md', 'docs/tasks/README.md'), ('reviews-readme.md', 'docs/reviews/README.md'), ('tasks/_template.md', 'docs/tasks/_template.md'), ('memo/_template.md', 'docs/memo/_template.md'), ('branches/_template.md', 'docs/branches/_template.md'), ('adr/_template.md', 'docs/adr/_template.md'), ('adr/AUTHORING.md', 'docs/adr/AUTHORING.md'), ('adr/.schema.json', 'docs/adr/.schema.json'), ('tasks/AUTHORING.md', 'docs/tasks/AUTHORING.md'), ('memo/AUTHORING.md', 'docs/memo/AUTHORING.md'), ('branches/AUTHORING.md', 'docs/branches/AUTHORING.md'), ('incidents/AUTHORING.md', 'docs/incidents/AUTHORING.md'), ('tasks/.schema.json', 'docs/tasks/.schema.json'), ('memo/.schema.json', 'docs/memo/.schema.json'), ('branches/.schema.json', 'docs/branches/.schema.json'), ('incidents/.schema.json', 'docs/incidents/.schema.json'), ('pre-commit.yaml.template', '.pre-commit-config.yaml'), ('branches-readme.md', 'docs/branches/README.md'), ('memo-readme.md', 'docs/memo/README.md'), ('downstream.md', 'docs/guides/downstream.md'), ('protocols/audit_default.md', 'docs/protocols/audit_default.md'), ('specs/README.md', 'docs/specs/README.md'), ('specs/AUTHORING.md', 'docs/specs/AUTHORING.md'), ('guides/README.md', 'docs/guides/README.md'), ('guides/AUTHORING.md', 'docs/guides/AUTHORING.md'), ('protocols/README.md', 'docs/protocols/README.md'), ('protocols/AUTHORING.md', 'docs/protocols/AUTHORING.md'), ('architecture/README.md', 'docs/architecture/README.md'), ('architecture/AUTHORING.md', 'docs/architecture/AUTHORING.md'), ('generated/README.md', 'docs/generated/README.md'), ('generated/AUTHORING.md', 'docs/generated/AUTHORING.md'), ('pre-commit', 'scripts/pre-commit'), ('commit-msg', 'scripts/commit-msg'), ('protocols/verify_default.md', 'docs/protocols/verify_default.md'), ('protocols/quality_default.md', 'docs/protocols/quality_default.md')]
 # pipeline_runner.py
 from __future__ import annotations
 from dataclasses import dataclass
@@ -699,7 +717,7 @@ strip_fences(text: str) -> str
 strip_code_spans(text: str) -> str
     # doc: Remove inline `code` spans.
 check_dangling_adr(workspace: Path, rel: str, text: str) -> List[Ref]
-    # doc: Every `ADR-XXXX` must resolve to `docs/adr/XXXX-*.md` (or `obsolete/`).
+    # doc: Every unqualified `ADR-XXXX` must resolve to `docs/adr/XXXX-*.md` (or `obsolete/`).
 check_report_pointer(workspace: Path, rel: str, text: str) -> List[Ref]
     # doc: A task's `report:` pointer must resolve (tasks only; others skipped).
 check_footnotes(rel: str, text: str) -> List[Ref]
@@ -725,6 +743,7 @@ find_orphan_tests(workspace: Path) -> List[Ref]
 find_orphan_adrs(workspace: Path) -> List[Ref]
     # doc: `docs/adr/NNNN-*.md` numbers missing from README Topics (warn-tier).
 DETERMINISTIC_DOC_PREFIXES: Tuple[str, ...] = ('docs/generated/', 'docs/specs/', 'docs/tasks/', 'docs/reviews/')
+INIT_DELIVERED_DOCS: Tuple[str, ...] = ('docs/architecture/overview.md', 'docs/protocols/audit_default.md', 'docs/protocols/verify_default.md', 'docs/protocols/quality_default.md', 'docs/guides/mcp-bridge.md', 'docs/guides/downstream.md')
 SCREEN_ACK_REL = '.protocol-ack/doc-screen'
 is_screenable_new_doc(rel: str) -> bool
     # doc: 该新增路径是否属"主观撰写的受管文档"（需要首次排查）。
@@ -1098,6 +1117,8 @@ PIPELINE_TOML_TEMPLATE = _asset('pipeline.toml.template')
 GENERATE_DOCS_SH_TEMPLATE = _asset('generate-docs.sh')
 GENERATE_DOCS_PS1_TEMPLATE = _asset('generate-docs.ps1')
 PRE_COMMIT_TEMPLATE = _asset('pre-commit.yaml.template')
+PRE_COMMIT_HOOK_TEMPLATE = _asset('pre-commit')
+COMMIT_MSG_HOOK_TEMPLATE = _asset('commit-msg')
 ARCHITECTURE_TEMPLATE = _asset('architecture.md.template')
 REVIEWS_README_TEMPLATE = _asset('reviews-readme.md')
 MCP_BRIDGE_TEMPLATE = _asset('mcp-bridge.md.template')
@@ -1106,6 +1127,7 @@ ADR_README_TEMPLATE = _asset('adr-readme.md.template')
 DOWNSTREAM_GUIDE_TEMPLATE = _asset('downstream.md')
 PROTOCOL_TEMPLATE = _asset('protocols/audit_default.md')
 VERIFY_PROTOCOL_TEMPLATE = _asset('protocols/verify_default.md')
+QUALITY_PROTOCOL_TEMPLATE = _asset('protocols/quality_default.md')
 TASKS_README_TEMPLATE = _asset('tasks-readme.md')
 BRANCHES_README_TEMPLATE = _asset('branches-readme.md')
 MEMO_README_TEMPLATE = _asset('memo-readme.md')

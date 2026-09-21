@@ -951,8 +951,12 @@ class ConsistencyEngine:
             return []
         from k3dge.engine import nextstep, state_machine
 
-        missing = [s for s in sorted(nextstep.STATE_OPTIONS) if f"`{s}`" not in text]
-        missing += [s.value for s in state_machine.TaskState if f"`{s.value}`" not in text]
+        states = sorted(nextstep.STATE_OPTIONS) + [s.value for s in state_machine.TaskState]
+        # 「要么不写、要么写全」：一个状态名都没列 ⇒ 本文件没打算做状态总览（下游骨架即如此），
+        # 不报；列了一部分 ⇒ 那才是会误导人的半张表（漏项＝新状态在总览里不存在）。
+        if not any(f"`{s}`" in text for s in states):
+            return []
+        missing = [s for s in states if f"`{s}`" not in text]
         if not missing:
             return []
         return [

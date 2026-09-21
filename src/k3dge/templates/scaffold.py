@@ -54,6 +54,8 @@ GENERATE_DOCS_SH_TEMPLATE = _asset("generate-docs.sh")
 GENERATE_DOCS_PS1_TEMPLATE = _asset("generate-docs.ps1")
 
 PRE_COMMIT_TEMPLATE = _asset("pre-commit.yaml.template")
+PRE_COMMIT_HOOK_TEMPLATE = _asset("pre-commit")
+COMMIT_MSG_HOOK_TEMPLATE = _asset("commit-msg")
 
 ARCHITECTURE_TEMPLATE = _asset("architecture.md.template")
 
@@ -69,6 +71,7 @@ DOWNSTREAM_GUIDE_TEMPLATE = _asset("downstream.md")
 
 PROTOCOL_TEMPLATE = _asset("protocols/audit_default.md")
 VERIFY_PROTOCOL_TEMPLATE = _asset("protocols/verify_default.md")
+QUALITY_PROTOCOL_TEMPLATE = _asset("protocols/quality_default.md")
 
 TASKS_README_TEMPLATE = _asset("tasks-readme.md")
 
@@ -286,9 +289,15 @@ def scaffold(target: Path, name: str | None = None) -> None:
         'enable = ["typescript"]\n',
     )
     _write_if_missing(target / ".agent" / "milestone", "M0\n")
+    # 5 个此前缺治理件的类型（doc-gate 要求每个 docs/<type>/ 齐 README + AUTHORING）
+    for _type in ("specs", "guides", "protocols", "architecture", "generated"):
+        _d = target / "docs" / _type
+        _d.mkdir(parents=True, exist_ok=True)
+        _write_if_missing(_d / "README.md", _asset(f"{_type}/README.md"))
+        _write_if_missing(_d / "AUTHORING.md", _asset(f"{_type}/AUTHORING.md"))
     _write_if_missing(
         target / "docs" / "specs" / "_template" / "spec.md",
-        SPEC_TEMPLATE.format(domain="<domain>", date=today),
+        _qualify_adr_refs(SPEC_TEMPLATE.format(domain="<domain>", date=today)),
     )
     _write_if_missing(target / ".pre-commit-config.yaml", PRE_COMMIT_TEMPLATE)
     _write_if_missing(target / "scripts" / "gate.sh", GATE_SH_TEMPLATE, executable=True)
@@ -313,11 +322,12 @@ def scaffold(target: Path, name: str | None = None) -> None:
     _write_if_missing(target / "docs" / "adr" / "_template.md", _asset("adr/_template.md"))
     (target / "docs" / "adr" / "obsolete").mkdir(parents=True, exist_ok=True)
     (target / "docs" / "guides").mkdir(parents=True, exist_ok=True)
-    _write_if_missing(target / "docs" / "guides" / "mcp-bridge.md", MCP_BRIDGE_TEMPLATE)
-    _write_if_missing(target / "docs" / "guides" / "downstream.md", DOWNSTREAM_GUIDE_TEMPLATE)
+    _write_if_missing(target / "docs" / "guides" / "mcp-bridge.md", _qualify_adr_refs(MCP_BRIDGE_TEMPLATE))
+    _write_if_missing(target / "docs" / "guides" / "downstream.md", _qualify_adr_refs(DOWNSTREAM_GUIDE_TEMPLATE))
     (target / "docs" / "protocols").mkdir(parents=True, exist_ok=True)
-    _write_if_missing(target / "docs" / "protocols" / "audit_default.md", PROTOCOL_TEMPLATE)
-    _write_if_missing(target / "docs" / "protocols" / "verify_default.md", VERIFY_PROTOCOL_TEMPLATE)
+    _write_if_missing(target / "docs" / "protocols" / "audit_default.md", _qualify_adr_refs(PROTOCOL_TEMPLATE))
+    _write_if_missing(target / "docs" / "protocols" / "verify_default.md", _qualify_adr_refs(VERIFY_PROTOCOL_TEMPLATE))
+    _write_if_missing(target / "docs" / "protocols" / "quality_default.md", _qualify_adr_refs(QUALITY_PROTOCOL_TEMPLATE))
     (target / "docs" / "generated").mkdir(parents=True, exist_ok=True)
     (target / "docs" / "branches").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "branches" / "README.md", BRANCHES_README_TEMPLATE)
@@ -334,11 +344,14 @@ def scaffold(target: Path, name: str | None = None) -> None:
     _write_if_missing(target / "docs" / "memo" / "README.md", MEMO_README_TEMPLATE)
     _write_if_missing(target / "docs" / "memo" / "AUTHORING.md", _asset("memo/AUTHORING.md"))
     _write_if_missing(target / "docs" / "memo" / ".schema.json", _asset("memo/.schema.json"))
-    _write_if_missing(target / "docs" / "architecture" / "overview.md", ARCHITECTURE_TEMPLATE)
+    _write_if_missing(target / "docs" / "architecture" / "overview.md", _qualify_adr_refs(ARCHITECTURE_TEMPLATE))
     _write_if_missing(target / ".agent" / "docs.toml", DOCS_TOML_TEMPLATE)
     _write_if_missing(target / ".agent" / "pipeline.toml", PIPELINE_TOML_TEMPLATE)
     ensure_mcp_config(target)
     _ensure_peer_stubs(target)
+    # git hooks：这两件此前**不在资产里** ⇒ 下游 init 后照 AGENTS.md 激活 hooks 会被 git 静默跳过
+    _write_if_missing(target / "scripts" / "pre-commit", PRE_COMMIT_HOOK_TEMPLATE, executable=True)
+    _write_if_missing(target / "scripts" / "commit-msg", COMMIT_MSG_HOOK_TEMPLATE, executable=True)
     _write_if_missing(target / "scripts" / "generate-docs.sh", GENERATE_DOCS_SH_TEMPLATE, executable=True)
     _write_if_missing(target / "scripts" / "generate-docs.ps1", GENERATE_DOCS_PS1_TEMPLATE)
 

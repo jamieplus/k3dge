@@ -521,6 +521,14 @@
       "tokens": "悬空生成路径归位：生成物新鲜度闸 + README layout 并入 sync + 删 changelog 死簇 + 架构 seal 收口"
     },
     {
+      "path": "docs/tasks/2026-09-21-M11-fix-hooks_reach_downstream.done.md",
+      "type": "tasks",
+      "id": "2026-09-21-M11-fix-hooks_reach_downstream.done",
+      "title": "到达环：hooks 与治理件随 init 下发（D1/D2）+ 便携性机检",
+      "status": "done",
+      "tokens": "到达环：hooks 与治理件随 init 下发（D1/D2）+ 便携性机检"
+    },
+    {
       "path": "docs/tasks/2026-09-21-M11-fix-memo_review_landing.done.md",
       "type": "tasks",
       "id": "2026-09-21-M11-fix-memo_review_landing.done",

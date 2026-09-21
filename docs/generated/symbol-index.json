@@ -338,19 +338,19 @@
   "check_adr_consistency": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 236
+      "line": 248
     }
   ],
   "check_adr_number_reuse": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 471
+      "line": 497
     }
   ],
   "check_adr_ref_retired": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 495
+      "line": 521
     }
   ],
   "check_completeness": [
@@ -368,7 +368,7 @@
   "check_dangling_adr": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 71
+      "line": 83
     }
   ],
   "check_file": [
@@ -386,7 +386,7 @@
   "check_footnotes": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 105
+      "line": 117
     }
   ],
   "check_frontmatter": [
@@ -410,7 +410,7 @@
   "check_incident_id_redundant": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 621
+      "line": 647
     }
   ],
   "check_index_ref": [
@@ -422,25 +422,31 @@
   "check_markdown_bytes": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 248
+      "line": 260
     }
   ],
   "check_markdown_text": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 264
+      "line": 276
+    }
+  ],
+  "check_one": [
+    {
+      "file": "src/k3dge/engine/doc_gate.py",
+      "line": 88
     }
   ],
   "check_report_pointer": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 93
+      "line": 105
     }
   ],
   "check_retired_adr_dest": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 562
+      "line": 588
     }
   ],
   "check_section_order": [
@@ -470,25 +476,25 @@
   "check_supersede_unreconciled": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 203
+      "line": 215
     }
   ],
   "check_task_body_meta_redundant": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 171
+      "line": 183
     }
   ],
   "check_task_closure_record": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 529
+      "line": 555
     }
   ],
   "check_task_consistency": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 136
+      "line": 148
     }
   ],
   "closure_ok": [
@@ -738,7 +744,7 @@
   "ensure_mcp_config": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 132
+      "line": 135
     }
   ],
   "extract": [
@@ -774,19 +780,19 @@
   "find_orphan_adrs": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 329
+      "line": 341
     }
   ],
   "find_orphan_specs": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 291
+      "line": 303
     }
   ],
   "find_orphan_tests": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 304
+      "line": 316
     }
   ],
   "find_table": [
@@ -798,13 +804,13 @@
   "find_unguarded_archives": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 595
+      "line": 621
     }
   ],
   "find_unscreened_new_docs": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 382
+      "line": 408
     }
   ],
   "fix_kind": [
@@ -906,7 +912,7 @@
   "has_milestone_token": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 122
+      "line": 134
     }
   ],
   "has_table": [
@@ -942,7 +948,7 @@
   "is_screenable_new_doc": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 365
+      "line": 389
     }
   ],
   "iter_doc_types": [
@@ -1121,12 +1127,16 @@
   ],
   "main": [
     {
+      "file": "src/k3dge/engine/doc_gate.py",
+      "line": 302
+    },
+    {
       "file": "src/k3dge/cli/main.py",
       "line": 1229
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 346
+      "line": 359
     }
   ],
   "managed_docs": [
@@ -1376,7 +1386,7 @@
   "record_screen_ack": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 417
+      "line": 443
     }
   ],
   "register_extractor": [
@@ -1389,6 +1399,12 @@
     {
       "file": "src/k3dge/engine/gates.py",
       "line": 44
+    }
+  ],
+  "relevant_for_check": [
+    {
+      "file": "src/k3dge/engine/doc_gate.py",
+      "line": 82
     }
   ],
   "remove": [
@@ -1484,7 +1500,7 @@
   "retired_adr_numbers": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 442
+      "line": 468
     }
   ],
   "retired_ledger_cards": [
@@ -1517,6 +1533,18 @@
       "line": 99
     }
   ],
+  "run_schema_gate": [
+    {
+      "file": "src/k3dge/engine/doc_gate.py",
+      "line": 143
+    }
+  ],
+  "run_screen_gate": [
+    {
+      "file": "src/k3dge/engine/doc_gate.py",
+      "line": 242
+    }
+  ],
   "run_seal_flow": [
     {
       "file": "src/k3dge/engine/seal_flow.py",
@@ -1532,7 +1560,7 @@
   "scaffold": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 266
+      "line": 269
     }
   ],
   "scan": [
@@ -1562,13 +1590,13 @@
   "screen_ack_path": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 377
+      "line": 403
     }
   ],
   "screen_target_exists": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 405
+      "line": 431
     }
   ],
   "seal_checklist": [
@@ -1619,6 +1647,12 @@
       "line": 28
     }
   ],
+  "set_workspace": [
+    {
+      "file": "src/k3dge/engine/doc_gate.py",
+      "line": 47
+    }
+  ],
   "severity": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
@@ -1635,6 +1669,18 @@
     {
       "file": "src/k3dge/engine/task_write.py",
       "line": 429
+    }
+  ],
+  "staged_added": [
+    {
+      "file": "src/k3dge/engine/doc_gate.py",
+      "line": 68
+    }
+  ],
+  "staged_files": [
+    {
+      "file": "src/k3dge/engine/doc_gate.py",
+      "line": 60
     }
   ],
   "stages": [

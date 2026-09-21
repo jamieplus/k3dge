@@ -68,11 +68,23 @@ def strip_code_spans(text: str) -> str:
     return _CODE_SPAN_RE.sub("", text)
 
 
+#: 跨仓自限定引用（`k3dge ADR-0001` / `where ADR-0001`）：**指向 k3dge 仓的决策**，不在本仓解析面。
+#: 下游仓自带 `docs/adr/` 从 0001 起编号，若这里也要求"解析得到"，则 k3dge **自己下发的文档**
+#: 永远过不了自己的 hook（实测 2026-09-21：init 后首次提交被 `DANGLING_ADR_REF` 拦）。
+#: 代价：k3dge 自举仓里带 `k3dge ` 前缀的引用不再被本闸校验（有意留，见 LEFTOVERS）。
+_QUALIFIED_ADR_RE = re.compile(r"(?:k3dge|where)\s+ADR-\d{4}", re.IGNORECASE)
+
+
+def _adr_numbers_to_resolve(text: str) -> List[str]:
+    """待解析的 ADR 号：先去代码围栏、再去跨仓自限定引用。"""
+    return sorted(set(_ADR_RE.findall(_QUALIFIED_ADR_RE.sub("", strip_fences(text)))))
+
+
 def check_dangling_adr(workspace: Path, rel: str, text: str) -> List[Ref]:
-    """Every `ADR-XXXX` must resolve to `docs/adr/XXXX-*.md` (or `obsolete/`)."""
+    """Every unqualified `ADR-XXXX` must resolve to `docs/adr/XXXX-*.md` (or `obsolete/`)."""
     out: List[Ref] = []
     adr_dir = workspace / "docs" / "adr"
-    for num in sorted(set(_ADR_RE.findall(strip_fences(text)))):
+    for num in _adr_numbers_to_resolve(text):
         if list(adr_dir.glob(f"{num}-*.md")):
             continue
         if (adr_dir / "obsolete").is_dir() and list((adr_dir / "obsolete").glob(f"{num}-*.md")):
@@ -358,6 +370,18 @@ DETERMINISTIC_DOC_PREFIXES: Tuple[str, ...] = (
     "docs/reviews/",     # 审计报告 / 收摊清单由流程落盘
 )
 
+#: **init 下发件**（`k3dge init` 从 `templates/assets` 写入）：内容是 k3dge 作者写的、不是本仓作者的
+#: "新建决策" ⇒ 不进排查面。否则下游仓**第一次提交必被 `DOC_NEW_UNSCREENED` 拦**（实测 2026-09-21：
+#: 全新 init 仓 staged 全部文件 → guides/protocols 4 件齐报），那与"把排查送到动手那一刻"的立意相反。
+INIT_DELIVERED_DOCS: Tuple[str, ...] = (
+    "docs/architecture/overview.md",
+    "docs/protocols/audit_default.md",
+    "docs/protocols/verify_default.md",
+    "docs/protocols/quality_default.md",
+    "docs/guides/mcp-bridge.md",
+    "docs/guides/downstream.md",
+)
+
 #: 排查回执（ephemeral，已在 .gitignore）：一个文件一张回执，只活到本次提交过闸。
 SCREEN_ACK_REL = ".protocol-ack/doc-screen"
 
@@ -371,6 +395,8 @@ def is_screenable_new_doc(rel: str) -> bool:
         return False
     if "archive" in Path(rel).parts:
         return False
+    if rel in INIT_DELIVERED_DOCS:
+        return False   # init 下发件：k3dge 作者写的，不是本仓的新建决策
     return not any(rel.startswith(pre) for pre in DETERMINISTIC_DOC_PREFIXES)
 
 
@@ -508,7 +534,7 @@ def check_adr_ref_retired(workspace: Path, rel: str, text: str) -> List[Ref]:
     live = _live_adr_numbers(workspace)
     ledger = retired_adr_numbers(workspace)
     out: List[Ref] = []
-    for num in sorted(set(_ADR_RE.findall(strip_fences(text)))):
+    for num in _adr_numbers_to_resolve(text):
         if num in live or num not in ledger:
             continue
         info = ledger[num]

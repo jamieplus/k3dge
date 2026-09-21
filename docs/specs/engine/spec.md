@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:06b3e351911f2a0979eab00d4113e115e4509f36712549ed464609005b280363`
+- **Contract Hash**: `sha256:55bea45a03f08e641b6523d891a5d0f0abbc9559e9d25aa5a97b1d8068fb1040`
 - **Last Updated**: 2026-09-21
 
 ## 1. Domain Boundary & Responsibilities
@@ -177,6 +177,19 @@ FIXABLE_RULES: Tuple[str, ...] = ('MD_TRAILING_WS', 'MD_CRLF', 'MD_NO_FINAL_NEWL
 managed_docs(workspace: Path) -> List[Path]
 scan(workspace: Path) -> List[Dict[str, str]]
 apply(workspace: Path, *, dry_run: bool=False) -> Dict[str, object]
+from __future__ import annotations
+from pathlib import Path
+from typing import Optional
+AUTHORING = 'AUTHORING.md'
+WS: Path = _detect_workspace()
+set_workspace(workspace: Path) -> None
+staged_files() -> list[str]
+staged_added() -> list[str]
+relevant_for_check(files: list[str]) -> bool
+check_one(rel: str) -> list[str]
+run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -> tuple[list[str], list[str]]
+run_screen_gate(added: list[str], pure_refs, gate_facts=None) -> list[tuple[str, str]]
+main() -> int
 from __future__ import annotations
 from pathlib import Path
 from typing import List
@@ -404,7 +417,7 @@ satisfied_ids(workspace: Path, op: str) -> set
 NodeFn = Callable[[Dict[str, Any]], Any]
 run_phase(workspace: Path, op: str, phase: str, registry: Dict[str, NodeFn], ctx: Dict[str, Any]) -> Tuple[bool, Any]
 from __future__ import annotations
-PAIRS: list[tuple[str, str]] = [('gate.py', 'scripts/gate.py'), ('gate.sh', 'scripts/gate.sh'), ('gate.ps1', 'scripts/gate.ps1'), ('init.sh', 'scripts/init.sh'), ('init.ps1', 'scripts/init.ps1'), ('k3dge-init-wrapper.sh', 'k3dge-init.sh'), ('k3dge-init-wrapper.ps1', 'k3dge-init.ps1'), ('generate-docs.sh', 'scripts/generate-docs.sh'), ('generate-docs.ps1', 'scripts/generate-docs.ps1'), ('agents.md', 'AGENTS.md'), ('agent-readme.md', '.agent/README.md'), ('extractors-readme.md', '.agent/extractors/README.md'), ('rules/00-core-discipline.md', '.agent/rules/00-core-discipline.md'), ('rules/01-docs-structure.md', '.agent/rules/01-docs-structure.md'), ('rules/02-simplification.md', '.agent/rules/02-simplification.md'), ('rules/03-self-contained.md', '.agent/rules/03-self-contained.md'), ('rules/04-milestone.md', '.agent/rules/04-milestone.md'), ('rules/05-branches.md', '.agent/rules/05-branches.md'), ('rules/06-memo.md', '.agent/rules/06-memo.md'), ('rules/07-audit.md', '.agent/rules/07-audit.md'), ('rules/08-design-discipline.md', '.agent/rules/08-design-discipline.md'), ('rules/09-absorption.md', '.agent/rules/09-absorption.md'), ('rules/10-structure-over-prose.md', '.agent/rules/10-structure-over-prose.md'), ('rules/11-next-sidecar.md', '.agent/rules/11-next-sidecar.md'), ('rules/12-introduction-discipline.md', '.agent/rules/12-introduction-discipline.md'), ('docs.toml.template', '.agent/docs.toml'), ('pipeline.toml.template', '.agent/pipeline.toml'), ('spec.md.template', 'docs/specs/_template/spec.md'), ('tasks-readme.md', 'docs/tasks/README.md'), ('reviews-readme.md', 'docs/reviews/README.md'), ('tasks/_template.md', 'docs/tasks/_template.md'), ('memo/_template.md', 'docs/memo/_template.md'), ('branches/_template.md', 'docs/branches/_template.md'), ('adr/_template.md', 'docs/adr/_template.md'), ('adr/AUTHORING.md', 'docs/adr/AUTHORING.md'), ('adr/.schema.json', 'docs/adr/.schema.json'), ('tasks/AUTHORING.md', 'docs/tasks/AUTHORING.md'), ('memo/AUTHORING.md', 'docs/memo/AUTHORING.md'), ('branches/AUTHORING.md', 'docs/branches/AUTHORING.md'), ('incidents/AUTHORING.md', 'docs/incidents/AUTHORING.md'), ('tasks/.schema.json', 'docs/tasks/.schema.json'), ('memo/.schema.json', 'docs/memo/.schema.json'), ('branches/.schema.json', 'docs/branches/.schema.json'), ('incidents/.schema.json', 'docs/incidents/.schema.json'), ('pre-commit.yaml.template', '.pre-commit-config.yaml'), ('branches-readme.md', 'docs/branches/README.md'), ('memo-readme.md', 'docs/memo/README.md'), ('downstream.md', 'docs/guides/downstream.md'), ('protocols/audit_default.md', 'docs/protocols/audit_default.md'), ('protocols/verify_default.md', 'docs/protocols/verify_default.md')]
+PAIRS: list[tuple[str, str]] = [('gate.py', 'scripts/gate.py'), ('gate.sh', 'scripts/gate.sh'), ('gate.ps1', 'scripts/gate.ps1'), ('init.sh', 'scripts/init.sh'), ('init.ps1', 'scripts/init.ps1'), ('k3dge-init-wrapper.sh', 'k3dge-init.sh'), ('k3dge-init-wrapper.ps1', 'k3dge-init.ps1'), ('generate-docs.sh', 'scripts/generate-docs.sh'), ('generate-docs.ps1', 'scripts/generate-docs.ps1'), ('agents.md', 'AGENTS.md'), ('agent-readme.md', '.agent/README.md'), ('extractors-readme.md', '.agent/extractors/README.md'), ('rules/00-core-discipline.md', '.agent/rules/00-core-discipline.md'), ('rules/01-docs-structure.md', '.agent/rules/01-docs-structure.md'), ('rules/02-simplification.md', '.agent/rules/02-simplification.md'), ('rules/03-self-contained.md', '.agent/rules/03-self-contained.md'), ('rules/04-milestone.md', '.agent/rules/04-milestone.md'), ('rules/05-branches.md', '.agent/rules/05-branches.md'), ('rules/06-memo.md', '.agent/rules/06-memo.md'), ('rules/07-audit.md', '.agent/rules/07-audit.md'), ('rules/08-design-discipline.md', '.agent/rules/08-design-discipline.md'), ('rules/09-absorption.md', '.agent/rules/09-absorption.md'), ('rules/10-structure-over-prose.md', '.agent/rules/10-structure-over-prose.md'), ('rules/11-next-sidecar.md', '.agent/rules/11-next-sidecar.md'), ('rules/12-introduction-discipline.md', '.agent/rules/12-introduction-discipline.md'), ('docs.toml.template', '.agent/docs.toml'), ('pipeline.toml.template', '.agent/pipeline.toml'), ('spec.md.template', 'docs/specs/_template/spec.md'), ('tasks-readme.md', 'docs/tasks/README.md'), ('reviews-readme.md', 'docs/reviews/README.md'), ('tasks/_template.md', 'docs/tasks/_template.md'), ('memo/_template.md', 'docs/memo/_template.md'), ('branches/_template.md', 'docs/branches/_template.md'), ('adr/_template.md', 'docs/adr/_template.md'), ('adr/AUTHORING.md', 'docs/adr/AUTHORING.md'), ('adr/.schema.json', 'docs/adr/.schema.json'), ('tasks/AUTHORING.md', 'docs/tasks/AUTHORING.md'), ('memo/AUTHORING.md', 'docs/memo/AUTHORING.md'), ('branches/AUTHORING.md', 'docs/branches/AUTHORING.md'), ('incidents/AUTHORING.md', 'docs/incidents/AUTHORING.md'), ('tasks/.schema.json', 'docs/tasks/.schema.json'), ('memo/.schema.json', 'docs/memo/.schema.json'), ('branches/.schema.json', 'docs/branches/.schema.json'), ('incidents/.schema.json', 'docs/incidents/.schema.json'), ('pre-commit.yaml.template', '.pre-commit-config.yaml'), ('branches-readme.md', 'docs/branches/README.md'), ('memo-readme.md', 'docs/memo/README.md'), ('downstream.md', 'docs/guides/downstream.md'), ('protocols/audit_default.md', 'docs/protocols/audit_default.md'), ('specs/README.md', 'docs/specs/README.md'), ('specs/AUTHORING.md', 'docs/specs/AUTHORING.md'), ('guides/README.md', 'docs/guides/README.md'), ('guides/AUTHORING.md', 'docs/guides/AUTHORING.md'), ('protocols/README.md', 'docs/protocols/README.md'), ('protocols/AUTHORING.md', 'docs/protocols/AUTHORING.md'), ('architecture/README.md', 'docs/architecture/README.md'), ('architecture/AUTHORING.md', 'docs/architecture/AUTHORING.md'), ('generated/README.md', 'docs/generated/README.md'), ('generated/AUTHORING.md', 'docs/generated/AUTHORING.md'), ('pre-commit', 'scripts/pre-commit'), ('commit-msg', 'scripts/commit-msg'), ('protocols/verify_default.md', 'docs/protocols/verify_default.md'), ('protocols/quality_default.md', 'docs/protocols/quality_default.md')]
 from __future__ import annotations
 from dataclasses import dataclass
 from dataclasses import field
@@ -473,6 +486,7 @@ find_orphan_specs(workspace: Path, manifest_spec_paths: List[str]) -> List[Ref]
 find_orphan_tests(workspace: Path) -> List[Ref]
 find_orphan_adrs(workspace: Path) -> List[Ref]
 DETERMINISTIC_DOC_PREFIXES: Tuple[str, ...] = ('docs/generated/', 'docs/specs/', 'docs/tasks/', 'docs/reviews/')
+INIT_DELIVERED_DOCS: Tuple[str, ...] = ('docs/architecture/overview.md', 'docs/protocols/audit_default.md', 'docs/protocols/verify_default.md', 'docs/protocols/quality_default.md', 'docs/guides/mcp-bridge.md', 'docs/guides/downstream.md')
 SCREEN_ACK_REL = '.protocol-ack/doc-screen'
 is_screenable_new_doc(rel: str) -> bool
 screen_ack_path(workspace: Path, rel: str) -> Path

@@ -7,7 +7,8 @@ Not in PAIRS (intentional, do not "complete" the list):
 - architecture.md.template — downstream generic placeholder; never byte-compare
   against this repo's four-domain docs/architecture/overview.md (G-04 / P4-05).
 - reviews/LEFTOVERS.md — downstream empty table; this repo's leftovers are k3dge-specific.
-- mcp-bridge.md.template / gitignore.template — downstream-only init files.
+- mcp-bridge.md.template / gitignore.template / adr-readme.md.template — downstream-only init files
+  （adr-readme 是下游的 ADR 索引样板：本仓 `docs/adr/README.md` 是 k3dge 专属主题表，字节不同是**有意**的）。
 - architecture-style splits only; docs/guides/downstream.md is paired (upgrade protocol).
 - runtime state and empty skeletons — .agent/milestone, logs/ (P4-08).
 - customizable drop-in plugins — .agent/extractors/*.py except README.md:
@@ -68,5 +69,18 @@ PAIRS: list[tuple[str, str]] = [
     ("memo-readme.md", "docs/memo/README.md"),
     ("downstream.md", "docs/guides/downstream.md"),
     ("protocols/audit_default.md", "docs/protocols/audit_default.md"),
+    ("specs/README.md", "docs/specs/README.md"),
+    ("specs/AUTHORING.md", "docs/specs/AUTHORING.md"),
+    ("guides/README.md", "docs/guides/README.md"),
+    ("guides/AUTHORING.md", "docs/guides/AUTHORING.md"),
+    ("protocols/README.md", "docs/protocols/README.md"),
+    ("protocols/AUTHORING.md", "docs/protocols/AUTHORING.md"),
+    ("architecture/README.md", "docs/architecture/README.md"),
+    ("architecture/AUTHORING.md", "docs/architecture/AUTHORING.md"),
+    ("generated/README.md", "docs/generated/README.md"),
+    ("generated/AUTHORING.md", "docs/generated/AUTHORING.md"),
+    ("pre-commit", "scripts/pre-commit"),
+    ("commit-msg", "scripts/commit-msg"),
     ("protocols/verify_default.md", "docs/protocols/verify_default.md"),
+    ("protocols/quality_default.md", "docs/protocols/quality_default.md"),
 ]

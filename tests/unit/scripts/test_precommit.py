@@ -1,27 +1,13 @@
-"""pre-commit hook integration: schema gate wiring (git calls stubbed)."""
-import importlib.util
+"""pre-commit 三层闸的接线测试（2026-09-21 起实现归 `k3dge.engine.doc_gate`，脚本只是薄壳）。"""
 import sys
 import unittest
 from pathlib import Path
 
+from k3dge.engine import doc_gate as hook
+
 ROOT = Path(__file__).resolve().parents[3]
 
-
-def _load_hook():
-    mod_name = "k3dge_precommit_hook"
-    if mod_name in sys.modules:
-        return sys.modules[mod_name]
-    import importlib.machinery
-    loader = importlib.machinery.SourceFileLoader(mod_name, str(ROOT / "scripts" / "pre-commit"))
-    spec = importlib.util.spec_from_loader(mod_name, loader)
-    assert spec is not None
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[mod_name] = mod
-    loader.exec_module(mod)
-    return mod
-
-
-hook = _load_hook()
+hook.set_workspace(ROOT)
 
 # 唯一源形状：元数据只在 frontmatter，正文不复写（TASK_BODY_META_REDUNDANT）
 TASK_GOOD = (
