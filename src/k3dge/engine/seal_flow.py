@@ -116,6 +116,47 @@ def _architecture_staleness(workspace: Path, milestone_id: str) -> str:
     )
 
 
+def _refresh_projections(workspace: Path) -> list:
+    """相位 3 的**纯投影**刷新：`docs/generated/{api,domains,docs-index}.md|json`、符号索引、README 自动块。
+
+    返回**实际变化**的相对路径（人读；没变就不列）。全部幂等、零判断；任一件失败 ⇒ 跳过该件
+    （投影坏不得拦住封板收尾，但会写进事件面）。
+    """
+    changed: list = []
+
+    def _track(path: Path, fn) -> None:
+        before = path.read_bytes() if path.is_file() else None
+        try:
+            fn()
+        except Exception:
+            return
+        after = path.read_bytes() if path.is_file() else None
+        if after != before and after is not None:
+            try:
+                changed.append(str(path.relative_to(workspace)))
+            except ValueError:
+                pass
+
+    try:
+        from k3dge.engine.doc_catalog import INDEX_REL, write_docs_index
+        from k3dge.engine.generated_docs import render_manual_docs_content, render_readme_layout
+        from k3dge.engine.manifest import Manifest
+        from k3dge.engine.search import index_path, write_symbol_index
+
+        manifest = Manifest.load(workspace)
+        for path, content in render_manual_docs_content(workspace, manifest).items():
+            _track(path, lambda path=path, content=content: (
+                path.parent.mkdir(parents=True, exist_ok=True),
+                path.write_text(content, encoding="utf-8"),
+            ))
+        _track(workspace / "README.md", lambda: render_readme_layout(workspace, manifest))
+        _track(workspace / INDEX_REL, lambda: write_docs_index(workspace))
+        _track(index_path(workspace), lambda: write_symbol_index(workspace))
+    except Exception:
+        pass
+    return changed
+
+
 def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
     """Emit the context-compression closure checklist for a sealed milestone.
 
@@ -300,16 +341,16 @@ def run_seal_flow(
         return True, "\n  记录: " + rmsg
 
     def _closure_note(_ctx):
+        # 先刷**纯投影**（docs/generated/* + README 自动块 + 符号索引），再写清单 ⇒ 刷出来的内容
+        # 落进随后的封版提交。**不跑整条 sync**：spec 接口块/契约哈希与 ADR reconcile 是**事实源写**，
+        # 在审计之后动它们等于改审计看过的内容（ADR-0004 §2.1.9「审哪版封哪版」）。
+        refreshed = _refresh_projections(workspace)
         p = _write_closure_note(workspace, milestone_id)
-        try:
-            from k3dge.engine.doc_catalog import write_docs_index
-
-            write_docs_index(workspace)
-        except Exception:
-            pass
+        note = f"\n  派生件: {'、'.join(refreshed) if refreshed else '已与事实一致'}"
         # 架构文档新鲜度：清单里已写具体事实，这里再投影一次到 seal 输出（同一判定，两处显示）
-        return True, (f"\n  收摊清单: {p.relative_to(workspace)}"
-                      f"\n  架构文档: {_architecture_staleness(workspace, milestone_id)}")
+        return True, (note
+                      + f"\n  收摊清单: {p.relative_to(workspace)}"
+                      + f"\n  架构文档: {_architecture_staleness(workspace, milestone_id)}")
 
     def _prune(_ctx):
         try:  # end-flow 清理钩子：派生件（worktree/已并入的审计线）收口即删；史在主干

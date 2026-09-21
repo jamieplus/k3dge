@@ -434,6 +434,10 @@ from k3dge.engine import contract
 from k3dge.engine.manifest import Manifest
 render_manual_docs_content(workspace: Path, manifest: Manifest, doc_cache: dict[str, str] | None=None) -> Dict[Path, str]
     # doc: `docs/generated/` 的**纯渲染**（path → 应有内容；不写盘）。
+LAYOUT_START = '<!-- k3dge:layout-start -->'
+LAYOUT_END = '<!-- k3dge:layout-end -->'
+render_readme_layout(workspace: Path, manifest: Manifest) -> Optional[Path]
+    # doc: Regenerate the README layout block from the manifest (no-op if README lacks markers).
 # manifest.py
 from __future__ import annotations
 from pathlib import Path
@@ -1051,16 +1055,15 @@ from typing import Sequence
 from typing import Tuple
 from k3dge.engine import contract
 from k3dge.engine import spec_schema
+from k3dge.engine.generated_docs import LAYOUT_END
+from k3dge.engine.generated_docs import LAYOUT_START
 from k3dge.engine.generated_docs import render_manual_docs_content
+from k3dge.engine.generated_docs import render_readme_layout
 from k3dge.engine.manifest import Manifest
 HASH_LINE_RE = re.compile('(\\*\\*Contract Hash\\*\\*:).*$', re.MULTILINE)
 DATE_LINE_RE = re.compile('(\\*\\*Last Updated\\*\\*:).*$', re.MULTILINE)
 PUBLIC_INTERFACES_RE = re.compile('^#{2,3}\\s+.*Public Interfaces', re.MULTILINE)
-LAYOUT_START = '<!-- k3dge:layout-start -->'
-LAYOUT_END = '<!-- k3dge:layout-end -->'
 sync_domain(workspace: Path, manifest: Manifest, domain: str, iface: str | None=None) -> Optional[Path]
-render_readme_layout(workspace: Path, manifest: Manifest) -> Optional[Path]
-    # doc: Regenerate the README layout block from the manifest (no-op if README lacks markers).
 render_manual_docs(workspace: Path, manifest: Manifest, doc_cache: dict[str, str] | None=None) -> List[Path]
     # doc: Generate machine docs under docs/generated/ (no agent needed, Diátaxis Reference).
 sync_all(workspace: Path, domains: Optional[Sequence[str]]=None) -> Tuple[List[str], bool]

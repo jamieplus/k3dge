@@ -489,6 +489,14 @@
       "tokens": "架构文档 seal 覆盖（overview + encyclopedia）+ 域表对账闸 `ARCH_TABLE_DRIFT`"
     },
     {
+      "path": "docs/tasks/2026-09-21-M11-feat-projection_refresh.done.md",
+      "type": "tasks",
+      "id": "2026-09-21-M11-feat-projection_refresh.done",
+      "title": "seal 相位 3 自动刷纯投影 + `k3dge where` 索引自愈",
+      "status": "done",
+      "tokens": "seal 相位 3 自动刷纯投影 + `k3dge where` 索引自愈"
+    },
+    {
       "path": "docs/tasks/2026-09-21-M11-fix-commit_runs_hooks.done.md",
       "type": "tasks",
       "id": "2026-09-21-M11-fix-commit_runs_hooks.done",

@@ -1412,7 +1412,7 @@
   "render_manual_docs": [
     {
       "file": "src/k3dge/sync/generator.py",
-      "line": 131
+      "line": 87
     }
   ],
   "render_manual_docs_content": [
@@ -1429,8 +1429,8 @@
   ],
   "render_readme_layout": [
     {
-      "file": "src/k3dge/sync/generator.py",
-      "line": 118
+      "file": "src/k3dge/engine/generated_docs.py",
+      "line": 101
     }
   ],
   "reset_for_audit": [
@@ -1520,7 +1520,7 @@
   "run_seal_flow": [
     {
       "file": "src/k3dge/engine/seal_flow.py",
-      "line": 179
+      "line": 220
     }
   ],
   "satisfied_ids": [
@@ -1604,7 +1604,7 @@
   "search": [
     {
       "file": "src/k3dge/engine/search.py",
-      "line": 194
+      "line": 215
     }
   ],
   "secret": [
@@ -1686,13 +1686,13 @@
   "sync_all": [
     {
       "file": "src/k3dge/sync/generator.py",
-      "line": 216
+      "line": 172
     }
   ],
   "sync_domain": [
     {
       "file": "src/k3dge/sync/generator.py",
-      "line": 71
+      "line": 40
     }
   ],
   "sync_extractors": [
@@ -1788,7 +1788,7 @@
   "where": [
     {
       "file": "src/k3dge/engine/search.py",
-      "line": 106
+      "line": 127
     }
   ],
   "where_doc": [

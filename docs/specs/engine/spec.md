@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:bf3662d3b3e4395567dc58112ee84be52859d084de392807a4287fdc9719758a`
+- **Contract Hash**: `sha256:3ed1888677386bf699e6ad7b56c6f84e9f1de4e1d2512d2b6c67c38952fa34d7`
 - **Last Updated**: 2026-09-21
 
 ## 1. Domain Boundary & Responsibilities
@@ -254,6 +254,9 @@ from typing import Optional
 from k3dge.engine import contract
 from k3dge.engine.manifest import Manifest
 render_manual_docs_content(workspace: Path, manifest: Manifest, doc_cache: dict[str, str] | None=None) -> Dict[Path, str]
+LAYOUT_START = '<!-- k3dge:layout-start -->'
+LAYOUT_END = '<!-- k3dge:layout-end -->'
+render_readme_layout(workspace: Path, manifest: Manifest) -> Optional[Path]
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
@@ -751,6 +754,8 @@ stateDiagram-v2
 | TC-ENG-23 | L1 | 声明 enabled 且可探到 sibling 的 peer 缺席 `.mcp.json` | 违反 `MCP_JSON_PEER_MISSING`；探不到 ⇒ 不报 | `tests/unit/engine/test_generated_projections.py::test_enabled_resolvable_peer_missing_from_mcp_json_is_violation` |
 | TC-ENG-24 | L1 | 架构文档自上个边界 tag 起未更新而 `src/`/`docs/specs/` 变过 | seal 收摊事实行报「未更新」；已更新/无改动/首个里程碑各报对账结论 | `tests/unit/engine/test_architecture_freshness.py::test_src_changed_without_overview_warns` |
 | TC-ENG-25 | L1 | `docs/architecture/{overview,encyclopedia}.md` 的域表与 manifest 的事实列不一致（域集/src/spec/tests/depends_on） | 违反 `ARCH_TABLE_DRIFT`；缺文件或非域表不报；depends_on 顺序不敏感 | `tests/unit/engine/test_architecture_tables.py::test_wrong_src_cell_is_violation` |
+| TC-ENG-26 | L1 | seal 相位 3 刷纯投影（`docs/generated/{api,domains}.md`/`docs-index`/符号索引/README 自动块） | 陈旧的被刷回并报「派生件: …」；幂等（第二次为空）；**不碰 specs/ADR** | `tests/unit/engine/test_projection_refresh.py::test_stale_generated_doc_is_refreshed_and_reported` |
+| TC-ENG-27 | L1 | `k3dge where` 遇陈旧/缺失索引 | 自愈重建（mtime 启发式）；权威判据仍是 `SYMBOL_INDEX_STALE` | `tests/unit/engine/test_projection_refresh.py::test_stale_index_is_rebuilt_on_where` |
 
 ## 5. Fact-Source Gate Matrix (三元门禁矩阵)
 

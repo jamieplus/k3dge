@@ -93,9 +93,30 @@ def write_symbol_index(workspace: Path) -> Path:
     return out
 
 
+def _is_stale_cheaply(workspace: Path, index: Path) -> bool:
+    """廉价陈旧判定（mtime 启发式）：任一域 src 文件比索引新 ⇒ 重建。
+
+    权威判据是 `check` 的 `SYMBOL_INDEX_STALE`（重建后逐字比）；这里只是让 `k3dge where`
+    **不要**拿旧索引给出错的 file:line（旧行为只在文件缺失时重建 ⇒ 代码写完没跑 `k3dge index`
+    就会静默返回过期位置）。
+    """
+    try:
+        idx_mtime = index.stat().st_mtime
+    except OSError:
+        return True
+    for src in _domain_src_dirs(workspace):
+        for path in src.rglob("*.py"):
+            try:
+                if path.stat().st_mtime > idx_mtime:
+                    return True
+            except OSError:
+                continue
+    return False
+
+
 def _load_index(workspace: Path) -> Dict[str, List[dict]]:
     p = index_path(workspace)
-    if not p.is_file():
+    if not p.is_file() or _is_stale_cheaply(workspace, p):
         write_symbol_index(workspace)
     try:
         return json.loads(p.read_text(encoding="utf-8"))

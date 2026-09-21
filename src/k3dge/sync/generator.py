@@ -8,54 +8,23 @@ from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
 from k3dge.engine import contract, spec_schema
-from k3dge.engine.generated_docs import render_manual_docs_content
+from k3dge.engine.generated_docs import (
+    LAYOUT_END,
+    LAYOUT_START,
+    _layout_block,
+    _replace_between_all,
+    render_manual_docs_content,
+    render_readme_layout,
+)
 from k3dge.engine.manifest import Manifest
 
 HASH_LINE_RE = re.compile(r"(\*\*Contract Hash\*\*:).*$", re.MULTILINE)
 DATE_LINE_RE = re.compile(r"(\*\*Last Updated\*\*:).*$", re.MULTILINE)
 PUBLIC_INTERFACES_RE = re.compile(r"^#{2,3}\s+.*Public Interfaces", re.MULTILINE)
 
-LAYOUT_START = "<!-- k3dge:layout-start -->"
-LAYOUT_END = "<!-- k3dge:layout-end -->"
-
-
 def _interface_block(interface: str) -> str:
     body = interface or "# (no public interface)"
     return f"{contract.INTERFACE_START}\n```python\n{body}\n```\n{contract.INTERFACE_END}"
-
-
-def _layout_block(manifest: Manifest) -> str:
-    header = "| Domain | Source | Spec | Description |\n| --- | --- | --- | --- |"
-    rows = []
-    for domain in sorted(manifest.domains):
-        cfg = manifest.domains[domain]
-        src = cfg.get("src", "")
-        spec = cfg.get("spec", "")
-        desc = cfg.get("description", "")
-        rows.append(f"| {domain} | `{src}` | `{spec}` | {desc} |")
-    return f"{LAYOUT_START}\n{header}\n" + "\n".join(rows) + f"\n{LAYOUT_END}"
-
-
-def _replace_between_all(content: str, start: str, end: str, replacement: str) -> Optional[str]:
-    """Replace every start..end span with a single replacement (first occurrence position)."""
-    if start not in content or end not in content:
-        return None
-    s = content.index(start)
-    # remove all further duplicate spans (search from after the first start)
-    while True:
-        s2 = content.find(start, s + len(start))
-        if s2 == -1:
-            break
-        e2 = content.find(end, s2)
-        if e2 == -1:
-            break
-        content = content[:s2] + content[e2 + len(end):]
-        # do not advance s; keep scanning from first marker
-    e = content.find(end, s)
-    if e == -1:
-        return None
-    e += len(end)
-    return content[:s] + replacement + content[e:]
 
 
 def _insert_after_heading(content: str, pattern: "re.Pattern[str]", block: str) -> str:
@@ -113,19 +82,6 @@ def sync_domain(
     content = DATE_LINE_RE.sub(lambda m: f"{m.group(1)} {today}", content)
     spec_path.write_text(content, encoding="utf-8")
     return spec_path
-
-
-def render_readme_layout(workspace: Path, manifest: Manifest) -> Optional[Path]:
-    """Regenerate the README layout block from the manifest (no-op if README lacks markers)."""
-    readme = workspace / "README.md"
-    if not readme.exists():
-        return None
-    content = readme.read_text(encoding="utf-8")
-    rendered = _replace_between_all(content, LAYOUT_START, LAYOUT_END, _layout_block(manifest))
-    if rendered is None or rendered == content:
-        return None
-    readme.write_text(rendered, encoding="utf-8")
-    return readme
 
 
 def render_manual_docs(
