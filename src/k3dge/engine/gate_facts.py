@@ -389,6 +389,14 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         ],
         "pointers": [".agent/manifest.json", "k3dge ADR-0005 §2.8"],
     },
+    "TASK_MILESTONE_AFTER_BOUNDARY": {
+        "fix": "judgment", "severity": "warn",
+        "fact": "`{path}` 在 `{milestone}` 的边界（`tag <M> = <B>`）那一版里**还不存在**，"
+                "却挂在 `{milestone}` 上——按 ADR-0004 §2.1.9，边界之后的改动归下一个里程碑",
+        "options": ["重挂到它实际所属的里程碑：`k3dge milestone reassign {milestone} --to <目标>`",
+                    "确认它确实属于 `{milestone}`（边界 tag 立错/补记）→ 不处理，本条只观测不拦"],
+        "pointers": ["k3dge ADR-0004 §2.1.9", "k3dge milestone reassign"],
+    },
     # --- observe：观测建议，不阻断、不裁决（service 角色；peer 不可达即无提示）---
     "DUP_CHECK": {
         "fix": "judgment",

@@ -24,6 +24,8 @@
 
 * **人工入口** —— `k3dge milestone audit <id>` / `k3dge milestone seal [--yes] <id>` 都是人工主动入口，走同一套流程。`--yes` 跳过「要不要封」的提问，但不跳过审计。
 
+* **重挂（边界之后开的票）** —— 边界确立后（`tag <M> = <B>`），B 之后新开的票若指针未前进就会挂在旧里程碑上 ⇒ `[GATE WARN] TASK_MILESTONE_AFTER_BOUNDARY`（**advisory**：只指出"边界那一版还没有它"，不判该归哪一版）。重挂用 `k3dge milestone reassign <M> --to <新号> [--dry-run]`：**frontmatter 与文件名同改**（半吊子会被 `TASK_MILESTONE_MISMATCH` 拦），幂等。
+
 * **文档合规（三层，T-01）** —— `check` 保持静态硬闸、**不跑透镜**。①**提交时**：结构/schema 硬闸 + 新建受管文档首次筛查闸 `DOC_NEW_UNSCREENED`（阻断一次，判定归 agent）；②**可确定修的偏差**：`[NEXT] doc_fix` 引导 `k3dge doc fix`（闭集规则、幂等、`--dry-run`），封板前置 `docs_normalized` 验"做没做"——规约化必须在**封板前**完成，否则改在审计闭环之后会让刚闭环的审计证据失效；③**语义质量**（Context 是否写成 timeline、Decision 是否只写不变量、有无过程叙述）：归**里程碑审计**（合并审计模块的 scope 含 `docs`），不进自动修。原「doc-audit 出报告 + 建里程碑票」路径**已退休**（ADR-0022 §2.2 🅰1：`run_doc_audit` 丢弃透镜返回、票绑错报告，实测未走通）。ADR 冲突/覆盖仍在里程碑审计（ADR-0005）。
 
 * **外来审计源落盘（只补证据）** —— 人贴/agent 转发的报告经 `k3dge milestone audit-submit <id> [--file <报告.md> | -]`（或 MCP `k3dge_submit_audit_report`）落盘为 `docs/reviews/YYYY-MM-DD-<id>-<scope>-audit.md` 本版报告（缺 12 列表头自动补；最新覆盖旧）。**不推进版号、不触发封板**（ADR-0004 §2.1.10）：版号前进只认"审计正常返回"（seal 相位 2）。报告＝**可选产物**——存在则须合格（12 列 + `审计人`/`透镜来源`/`基线`），不存在不卡流程；`audit_closed`（报告存在 ∧ 待修=0）只是**报告合格性**，不再是封板前置。判据只认 git 事实（`audit_flow.audit_evidence`：边界 tag + 封版提交 trailer / tag 注解），本地账是投影、**冲突以 git 为准**。（`--kind quality` 保留为 legacy，不再有独立质量腿。）

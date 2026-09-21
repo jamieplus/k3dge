@@ -54,6 +54,7 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 | 新建受管文档（主观撰写类：adr/memo/guides/architecture/protocols/incidents/branches） | `scripts/pre-commit` 阻断一次（`DOC_NEW_UNSCREENED`）：按规约先排查是否与既存文档**冲突/覆盖/只是其子项**——**判定归 agent**（进程判不了语义），闸只把排查送到动手这一刻。并入既存 ⇒ 收编 + 删新文件 + `k3dge sync`；确认新建 ⇒ `k3dge doc screen <path>`（回执 ephemeral，`.protocol-ack/`，不入库；同文件不再拦）。确定性流程生成的文档（`docs/generated|specs|tasks|reviews`）与 aux 不在排查面 |
 | 文档改动（`docs/**` 变更） | 三层：①**提交时硬闸**（结构/schema）+ 新建受管文档**首次筛查闸** `DOC_NEW_UNSCREENED`（阻断一次）；②`[NEXT] doc_fix` 引导**主动动作** `k3dge doc fix`（闭集规则、幂等、`--dry-run`），封板前置 `docs_normalized` 验"做没做"；③**语义质量**归里程碑审计（合并审计模块的 scope 含 `docs`）。原「doc-audit 出报告 + 建里程碑票」路径已退休（ADR-0022 §2.2 🅰1：实测未走通）。**ADR 冲突/覆盖**仍在里程碑审计（`k3dge_adr_index`+k3dit，ADR-0005） |
 | Move/delete fact source | Update all pointers; memo target gone → move back |
+| 票落在边界之后（`[GATE WARN] TASK_MILESTONE_AFTER_BOUNDARY`） | advisory：`k3dge milestone reassign <M> --to <新里程碑>`（frontmatter + 文件名同改，幂等、`--dry-run` 可预览）；不阻断——归属判定归人，闸只说「边界那一版还没有它」 |
 | 新增一条可机检规则（`check`/schema/hook 能红的那种） | 同轮配闸（违规码或消费者）；只写进 `AGENTS.md`/`.agent/rules` 散文、没有到达执行者 → 本轮补闸或标有意留。**不**因此硬阻断人写的散文 |
 
 ## 13. Evidence Chain (ADR-0012)

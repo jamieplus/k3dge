@@ -701,6 +701,22 @@ def cmd_milestone(args: argparse.Namespace) -> int:
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone seal-check -> {m_id} unmet={len(unmet_seal_preconditions(workspace, m_id))}")
         return 1 if unmet_seal_preconditions(workspace, m_id) else 0
 
+    if action == "reassign":
+        # 重挂（ADR-0004 §2.1.9：B 之后的改动归下一个里程碑）：只改票的里程碑事实
+        #（frontmatter + 文件名 M 段，同一次两处同改；闸 TASK_MILESTONE_MISMATCH 兜底）
+        from k3dge.engine.task_write import reassign_milestone
+
+        to_ms = getattr(args, "to_milestone", None)
+        if not to_ms:
+            print("[TASK] reassign 需要 --to <new-milestone>", file=sys.stderr)
+            return 1
+        dry = bool(getattr(args, "dry_run", False))
+        ok, lines = reassign_milestone(workspace, m_id, to_ms, dry_run=dry)
+        for line in lines:
+            print(f"[TASK] {line}")
+        _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone reassign {m_id} -> {to_ms} dry={dry} ok={ok}")
+        return 0 if ok else 1
+
     if action == "checklist":
         from k3dge.engine import audit_checklist
 
@@ -1139,8 +1155,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_extractor.set_defaults(func=cmd_extractor)
 
     p_milestone = sub.add_parser("milestone", help="milestone alignment and context compaction")
-    p_milestone.add_argument("action", choices=["status", "align", "seal", "audit", "checklist", "audit-submit", "seal-check"], help="milestone action")
+    p_milestone.add_argument("action", choices=["status", "align", "seal", "audit", "checklist", "audit-submit", "seal-check", "reassign"], help="milestone action")
     p_milestone.add_argument("milestone_id", help="milestone identifier (matches Milestone field in tasks)")
+    p_milestone.add_argument("--to", dest="to_milestone",
+                            help="reassign: new milestone id (e.g. M11)")
+    p_milestone.add_argument("--dry-run", dest="dry_run", action="store_true",
+                            help="reassign: preview without touching files")
     p_milestone.add_argument(
         "--no-version-bump",
         action="store_true",

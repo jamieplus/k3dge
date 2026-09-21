@@ -368,3 +368,93 @@ def _similar_task_hints(workspace: Path, title: str, exclude: Optional[Path] = N
         if len(out) >= 3:
             break
     return out
+
+#: 任务文件名：`<date>-[<milestone>-]<type>-<slug>[.done].md`（type 是闭集，故能定位段位）
+_TASK_NAME_RE = re.compile(
+    r"^(?P<date>\d{4}-\d{2}-\d{2})-(?:(?P<ms>[A-Za-z0-9._-]+)-)?"
+    r"(?P<type>audit|feat|fix|docs|chore|refactor)-(?P<slug>.+?)(?P<done>\.done)?\.md$"
+)
+
+
+def split_task_name(name: str) -> Optional[dict]:
+    """拆任务文件名 → `{date, ms, type, slug, done}`；不合规 ⇒ None（不猜）。"""
+    m = _TASK_NAME_RE.match(name)
+    return m.groupdict() if m else None
+
+
+def build_task_name(parts: dict, milestone: Optional[str]) -> str:
+    """按拆解结果重建文件名（milestone=None ⇒ 无里程碑段）。"""
+    seg = f"{parts['date']}-" + (f"{milestone}-" if milestone else "")
+    return f"{seg}{parts['type']}-{parts['slug']}{parts['done'] or ''}.md"
+
+
+def reassign_task_milestone(
+    workspace: Path, path: Path, new_milestone: Optional[str], *, dry_run: bool = False
+) -> Tuple[bool, str, Optional[Path]]:
+    """把一张票**重挂**到另一个里程碑（ADR-0004 §2.1.9：B 之后的改动归下一个里程碑）。
+
+    票的里程碑事实在两处物理位置：frontmatter `milestone:` 与文件名里的 `<M>` 段
+    （`docs/tasks/AUTHORING.md`）。**必须同一次改两处**——否则 `TASK_MILESTONE_MISMATCH`
+    立刻红（闸恰好保证"没有半吊子重挂"）。返回 `(ok, msg, 新路径)`；幂等（同号 ⇒ no-op）。
+    """
+    if new_milestone is not None:
+        err = _validate_milestone_id(new_milestone)
+        if err:
+            return False, err, None
+    if not path.is_file():
+        return False, f"no such task: {path}", None
+    parts = split_task_name(path.name)
+    if parts is None:
+        return False, (f"文件名不合 `YYYY-MM-DD-<Ms>-<type>-<slug>[.done].md` 约定：{path.name}"
+                       f"（不猜段位，重挂拒绝）"), None
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith("---"):
+        return False, f"{path.name}: 无 frontmatter，里程碑事实无处可改（拒绝）", None
+    head, _, tail = text[3:].partition("\n---")
+    new_head_lines = []
+    had = False
+    for line in head.splitlines():
+        if re.match(r"^\s*milestone\s*:", line):
+            had = True
+            if new_milestone is None:
+                continue                                   # 摘掉里程碑段
+            new_head_lines.append(f"milestone: {new_milestone}")
+        else:
+            new_head_lines.append(line)
+    if new_milestone is not None and not had:
+        new_head_lines.append(f"milestone: {new_milestone}")
+    target_name = build_task_name(parts, new_milestone)
+    target = path.with_name(target_name)
+    if target == path and f"milestone: {new_milestone}" in head:
+        return True, f"已是 {new_milestone}（幂等）", path
+    if dry_run:
+        return True, f"[dry-run] {path.name} -> {target_name}", target
+    path.write_text("---" + "\n".join(new_head_lines) + "\n---" + tail, encoding="utf-8")
+    if target != path:
+        if target.exists():
+            return False, f"目标已存在：{target.name}（先人工处理）", None
+        path.rename(target)
+    return True, f"{path.name} -> {target_name}", target
+
+
+def reassign_milestone(
+    workspace: Path, from_milestone: str, to_milestone: str, *, dry_run: bool = False
+) -> Tuple[bool, List[str]]:
+    """把 `docs/tasks/` 顶层**全部** `from_milestone` 的票重挂到 `to_milestone`（幂等、逐张报）。"""
+    tasks_dir = workspace / "docs" / "tasks"
+    lines: List[str] = []
+    ok_all = True
+    if not tasks_dir.is_dir():
+        return False, [f"no tasks dir: {tasks_dir}"]
+    for p in sorted(tasks_dir.glob("*.md")):
+        if p.name in ("README.md", "AUTHORING.md") or p.name.startswith("_"):
+            continue
+        fm = parse_frontmatter(p.read_text(encoding="utf-8"))
+        if (fm.get("milestone") or "").strip() != from_milestone:
+            continue
+        ok, msg, _newp = reassign_task_milestone(workspace, p, to_milestone, dry_run=dry_run)
+        lines.append(("OK  " if ok else "FAIL") + " " + msg)
+        ok_all = ok_all and ok
+    if not lines:
+        lines.append(f"没有 {from_milestone} 的票可重挂（幂等，无需动作）")
+    return ok_all, lines

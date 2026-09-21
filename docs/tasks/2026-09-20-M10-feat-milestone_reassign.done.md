@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M10
 priority: P2
 date: 2026-09-20
@@ -51,3 +51,25 @@ reassign 跑两次结果一致（幂等）；--dry-run 不改盘
 ## Notes
 
 - 与 `feat-seal_boundary_tag` 同期：没有 tag 就没有"归属可解释"的判据。
+
+## 落地（2026-09-20）
+
+| 项 | 落点 | 实测 |
+| --- | --- | --- |
+| ① 重挂工具 | `task_write.reassign_task_milestone()` / `reassign_milestone()`（批量）+ `split_task_name`/`build_task_name`（段位解析与重建，type 是闭集故能定位）；CLI `k3dge milestone reassign <M> --to <新号> [--dry-run]` | `TestReassignTask`（4 条）：frontmatter 与文件名**同一次同改**且 `check_task_consistency` 绿；幂等；`--dry-run` 不动盘；非法 id / 拆不出段位 ⇒ 拒 |
+| ② 归属提示（advisory） | `milestone_files.tasks_after_boundary()`：判据＝**存在性**（`git cat-file -e <M>:<票>`）而非提交区间——区间会漏掉"新建但还没提交"这一最常见情形；`doc_catalog._boundary_task_violations` 一次性收集（不放类型循环里逐票跑 git）；新码 `TASK_MILESTONE_AFTER_BOUNDARY`（severity=`warn`，**不阻断**） | `TestBoundaryNudge`（3 条）：边界后新增且仍挂旧号 ⇒ 报；重挂后 ⇒ 不报；`severity=warn` 且渲染为 `[GATE WARN]` + 给出 `k3dge milestone reassign M10` |
+| ③ 子串→词元 | `pure_refs.has_milestone_token()`（**实现在零依赖层**）+ `check_task_consistency` 用它替换 `ms not in base`；`milestone_files._has_milestone_token` 改为委托别名（单一实现在此，闸核与生命周期判同一件事） | `M1` 不再被 `2026-09-01-M10-feat-x.md` 满足；`TestNameParts` + 存量 `test_pure_refs` 全绿 |
+| ④ 散文同步 | `AGENTS.md` §12 新增「票落在边界之后」行；`.agent/rules/04-milestone.md` 新增「重挂」段（+模板镜像） | PAIRS `diff` 一致 |
+
+测试：新增 `tests/unit/engine/test_task_reassign.py`（12 条）；**680 passed, 2 skipped**；`k3dge check` 绿。
+
+### 有意偏离票面（附理由）
+
+票面写"闸先落提示后阻断二选一"。落地选择**只做提示**（`severity=warn`）：归属是
+**内容判断**（这张票到底属于哪一版），k3dge 不判 merit（ADR-0026 §2.1）——阻断会让
+"我确实要把它留在这版"变成伪合规（要么改号要么绕闸）。故本票不提供阻断档。
+
+### 边界（有意留）
+
+`tasks_after_boundary` 只看 `docs/tasks/` **顶层**的票：已归档（`archive/<M>/`）的票不在扫描面，
+它们的归属由归档那一步（seal 的动作）定格，事后重挂无意义。

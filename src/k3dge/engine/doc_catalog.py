@@ -401,6 +401,24 @@ def _validate_file(workspace: Path, typ: str, path: Path, schema: dict, seen: di
             out.append(Violation(code, msg, file_path=rel, detail={"path": rel}))
     return out
 
+def _boundary_task_violations(workspace: Path) -> List[Violation]:
+    """边界之后新增却仍挂在已封里程碑上的票（advisory，ADR-0004 §2.1.9）。
+
+    一次性算（每个边界一次 git 调用），不放进类型循环——否则每张票都要跑一遍 git。
+    """
+    from k3dge.engine import milestone_files as _mf
+
+    try:
+        rows = _mf.tasks_after_boundary(workspace)
+    except Exception:  # 非 git 仓 / git 不可用 ⇒ 无事实可报，不假装有
+        return []
+    return [
+        Violation("TASK_MILESTONE_AFTER_BOUNDARY", msg, file_path=rel,
+                  detail={"path": rel, "milestone": ms})
+        for rel, ms, msg in rows
+    ]
+
+
 def validate_docs(workspace: Path, types: Optional[Iterable[str]] = None) -> List[Violation]:
     """Structure-only gate. Types without ``.schema.json`` are skipped."""
     violations: List[Violation] = []
@@ -442,6 +460,9 @@ def validate_docs(workspace: Path, types: Optional[Iterable[str]] = None) -> Lis
                             file_path=rel,
                         )
                     )
+    # 边界之后新增的票仍挂在已封里程碑上（advisory）：一次算，不放类型循环里
+    if types is None or "tasks" in wanted:
+        violations.extend(_boundary_task_violations(workspace))
     return violations
 
 

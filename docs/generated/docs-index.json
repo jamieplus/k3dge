@@ -721,11 +721,11 @@
       "tokens": "编排骨架收敛·节点表：pipeline.toml [checks.*] 单一声明面 + 五属性 + ctx + 单执行器（下游可配）"
     },
     {
-      "path": "docs/tasks/2026-09-20-M10-feat-milestone_reassign.md",
+      "path": "docs/tasks/2026-09-20-M10-feat-milestone_reassign.done.md",
       "type": "tasks",
-      "id": "2026-09-20-M10-feat-milestone_reassign",
+      "id": "2026-09-20-M10-feat-milestone_reassign.done",
       "title": "里程碑重挂：`milestone reassign <from> <to>` + 归属闸 + 修子串一致性检查",
-      "status": "idea",
+      "status": "done",
       "tokens": "里程碑重挂：`milestone reassign <from> <to>` + 归属闸 + 修子串一致性检查"
     },
     {

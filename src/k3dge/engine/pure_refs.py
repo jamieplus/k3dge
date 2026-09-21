@@ -119,6 +119,20 @@ def _fm_value(text: str, key: str) -> str:
     return ""
 
 
+def has_milestone_token(text: str, milestone_id: str) -> bool:
+    r"""`milestone_id` 是否以**路径/词元**出现（不是更长 id 的子串）。
+
+    `M1` 不得匹配 `M10`（文件名 `2026-08-23-M10-align.md` 或正文里的 `M10`）。
+    边界集 `[-_./\s]`（**不含 `+`**：`M10+` 形态不合法，见 `milestone_pointer` 的 id 规则）。
+
+    归零依赖层：`milestone_files._has_milestone_token` 是其委托别名（单一实现在此），
+    这样闸核（`check_task_consistency`）与生命周期模块判同一个东西，不必各写一遍正则。
+    """
+    if not milestone_id:
+        return False
+    return re.search(rf"(?:^|[-_./\s]){re.escape(milestone_id)}(?:[-_./\s]|$)", text) is not None
+
+
 def check_task_consistency(rel: str, text: str) -> List[Ref]:
     """`status: done` ⇔ `.done.md` 后缀；文件名 milestone ⇔ frontmatter；正文不得复写元数据。"""
     if not rel.startswith("docs/tasks/"):
@@ -135,7 +149,9 @@ def check_task_consistency(rel: str, text: str) -> List[Ref]:
     elif st and st != "done" and is_done_name:
         out.append(("TASK_STATUS_MISMATCH", f"{rel}: filename is .done.md but status is '{st}'"))
     ms = _fm_value(text, "milestone")
-    if ms and ms not in base:
+    if ms and not has_milestone_token(base, ms):
+        # 词元判定（不是子串）：`M1` 不得被 `2026-09-01-M10-feat-x.md` 满足——子串检查会让
+        # 挂错里程碑的票静默通过（A-01 同形：闸偏松 = 假合规）
         out.append(("TASK_MILESTONE_MISMATCH", f"{rel}: frontmatter milestone '{ms}' not in filename"))
     out.extend(check_task_body_meta_redundant(rel, text))
     out.extend(check_task_closure_record(rel, text))
