@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:736fc14ba485bea3dfca34f0b4157e5947f69b04d6d604c36af0bbd9d7b85e3f`
+- **Contract Hash**: `sha256:f3a7028f84531ceb660dc9d14ac201ca38be2e059c162b70840cd87443699a33`
 - **Last Updated**: 2026-09-20
 
 ## 1. Domain Boundary & Responsibilities
@@ -65,6 +65,7 @@ AUDIT_RESULTS = ('closed', 'degraded-manual', 'escalated', 'refused')
 SEALABLE_AUDIT_RESULTS = ('closed', 'degraded-manual')
 audit_call_result(produced) -> str
 audit_result_of(status: str) -> Optional[str]
+audit_evidence(workspace: Path, milestone_id: str) -> dict
 submit_audit(workspace: Path, milestone_id: str, targets: Optional[list]=None, io=None, role: str='audit') -> dict
 collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str]=None, io=None) -> dict
 push_present(workspace: Path, job_key: str, commit: str='', io=None) -> dict
@@ -402,9 +403,6 @@ resolve_role(pipeline: dict, name: str) -> str
 resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]
 validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
 from __future__ import annotations
-from pathlib import Path
-from typing import Optional
-evidence_chain_error(workspace: Path, milestone_id: str) -> Optional[str]
 from __future__ import annotations
 class Prompt
     @classmethod
@@ -512,7 +510,7 @@ SEAL_TRAILER_KEYS = ('seal-milestone', 'audit-baseline', 'audit-seat', 'audit-re
 head_commit(workspace: Path) -> str
 format_seal_trailers(milestone_id: str, baseline: str, seat: str, result: str) -> str
 parse_seal_trailers(text: str) -> dict
-tag_audit_baseline(workspace: Path, milestone_id: str, baseline: str) -> Tuple[bool, str]
+tag_audit_baseline(workspace: Path, milestone_id: str, baseline: str, *, trailers: str='') -> Tuple[bool, str]
 seal_record(workspace: Path, milestone_id: str, *, baseline: str, seat: str='', result: str='', subject: str='') -> Tuple[bool, str]
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
 auto_satisfied_ids(workspace: Path, op: str) -> set

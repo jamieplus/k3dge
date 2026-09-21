@@ -753,11 +753,11 @@
       "tokens": "CHANGELOG 改由提交区间生成：删\"每票 done 写一行\"的双写、闸只验不漏项"
     },
     {
-      "path": "docs/tasks/2026-09-20-M10-refactor-report_demote.md",
+      "path": "docs/tasks/2026-09-20-M10-refactor-report_demote.done.md",
       "type": "tasks",
-      "id": "2026-09-20-M10-refactor-report_demote",
+      "id": "2026-09-20-M10-refactor-report_demote.done",
       "title": "报告降级为可选产物：`audit_closed`/`evidence_chain` 不再卡门、`audit-submit` 只补证据、运行态明标投影",
-      "status": "idea",
+      "status": "done",
       "tokens": "报告降级为可选产物：`audit_closed`/`evidence_chain` 不再卡门、`audit-submit` 只补证据、运行态明标投影"
     },
     {

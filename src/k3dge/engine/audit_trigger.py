@@ -92,10 +92,15 @@ def compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]:
 
 
 def audit_closed(workspace: Path, milestone_id: str) -> bool:
-    """True iff the single audit report exists with 待修==0.
+    """True iff the single audit report exists with 待修==0（报告的**合格性**）。
 
     One "audit pass" = the merged audit module (ADR-0025) produces ONE 12-col
     report; there is no independent quality peer/report any more.
+
+    **不是封板前置**（ADR-0004 §2.1.3/§2.1.10 🅰1）：报告＝可选产物（存在则须合格，
+    不存在不卡流程）；封板资格由 `seal` 相位 2 的**审计正常返回**（闭集，§2.1.11）与
+    边界 `tag <M>=<B>` 决定。现在只在两处消费：`audit_checklist`（运行态投影）与
+    `compute_audit_suggestion`（"本里程碑已有报告即视为已审"，提醒用）。
     """
     from k3dge.engine.audit_report import _find_report, _parse_audit_stats
 

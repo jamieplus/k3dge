@@ -9,8 +9,12 @@ state of the audit loop — not "can I seal". The checklist holds:
 
 Caching: keyed by a hash of the current milestone's task statuses so `check` need
 not re-scan when nothing changed. **Initiating an audit (`k3dge milestone audit`)
-resets the checklist** (fresh verify budget + new started_at). Seal eligibility /
-`[NEXT] seal_ready` is decided elsewhere (`audit_trigger.audit_closed`), not here.
+resets the checklist** (fresh verify budget + new started_at).
+
+**这是运行态投影，不是判据**（ADR-0004 §2.1.10 🅰1）：文件在 `.agent/`（本地、可删、可重建）；
+判据只认 git 事实（基线 hash / 边界 `tag <M>=<B>` / 封版提交 trailer，见
+`audit_flow.audit_evidence`），两者冲突**以 git 为准**。`[NEXT] seal_ready` 的判据在
+`cli/status.lifecycle_next`（预审＝形式闸），也不在此。
 """
 
 from __future__ import annotations

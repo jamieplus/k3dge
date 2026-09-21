@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - incidents frontmatter id 双写收成单一源（文件名）
 - 闸红声明面收尾：pure_* 检查器产结构化事实（3-tuple），Violation.message 降为兜底
 - 封版三相位重排：预审（align+形式闸）→ 审计 → 审核后自动；`full_matrix` 移出封板动作、删 `satisfies`
+- 报告降级为可选产物：`audit_closed`/`evidence_chain` 不再卡门、`audit-submit` 只补证据、运行态明标投影
 ### Fixed
 - seal/align 任务扫描不含 archive/<M>/：提前归档的 done 里程碑任务致封板被拒（No tasks found）
 

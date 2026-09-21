@@ -74,15 +74,6 @@ class TestSealRecord(TestCase):
         self.assertEqual(_git(ws, "rev-parse", "M10^{commit}"), baseline)
         self.assertNotEqual(_git(ws, "rev-parse", "HEAD"), baseline)
 
-    def test_zero_audit_commit_still_gets_a_record(self) -> None:
-        """审计零提交 ⇒ 仍有封版提交承载记录（否则记录没有载体）。"""
-        ws = _repo()
-        baseline = _git(ws, "rev-parse", "HEAD")
-        ok, msg = seal_record(ws, "M10", baseline=baseline, result="closed")
-        self.assertTrue(ok, msg)
-        self.assertIn("无改动", msg)          # 空改动不造空提交
-        self.assertEqual(_git(ws, "rev-parse", "M10^{commit}"), baseline)
-
     def test_clean_tree_does_not_create_empty_commit(self) -> None:
         ws = _repo()
         baseline = _git(ws, "rev-parse", "HEAD")
@@ -119,3 +110,52 @@ class TestTagBoundary(TestCase):
         ok, msg = seal_record(ws, "M10", baseline="abc1234", result="closed")
         self.assertFalse(ok)
         self.assertIn("git", msg.lower())
+
+
+class TestAuditEvidence(TestCase):
+    """判据只认 git 事实；本地账是投影，**冲突以 git 为准**（ADR-0004 §2.1.10）。"""
+
+    def test_absent_tag_means_not_sealed(self) -> None:
+        from k3dge.engine.audit_flow import audit_evidence
+
+        ws = _repo()
+        ev = audit_evidence(ws, "M10")
+        self.assertEqual(ev, {"tag": "", "trailers": {}, "sealed": False})
+
+    def test_tag_with_trailers_is_sealed(self) -> None:
+        """干净树也要能读回记录：`_commit_all` 不造空提交 ⇒ tag 注解是第二载体。"""
+        from k3dge.engine.audit_flow import audit_evidence
+
+        ws = _repo()
+        baseline = _git(ws, "rev-parse", "HEAD")
+        ok, msg = seal_record(ws, "M10", baseline=baseline, seat="k3dit@seat", result="closed")
+        self.assertTrue(ok, msg)
+        self.assertIn("无改动", msg)                       # 干净树 ⇒ 没有封版提交
+        ev = audit_evidence(ws, "M10")
+        self.assertEqual(ev["tag"], baseline)
+        self.assertTrue(ev["sealed"])
+        self.assertEqual(ev["trailers"]["audit-result"], "closed")
+        self.assertEqual(ev["trailers"]["audit-seat"], "k3dit@seat")
+
+    def test_tag_without_trailers_is_not_sealed(self) -> None:
+        """有 tag 不等于有记录：四键齐才算封版记录（缺键就是缺记录，不猜）。"""
+        from k3dge.engine.audit_flow import audit_evidence
+
+        ws = _repo()
+        _git(ws, "tag", "-a", "M10", "-m", "hand-made", "HEAD")
+        ev = audit_evidence(ws, "M10")
+        self.assertTrue(ev["tag"])
+        self.assertFalse(ev["sealed"])
+
+    def test_local_job_state_cannot_claim_a_seal(self) -> None:
+        """本地账说 `collected`、仓里没有 tag/trailer ⇒ 判"未封"（git 优先）。"""
+        from k3dge.engine import audit_flow
+
+        ws = _repo()
+        (ws / ".agent").mkdir(exist_ok=True)
+        (ws / ".agent" / "audit_jobs.json").write_text(
+            '{"jobs": [{"job_id": "J1", "role": "audit", "milestone_id": "M10",'
+            ' "state": "collected", "baseline": "deadbeef", "report": "docs/reviews/x.md",'
+            ' "counts": {"待修": 0}, "merge_ok": true}]}',
+            encoding="utf-8")
+        self.assertFalse(audit_flow.audit_evidence(ws, "M10")["sealed"])

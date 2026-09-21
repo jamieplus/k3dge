@@ -157,12 +157,12 @@ class TestMcp(unittest.TestCase):
             subprocess.run(["git", "commit", "-m", "init"], cwd=root, capture_output=True)
             payload = json.loads(mcp.k3dge_milestone_control("align", "M9", workspace_path=d))
             self.assertTrue(payload["aligned"], payload)
-            # align no longer carries a checkpoint nor "seal_eligible"; the next
-            # step after align is AUDIT (seal only unlocks after the audit closes).
+            # align no longer carries a checkpoint nor "seal_eligible"; 预审（形式闸）全绿时
+            # 下一步就是 seal（审计由 seal 相位 2 自己跑，ADR-0004 §2.1.9）。
             self.assertNotIn("checkpoint", payload)
             self.assertNotIn("seal_eligible", payload)
             self.assertIn("next", payload)
-            self.assertEqual(payload["next"]["state"], "audit_suggested")
+            self.assertEqual(payload["next"]["state"], "seal_ready")
 
 
 class TestAuditPromptRouting(unittest.TestCase):

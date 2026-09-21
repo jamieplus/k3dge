@@ -32,15 +32,20 @@ def test_all_green_exits_zero(tmp_path, monkeypatch):
 
 
 def test_unmet_exits_one_and_lists_reason(tmp_path, monkeypatch):
-    ws = _ws(tmp_path, '"audit_closed"')   # 空仓必失败：无 12 列报告
+    # 空仓里形式闸几乎都"过"（无 guides/无 ADR ＝ 无偏差）⇒ 放一个 guide-stub 才是真失败项
+    ws = _ws(tmp_path, '"guides_filled"')
+    (ws / "docs" / "guides").mkdir(parents=True, exist_ok=True)
+    (ws / "docs" / "guides" / "g.md").write_text("# G\n<!-- k3dge:guide-stub -->\n", encoding="utf-8")
     monkeypatch.chdir(ws)
     buf = io.StringIO()
     with redirect_stdout(buf):
         rc = main(["milestone", "seal-check", "M10"])
     out = buf.getvalue()
     assert rc == 1
-    assert "❌ audit_closed" in out
+    assert "❌ guides_filled" in out
     assert "需你先办 1 项" in out
+    # durable 证据一栏（ADR-0004 §2.1.10）：只陈述事实，不影响退出码
+    assert "[EVIDENCE]" in out
 
 
 def test_read_only_does_not_touch_state(tmp_path, monkeypatch):

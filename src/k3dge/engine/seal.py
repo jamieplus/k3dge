@@ -342,10 +342,15 @@ def parse_seal_trailers(text: str) -> dict:
     return out
 
 
-def tag_audit_baseline(workspace: Path, milestone_id: str, baseline: str) -> Tuple[bool, str]:
+def tag_audit_baseline(
+    workspace: Path, milestone_id: str, baseline: str, *, trailers: str = ""
+) -> Tuple[bool, str]:
     """`tag <M> = B`（annotated）：边界＝审的那一版（ADR-0004 §2.1.9）。
 
     幂等：同指向 ⇒ 绿（已立）；指向不同 ⇒ **拒**（静默移动 tag 会毁掉边界事实）。
+
+    `trailers` 也写进注解正文：**零改动的封版没有提交可挂**（`_commit_all` 不造空提交）
+    ⇒ tag 是记录的第二载体；`audit_evidence` 两处都读（先提交、后注解）。
     """
     id_err = _validate_milestone_id(milestone_id)
     if id_err:
@@ -358,8 +363,10 @@ def tag_audit_baseline(workspace: Path, milestone_id: str, baseline: str) -> Tup
             return True, f"边界 tag 已在（{milestone_id} = {baseline[:12]}）"
         return False, (f"tag {milestone_id} 已存在且指向 {existing[:12]} ≠ 本次基线 "
                        f"{baseline[:12]}：不移动（边界事实不可改写），请人工裁决。")
-    rc, out = _git(workspace, "tag", "-a", milestone_id, "-m",
-                   f"Seal boundary for {milestone_id}: audited baseline {baseline[:12]}", baseline)
+    note = f"Seal boundary for {milestone_id}: audited baseline {baseline[:12]}"
+    if trailers:
+        note += "\n\n" + trailers
+    rc, out = _git(workspace, "tag", "-a", milestone_id, "-m", note, baseline)
     if rc != 0:
         return False, f"建边界 tag 失败：{out[:160]}"
     return True, f"边界 tag：{milestone_id} = {baseline[:12]}"
@@ -411,14 +418,15 @@ def seal_record(
     ⇒ 把记录挂在"审计的提交"上会没有载体（本会话实测）。封版动作本身必然产生改动，
     所以这里一定有载体。
     """
+    trailers = format_seal_trailers(milestone_id, baseline, seat, result)
     msg = (subject or f"chore(seal): seal milestone {milestone_id} "
                        f"(audit {result or '?'}; baseline {(baseline or '?')[:12]})")
-    msg += "\n\n" + format_seal_trailers(milestone_id, baseline, seat, result)
+    msg += "\n\n" + trailers
     ok, out = _commit_all(workspace, msg)
     if not ok:
         return False, out
     committed = out
-    tag_ok, tag_msg = tag_audit_baseline(workspace, milestone_id, baseline)
+    tag_ok, tag_msg = tag_audit_baseline(workspace, milestone_id, baseline, trailers=trailers)
     if not tag_ok:
         return False, tag_msg
     return True, f"封版提交 {committed[:12] or '(无改动，未提交)'}；{tag_msg}"

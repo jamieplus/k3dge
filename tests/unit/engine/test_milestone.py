@@ -290,6 +290,20 @@ class TestMilestone(unittest.TestCase):
         self.assertIsNotNone(err)
         self.assertIn("align-pass", err)
 
+    def test_report_presence_is_never_a_seal_precondition(self) -> None:
+        """ADR-0004 §2.1.3/§2.1.10：报告＝**可选产物** ⇒ 报告存在性/新鲜度（`audit_closed` /
+        `evidence_chain` / `audit_fresh`）不得出现在任何 `[checks.*]` 的 preconditions 里
+        （缺省面与仓内声明面都验）——否则又会退回"有旧报告就能封"的旧模型。"""
+        from k3dge.engine import gates
+
+        banned = {"audit_closed", "evidence_chain", "audit_fresh"}
+        repo = pathlib.Path(__file__).resolve().parents[3]
+        for ws in (pathlib.Path(tempfile.mkdtemp()), repo):
+            declared = gates.DEFAULTS if ws != repo else gates.load(ws)
+            for kind, unit in (declared.get("checks") or {}).items():
+                hit = banned & set(unit.get("preconditions") or [])
+                self.assertEqual(hit, set(), f"{ws} [checks.{kind}] preconditions 含 {hit}")
+
     def test_seal_gate_audit_closed_is_retired(self) -> None:
         """`audit_closed` 已退休（ADR-0004 §2.1.3/§2.1.9）：报告降为可选产物、审计由 seal
         相位 2 自己跑 ⇒ 声明里再写它就是**配置错**（闸不静默空转）。"""
@@ -476,10 +490,13 @@ class TestSealChecklist(unittest.TestCase):
         from k3dge.engine.seal import render_checklist
 
         _write_task(self.ws / "docs/tasks/x.md", "done", "M10")
-        _set_seal_gates(self.ws, "tasks_all_done", "audit_closed")
+        (self.ws / "docs" / "guides").mkdir(parents=True, exist_ok=True)
+        (self.ws / "docs" / "guides" / "g.md").write_text(
+            "# G\n<!-- k3dge:guide-stub -->\n", encoding="utf-8")
+        _set_seal_gates(self.ws, "tasks_all_done", "guides_filled")
         text = render_checklist(self.ws, "M10")
         self.assertIn("✅ tasks_all_done", text)
-        self.assertIn("❌ audit_closed", text)
+        self.assertIn("❌ guides_filled", text)
         self.assertIn("1/2 通过", text)
         self.assertIn("需你先办 1 项", text)
 

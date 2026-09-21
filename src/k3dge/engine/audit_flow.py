@@ -4,7 +4,10 @@
 - k3dge 只认角色 `audit`（`[roles.audit] bind` 决定实现），代码路径上不出现具体 harness 名；
 - 等待不占协议：`job_id` 落编排状态（`.agent/audit_jobs.json`），何时 collect 由外层决定；
 - k3dge 只验信封与形式（kind / provenance.baseline / 12 列计数），机械落盘对端字节，不补内容；
-- 失败按契约错误码分类透传（报原因，不探内部）。
+- 失败按契约错误码分类透传（报原因，不探内部）；
+- `STATE_REL`（`.agent/audit_jobs.json`）是**运行态投影**（ADR-0004 §2.1.10）：本地、
+  可重建、**不作判据**——判据只认 git 事实（`audit_evidence()`：边界 tag + 封版提交 trailer），
+  两者冲突以 git 为准。
 """
 from __future__ import annotations
 
@@ -52,6 +55,59 @@ def audit_call_result(produced) -> str:
 def audit_result_of(status: str) -> Optional[str]:
     """审计流程状态 → 闭集值；in-flight（尚未正常返回）⇒ None。"""
     return _STATUS_RESULTS.get(status)
+
+
+def audit_evidence(workspace: Path, milestone_id: str) -> dict:
+    """审计的 **durable 证据**（判据只认这些）：边界 tag + 封版提交 trailer。
+
+    与本地账（`.agent/audit_jobs.json` / `.agent/audit_checklist.json`）的关系是
+    **写源/投影**（ADR-0004 §2.1.10）：本地账可重建、可删，**不作判据**；两者冲突
+    以本函数为准（例：job.state=`collected` 但仓里无 tag/trailer ⇒ 判"未封"）。
+
+    返回 `{"tag": <sha 或 "">, "trailers": {...}, "sealed": bool}`；非 git 仓 ⇒ 全空/False。
+    """
+    import subprocess
+
+    from k3dge.engine.seal import SEAL_TRAILER_KEYS
+
+    def _git(*args: str) -> str:
+        try:
+            r = subprocess.run(["git", "-C", str(workspace), *args], capture_output=True, text=True)
+        except OSError:
+            return ""
+        return r.stdout.strip() if r.returncode == 0 else ""
+
+    tag = _git("rev-parse", f"refs/tags/{milestone_id}^{{commit}}")
+    trailers: dict = {}
+    if tag:
+        # 记录在**封版提交**上（tag 指基线，那条提交本身没有 trailer）⇒ 沿历史找带
+        # `Seal-milestone: <id>` 的那次提交；记录分隔用 RS，字段用 US（提交正文可能多行）。
+        log = _git("log", "--format=%H%x1f%(trailers)%x1e")
+        for rec in log.split("\x1e"):
+            rec = rec.strip("\n")
+            if not rec:
+                continue
+            _sha, _, body = rec.partition("\x1f")
+            cand = _parse_trailers(body)
+            if cand.get("seal-milestone") == milestone_id:
+                trailers = cand
+                break
+        if not trailers:
+            # 第二载体：tag 注解正文（**零改动封版**没有提交可挂 ⇒ 记录只在注解里）
+            trailers = _parse_trailers(_git("for-each-ref", "--format=%(contents)",
+                                            f"refs/tags/{milestone_id}"))
+    return {
+        "tag": tag,
+        "trailers": trailers,
+        "sealed": bool(tag) and set(trailers) >= set(SEAL_TRAILER_KEYS),
+    }
+
+
+def _parse_trailers(text: str) -> dict:
+    """薄委托 `seal.parse_seal_trailers`（记录格式的写源在那里，避免两处解析）。"""
+    from k3dge.engine.seal import parse_seal_trailers
+
+    return parse_seal_trailers(text)
 
 
 # ---------- 编排状态（k3dge 自己的事实，不是 peer 的） ----------

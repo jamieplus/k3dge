@@ -396,15 +396,17 @@ def k3dge_milestone_control(
     )
 
     if act == "align":
-        # Full Matrix only — no human prompt. After align the next step is AUDIT
-        # (not seal); seal unlocks only once the audit loop closes.
+        # Full Matrix only — no human prompt. align 是**预审**（进审计的门槛，ADR-0004 §2.1.9），
+        # 不是封板的收尾动作：预审全绿 ⇒ 可 seal（seal 自己跑审计）。
         from k3dge.engine import nextstep
-        from k3dge.engine.audit_trigger import audit_closed, compute_audit_suggestion
+        from k3dge.engine.audit_trigger import compute_audit_suggestion
+        from k3dge.engine.seal import unmet_seal_preconditions
 
         ok, msg, tasks = run_milestone_alignment(ws, milestone_id)
         if not ok:
             nxt = nextstep.next_for_rejection(milestone_id, msg)
-        elif audit_closed(ws, milestone_id):
+        elif not unmet_seal_preconditions(ws, milestone_id):
+            # 预审（形式闸）全绿 ⇒ 可 seal（审计由 seal 相位 2 跑，ADR-0004 §2.1.9）
             nxt = nextstep.seal_ready_for(ws, milestone_id)
         else:
             _, reasons = compute_audit_suggestion(ws)
@@ -525,13 +527,17 @@ def k3dge_submit_audit_report(
     """Persist a human/agent-submitted audit report as the canonical on-disk report.
 
     External audit sources (a human pasting a report into the dialog, or an agent
-    forwarding one) must be landed under docs/reviews/ so the seal flow can gate on
-    it. Canonicalizes the 12-col header when missing; latest submission wins.
+    forwarding one) must be landed under docs/reviews/ so the audit has durable
+    evidence. Canonicalizes the 12-col header when missing; latest submission wins.
+
+    **只补证据**（ADR-0004 §2.1.10/§2.1.11）：不推进版号、不触发封板——版号前进只认
+    "审计正常返回"（`seal` 相位 2），边界由 `tag <M>=<B>` 表达。
     """
     ws = _find_workspace(workspace_path=workspace_path)
     path = persist_external_audit_report(ws, milestone_id, content or "")
     return json.dumps(
-        {"ok": True, "milestone_id": milestone_id, "path": str(path)},
+        {"ok": True, "milestone_id": milestone_id, "path": str(path),
+         "advances_version": False, "triggers_seal": False},
         indent=2,
         ensure_ascii=False,
     )

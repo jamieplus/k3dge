@@ -173,6 +173,8 @@ audit_call_result(produced) -> str
     # doc: 一跳传输的结果 → `AUDIT_RESULTS` 里的一档（ADR-0004 §2.1.11）。
 audit_result_of(status: str) -> Optional[str]
     # doc: 审计流程状态 → 闭集值；in-flight（尚未正常返回）⇒ None。
+audit_evidence(workspace: Path, milestone_id: str) -> dict
+    # doc: 审计的 **durable 证据**（判据只认这些）：边界 tag + 封版提交 trailer。
 submit_audit(workspace: Path, milestone_id: str, targets: Optional[list]=None, io=None, role: str='audit') -> dict
     # doc: produce 阶段：锁审计线 → 交件 → 落 `awaiting_audit`。协议调用必须短。
 collect_audit(workspace: Path, milestone_id: str, job_id: Optional[str]=None, io=None) -> dict
@@ -206,7 +208,7 @@ from k3dge.engine.task_index import scan_milestone_tasks
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
     # doc: Return (suggested, reasons). Only fires on a quantitative event.
 audit_closed(workspace: Path, milestone_id: str) -> bool
-    # doc: True iff the single audit report exists with 待修==0.
+    # doc: True iff the single audit report exists with 待修==0（报告的**合格性**）。
 # changelog.py
 from __future__ import annotations
 from pathlib import Path
@@ -622,10 +624,6 @@ validate_pipeline_config(workspace: Path) -> List[PipelineViolation]
     # doc: Validate `.agent/pipeline.toml`. Returns [] when valid or file absent.
 # process_audit.py
 from __future__ import annotations
-from pathlib import Path
-from typing import Optional
-evidence_chain_error(workspace: Path, milestone_id: str) -> Optional[str]
-    # doc: 证据链（完整性 + 可追溯）不满足 ⇒ 返回拒因；满足 ⇒ None。
 # prompt.py
 from __future__ import annotations
 class Prompt
@@ -786,7 +784,7 @@ format_seal_trailers(milestone_id: str, baseline: str, seat: str, result: str) -
     # doc: 封版提交 trailer 文本（git 认 `Key: value`；键用 `SEAL_TRAILER_KEYS`）。
 parse_seal_trailers(text: str) -> dict
     # doc: `git log --format=%(trailers)` / 提交正文 → `{key: value}`（键小写）。
-tag_audit_baseline(workspace: Path, milestone_id: str, baseline: str) -> Tuple[bool, str]
+tag_audit_baseline(workspace: Path, milestone_id: str, baseline: str, *, trailers: str='') -> Tuple[bool, str]
     # doc: `tag <M> = B`（annotated）：边界＝审的那一版（ADR-0004 §2.1.9）。
 seal_record(workspace: Path, milestone_id: str, *, baseline: str, seat: str='', result: str='', subject: str='') -> Tuple[bool, str]
     # doc: 相位 3 的持久记录：**封版提交**（归档/提版/收摊/审计产出一起进）+ 边界 tag。

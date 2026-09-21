@@ -307,13 +307,15 @@ class TestWorkspaceHints(TestCase):
 
 
 class TestLifecycleNext(TestCase):
-    def test_audit_first_then_seal(self) -> None:
+    def test_seal_ready_when_precheck_green(self) -> None:
+        """ADR-0004 §2.1.9：审计**不是**封板的前置闸（seal 相位 2 自己跑）⇒ 票全 done
+        且预审无"需人先办"时 `[NEXT]` 直接给 `seal_ready`，不再先要一次独立审计。"""
         from k3dge.cli import main as cli_main
 
         ws = _base_ws()
-        with mock.patch.object(audit_trigger, "_git_changed_files", return_value=[]):
-            ns = cli_main._lifecycle_next(ws)
-        self.assertEqual(ns.state, "audit_suggested")
+        ns = cli_main._lifecycle_next(ws)
+        self.assertEqual(ns.state, "seal_ready")
+        self.assertIn("预审待办：全绿", ns.render_cli())
 
     def test_seal_ready_when_audit_closed(self) -> None:
         from k3dge.cli import main as cli_main

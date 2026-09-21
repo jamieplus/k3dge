@@ -688,6 +688,16 @@ def cmd_milestone(args: argparse.Namespace) -> int:
         from k3dge.engine.seal import render_checklist, unmet_seal_preconditions
 
         print(render_checklist(workspace, m_id))
+        # durable 证据（ADR-0004 §2.1.10）：判据只认 git 事实（边界 tag + 封版提交 trailer）；
+        # 本地账（audit_jobs/audit_checklist）是运行态投影 ⇒ 冲突以 git 为准。此处只陈述事实，
+        # 不是闸（报告是可选产物），所以它**不影响**退出码。
+        from k3dge.engine.audit_flow import audit_evidence
+
+        ev = audit_evidence(workspace, m_id)
+        tag = ev["tag"][:12] if ev["tag"] else "-"
+        print(f"[EVIDENCE] 边界 tag {m_id} = {tag}；封版记录 "
+              f"{'齐（' + ', '.join(f'{k}={v}' for k, v in ev['trailers'].items()) + '）' if ev['sealed'] else '缺'}"
+              f" —— 本地账不作判据（git 事实优先）")
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone seal-check -> {m_id} unmet={len(unmet_seal_preconditions(workspace, m_id))}")
         return 1 if unmet_seal_preconditions(workspace, m_id) else 0
 
@@ -705,8 +715,9 @@ def cmd_milestone(args: argparse.Namespace) -> int:
             return 1
         path = persist_external_audit_report(workspace, m_id, raw, kind=getattr(args, "kind", "audit") or "audit")
         print(f"[AUDIT] persisted external audit report -> {path}")
+        print("[AUDIT] 只补证据（ADR-0004 §2.1.10）：不推进版号、不触发封板——"
+              "版号前进只认审计正常返回（seal 相位 2）。")
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone audit-submit -> {m_id} -> {path}")
-        # Landed report may close the audit loop -> unlock the seal question.
         _emit_lifecycle_next(workspace, sys.stdout)
         return 0
 

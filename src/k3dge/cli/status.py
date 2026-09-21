@@ -46,14 +46,19 @@ def lifecycle_next(workspace: Path) -> Any:
     Lives here — not in `cli/main.py` — because `workspace_status` must put the same
     value on both exits: human `[NEXT]`, ``status --json`` `.next`, and MCP
     `k3dge_status`. Precedence stays pending_findings > ratchet_open > seal_ready > audit_suggested.
+
+    `seal_ready` 的判据＝**预审**（票全 done + 形式闸齐，ADR-0004 §2.1.9 相位 1），与 `seal`
+    自己的门槛同源（`seal.unmet_seal_preconditions`）；**审计状态不参与**——审计是 seal 相位 2
+    自己跑的，不是"先审好才谈封"的前置闸。
     """
     from typing import Optional
 
     from k3dge.engine import nextstep
     from k3dge.engine.audit_flow import open_ratchet_jobs
-    from k3dge.engine.audit_trigger import audit_closed, compute_audit_suggestion
+    from k3dge.engine.audit_trigger import compute_audit_suggestion
     from k3dge.engine.milestone_audit import scan_pending_findings
     from k3dge.engine.milestone_pointer import get_current_milestone
+    from k3dge.engine.seal import unmet_seal_preconditions
 
     try:
         mid = get_current_milestone(workspace)
@@ -69,7 +74,8 @@ def lifecycle_next(workspace: Path) -> Any:
                 "ratchet_open", j.get("milestone_id") or mid,
                 reasons=[f"job {x.get('job_id')}（{x.get('state')}）" for x in open_jobs[:3]],
             )
-        if audit_closed(workspace, mid):
+        if not unmet_seal_preconditions(workspace, mid):
+            # 预审全绿 ⇒ 可以收这一章了（seal 会跑审计，ADR-0004 §2.1.9）
             return nextstep.seal_ready_for(workspace, mid)
         suggested, reasons = compute_audit_suggestion(workspace)
         if suggested:

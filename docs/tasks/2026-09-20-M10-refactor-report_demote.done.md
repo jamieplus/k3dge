@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M10
 priority: P2
 date: 2026-09-20
@@ -52,3 +52,24 @@ rm .agent/audit_jobs.json ⇒ 判据不受影响（结论可从 git 重建）
 
 - `_SIGN_KEYS`（含 `基线`）保留：报告一旦存在就必须合格。
 - 与 `refactor-seal_phases` 同轮落最省（都改 `[checks.seal]` 声明面）。
+
+## 落地（2026-09-20）
+
+| 项 | 落点 | 实测 |
+| --- | --- | --- |
+| ① `audit_closed` 改定性 | `audit_trigger` 文档明写"报告**合格性**，不是封板前置"；消费面只剩 `audit_checklist`（投影）与 `compute_audit_suggestion`（提醒） | `test_report_presence_is_never_a_seal_precondition`（缺省面 + 仓内声明面都验 `audit_closed`/`evidence_chain`/`audit_fresh` 不在任何 preconditions） |
+| ② 删 `audit_fresh`/`fresh_ignore` | T2 已随之落地（同一批声明行）；本票补守卫测试 | 同上 |
+| ③ `audit-submit` 只补证据 | `persist_external_audit_report` / MCP 文档 + MCP 回包新增 `advances_version: false, triggers_seal: false`；CLI 打印同句 | MCP 回包字段可断言；`audit-submit` 前后版号/`tag` 不变（`TestAuditEvidence::test_absent_tag_means_not_sealed`） |
+| ④ 运行态明标投影 | `audit_flow` 模块头 + `audit_checklist` 模块头：本地账可重建、**不作判据**、冲突以 git 为准；新增 `audit_flow.audit_evidence()`（读**边界 tag + 封版提交 trailer**，tag 注解为第二载体） | `TestAuditEvidence`（4 条）：无 tag ⇒ 未封；tag+trailer ⇒ 已封；**tag 无 trailer ⇒ 未封**；**本地账说 collected 但仓里无 tag ⇒ 判未封（git 优先）** |
+| ⑤ `evidence_chain` 降级 | 其唯一函数 `evidence_chain_error` 在 src 已无消费者（纯死码）⇒ **删除**；报告合格性留在审计侧用 `_SIGN_KEYS`（T1 的降级署名判据）。`process_audit` 模块头改述"不是封板前置" | `tests/unit/engine/test_process_audit.py` 重写为只测 `_SIGN_KEYS`/`_field`（5 条）；旧 4 条"缺报告/未入库 ⇒ 拒"随判据退休而删 |
+| ⑥ `[NEXT]` 判据换源 | `cli/status.lifecycle_next` 与 MCP `align` 分支：`seal_ready` 改由 `seal.unmet_seal_preconditions`（预审＝形式闸）决定，**审计状态不参与** | `test_seal_ready_when_precheck_green` / `test_align_payload_no_checkpoint` 改为断言 `seal_ready` |
+| ⑦ `seal-check` 展示证据 | `k3dge milestone seal-check <id>` 追加 `[EVIDENCE]` 行（边界 tag / 封板记录齐否 + "本地账不作判据"），**不影响退出码**（报告是可选产物） | `test_seal_check.test_unmet_exits_one_and_lists_reason` 断言 `[EVIDENCE]` |
+| ⑧ 散文同步 | `AGENTS.md` §12 + `.agent/rules/04-milestone.md`（+镜像）：只补证据、可选产物、`audit_closed` 新定性、运行态投影、git 优先 | PAIRS `diff` 一致 |
+
+测试：**668 passed, 2 skipped**；`k3dge check` 绿。
+
+### 顺带补的洞（T3 收尾发现）
+
+「封版记录挂在提交上」在**零改动**时不成立（`_commit_all` 不造空提交 ⇒ 干净树没有载体）。
+补法：tag 的**注解正文**同样写 trailer，`audit_evidence` 先沿历史找带 `Seal-milestone` 的提交、
+找不到再读注解 ⇒ 两条路都可读回。证据：`test_tag_with_trailers_is_sealed`（干净树 ⇒ 仍 `sealed=True`）。
