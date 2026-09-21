@@ -146,7 +146,7 @@ class TestAuditEvidence(TestCase):
         from k3dge.engine.audit_flow import audit_evidence
 
         ws = _repo()
-        _git(ws, "tag", "-a", "M10", "-m", "hand-made", "HEAD")
+        _git(ws, "-c", "user.name=t", "-c", "user.email=t@t", "tag", "-a", "M10", "-m", "hand-made", "HEAD")
         ev = audit_evidence(ws, "M10")
         self.assertTrue(ev["tag"])
         self.assertFalse(ev["sealed"])

@@ -29,7 +29,12 @@ def _commit(ws: Path, subject: str, *, body: str = "") -> str:
 
 
 def _tag(ws: Path, name: str) -> None:
-    subprocess.run(["git", "tag", "-a", name, "-m", name], cwd=ws, capture_output=True)
+    r = subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "tag", "-a", name, "-m", name],
+        cwd=ws, capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr or r.stdout)
 
 
 class TestMechanical(TestCase):

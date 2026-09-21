@@ -303,17 +303,21 @@ def render_checklist(workspace: Path, milestone_id: str) -> str:
 # ── 封版记录：trailer + 边界 tag（ADR-0004 §2.1.9/§2.1.10 的 durable 面）──────
 #: 封版提交的 trailer 键（**唯一格式源**：写入与读回都走本模块的 format/parse）。
 SEAL_TRAILER_KEYS = ("seal-milestone", "audit-baseline", "audit-seat", "audit-result")
+#: annotated tag 与封版提交同一进程身份（runner 默认没有 user.name；缺 ident 会空 stderr 失败）。
+_PROCESS_GIT = ("-c", "user.name=k3dge-process", "-c", "user.email=noreply@k3dge.local")
 
 
 def _git(workspace: Path, *args: str) -> tuple[int, str]:
-    """`git -C <ws> …` → (rc, stdout)。异常也落成 rc≠0（判定不抛）。"""
+    """`git -C <ws> …` → (rc, stdout) 成功；(rc, stderr) 失败。异常也落成 rc≠0（判定不抛）。"""
     import subprocess
 
     try:
         r = subprocess.run(["git", "-C", str(workspace), *args], capture_output=True, text=True)
     except OSError as exc:  # pragma: no cover - git 缺失属环境异常
         return 127, str(exc)
-    return r.returncode, (r.stdout or "").strip()
+    if r.returncode == 0:
+        return 0, (r.stdout or "").strip()
+    return r.returncode, ((r.stderr or "").strip() or (r.stdout or "").strip())
 
 
 def head_commit(workspace: Path) -> str:
@@ -375,7 +379,7 @@ def tag_audit_baseline(
     note = f"Seal boundary for {milestone_id}: audited baseline {baseline[:12]}"
     if trailers:
         note += "\n\n" + trailers
-    rc, out = _git(workspace, "tag", "-a", milestone_id, "-m", note, baseline)
+    rc, out = _git(workspace, *_PROCESS_GIT, "tag", "-a", milestone_id, "-m", note, baseline)
     if rc != 0:
         return False, f"建边界 tag 失败：{out[:160]}"
     return True, f"边界 tag：{milestone_id} = {baseline[:12]}"
@@ -401,9 +405,7 @@ def _commit_all(workspace: Path, msg: str) -> Tuple[bool, str]:
         fh.write(msg)
         tmp = fh.name
     try:
-        rc, out = _git(workspace, "-c", "user.name=k3dge-process",
-                       "-c", "user.email=noreply@k3dge.local",
-                       "commit", "--no-verify", "-F", tmp)
+        rc, out = _git(workspace, *_PROCESS_GIT, "commit", "--no-verify", "-F", tmp)
     finally:
         try:
             Path(tmp).unlink()

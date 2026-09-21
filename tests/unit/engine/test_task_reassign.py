@@ -133,7 +133,7 @@ class TestBoundaryNudge(TestCase):
         (ws / "seed.md").write_text("seed\n", encoding="utf-8")
         g("add", "-A")
         g("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--no-verify", "-m", "chore: seed")
-        g("tag", "-a", "M10", "-m", "boundary")
+        g("-c", "user.name=t", "-c", "user.email=t@t", "tag", "-a", "M10", "-m", "boundary")
         return ws
 
     def test_task_added_after_boundary_and_still_labelled_is_reported(self) -> None:
