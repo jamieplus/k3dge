@@ -20,7 +20,7 @@ from k3dge.engine.task_index import MILESTONE_RE, TITLE_RE, parse_frontmatter
 _TASK_TYPES = frozenset({"audit", "feat", "fix", "docs", "chore", "refactor"})
 
 
-# k3dit:fixnote value-20 有 report: 指针的票不再跑模糊回填（防误翻他报告）；CC 与补测留主仓
+# k3dit:pending value-20 改的是调用方 _backfill_task_reviews（task_write.py:262-266 加 _task_report_pointer 早返回），而 finding 指的 _auto_backfill_reviews（task_write.py:24-120）本体未动、CC36 未降，且无新增测试；ADR-0022:35 只把它定为「无 report: 指针旧 task 的遗留兜底」——若主张即此，应翻 leftover 而非 fixed。请抽子函数降 CC，或改判 leftover。
 def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, milestone: str | None) -> None:
     """Best-effort auto-backfill for audit reviews when a task is marked done.
 
