@@ -281,6 +281,14 @@
       "tokens": "Incident: 合并审计模块/postmortem 落地后设计文档滞后于已决行为"
     },
     {
+      "path": "docs/incidents/INC-20260920-AST-stale-report-closed-audit.md",
+      "type": "incidents",
+      "id": "INC-20260920-AST-stale-report-closed-audit",
+      "title": "Incident: 旧报告充闭环——ratchet 的「已闭环」只看本地账，M10 因此被封板",
+      "status": "closed",
+      "tokens": "Incident: 旧报告充闭环——ratchet 的「已闭环」只看本地账，M10 因此被封板"
+    },
+    {
       "path": "docs/memo/2026-09-13-agent-dev-tools-absorption-eval.md",
       "type": "memo",
       "id": "2026-09-13-agent-dev-tools-absorption-eval",
@@ -367,6 +375,14 @@
       "title": "审计：src,docs（milestone M10）",
       "status": "",
       "tokens": "审计：src,docs（milestone M10）"
+    },
+    {
+      "path": "docs/reviews/2026-09-20-M10-align.md",
+      "type": "reviews",
+      "id": "2026-09-20-M10-align",
+      "title": "里程碑对齐与验收报告: M10",
+      "status": "",
+      "tokens": "里程碑对齐与验收报告: M10"
     },
     {
       "path": "docs/reviews/2026-09-20-M10-closure.md",
@@ -727,6 +743,14 @@
       "title": "编排骨架收敛·节点表：pipeline.toml [checks.*] 单一声明面 + 五属性 + ctx + 单执行器（下游可配）",
       "status": "done",
       "tokens": "编排骨架收敛·节点表：pipeline.toml [checks.*] 单一声明面 + 五属性 + ctx + 单执行器（下游可配）"
+    },
+    {
+      "path": "docs/tasks/2026-09-20-M10-audit-audit_job_1e408cbd4c78.md",
+      "type": "tasks",
+      "id": "2026-09-20-M10-audit-audit_job_1e408cbd4c78",
+      "title": "audit job 1e408cbd4c78: src,docs",
+      "status": "idea",
+      "tokens": "audit job 1e408cbd4c78: src,docs"
     },
     {
       "path": "docs/tasks/2026-09-20-M10-feat-milestone_reassign.done.md",
