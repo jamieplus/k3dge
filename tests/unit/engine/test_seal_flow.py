@@ -472,6 +472,28 @@ class TestRatchetAuditStep(TestCase):
         (ws / ".agent" / "pipeline.toml").write_text(self._RATCHET, encoding="utf-8")
         return ws
 
+    def _ws_r_git(self, *, report: str = "", baseline: str = ""):
+        """真 git 仓（`_baseline_covers` 要看 git 事实）+ 可选的**带签名**报告。
+
+        为什么要真仓：本地账里的"已闭环"不再算数（ADR-0004 §2.1.10）——接受它必须同时满足
+        报告在盘上、署名齐、报告基线＝单基线、且单基线覆盖本轮 B。桩掉 git 就没法验其中两条。
+        """
+        import subprocess
+
+        ws = self._ws_r()
+        subprocess.run(["git", "init", "-q"], cwd=ws, capture_output=True)
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit",
+                        "-q", "--no-verify", "--allow-empty", "-m", "chore: init"],
+                       cwd=ws, capture_output=True)
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True,
+                              text=True).stdout.strip()
+        if report:
+            (ws / "docs" / "reviews").mkdir(parents=True, exist_ok=True)
+            (ws / "docs" / "reviews" / "M1-audit.md").write_text(
+                _AUDIT_CLEAN + f"\n- **审计人**: seat\n- **透镜来源**: k3dit\n"
+                f"- **基线**: {baseline or head}\n", encoding="utf-8")
+        return ws, head
+
     def test_mode_detection(self):
         ws = self._ws_r()
         self.assertEqual(_audit_mode(ws), "ratchet")
@@ -551,15 +573,68 @@ class TestRatchetAuditStep(TestCase):
         assert st == "open" and "待修 2" in msg
 
     def test_collected_closes_without_resubmit(self):
+        """本轮的已闭环单（报告在盘上 + 署名 + 基线一致 + 覆盖本轮 B）⇒ 接受，不重复建单。"""
         import json as _json
 
-        ws = self._ws_r()
+        ws, head = self._ws_r_git(report="signed")
         (ws / ".agent" / "audit_jobs.json").write_text(_json.dumps({"jobs": [
             {"job_id": "J-9", "milestone_id": "M1", "state": "collected", "merge_ok": True,
-             "report": "docs/reviews/M1-audit.md", "counts": {"待修": 0}}]}), encoding="utf-8")
+             "baseline": head, "report": "docs/reviews/M1-audit.md",
+             "counts": {"待修": 0}}]}), encoding="utf-8")
         with mock.patch("k3dge.engine.audit_flow.submit_audit", side_effect=AssertionError("不该再建单")):
-            st, msg = _ratchet_audit_step(ws, "M1")
+            st, msg = _ratchet_audit_step(ws, "M1", fresh_baseline=head)
         assert st == "closed" and "M1-audit.md" in msg
+
+    def test_stale_collected_job_is_not_accepted(self):
+        """**实测过的洞**（2026-09-20）：本地账里 14 天前的 collected 单 + 旧报告 ⇒ 旧报告充闭环。
+
+        本仓 M10 就是这么被封的（job 基线 `0cb1b42`、其后 60 个提交）。修法＝接受前逐条验
+        磁盘+git 事实；陈旧单 ⇒ 不接受 ⇒ 去建**本轮**新单。
+        """
+        import json as _json
+
+        ws, head = self._ws_r_git(report="signed", baseline="0" * 40)
+        old_baseline = subprocess_head = ws  # 占位（下面用 git 造一个更早的基线）
+        import subprocess
+
+        first = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True,
+                               text=True).stdout.strip()
+        (ws / "new.txt").write_text("x", encoding="utf-8")
+        subprocess.run(["git", "add", "-A"], cwd=ws, capture_output=True)
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit",
+                        "-q", "--no-verify", "-m", "chore: later"], cwd=ws, capture_output=True)
+        fresh = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True,
+                               text=True).stdout.strip()
+        # 报告带旧单的基线（自洽），但旧单基线早于本轮 B ⇒ 是旧内容的审计
+        (ws / "docs" / "reviews" / "M1-audit.md").write_text(
+            _AUDIT_CLEAN + f"\n- **审计人**: seat\n- **透镜来源**: k3dit\n- **基线**: {first}\n",
+            encoding="utf-8")
+        (ws / ".agent" / "audit_jobs.json").write_text(_json.dumps({"jobs": [
+            {"job_id": "J-old", "milestone_id": "M1", "state": "collected", "merge_ok": True,
+             "baseline": first, "report": "docs/reviews/M1-audit.md",
+             "counts": {"待修": 0}}]}), encoding="utf-8")
+        with mock.patch("k3dge.engine.audit_flow.submit_audit",
+                        return_value={"state": "failed", "detail": "透镜不可达"}) as sub:
+            st, msg = _ratchet_audit_step(ws, "M1", fresh_baseline=fresh)
+        sub.assert_called_once()             # 陈旧 ⇒ 去建新单，而不是接受
+        assert st == "stalled"
+        assert "旧内容" in msg or "早于本轮基线" in msg
+        assert old_baseline is ws
+
+    def test_missing_report_file_is_not_accepted(self):
+        """账里写路径 ≠ 文件存在（报告可能已归档/删除）⇒ 不接受。"""
+        import json as _json
+
+        ws, head = self._ws_r_git()          # 有意不落报告
+        (ws / ".agent" / "audit_jobs.json").write_text(_json.dumps({"jobs": [
+            {"job_id": "J-9", "milestone_id": "M1", "state": "collected", "merge_ok": True,
+             "baseline": head, "report": "docs/reviews/M1-audit.md",
+             "counts": {"待修": 0}}]}), encoding="utf-8")
+        with mock.patch("k3dge.engine.audit_flow.submit_audit",
+                        return_value={"state": "failed", "detail": "透镜不可达"}):
+            st, msg = _ratchet_audit_step(ws, "M1", fresh_baseline=head)
+        assert st == "stalled"
+        assert "不在盘上" in msg
 
     def test_collected_with_pending_does_not_fake_close(self):
         """collected 报告若 待修>0（未尽项 / 报告已删）⇒ 不得假闭环；应重新建单。"""
@@ -575,17 +650,20 @@ class TestRatchetAuditStep(TestCase):
         assert st == "progress" and "J-10" in msg and m.called
 
     def test_full_flow_ratchet_then_quality(self):
-        """审计腿工单闭环后只剩 quality 腿；两腿皆净 ⇒ audited。"""
+        """审计腿工单闭环（本轮的、有磁盘+git 证据）⇒ audited；`fresh_baseline` 由入口自己取。"""
         import json as _json
+        import subprocess
 
-        ws = self._ws_r()
+        ws, head = self._ws_r_git(report="signed")
         (ws / ".agent" / "audit_jobs.json").write_text(_json.dumps({"jobs": [
             {"job_id": "J-9", "milestone_id": "M1", "state": "collected", "merge_ok": True,
-             "report": "docs/reviews/M1-audit.md", "counts": {"待修": 0}}]}), encoding="utf-8")
-        _clean_report(ws)
+             "baseline": head, "report": "docs/reviews/M1-audit.md",
+             "counts": {"待修": 0}}]}), encoding="utf-8")
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
             status, msg = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
-        self.assertEqual(status, "audited")
+        self.assertEqual(status, "audited", msg)
+        self.assertEqual(subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True,
+                                        text=True).stdout.strip(), head)
 
     def test_merge_debt_retries_idempotently(self):
         import json as _j

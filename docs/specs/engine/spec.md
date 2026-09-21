@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:344fe4eeb05fd279442e31147b4116fd78537145e5bace9a6b814967bb9523be`
+- **Contract Hash**: `sha256:02742a2e9b36be670f612fcf549934dce393aa94e80be9a3370c7ae29ee3859e`
 - **Last Updated**: 2026-09-20
 
 ## 1. Domain Boundary & Responsibilities
@@ -296,7 +296,7 @@ from typing import Tuple
 from k3dge.engine import gates
 scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
 persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
-run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
+run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3, fresh_baseline: str='') -> Tuple[str, str]
 from __future__ import annotations
 from pathlib import Path
 from typing import List

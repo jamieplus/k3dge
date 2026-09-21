@@ -484,7 +484,7 @@ scan_pending_findings(workspace: Path) -> Tuple[int, List[str]]
     # doc: 未决 findings（语法 v1：pending/disputed/fixnote 计 open）。
 persist_external_audit_report(workspace: Path, milestone_id: str, content: str, scope: str='external', kind: str='audit') -> Path
     # doc: Persist a human/agent-submitted audit report as the canonical on-disk report.
-run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3) -> Tuple[str, str]
+run_audit_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, max_verify_attempts: int=3, fresh_baseline: str='') -> Tuple[str, str]
     # doc: Independent audit entry: the merged audit module (ADR-0025) produces ONE
 # milestone_files.py
 from __future__ import annotations

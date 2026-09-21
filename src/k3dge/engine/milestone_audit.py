@@ -98,6 +98,62 @@ def _ensure_leftovers(workspace: Path, text: str, report_path: Path) -> None:
     leftover_path.write_text(existing + block, encoding="utf-8")
 
 
+def _baseline_covers(workspace: Path, fresh: str, job_baseline: str) -> bool:
+    """`fresh`（本轮封版基线 B）是否被 job 的基线覆盖：相等，或 B 是它的祖先。
+
+    相等/祖先 ⇒ 这单是**在 B 之后建的**（本轮的新审计）；反过来（job 基线是 B 的祖先）⇒
+    那单来自更早的内容，**不是本轮审计**（旧报告不得充闭环）。
+    """
+    if not fresh or not job_baseline:
+        return False
+    if fresh == job_baseline:
+        return True
+    import subprocess
+
+    try:
+        r = subprocess.run(["git", "-C", str(workspace), "merge-base", "--is-ancestor",
+                            fresh, job_baseline], capture_output=True, text=True)
+    except OSError:  # pragma: no cover - 环境异常
+        return False
+    return r.returncode == 0
+
+
+def _closed_job_evidence(workspace: Path, job: dict, fresh_baseline: str) -> Tuple[bool, str]:
+    """本地账里的"已闭环"job 是否真有**本轮**证据（ADR-0004 §2.1.10：以 git/磁盘为准）。
+
+    本地账是**运行态投影**（可重建、可陈旧）：它说 `collected` + `待修=0` 不算数。要接受
+    必须同时满足：
+      ① 报告**文件在盘上**（账里写路径 ≠ 文件存在；报告可能已被归档/删除）
+      ② 报告**自身**待修=0 且有序言（`_SIGN_KEYS`）——计数从文件重算，不用账里的 counts
+      ③ 报告里的 `基线` 与 job 的 `基线` 一致（记录自洽：报告就是那单的产物）
+      ④ job 的基线覆盖本轮 B（`_baseline_covers`）——否则这是**旧内容**的审计
+    """
+    from k3dge.engine import audit_report as _ar
+    from k3dge.engine.process_audit import _SIGN_KEYS, _field
+
+    rel = str(job.get("report") or "")
+    if not rel:
+        return False, "账里没有报告路径"
+    path = workspace / rel
+    if not path.is_file():
+        return False, f"报告不在盘上（{rel}）"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False, f"报告不可读（{rel}）"
+    missing = [k for k in _SIGN_KEYS if not _field(text, k)]
+    if missing:
+        return False, f"报告缺署名/来源 {missing}（{path.name}）"
+    if (_field(text, "基线") or "").split()[0].strip("`") != (job.get("baseline") or ""):
+        return False, f"报告里的基线≠该单基线（{path.name}）"
+    if _ar._parse_audit_stats(text)["待修"] != 0:
+        return False, f"报告有待修（{path.name}）"
+    if not _baseline_covers(workspace, fresh_baseline, str(job.get("baseline") or "")):
+        return False, (f"该单基线 {str(job.get('baseline'))[:12]} 早于本轮基线 "
+                       f"{str(fresh_baseline)[:12]} ⇒ 是旧内容的审计")
+    return True, f"本里程碑签署报告已闭环（{rel}；待修 0）"
+
+
 def _audit_mode(workspace: Path, role: str = "audit") -> str:
     """审计腿形状：`[roles.audit] mode="ratchet"`＝工单模式（ADR-0025）；缺省 oneshot（旧一次性形）。
 
@@ -116,8 +172,13 @@ def _audit_mode(workspace: Path, role: str = "audit") -> str:
         return "oneshot"
 
 
-def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str = "audit") -> Tuple[str, str]:
-    """审计腿一步（ratchet）：建单→探单→collect→（merge 欠账幂等重试）。一步一返回，进程不等人。"""
+def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str = "audit",
+                        fresh_baseline: str = "") -> Tuple[str, str]:
+    """审计腿一步（ratchet）：建单→探单→collect→（merge 欠账幂等重试）。一步一返回，进程不等人。
+
+    `fresh_baseline`＝本轮封版基线 B（seal 相位 2 在审计**之前**取的 HEAD）：用来判"本地账里
+    那单是不是**本轮**的审计"——陈旧单不接受（否则旧报告就会充闭环，实测过）。
+    """
     from k3dge.engine import audit_flow
     from k3dge.engine import worktree as _wt
 
@@ -138,14 +199,21 @@ def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str =
         return "stalled", f"写回仍未闭（{r.get('mode')}）：{r.get('message', '')[:90]}——人工 rebase 后再跑本命令幂等重试。"
     inflight = [j for j in mine if j.get("state") not in ("collected", "failed")]
     if not inflight:
-        done = [j for j in mine if j.get("state") == "collected" and j.get("merge_ok", True)
-                and j.get("report") and (j.get("counts") or {}).get("待修", 0) == 0]
-        if done:  # 本里程碑已有签署报告且**待修=0**并写回闭 ⇒ 审计腿即成（报告在场不代表闭环）
-            return "closed", f"本里程碑签署报告已闭环（{done[-1]['report']}；待修 {done[-1].get('counts', {}).get('待修', '?')}）。"
+        done = [j for j in mine if j.get("state") == "collected" and j.get("merge_ok", True)]
+        if done:
+            # 报告在场**不代表**闭环，更不代表是**这一轮**的：逐单验磁盘+git 事实（ADR-0004 §2.1.10）。
+            # 陈旧单（基线早于本轮 B）不接受 ⇒ 落到下面去建新单；透镜不可达则 stalled ⇒ escalated。
+            ok, why = _closed_job_evidence(workspace, done[-1], fresh_baseline)
+            if ok:
+                return "closed", f"{why}。"
+            _stale_note = f"本地账里那单不算本轮审计（{why}）⇒ 需要本轮新单。"
         r = audit_flow.submit_audit(workspace, milestone_id, io=io, role=role)
         if not r.get("ok"):
-            return "stalled", f"建单失败：{str(r.get('detail') or r.get('state'))[:120]}"
-        return "progress", f"棘轮工单已建：{r['job_id']}（{role} 腿判据在机构侧席位，k3dge 不代笔）。"
+            reason = str(r.get("detail") or r.get("state"))[:120]
+            prefix = locals().get("_stale_note", "")
+            return "stalled", f"{prefix}建单失败：{reason}"
+        return "progress", (f"{locals().get('_stale_note', '')}"
+                            f"棘轮工单已建：{r['job_id']}（{role} 腿判据在机构侧席位，k3dge 不代笔）。")
     j = inflight[-1]
     st = audit_flow.peer_status(workspace, j["job_id"], io=io)
     if not st.get("ok"):
@@ -172,6 +240,7 @@ def run_audit_flow(
     *,
     prompter: Optional[_Prompt] = None,
     max_verify_attempts: int = 3,
+    fresh_baseline: str = "",
 ) -> Tuple[str, str]:
     """Independent audit entry: the merged audit module (ADR-0025) produces ONE
     12-col report (k3dit audit leg; quality is a window inside the module, not an
@@ -187,10 +256,18 @@ def run_audit_flow(
     # started_at stamp), whether triggered manually (`milestone audit`) or via a hook.
     ac.reset_for_audit(workspace, milestone_id)
 
+    # 本轮基线 B（审计前取一次）：既是 durable 记录（trailer / tag）的取值，也是"本地账里那单
+    # 是不是本轮审计"的判据（陈旧单不得充闭环）。
+    if not fresh_baseline:
+        from k3dge.engine.seal import head_commit
+
+        fresh_baseline = head_commit(workspace)
+
     ratchet = _audit_mode(workspace) == "ratchet"
     if ratchet:
         # 审计腿＝工单步进（ADR-0025）：一次调用推一步，绝不在闸里等席；步没 closed 就交回 [NEXT]。
-        step_status, step_msg = _ratchet_audit_step(workspace, milestone_id, io=prompt.out_stream)
+        step_status, step_msg = _ratchet_audit_step(workspace, milestone_id, io=prompt.out_stream,
+                                                    fresh_baseline=fresh_baseline)
         if step_status != "closed":
             if step_status == "progress":
                 return "ratchet_open", step_msg + "\n" + nextstep.NextStep.from_state(
