@@ -74,3 +74,11 @@ task done 不再改 CHANGELOG（该提交的 diff 里无 CHANGELOG）
 
 `_append_to_unreleased` 保留为**首个里程碑**的降级路径（无上一个边界 tag 时用）；它不再被
 `task done` 调用。若将来引入"手动写 Unreleased"的用法，需要重新裁定（本票只保证不双写）。
+
+### 收尾：门禁自己报出的相抵告警
+
+提交本票时 `check` 打出一条 `[WARN][CHANGELOG] Task '…' marked done … not in CHANGELOG.md
+## [Unreleased]`——它正是**旧模型**的判据（"关票必须写 CHANGELOG"），与本票删掉的双写直接相抵。
+`evaluator._warn_changelog_done` + 其调用点已退休（2513 字符），否则新规则下每次 `task done`
+都会恒告警（噪音＝把闸训练成"狼来了"）。证据：退休后 `k3dge task done` 与 `check` 均无该行；
+688 passed 不变。

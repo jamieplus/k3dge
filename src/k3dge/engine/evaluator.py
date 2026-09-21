@@ -338,7 +338,6 @@ class ConsistencyEngine:
 
         violations.extend(self._check_version_consistency())
 
-        self._warn_changelog_done(files)
 
         violations.extend(self._check_template_drift(manifest))
 
@@ -436,54 +435,6 @@ class ConsistencyEngine:
                     detail={"drift": f"版本校验未能完成：{exc}"},
                 )
             ]
-
-    def _warn_changelog_done(self, files) -> None:
-        """轻量 P3：任务手改 done 未进 CHANGELOG Unreleased 时 WARN（best-effort，不硬卡）。"""
-        import sys
-
-        try:
-            from k3dge.engine.task_index import TITLE_RE as _MilestoneTitleRE, parse_frontmatter
-
-            changelog_path = self.workspace_root / "CHANGELOG.md"
-            if changelog_path.is_file():
-                changelog_text = changelog_path.read_text(encoding="utf-8")
-                unreleased_tag = "## [Unreleased]"
-                u_idx = changelog_text.find(unreleased_tag)
-                if u_idx != -1:
-                    u_next = changelog_text.find("## [", u_idx + len(unreleased_tag))
-                    unreleased_block = changelog_text[u_idx:u_next] if u_next != -1 else changelog_text[u_idx:]
-                    for p in files:
-                        if (
-                            not p.startswith("docs/tasks/")
-                            or p.startswith("docs/tasks/archive/")
-                            or p.endswith("README.md")
-                            or p.endswith("_template.md")
-                        ):
-                            continue
-                        task_path = self.workspace_root / p
-                        if not task_path.is_file():
-                            continue
-                        try:
-                            t_content = task_path.read_text(encoding="utf-8")
-                        except (OSError, UnicodeDecodeError):
-                            continue
-                        fm = parse_frontmatter(t_content)
-                        st = fm.get("status", "").lower() if fm else ""
-                        if not st:
-                            m = re.search(r"-\s+\*\*Status\*\*:\s*([\w-]+)", t_content, re.IGNORECASE)
-                            st = m.group(1).lower() if m else ""
-                        if st != "done":
-                            continue
-                        tm = _MilestoneTitleRE.search(t_content)
-                        title = tm.group(1).strip() if tm else task_path.stem
-                        if title and title not in unreleased_block:
-                            print(
-                                f"[WARN][CHANGELOG] Task '{title}' marked done ({p}) not in CHANGELOG.md ## [Unreleased]; "
-                                f"run 'k3dge task done' or ensure _append_to_unreleased succeeded",
-                                file=sys.stderr,
-                            )
-        except Exception:
-            pass
 
     def _check_template_drift(self, manifest: Manifest) -> List[Violation]:
         """脚手架镜像漂移：assets ↔ 本仓文件一致（仅 self_hosting=true，ADR-0001）。"""
