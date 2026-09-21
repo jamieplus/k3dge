@@ -11,7 +11,7 @@ date: 2026-09-21
 
 ## 来源（memo 复核）
 
-`docs/memo/2026-09-21-hookization-surface-inventory.md` 候选 D（判决：收敛而非钩子化）、
+`docs/memo/archive/2026-09-21-hookization-surface-inventory.md` 候选 D（判决：收敛而非钩子化）、
 `docs/memo/2026-09-21-sync-docs-updated-flag.md` 选项 3（只改文案）+ `docs/reviews/LEFTOVERS.md` `SYNC-01`。
 
 ## 证据（可复跑）

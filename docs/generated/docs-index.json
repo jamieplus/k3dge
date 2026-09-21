@@ -313,14 +313,6 @@
       "tokens": "Memo: gap-trap 吸收评估（proven-red / PR-body / 多语 gate / \"无闸规则即缺陷\"）"
     },
     {
-      "path": "docs/memo/2026-09-21-hookization-surface-inventory.md",
-      "type": "memo",
-      "id": "2026-09-21-hookization-surface-inventory",
-      "title": "Memo: 硬编码 → 生命周期钩子：可拆面盘点与取舍",
-      "status": "",
-      "tokens": "Memo: 硬编码 → 生命周期钩子：可拆面盘点与取舍"
-    },
-    {
       "path": "docs/memo/2026-09-21-sync-docs-updated-flag.md",
       "type": "memo",
       "id": "2026-09-21-sync-docs-updated-flag",

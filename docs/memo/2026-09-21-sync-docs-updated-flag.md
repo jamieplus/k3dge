@@ -48,7 +48,7 @@ $ git diff --stat docs/generated/docs-index.json
 
 - 判据：`ADR-0026` §2.2（投影语法：纯打印面出**陈述式事实**，不夸大成"无变化"）、§2.7（字段语义变更 ⇒ 走 ADR；加字段可以）。
 - 现状机制：`src/k3dge/sync/generator.py:225-262`、`src/k3dge/cli/main.py:253-265,444-445`、`src/k3dge/cli/mcp.py:196-215`。
-- 相邻（同一轮讨论产出的另一份）：`docs/memo/2026-09-21-hookization-surface-inventory.md`。
+- 相邻（同一轮讨论产出的另一份，已归档）：`docs/memo/archive/2026-09-21-hookization-surface-inventory.md`。
 
 ## 下一步
 
