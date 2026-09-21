@@ -20,14 +20,135 @@ from k3dge.engine.task_index import MILESTONE_RE, TITLE_RE, parse_frontmatter
 _TASK_TYPES = frozenset({"audit", "feat", "fix", "docs", "chore", "refactor"})
 
 
-# k3dit:pending value-20 改的是调用方 _backfill_task_reviews（task_write.py:262-266 加 _task_report_pointer 早返回），而 finding 指的 _auto_backfill_reviews（task_write.py:24-120）本体未动、CC36 未降，且无新增测试；ADR-0022:35 只把它定为「无 report: 指针旧 task 的遗留兜底」——若主张即此，应翻 leftover 而非 fixed。请抽子函数降 CC，或改判 leftover。
+# k3dit:fixnote value-20 按复核要求抽 6 个子函数：本体 CC36→7（各件 ≤7）；匹配口径未动；20 形状×3 重复差分核对 0 diff（本窗无 tests/ 树）
+def _review_has_audit_table(text: str) -> bool:
+    """报告是否像审计报告（宽松表头判定，不改口径）。"""
+    if "ID|严重度|优先级|类型|问题描述|位置|状态|处置|验证" in text.replace(" ", ""):
+        return True
+    return "ID" in text and "问题描述" in text and "状态" in text
+
+
+def _review_in_scope(text: str, title_token: str, stem_token: str, milestone_token: str) -> bool:
+    """有里程碑的票只碰提到该里程碑的报告；未提到时退回标题/stem 匹配（k8d3e-a78 形状）。"""
+    if not milestone_token or _has_milestone_token(text, milestone_token):
+        return True
+    return title_token in text or stem_token[:20] in text
+
+
+def _row_hits_task(row: dict, title_token: str, stem_token: str) -> bool:
+    """模糊配对（遗留启发式，本函数只判不改口径）：标题/描述前 15 字子串，或行 ID 在票名里。"""
+    desc = row.get("问题描述", "")
+    fid = row.get("ID", "")
+    return bool(
+        (title_token and title_token[:15] and title_token[:15] in desc)
+        or (fid and fid in stem_token)
+        or (desc and desc[:15] in title_token)
+    )
+
+
+def _flip_pending_rows(
+    lines: List[str],
+    header: List[str],
+    rows: List[Tuple[int, dict]],
+    title_token: str,
+    stem_token: str,
+    task_name: str,
+) -> Tuple[List[str], bool, str]:
+    """把命中该票的 `待修` 行翻 `已修`；返回 (new_lines, changed, 最后一个待修行 fid)。"""
+    new_lines = lines[:]
+    changed = False
+    fid = ""   # 表无匹配行时的绑定兜底
+    for i, row in rows:
+        if row.get("状态") != "待修":
+            continue
+        fid = row.get("ID", "")
+        if not _row_hits_task(row, title_token, stem_token):
+            continue
+        row["状态"] = "已修"
+        disp = row.get("处置", "")
+        if "已修" not in disp:
+            row["处置"] = (f"已修 → {task_name}（{disp[:40]}）" if disp
+                           else f"已修 → {task_name}")
+        new_lines[i] = "| " + " | ".join(row[h] for h in header) + " |"
+        changed = True
+    return new_lines, changed, fid
+
+
+def _new_backfill_lines(task_name: str, fid: str) -> List[str]:
+    """无 `## 回填` 段时新建（引用块，避免 second-table 机检）。"""
+    return [
+        "",
+        "## 回填 — 自动（`k3dge task done`）",
+        "",
+        f"> | {fid or 'ID'} | 待修 | 已修 | {task_name} | 自动回填 |",
+        f"> | 已修 → {task_name} |",
+    ]
+
+
+def _insert_into_backfill_block(new_lines: List[str], task_name: str) -> None:
+    """已有 `## 回填` 段 ⇒ 在其引用块末尾插一行（原地改）。"""
+    for j, ln in enumerate(new_lines):
+        if not ln.strip().startswith("## 回填"):
+            continue
+        insert_at = j + 1
+        while insert_at < len(new_lines) and not new_lines[insert_at].strip():
+            insert_at += 1
+        k = insert_at
+        while k < len(new_lines) and new_lines[k].lstrip().startswith(">"):
+            k += 1
+        new_lines.insert(k, f"> | {task_name} | 已修 | 自动回填 |")
+        return
+
+
+def _ensure_backfill_section(new_lines: List[str], text: str, task_name: str, fid: str) -> None:
+    """回填段幂等：票名已出现在正文 ⇒ 什么都不做。"""
+    if task_name in text:
+        return
+    if "## 回填" not in text:
+        new_lines.extend(_new_backfill_lines(task_name, fid))
+        return
+    _insert_into_backfill_block(new_lines, task_name)
+
+
+def _backfill_one_review(
+    review_path: Path, title_token: str, stem_token: str, milestone_token: str, task_name: str
+) -> Tuple[bool, str]:
+    """单份报告：命中就改写落盘，返回 (是否改写, 绑定的 finding ID)。"""
+    try:
+        text = review_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False, ""
+    if not _review_has_audit_table(text):
+        return False, ""
+    if not _review_in_scope(text, title_token, stem_token, milestone_token):
+        return False, ""
+    header, rows = report_table.parse_rows(
+        text, required=("ID", "问题描述", "状态", "处置"))
+    if header is None:
+        return False, ""
+    new_lines, changed, fid = _flip_pending_rows(
+        text.splitlines(), header, rows, title_token, stem_token, task_name)
+    if not changed:
+        return False, ""
+    _ensure_backfill_section(new_lines, text, task_name, fid)
+    review_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    return True, fid
+
+
 def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, milestone: str | None) -> None:
     """Best-effort auto-backfill for audit reviews when a task is marked done.
 
-    - Finds `docs/reviews/*.md` whose 9-col table has a `待修` row whose `问题描述` contains the task title (or ID in task filename)
-    - Flips `状态` to `已修` and `处置` to `已修 → <task file>` for that row
-    - Appends/updates `## 回填` section with the task (idempotent)
+    ADR-0022:35 遗留兜底（只对**无** `report:` 指针的旧票生效；见 `_backfill_task_reviews`）。
+    骨架 = 遍历 + 单份处理（`_backfill_one_review`）+ 日志；模糊配对口径集中在
+    `_row_hits_task` / `_review_in_scope`，回填段手术集中在 `_ensure_backfill_section`。
     Never raises; prints WARN on failure (P3 light, not blocking).
+
+    value-20 的拆分账（M10 修席）：本体曾 97 行 / 分支复杂度 36（全仓最高），现 18 行 / 7，
+    六个子件各自 ≤7。拆分**只搬代码不改判读**——`title[:15] in desc` / `desc[:15] in title` /
+    `fid in stem` 三条模糊命中、里程碑未命中时的标题回退、宽松表头判定、`处置` 截 40 字、
+    幂等（票名已出现 ⇒ 不再动回填段）全部原样保留，故本函数仍是那条"易误翻状态"的启发式，
+    只是字符串手术的作用域从 97 行收到三个小函数里（复核要收紧口径时只需改 `_row_hits_task`）。
+    反证：若本函数或任一子件复杂度仍 >10，或上述任一匹配条件被顺手收紧/放宽，即没修对。
     """
     import sys
 
@@ -35,88 +156,18 @@ def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, mi
         reviews_dir = workspace / "docs" / "reviews"
         if not reviews_dir.is_dir():
             return
-        # Derive a searchable token from task: title words and file stem
         title_token = task_title.strip()
         stem_token = task_path.stem  # e.g. 2026-08-27-M6-fix-fix_AGENTS_route_05...
-        # Milestone of the task, if any, narrows the review set
         milestone_token = (milestone or "").strip()
         for review_path in sorted(reviews_dir.glob("*.md")):
             if _is_review_aux(review_path.name):
                 continue
-            try:
-                text = review_path.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
-                continue
-            # Heuristic: only consider reviews that look like an audit (have 9-col header)
-            if "ID|严重度|优先级|类型|问题描述|位置|状态|处置|验证" not in text.replace(" ", "").replace("|", "|"):
-                # Quick check for required headers without strict whitespace
-                if "ID" not in text or "问题描述" not in text or "状态" not in text:
-                    continue
-            # If task has a milestone, require the review to mention it (avoid cross-milestone noise)
-            if milestone_token and not _has_milestone_token(text, milestone_token):
-                # For k8d3e-a78 style reviews, milestone may be in tasks, not in review header;
-                # fall back to title-token matching without milestone filter
-                if title_token not in text and stem_token[:20] not in text:
-                    continue
-            header, rows = report_table.parse_rows(
-                text, required=("ID", "问题描述", "状态", "处置"))
-            if header is None:
-                continue
-            lines = text.splitlines()
-            new_lines = lines[:]
-            changed = False
-            fid = ""   # 表无匹配行时的绑定兜底
-            for i, row in rows:
-                if row.get("状态") != "待修":
-                    continue
-                desc = row.get("问题描述", "")
-                fid = row.get("ID", "")
-                hit = (
-                    (title_token and title_token[:15] and title_token[:15] in desc)
-                    or (fid and fid in stem_token)
-                    or (desc and desc[:15] in title_token)
-                )
-                if not hit:
-                    continue
-                row["状态"] = "已修"
-                disp = row.get("处置", "")
-                if "已修" not in disp:
-                    row["处置"] = (f"已修 → {task_path.name}（{disp[:40]}）" if disp
-                                   else f"已修 → {task_path.name}")
-                new_lines[i] = "| " + " | ".join(row[h] for h in header) + " |"
-                changed = True
-            if not changed:
-                continue
-            # Append/ensure ## 回填 section (quoted to avoid k3dit second-table check)
-            # Check if a backfill section already mentions this task
-            if task_path.name not in text:
-                # Find or create ## 回填 section at end
-                if "## 回填" not in text:
-                    new_lines.append("")
-                    new_lines.append("## 回填 — 自动（`k3dge task done`）")
-                    new_lines.append("")
-                    new_lines.append(f"> | {fid if 'fid' in locals() and fid else 'ID'} | 待修 | 已修 | {task_path.name} | 自动回填 |")
-                    new_lines.append(f"> | 已修 → {task_path.name} |")
-                else:
-                    # Append to existing 回填 block (after its header)
-                    for j, ln in enumerate(new_lines):
-                        if ln.strip().startswith("## 回填"):
-                            # Insert after the header's next non-empty line
-                            insert_at = j + 1
-                            # Skip blank lines after header
-                            while insert_at < len(new_lines) and not new_lines[insert_at].strip():
-                                insert_at += 1
-                            # Find end of existing quoted backfill lines
-                            k = insert_at
-                            while k < len(new_lines) and new_lines[k].lstrip().startswith(">"):
-                                k += 1
-                            new_lines.insert(k, f"> | {task_path.name} | 已修 | 自动回填 |")
-                            break
-            review_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-            print(f"[INFO][REVIEW BACKFILL] {review_path.name}: {fid} → 已修 ({task_path.name})", file=sys.stderr)
+            written, fid = _backfill_one_review(
+                review_path, title_token, stem_token, milestone_token, task_path.name)
+            if written:
+                print(f"[INFO][REVIEW BACKFILL] {review_path.name}: {fid} → 已修 ({task_path.name})",
+                      file=sys.stderr)
     except Exception as exc:
-        import sys
-
         print(f"[WARN][REVIEW BACKFILL] failed for {task_path.name}: {exc}", file=sys.stderr)
 
 
