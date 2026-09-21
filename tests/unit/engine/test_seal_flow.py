@@ -831,6 +831,19 @@ class TestAuditNoNoop(TestCase):
         self.assertIn("degraded-manual", SEALABLE_AUDIT_RESULTS)
         self.assertIn("降级", msg)
 
+    def test_empty_stage_declaration_is_refused(self) -> None:
+        """配置层的同一个洞：`stages_produce` 留空 ⇒ 一次都没跑，**不得**因旧报告判闭环。"""
+        ws = _ws_oneshot()
+        _clean_report(ws)
+        (ws / ".agent" / "pipeline.toml").write_text(
+            '[roles.audit]\nbind = "k3dit"\nmode = "oneshot"\n'
+            "[checks.audit]\nstages_produce = []\nstages_verify = []\n",
+            encoding="utf-8",
+        )
+        status, msg = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
+        self.assertEqual(status, "refused")
+        self.assertIn("stages_produce", msg)
+
     def test_skip_does_not_advance_but_closed_does(self) -> None:
         """闭集纪律：只有 closed / degraded-manual 允许推进版号。"""
         from k3dge.engine.audit_flow import AUDIT_RESULTS, SEALABLE_AUDIT_RESULTS, audit_result_of

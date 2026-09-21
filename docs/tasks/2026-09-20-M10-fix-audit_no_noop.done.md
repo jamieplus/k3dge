@@ -74,3 +74,21 @@ milestone_audit.py:215  produced = run_action(...) 之后只读 produced.payload
 测试：`TestAuditNoNoop`（5 条）+ 存量回归；**661 passed, 2 skipped**；`k3dge check` 绿。
 
 **边界（有意留，归后续票）**：本票只让"结果"可判可信，尚未把它写进持久记录（trailer）——那是 `feat-seal_boundary_tag`；`audit-result` 目前只在返回面与 `[NEXT]` 上可见。
+
+### 收尾：对抗性复查又抓到一条同族的洞（配置层）
+
+T6 全部落完后我做了一次反向复查（"还能怎样让空转通过？"），发现**声明面把审计步留空**这条路：
+
+```
+[checks.audit] stages_produce = []        # 下游可配；坏配置回落缺省**不覆盖显式空表**
+  ⇒ run_audit_flow 的 streams 为空 ⇒ 循环体不执行 ⇒ pending_total=0 ⇒ break ⇒ "audited"
+  实测：仓里放一份旧报告 ⇒ STATUS: audited（closed）——与 skip 完全同族
+```
+修法（同票精神：先判"真跑过"）：non-ratchet 且 `stages_produce` 为空 ⇒ 直接 `refused`
+（"声明面没给＝一次都没跑，不得当已审"）。证据：`test_empty_stage_declaration_is_refused`
+（旧报告在场 + 空声明 ⇒ `refused`，消息点名 `stages_produce`）。
+
+**留给人裁定的一条**（不在本票范围，未擅自决定）：`manual` 作为**首选**传输（而非降级）时，
+`audit_call_result` 现在判 `closed`（因为 `downgrades` 为空）；但 `_run_manual` 自己声明
+"NOT an independent audit"（ADR-0006 §2.4）。按 ADR-0004 §2.1.11 的字面（"降级到 manual"）
+现状是对的；若要更严（manual 一律记 `degraded-manual`、必须署名），需另行裁定。

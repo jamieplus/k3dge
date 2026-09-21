@@ -210,8 +210,19 @@ def run_audit_flow(
     _produce = _gates.stages(workspace, "audit", "produce")
     _verify = _gates.stages(workspace, "audit", "verify")
     streams = {"audit": (_produce[0] if _produce else "", _verify[0] if _verify else "")}
-    if ratchet or not _produce:
+    if ratchet:
         streams.pop("audit", None)
+    elif not _produce:
+        # 声明面留空 ⇒ **一次都没跑**（不是"无需审计"）：与 skip 同族，不得当已审——
+        # 否则只要仓里有一份旧报告就能判闭环（本会话实测过这个配置层的洞）。
+        msg = (
+            "审计未声明：`[checks.audit].stages_produce` 为空 ⇒ 没有可跑的审计步；"
+            "声明面没给 = 一次都没跑，不得当已审（ADR-0004 §2.1.9/§2.1.11）。"
+            "要么在 `.agent/pipeline.toml` 声明审计步，要么不要 seal。"
+        )
+        _ns = nextstep.next_for_rejection(milestone_id, gates.Rejection("audit_noop", msg))
+        nextstep.persist(workspace, _ns)
+        return "refused", msg + "\n" + _ns.render_cli()
 
     # mandatory audit + fix loop, capped at `max_verify_attempts` verifies.
     degraded = False  # 任一跳降级（downgrades 非空）⇒ 结果记 degraded-manual（ADR-0004 §2.1.11）
