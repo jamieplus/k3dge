@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/cli`
-- **Contract Hash**: `sha256:67273b65ebe252b38926e07aa476b1ab21b5f3045552c0a2da327220f12fff0e`
-- **Last Updated**: 2026-09-19
+- **Contract Hash**: `sha256:9ac172f29a69fe8302c0b4ac867fc07505abe42df9694b3118c5873cd783d7ac`
+- **Last Updated**: 2026-09-21
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -90,6 +90,7 @@ k3dge_adr_index(workspace_path: Optional[str]=None) -> str
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
+from k3dge.engine.mcp_json import probe_peer_mcp
 cmd_mcp_sync(workspace: Path) -> int
 cmd_mcp_probe(args, workspace: Path) -> int
 from __future__ import annotations

@@ -2,19 +2,25 @@
   "ConsistencyEngine": [
     {
       "file": "src/k3dge/engine/evaluator.py",
-      "line": 148
+      "line": 256
     }
   ],
   "ContractExtractor": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 126
+      "line": 149
+    }
+  ],
+  "ExtractorConfigError": [
+    {
+      "file": "src/k3dge/engine/extractor_gen.py",
+      "line": 107
     }
   ],
   "GateReport": [
     {
       "file": "src/k3dge/engine/models.py",
-      "line": 24
+      "line": 39
     }
   ],
   "GitError": [
@@ -26,13 +32,13 @@
   "Location": [
     {
       "file": "src/k3dge/engine/search.py",
-      "line": 23
+      "line": 26
     }
   ],
   "Manifest": [
     {
       "file": "src/k3dge/engine/manifest.py",
-      "line": 40
+      "line": 68
     }
   ],
   "ManifestError": [
@@ -41,46 +47,112 @@
       "line": 17
     }
   ],
+  "Marker": [
+    {
+      "file": "src/k3dge/engine/markers.py",
+      "line": 56
+    }
+  ],
   "MilestoneTask": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 435
+      "file": "src/k3dge/engine/task_index.py",
+      "line": 81
     }
   ],
   "NextStep": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 76
+      "line": 173
+    }
+  ],
+  "Prompt": [
+    {
+      "file": "src/k3dge/engine/prompt.py",
+      "line": 9
     }
   ],
   "PythonExtractor": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 139
+      "line": 162
+    }
+  ],
+  "Rejection": [
+    {
+      "file": "src/k3dge/engine/gates.py",
+      "line": 22
     }
   ],
   "TaskIndex": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 443
+      "file": "src/k3dge/engine/task_index.py",
+      "line": 89
+    }
+  ],
+  "TaskMove": [
+    {
+      "file": "src/k3dge/engine/state_machine.py",
+      "line": 22
+    }
+  ],
+  "TaskState": [
+    {
+      "file": "src/k3dge/engine/state_machine.py",
+      "line": 15
+    }
+  ],
+  "Transition": [
+    {
+      "file": "src/k3dge/engine/state_machine.py",
+      "line": 28
     }
   ],
   "TransportResult": [
     {
       "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 46
-    }
-  ],
-  "TypeScriptExtractor": [
-    {
-      "file": "src/k3dge/engine/contract.py",
-      "line": 147
+      "line": 63
     }
   ],
   "Violation": [
     {
       "file": "src/k3dge/engine/models.py",
       "line": 10
+    }
+  ],
+  "actions": [
+    {
+      "file": "src/k3dge/engine/gates.py",
+      "line": 185
+    }
+  ],
+  "adr_landed": [
+    {
+      "file": "src/k3dge/engine/adr_gate.py",
+      "line": 59
+    }
+  ],
+  "adrs_all_accepted": [
+    {
+      "file": "src/k3dge/engine/adr_gate.py",
+      "line": 37
+    }
+  ],
+  "advance": [
+    {
+      "file": "src/k3dge/engine/worktree.py",
+      "line": 94
+    }
+  ],
+  "advance_line": [
+    {
+      "file": "src/k3dge/engine/audit_flow.py",
+      "line": 458
+    }
+  ],
+  "all_stage_refs": [
+    {
+      "file": "src/k3dge/engine/gates.py",
+      "line": 172
     }
   ],
   "analyze_adr_coverage": [
@@ -92,7 +164,31 @@
   "append_changelog": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 205
+      "line": 251
+    }
+  ],
+  "append_to_message": [
+    {
+      "file": "src/k3dge/engine/attest.py",
+      "line": 89
+    }
+  ],
+  "apply": [
+    {
+      "file": "src/k3dge/engine/doc_fix.py",
+      "line": 100
+    }
+  ],
+  "archived_milestone_tasks": [
+    {
+      "file": "src/k3dge/engine/task_index.py",
+      "line": 108
+    }
+  ],
+  "audit_call_result": [
+    {
+      "file": "src/k3dge/engine/audit_flow.py",
+      "line": 41
     }
   ],
   "audit_closed": [
@@ -101,184 +197,472 @@
       "line": 94
     }
   ],
+  "audit_evidence": [
+    {
+      "file": "src/k3dge/engine/audit_flow.py",
+      "line": 64
+    }
+  ],
+  "audit_job_ticket_names": [
+    {
+      "file": "src/k3dge/engine/task_index.py",
+      "line": 18
+    }
+  ],
+  "audit_result_of": [
+    {
+      "file": "src/k3dge/engine/audit_flow.py",
+      "line": 59
+    }
+  ],
+  "auto_pending_seal_gates": [
+    {
+      "file": "src/k3dge/engine/seal.py",
+      "line": 274
+    }
+  ],
+  "auto_satisfied_ids": [
+    {
+      "file": "src/k3dge/engine/seal.py",
+      "line": 479
+    }
+  ],
+  "begin_run": [
+    {
+      "file": "src/k3dge/engine/nextstep.py",
+      "line": 271
+    }
+  ],
+  "blocking_cycles": [
+    {
+      "file": "src/k3dge/engine/task_dag.py",
+      "line": 79
+    }
+  ],
+  "blocking_dangling": [
+    {
+      "file": "src/k3dge/engine/task_dag.py",
+      "line": 37
+    }
+  ],
+  "blocking_graph": [
+    {
+      "file": "src/k3dge/engine/task_dag.py",
+      "line": 16
+    }
+  ],
+  "branch_name": [
+    {
+      "file": "src/k3dge/engine/worktree.py",
+      "line": 23
+    }
+  ],
   "build_card": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 120
+      "line": 123
     }
   ],
   "build_checklist": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 61
+      "line": 65
     }
   ],
   "build_docs_index": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 142
+      "line": 152
+    }
+  ],
+  "build_notes_from_range": [
+    {
+      "file": "src/k3dge/engine/changelog.py",
+      "line": 60
     }
   ],
   "build_parser": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1019
+      "line": 1015
+    }
+  ],
+  "build_server_params": [
+    {
+      "file": "src/k3dge/engine/pipeline_runner.py",
+      "line": 149
     }
   ],
   "build_symbol_index": [
     {
       "file": "src/k3dge/engine/search.py",
-      "line": 64
+      "line": 67
+    }
+  ],
+  "build_task_name": [
+    {
+      "file": "src/k3dge/engine/task_write.py",
+      "line": 435
     }
   ],
   "bump_milestone": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 73
+      "file": "src/k3dge/engine/milestone_pointer.py",
+      "line": 37
     }
   ],
   "bump_verify_attempt": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 119
+      "line": 123
     }
   ],
   "bump_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 144
+      "line": 201
+    }
+  ],
+  "cache_observability": [
+    {
+      "file": "src/k3dge/cli/status.py",
+      "line": 20
+    }
+  ],
+  "call_mcp_tool": [
+    {
+      "file": "src/k3dge/engine/pipeline_runner.py",
+      "line": 181
+    }
+  ],
+  "check_adr_consistency": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 236
+    }
+  ],
+  "check_adr_number_reuse": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 471
+    }
+  ],
+  "check_adr_ref_retired": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 495
+    }
+  ],
+  "check_completeness": [
+    {
+      "file": "src/k3dge/engine/state_machine.py",
+      "line": 68
+    }
+  ],
+  "check_content": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 282
+    }
+  ],
+  "check_dangling_adr": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 71
+    }
+  ],
+  "check_file": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 300
+    }
+  ],
+  "check_filename": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 107
+    }
+  ],
+  "check_footnotes": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 105
+    }
+  ],
+  "check_frontmatter": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 215
+    }
+  ],
+  "check_h1": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 137
+    }
+  ],
+  "check_headers": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 244
+    }
+  ],
+  "check_incident_id_redundant": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 621
+    }
+  ],
+  "check_index_ref": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 266
+    }
+  ],
+  "check_markdown_bytes": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 248
+    }
+  ],
+  "check_markdown_text": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 264
+    }
+  ],
+  "check_report_pointer": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 93
+    }
+  ],
+  "check_retired_adr_dest": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 562
     }
   ],
   "check_section_order": [
     {
-      "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 265
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 76
+    }
+  ],
+  "check_section_ordering": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 197
+    }
+  ],
+  "check_sections": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 175
+    }
+  ],
+  "check_sections_when": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 156
+    }
+  ],
+  "check_supersede_unreconciled": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 203
+    }
+  ],
+  "check_task_body_meta_redundant": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 171
+    }
+  ],
+  "check_task_closure_record": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 529
+    }
+  ],
+  "check_task_consistency": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 136
+    }
+  ],
+  "closure_ok": [
+    {
+      "file": "src/k3dge/engine/markers.py",
+      "line": 235
+    }
+  ],
+  "cmd_audit": [
+    {
+      "file": "src/k3dge/cli/main.py",
+      "line": 574
     }
   ],
   "cmd_check": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 146
+      "line": 182
     }
   ],
   "cmd_check_msg": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 947
+      "line": 903
     }
   ],
   "cmd_commit": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 858
+      "line": 841
     }
   ],
   "cmd_commit_attest": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 899
+      "line": 890
     }
   ],
   "cmd_doc": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 281
+      "line": 334
     }
   ],
-  "cmd_doc_audit": [
+  "cmd_extractor": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 135
+      "line": 273
     }
   ],
   "cmd_incident": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 960
+      "line": 916
     }
   ],
   "cmd_index": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 849
+      "line": 832
     }
   ],
   "cmd_init": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 435
+      "line": 548
+    }
+  ],
+  "cmd_markers": [
+    {
+      "file": "src/k3dge/cli/main.py",
+      "line": 604
     }
   ],
   "cmd_mcp": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 532
+      "line": 565
+    }
+  ],
+  "cmd_mcp_probe": [
+    {
+      "file": "src/k3dge/cli/mcp_peers.py",
+      "line": 176
+    }
+  ],
+  "cmd_mcp_sync": [
+    {
+      "file": "src/k3dge/cli/mcp_peers.py",
+      "line": 144
     }
   ],
   "cmd_milestone": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 613
+      "line": 638
     }
   ],
   "cmd_search": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 816
+      "line": 789
     }
   ],
   "cmd_status": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 982
+      "line": 938
     }
   ],
   "cmd_sync": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 225
+      "line": 247
     }
   ],
   "cmd_task": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 358
+      "line": 462
     }
   ],
   "cmd_verify_attest": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 908
+      "line": 896
     }
   ],
   "cmd_version": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 250
+      "line": 303
     }
   ],
   "cmd_where": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 836
+      "line": 819
+    }
+  ],
+  "code_for": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 103
+    }
+  ],
+  "collect_audit": [
+    {
+      "file": "src/k3dge/engine/audit_flow.py",
+      "line": 262
     }
   ],
   "collect_domain_interface": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 231
+      "line": 377
+    }
+  ],
+  "completeness_violations": [
+    {
+      "file": "src/k3dge/engine/state_machine.py",
+      "line": 100
     }
   ],
   "compute_audit_suggestion": [
     {
       "file": "src/k3dge/engine/audit_trigger.py",
-      "line": 65
+      "line": 63
     }
   ],
   "compute_hash": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 227
+      "line": 373
     }
   ],
   "consume_unreleased": [
@@ -287,22 +671,80 @@
       "line": 270
     }
   ],
+  "count_statuses": [
+    {
+      "file": "src/k3dge/engine/report_table.py",
+      "line": 72
+    }
+  ],
+  "counts": [
+    {
+      "file": "src/k3dge/engine/markers.py",
+      "line": 223
+    }
+  ],
   "create_task": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 503
+      "file": "src/k3dge/engine/task_write.py",
+      "line": 173
+    }
+  ],
+  "critical_path": [
+    {
+      "file": "src/k3dge/engine/task_dag.py",
+      "line": 89
+    }
+  ],
+  "decl": [
+    {
+      "file": "src/k3dge/engine/nodes.py",
+      "line": 70
+    }
+  ],
+  "describe_extractors": [
+    {
+      "file": "src/k3dge/engine/extractor_gen.py",
+      "line": 391
+    }
+  ],
+  "emit": [
+    {
+      "file": "src/k3dge/engine/events.py",
+      "line": 29
+    },
+    {
+      "file": "src/k3dge/engine/nextstep.py",
+      "line": 299
+    }
+  ],
+  "emit_all": [
+    {
+      "file": "src/k3dge/engine/nextstep.py",
+      "line": 311
+    }
+  ],
+  "ensure": [
+    {
+      "file": "src/k3dge/engine/worktree.py",
+      "line": 45
     }
   ],
   "ensure_checklist": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 98
+      "line": 102
     }
   ],
   "ensure_mcp_config": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 113
+      "line": 132
+    }
+  ],
+  "extract": [
+    {
+      "file": "src/k3dge/engine/markers.py",
+      "line": 176
     }
   ],
   "extract_contract_hash": [
@@ -314,19 +756,67 @@
   "extract_python_interface": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 182
+      "line": 343
     }
   ],
-  "extract_ts_interface": [
+  "facts_of": [
     {
-      "file": "src/k3dge/engine/_ts.py",
-      "line": 69
+      "file": "src/k3dge/engine/gate_facts.py",
+      "line": 524
     }
   ],
-  "extract_typescript_interface": [
+  "fill": [
     {
-      "file": "src/k3dge/engine/contract.py",
-      "line": 212
+      "file": "src/k3dge/engine/gate_facts.py",
+      "line": 476
+    }
+  ],
+  "find_orphan_adrs": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 329
+    }
+  ],
+  "find_orphan_specs": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 291
+    }
+  ],
+  "find_orphan_tests": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 304
+    }
+  ],
+  "find_table": [
+    {
+      "file": "src/k3dge/engine/report_table.py",
+      "line": 32
+    }
+  ],
+  "find_unguarded_archives": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 595
+    }
+  ],
+  "find_unscreened_new_docs": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 382
+    }
+  ],
+  "fix_kind": [
+    {
+      "file": "src/k3dge/engine/gate_facts.py",
+      "line": 454
+    }
+  ],
+  "format_seal_trailers": [
+    {
+      "file": "src/k3dge/engine/seal.py",
+      "line": 329
     }
   ],
   "format_version": [
@@ -335,22 +825,34 @@
       "line": 51
     }
   ],
+  "get": [
+    {
+      "file": "src/k3dge/engine/gates.py",
+      "line": 151
+    }
+  ],
   "get_changed_files": [
     {
       "file": "src/k3dge/engine/diff.py",
-      "line": 74
+      "line": 87
     }
   ],
   "get_current_milestone": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 51
+      "file": "src/k3dge/engine/milestone_pointer.py",
+      "line": 15
     }
   ],
   "get_domain_spec_resource": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 71
+      "line": 87
+    }
+  ],
+  "get_domain_spec_resource_for": [
+    {
+      "file": "src/k3dge/cli/mcp.py",
+      "line": 92
     }
   ],
   "get_init_version": [
@@ -362,7 +864,13 @@
   "get_manifest_resource": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 58
+      "line": 70
+    }
+  ],
+  "get_manifest_resource_for": [
+    {
+      "file": "src/k3dge/cli/mcp.py",
+      "line": 75
     }
   ],
   "get_manifest_version": [
@@ -380,7 +888,7 @@
   "get_verify_attempts": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 115
+      "line": 119
     }
   ],
   "get_version": [
@@ -392,173 +900,357 @@
   "grep_docs": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 201
+      "line": 273
+    }
+  ],
+  "has_milestone_token": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 122
+    }
+  ],
+  "has_table": [
+    {
+      "file": "src/k3dge/engine/report_table.py",
+      "line": 27
+    }
+  ],
+  "head_block_end": [
+    {
+      "file": "src/k3dge/engine/markers.py",
+      "line": 88
+    }
+  ],
+  "head_commit": [
+    {
+      "file": "src/k3dge/engine/seal.py",
+      "line": 323
     }
   ],
   "index_path": [
     {
       "file": "src/k3dge/engine/search.py",
-      "line": 36
+      "line": 39
+    }
+  ],
+  "is_declared": [
+    {
+      "file": "src/k3dge/engine/gate_facts.py",
+      "line": 464
+    }
+  ],
+  "is_screenable_new_doc": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 365
     }
   ],
   "iter_doc_types": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 55
+      "line": 49
     }
   ],
   "iter_managed_files": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 70
+      "line": 64
     }
   ],
   "k3dge_5pass_audit_prompt": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 549
+      "line": 614
     }
   ],
   "k3dge_adr_index": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 591
+      "line": 656
     }
   ],
   "k3dge_check": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 91
+      "line": 111
     }
   ],
   "k3dge_doc_grep": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 311
+      "line": 358
     }
   ],
   "k3dge_doc_list": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 285
+      "line": 332
     }
   ],
   "k3dge_doc_where": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 301
+      "line": 348
     }
   ],
   "k3dge_milestone_control": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 327
+      "line": 374
     }
   ],
   "k3dge_status": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 107
+      "line": 131
     }
   ],
   "k3dge_submit_audit_report": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 462
+      "line": 517
     }
   ],
   "k3dge_sync": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 168
+      "line": 192
     }
   ],
   "k3dge_task_create": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 229
+      "line": 253
     }
   ],
   "k3dge_task_done": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 247
+      "line": 290
     }
   ],
   "k3dge_task_list": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 256
+      "line": 299
     }
   ],
   "k3dge_verify_domain_contract": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 124
+      "line": 148
     }
   ],
   "k3dge_version": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 195
+      "line": 219
+    }
+  ],
+  "kind": [
+    {
+      "file": "src/k3dge/engine/nodes.py",
+      "line": 77
+    }
+  ],
+  "legacy_config_present": [
+    {
+      "file": "src/k3dge/engine/gates.py",
+      "line": 146
+    }
+  ],
+  "lifecycle_next": [
+    {
+      "file": "src/k3dge/cli/status.py",
+      "line": 43
+    }
+  ],
+  "line": [
+    {
+      "file": "src/k3dge/engine/attest.py",
+      "line": 71
     }
   ],
   "list_docs": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 159
+      "line": 196
     }
   ],
   "list_tasks": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 453
+      "file": "src/k3dge/engine/task_index.py",
+      "line": 99
+    }
+  ],
+  "load": [
+    {
+      "file": "src/k3dge/engine/gates.py",
+      "line": 123
+    }
+  ],
+  "load_all": [
+    {
+      "file": "src/k3dge/engine/nextstep.py",
+      "line": 335
+    }
+  ],
+  "load_mcp_document": [
+    {
+      "file": "src/k3dge/engine/mcp_json.py",
+      "line": 17
+    }
+  ],
+  "load_mcp_endpoints": [
+    {
+      "file": "src/k3dge/engine/mcp_json.py",
+      "line": 29
+    }
+  ],
+  "load_persisted": [
+    {
+      "file": "src/k3dge/engine/nextstep.py",
+      "line": 352
     }
   ],
   "load_pipeline_config": [
     {
       "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 61
+      "line": 84
     }
   ],
   "main": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1196
+      "line": 1229
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 260
+      "line": 346
+    }
+  ],
+  "managed_docs": [
+    {
+      "file": "src/k3dge/engine/doc_fix.py",
+      "line": 46
     }
   ],
   "mark_task_done": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 594
+      "file": "src/k3dge/engine/task_write.py",
+      "line": 372
+    }
+  ],
+  "materialize": [
+    {
+      "file": "src/k3dge/engine/audit_flow.py",
+      "line": 550
+    },
+    {
+      "file": "src/k3dge/engine/worktree.py",
+      "line": 333
+    }
+  ],
+  "mcp_server_names": [
+    {
+      "file": "src/k3dge/engine/mcp_json.py",
+      "line": 38
+    }
+  ],
+  "mechanical_commit": [
+    {
+      "file": "src/k3dge/engine/changelog.py",
+      "line": 46
+    }
+  ],
+  "merge_back": [
+    {
+      "file": "src/k3dge/engine/worktree.py",
+      "line": 217
+    }
+  ],
+  "milestone_tags": [
+    {
+      "file": "src/k3dge/engine/milestone_files.py",
+      "line": 59
     }
   ],
   "next_for_rejection": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 146
+      "line": 399
     }
   ],
   "normalize": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 221
+      "line": 367
+    }
+  ],
+  "on_error": [
+    {
+      "file": "src/k3dge/engine/nodes.py",
+      "line": 81
+    }
+  ],
+  "open_ratchet_jobs": [
+    {
+      "file": "src/k3dge/engine/audit_flow.py",
+      "line": 522
+    }
+  ],
+  "open_samples": [
+    {
+      "file": "src/k3dge/engine/markers.py",
+      "line": 231
     }
   ],
   "parse_doc_schema": [
     {
-      "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 39
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 41
     }
   ],
   "parse_frontmatter": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 21
+      "file": "src/k3dge/engine/task_index.py",
+      "line": 71
+    }
+  ],
+  "parse_frontmatter_pairs": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 53
+    }
+  ],
+  "parse_headers": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 72
+    }
+  ],
+  "parse_rows": [
+    {
+      "file": "src/k3dge/engine/report_table.py",
+      "line": 46
+    }
+  ],
+  "parse_seal_trailers": [
+    {
+      "file": "src/k3dge/engine/seal.py",
+      "line": 341
+    }
+  ],
+  "parse_sidecar": [
+    {
+      "file": "src/k3dge/engine/markers.py",
+      "line": 152
+    }
+  ],
+  "parse_text": [
+    {
+      "file": "src/k3dge/engine/markers.py",
+      "line": 115
     }
   ],
   "parse_version": [
@@ -567,160 +1259,506 @@
       "line": 44
     }
   ],
+  "peer_status": [
+    {
+      "file": "src/k3dge/engine/audit_flow.py",
+      "line": 495
+    }
+  ],
+  "persist": [
+    {
+      "file": "src/k3dge/engine/nextstep.py",
+      "line": 283
+    }
+  ],
   "persist_external_audit_report": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 1024
+      "file": "src/k3dge/engine/milestone_audit.py",
+      "line": 35
+    }
+  ],
+  "pin_baseline": [
+    {
+      "file": "src/k3dge/engine/worktree.py",
+      "line": 301
+    }
+  ],
+  "preconditions": [
+    {
+      "file": "src/k3dge/engine/gates.py",
+      "line": 156
+    }
+  ],
+  "premature_archive_hint": [
+    {
+      "file": "src/k3dge/engine/task_index.py",
+      "line": 118
+    }
+  ],
+  "present": [
+    {
+      "file": "src/k3dge/engine/worktree.py",
+      "line": 73
+    }
+  ],
+  "probe_peer_mcp": [
+    {
+      "file": "src/k3dge/engine/mcp_json.py",
+      "line": 47
+    }
+  ],
+  "probe_servers": [
+    {
+      "file": "src/k3dge/engine/pipeline_runner.py",
+      "line": 270
+    }
+  ],
+  "projection": [
+    {
+      "file": "src/k3dge/engine/gate_facts.py",
+      "line": 514
+    }
+  ],
+  "prune": [
+    {
+      "file": "src/k3dge/engine/worktree.py",
+      "line": 277
+    }
+  ],
+  "prune_finished": [
+    {
+      "file": "src/k3dge/engine/audit_flow.py",
+      "line": 571
+    }
+  ],
+  "push_present": [
+    {
+      "file": "src/k3dge/engine/audit_flow.py",
+      "line": 429
+    }
+  ],
+  "question_text": [
+    {
+      "file": "src/k3dge/engine/nextstep.py",
+      "line": 424
     }
   ],
   "read_checklist": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 82
+      "line": 86
+    }
+  ],
+  "read_events": [
+    {
+      "file": "src/k3dge/engine/events.py",
+      "line": 54
+    }
+  ],
+  "reassign_milestone": [
+    {
+      "file": "src/k3dge/engine/task_write.py",
+      "line": 490
+    }
+  ],
+  "reassign_task_milestone": [
+    {
+      "file": "src/k3dge/engine/task_write.py",
+      "line": 441
+    }
+  ],
+  "reconcile_supersedes": [
+    {
+      "file": "src/k3dge/engine/adr_gate.py",
+      "line": 81
+    }
+  ],
+  "record_screen_ack": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 417
+    }
+  ],
+  "register_extractor": [
+    {
+      "file": "src/k3dge/engine/contract.py",
+      "line": 175
+    }
+  ],
+  "rejection": [
+    {
+      "file": "src/k3dge/engine/gates.py",
+      "line": 44
+    }
+  ],
+  "remove": [
+    {
+      "file": "src/k3dge/engine/worktree.py",
+      "line": 297
+    }
+  ],
+  "render": [
+    {
+      "file": "src/k3dge/engine/gate_facts.py",
+      "line": 488
+    }
+  ],
+  "render_checklist": [
+    {
+      "file": "src/k3dge/engine/seal.py",
+      "line": 279
     }
   ],
   "render_manual_docs": [
     {
       "file": "src/k3dge/sync/generator.py",
-      "line": 130
+      "line": 131
+    }
+  ],
+  "render_manual_docs_content": [
+    {
+      "file": "src/k3dge/engine/generated_docs.py",
+      "line": 17
+    }
+  ],
+  "render_plugin": [
+    {
+      "file": "src/k3dge/engine/extractor_gen.py",
+      "line": 200
     }
   ],
   "render_readme_layout": [
     {
       "file": "src/k3dge/sync/generator.py",
-      "line": 117
+      "line": 118
     }
   ],
   "reset_for_audit": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 102
+      "line": 106
     }
   ],
   "reset_verify_attempts": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 126
+      "line": 130
+    }
+  ],
+  "resolve": [
+    {
+      "file": "src/k3dge/engine/state_machine.py",
+      "line": 48
     }
   ],
   "resolve_action": [
     {
-      "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 74
+      "file": "src/k3dge/engine/pipeline_schema.py",
+      "line": 58
     }
   ],
   "resolve_base": [
     {
       "file": "src/k3dge/engine/diff.py",
-      "line": 30
+      "line": 43
+    }
+  ],
+  "resolve_endpoint_command": [
+    {
+      "file": "src/k3dge/engine/pipeline_runner.py",
+      "line": 125
+    }
+  ],
+  "resolve_languages": [
+    {
+      "file": "src/k3dge/engine/extractor_gen.py",
+      "line": 156
+    }
+  ],
+  "resolve_role": [
+    {
+      "file": "src/k3dge/engine/pipeline_schema.py",
+      "line": 42
+    }
+  ],
+  "retired_adr_numbers": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 442
+    }
+  ],
+  "retired_ledger_cards": [
+    {
+      "file": "src/k3dge/engine/doc_catalog.py",
+      "line": 163
     }
   ],
   "run_action": [
     {
       "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 171
+      "line": 343
     }
   ],
   "run_audit_flow": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 1302
-    }
-  ],
-  "run_doc_audit": [
-    {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 1266
+      "file": "src/k3dge/engine/milestone_audit.py",
+      "line": 454
     }
   ],
   "run_milestone_alignment": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 698
+      "file": "src/k3dge/engine/align.py",
+      "line": 65
+    }
+  ],
+  "run_phase": [
+    {
+      "file": "src/k3dge/engine/nodes.py",
+      "line": 99
     }
   ],
   "run_seal_flow": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 1383
+      "file": "src/k3dge/engine/seal_flow.py",
+      "line": 174
+    }
+  ],
+  "satisfied_ids": [
+    {
+      "file": "src/k3dge/engine/nodes.py",
+      "line": 86
     }
   ],
   "scaffold": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 189
+      "line": 266
+    }
+  ],
+  "scan": [
+    {
+      "file": "src/k3dge/engine/doc_fix.py",
+      "line": 86
     }
   ],
   "scan_milestone_tasks": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 496
+      "file": "src/k3dge/engine/task_index.py",
+      "line": 175
     }
   ],
   "scan_pending_findings": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 402
+      "file": "src/k3dge/engine/milestone_audit.py",
+      "line": 22
     }
   ],
   "scan_unfilled_guides": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 375
+      "file": "src/k3dge/engine/seal.py",
+      "line": 34
+    }
+  ],
+  "screen_ack_path": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 377
+    }
+  ],
+  "screen_target_exists": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 405
+    }
+  ],
+  "seal_checklist": [
+    {
+      "file": "src/k3dge/engine/seal.py",
+      "line": 239
     }
   ],
   "seal_milestone": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 778
+      "file": "src/k3dge/engine/seal.py",
+      "line": 449
+    }
+  ],
+  "seal_preconditions_error": [
+    {
+      "file": "src/k3dge/engine/seal.py",
+      "line": 199
+    }
+  ],
+  "seal_ready_for": [
+    {
+      "file": "src/k3dge/engine/nextstep.py",
+      "line": 372
+    }
+  ],
+  "seal_record": [
+    {
+      "file": "src/k3dge/engine/seal.py",
+      "line": 419
     }
   ],
   "search": [
     {
       "file": "src/k3dge/engine/search.py",
-      "line": 160
+      "line": 194
+    }
+  ],
+  "secret": [
+    {
+      "file": "src/k3dge/engine/attest.py",
+      "line": 26
     }
   ],
   "set_current_milestone": [
     {
-      "file": "src/k3dge/engine/milestone.py",
-      "line": 64
+      "file": "src/k3dge/engine/milestone_pointer.py",
+      "line": 28
+    }
+  ],
+  "severity": [
+    {
+      "file": "src/k3dge/engine/gate_facts.py",
+      "line": 469
+    }
+  ],
+  "show_job": [
+    {
+      "file": "src/k3dge/engine/audit_flow.py",
+      "line": 528
+    }
+  ],
+  "split_task_name": [
+    {
+      "file": "src/k3dge/engine/task_write.py",
+      "line": 429
+    }
+  ],
+  "stages": [
+    {
+      "file": "src/k3dge/engine/gates.py",
+      "line": 161
+    }
+  ],
+  "strip_code_spans": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 60
+    }
+  ],
+  "strip_fences": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 42
+    }
+  ],
+  "strip_pins": [
+    {
+      "file": "src/k3dge/engine/worktree.py",
+      "line": 119
+    }
+  ],
+  "submit_audit": [
+    {
+      "file": "src/k3dge/engine/audit_flow.py",
+      "line": 172
+    }
+  ],
+  "summary": [
+    {
+      "file": "src/k3dge/engine/state_machine.py",
+      "line": 105
+    },
+    {
+      "file": "src/k3dge/engine/task_dag.py",
+      "line": 115
     }
   ],
   "symbol_diff": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 333
+      "line": 500
     }
   ],
   "sync_all": [
     {
       "file": "src/k3dge/sync/generator.py",
-      "line": 181
+      "line": 216
     }
   ],
   "sync_domain": [
     {
       "file": "src/k3dge/sync/generator.py",
-      "line": 70
+      "line": 71
+    }
+  ],
+  "sync_extractors": [
+    {
+      "file": "src/k3dge/engine/extractor_gen.py",
+      "line": 349
+    }
+  ],
+  "tag_audit_baseline": [
+    {
+      "file": "src/k3dge/engine/seal.py",
+      "line": 358
+    }
+  ],
+  "tasks_after_boundary": [
+    {
+      "file": "src/k3dge/engine/milestone_files.py",
+      "line": 75
+    }
+  ],
+  "token": [
+    {
+      "file": "src/k3dge/engine/attest.py",
+      "line": 66
+    }
+  ],
+  "tree_hash": [
+    {
+      "file": "src/k3dge/engine/attest.py",
+      "line": 30
+    }
+  ],
+  "unmet_seal_preconditions": [
+    {
+      "file": "src/k3dge/engine/seal.py",
+      "line": 263
+    }
+  ],
+  "utc_minute": [
+    {
+      "file": "src/k3dge/engine/attest.py",
+      "line": 36
+    }
+  ],
+  "validate": [
+    {
+      "file": "src/k3dge/engine/markers.py",
+      "line": 203
     }
   ],
   "validate_docs": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 443
+      "line": 422
     }
   ],
   "validate_docs_index": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 471
+      "line": 469
     }
   ],
   "validate_pipeline_config": [
     {
       "file": "src/k3dge/engine/pipeline_schema.py",
-      "line": 36
+      "line": 202
     }
   ],
   "validate_structure": [
@@ -735,34 +1773,64 @@
       "line": 108
     }
   ],
+  "verify_commit": [
+    {
+      "file": "src/k3dge/engine/attest.py",
+      "line": 96
+    }
+  ],
   "verify_contract": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 280
+      "line": 427
     }
   ],
   "where": [
     {
       "file": "src/k3dge/engine/search.py",
-      "line": 103
+      "line": 106
     }
   ],
   "where_doc": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 192
+      "line": 234
+    }
+  ],
+  "window": [
+    {
+      "file": "src/k3dge/engine/attest.py",
+      "line": 49
+    }
+  ],
+  "windows": [
+    {
+      "file": "src/k3dge/engine/attest.py",
+      "line": 56
+    }
+  ],
+  "work_pending": [
+    {
+      "file": "src/k3dge/engine/task_index.py",
+      "line": 41
     }
   ],
   "workspace_status": [
     {
       "file": "src/k3dge/cli/status.py",
-      "line": 17
+      "line": 91
+    }
+  ],
+  "worktree_path": [
+    {
+      "file": "src/k3dge/engine/worktree.py",
+      "line": 27
     }
   ],
   "write_docs_index": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 151
+      "line": 188
     }
   ],
   "write_incident": [
@@ -774,7 +1842,7 @@
   "write_symbol_index": [
     {
       "file": "src/k3dge/engine/search.py",
-      "line": 86
+      "line": 89
     }
   ]
 }

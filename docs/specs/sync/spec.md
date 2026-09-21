@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/sync`
-- **Contract Hash**: `sha256:a127638f48fe919d833e65fc64d7a9cdd17bb95c66081e2326afd0612d5ff2bc`
-- **Last Updated**: 2026-09-11
+- **Contract Hash**: `sha256:1ceebaf264abb810e25c141f2c407bdfca78193417cdde60cb6f76ad6a58d40e`
+- **Last Updated**: 2026-09-21
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -27,6 +27,7 @@ from typing import Sequence
 from typing import Tuple
 from k3dge.engine import contract
 from k3dge.engine import spec_schema
+from k3dge.engine.generated_docs import render_manual_docs_content
 from k3dge.engine.manifest import Manifest
 HASH_LINE_RE = re.compile('(\\*\\*Contract Hash\\*\\*:).*$', re.MULTILINE)
 DATE_LINE_RE = re.compile('(\\*\\*Last Updated\\*\\*:).*$', re.MULTILINE)

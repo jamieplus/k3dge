@@ -65,6 +65,31 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         ],
         "pointers": ["k3dge sync", "docs/generated/", "AGENTS.md §12"],
     },
+    "SYMBOL_INDEX_STALE": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "k3dge index（重生 docs/generated/symbol-index.json）",
+        "fact": "`docs/generated/symbol-index.json` 与重建结果不一致（{reason}）——它是 `k3dge where` "
+                "的判据面，旧了会静默给出错的 file:line；投影不手改",
+        "options": ["k3dge index（重生符号索引）", "索引本不该变 → 回退本轮 src/ 改动"],
+        "pointers": ["k3dge index", "k3dge where", "docs/generated/"],
+    },
+    "DOCS_GENERATED_STALE": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "k3dge sync（重生 docs/generated/ 下的 api.md 与 domains.md）",
+        "fact": "`{path}` 与 `k3dge sync` 的重建结果不一致（{reason}）——它是**投影**（api.md↔代码接口、"
+                "domains.md↔manifest），不手改",
+        "options": ["k3dge sync（重生 docs/generated/ 下的派生文档）", "内容本不该变 → 回退本轮改动"],
+        "pointers": ["k3dge sync", "docs/generated/", "AGENTS.md §12"],
+    },
+    "MCP_JSON_PEER_MISSING": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "k3dge mcp sync（把声明 enabled 的 peer 合入 `.mcp.json`）",
+        "fact": "`.mcp.json` 与 `.agent/pipeline.toml` 的 peer 声明不一致（peer={peer}）——外部 harness "
+                "拿不到该工具面，而声明面说它可用",
+        "options": ["k3dge mcp sync（合入缺的 peer / k3dge 自身条目）",
+                    "peer 不该启用 → 在 pipeline.toml 里改 enabled"],
+        "pointers": [".mcp.json", ".agent/pipeline.toml", "k3dge mcp sync"],
+    },
     "CONTRACT_HASH_MISSING": {
         "severity": "block", "fix": "deterministic",
         "fix_hint": "k3dge sync（写入契约哈希）",

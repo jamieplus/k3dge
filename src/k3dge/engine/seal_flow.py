@@ -65,6 +65,52 @@ def _report_seat(workspace: Path, milestone_id: str) -> str:
         return ""
 
 
+def _boundary_tag_before(workspace: Path, milestone_id: str) -> str:
+    """最近一个**别人**的边界 tag（`M<n>`；排当前里程碑自己）。无则空串。"""
+    from k3dge.engine import seal as _seal
+    from k3dge.engine.changelog import _tag_number
+
+    best = ""
+    rc, out = _seal._git(workspace, "tag", "--list", "M*")
+    if rc != 0:
+        return ""
+    for name in out.splitlines():
+        name = name.strip()
+        if not name or name == milestone_id:
+            continue
+        if _tag_number(name) > _tag_number(best or "M0"):
+            best = name
+    return best
+
+
+def _architecture_staleness(workspace: Path, milestone_id: str) -> str:
+    """架构文档自上一个边界以来的新鲜度（人读陈述；不判定“该不该改”）。
+
+    背景（2026-09-21 盘点）：`docs/architecture/overview.md` 的更新一直只写在收摊清单的
+    advisory 里，从来没有“什么时候该看它”的事实 ⇒ 跨里程碑静默漂移。这里把事实算出来，
+    让 seal 那一刻**必须看见**（仍不阻断：写得好不好归人/k3dit，见 `AGENTS.md` §12）。
+    """
+    from k3dge.engine import seal as _seal
+
+    tag = _boundary_tag_before(workspace, milestone_id)
+    if not tag:
+        return "无上一个边界 tag（首个里程碑）：架构文档按现状保留，无需对账"
+    rc, out = _seal._git(workspace, "diff", "--name-only", f"{tag}..HEAD")
+    if rc != 0:
+        return f"（读 {tag}..HEAD 失败，未能对账架构文档）"
+    files = [f for f in out.splitlines() if f.strip()]
+    arch_rel = "docs/architecture/overview.md"
+    code = [f for f in files if f.startswith(("src/", "docs/specs/"))]
+    if arch_rel in files:
+        return f"✅ `{arch_rel}` 在 `{tag}..HEAD` 区间内已更新（{len(code)} 个 src/spec 文件也变过）"
+    if not code:
+        return f"✅ 自 `{tag}` 以来 `src/`/`docs/specs/` 无改动 ⇒ 架构文档无需对账"
+    return (
+        f"⚠️ `{arch_rel}` 自 `{tag}` 以来**未更新**，而区间内 `src/`/`docs/specs/` 有 "
+        f"{len(code)} 个文件改动 ⇒ 本里程碑收摊时对齐（无实际变化就在清单里注明“无需改”）"
+    )
+
+
 def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
     """Emit the context-compression closure checklist for a sealed milestone.
 
@@ -89,6 +135,7 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
     audit_reports = ",".join(
         sorted({f.name for f in report_files if f.name.endswith(("-audit.md", "-quality.md"))})
     ) or "-"
+    arch_fact = _architecture_staleness(workspace, milestone_id)
     p = reviews / f"{today}-{milestone_id}-closure.md"
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(
@@ -107,7 +154,7 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
                 "- [ ] 删除/折叠与现行方案无关的草稿、分支说明",
                 "",
                 "## 3. 更新设计文档",
-                "- [ ] `docs/architecture/overview.md` 对齐到已封板的现实",
+                f"- [ ] `docs/architecture/overview.md` 对齐到已封板的现实 —— {arch_fact}",
                 "- [ ] 相关 ADR 标注 supersedes / 现行范围",
                 "",
                 "## 4. 提交里程碑",
@@ -255,7 +302,9 @@ def run_seal_flow(
             write_docs_index(workspace)
         except Exception:
             pass
-        return True, f"\n  收摊清单: {p.relative_to(workspace)}"
+        # 架构文档新鲜度：清单里已写具体事实，这里再投影一次到 seal 输出（同一判定，两处显示）
+        return True, (f"\n  收摊清单: {p.relative_to(workspace)}"
+                      f"\n  架构文档: {_architecture_staleness(workspace, milestone_id)}")
 
     def _prune(_ctx):
         try:  # end-flow 清理钩子：派生件（worktree/已并入的审计线）收口即删；史在主干

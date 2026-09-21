@@ -489,6 +489,14 @@
       "tokens": "`k3dge commit` 用 `--no-verify` 绕过 hook：引用/排查闸在便利入口上失效（PRE-01）"
     },
     {
+      "path": "docs/tasks/2026-09-21-M11-fix-dangling_generators.done.md",
+      "type": "tasks",
+      "id": "2026-09-21-M11-fix-dangling_generators.done",
+      "title": "悬空生成路径归位：生成物新鲜度闸 + README layout 并入 sync + 删 changelog 死簇 + 架构 seal 收口",
+      "status": "done",
+      "tokens": "悬空生成路径归位：生成物新鲜度闸 + README layout 并入 sync + 删 changelog 死簇 + 架构 seal 收口"
+    },
+    {
       "path": "docs/tasks/2026-09-21-M11-fix-memo_review_landing.done.md",
       "type": "tasks",
       "id": "2026-09-21-M11-fix-memo_review_landing.done",

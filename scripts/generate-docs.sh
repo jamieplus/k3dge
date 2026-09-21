@@ -44,7 +44,7 @@ Spec-gate harness：为 vibecoding agent 提供确定性的契约漂移检测与
 
 ## 布局
 
-> 基础版本随仓库存在；工程收尾时由 `./scripts/generate-docs.sh`（agent 按 `.agent/docs.toml`）刷新下表。
+> 基础版本随仓库存在；域表由 `k3dge sync` 从 `.agent/manifest.json` 刷新（不再由本脚本碰）。
 
 域路由以 `.agent/manifest.json` 为唯一事实源：
 
@@ -54,9 +54,7 @@ Spec-gate harness：为 vibecoding agent 提供确定性的契约漂移检测与
 另见：`docs/specs/<domain>/spec.md`（各域契约事实源）。
 EOF
   fi
-  echo "[k3dge] refreshing README layout..."
-  if [ -x ".venv/bin/python" ]; then PYEXE=".venv/bin/python"; else PYEXE=".venv/Scripts/python.exe"; fi
-  "$PYEXE" -c "from pathlib import Path; from k3dge.sync.generator import render_readme_layout; from k3dge.engine.manifest import Manifest; m=Manifest.load(Path('.')); p=render_readme_layout(Path('.'), m); print('  updated' if p else '  already up to date')"
+  echo "[k3dge] README layout: 归 `k3dge sync`（本脚本不再触碰）"
 else
   echo "[k3dge] disabled in config, skip: readme -> README.md"
 fi

@@ -5,10 +5,11 @@ Extracted from cli/main.py to reduce its size and isolate MCP peer logic.
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Optional
+
+from k3dge.engine.mcp_json import probe_peer_mcp
 
 
 def _peer_fallback_warn(peer: str, reason: str, fallback: str) -> None:
@@ -45,28 +46,6 @@ def _peer_fallback(pcfg: dict) -> str:
     return "audit_default.md"
 
 
-def _probe_peer_mcp(workspace: Path, pid: str) -> tuple[Optional[Path], Optional[str], Optional[str]]:
-    """Locate a sibling peer MCP module and a PYTHONPATH that can import it."""
-    sibling = workspace.parent / pid
-    alt_sibling = workspace / pid
-    probe = sibling if sibling.is_dir() else (alt_sibling if alt_sibling.is_dir() else None)
-    if probe is None:
-        return None, None, None
-    mod = None
-    if (probe / "src" / pid / "mcp.py").is_file():
-        mod = f"{pid}.mcp"
-    elif (probe / "src" / pid / "cli" / "mcp.py").is_file():
-        mod = f"{pid}.cli.mcp"
-    elif (probe / "pyproject.toml").is_file():
-        mod = f"{pid}.mcp"
-    py_path = None
-    src = probe / "src"
-    if src.is_dir():
-        try:
-            py_path = os.path.relpath(src, workspace)
-        except ValueError:
-            py_path = str(src)
-    return probe, mod, py_path
 
 
 def _peer_mcp_entry(mod: str, pythonpath: Optional[str]) -> dict:
@@ -127,7 +106,7 @@ def _sync_peers_into_mcp(workspace: Path, cfg: dict) -> Optional[str]:
     for pid, pcfg in cfg.get("peers", {}).items():
         if pid == "k3dge" or not pcfg.get("enabled", True):
             continue
-        probe, mod, py_path = _probe_peer_mcp(workspace, pid)
+        probe, mod, py_path = probe_peer_mcp(workspace, pid)
         if probe is None or mod is None:
             if pid not in data["mcpServers"]:
                 sibling = workspace.parent / pid

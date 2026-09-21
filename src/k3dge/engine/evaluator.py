@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Optional, Set
 
 import ast
+import json
 import re
 
 from k3dge.engine import contract, diff, spec_schema
@@ -356,6 +357,8 @@ class ConsistencyEngine:
         violations.extend(self._check_audit_trail())
 
         violations.extend(self._check_docs(files, force_full))
+
+        violations.extend(self._check_generated_projections(manifest))
 
         report = GateReport(
             passed=not violations,
@@ -790,6 +793,142 @@ class ConsistencyEngine:
                 )
             )
         return out, False
+
+    def _check_generated_projections(self, manifest: Manifest) -> List[Violation]:
+        """生成物的新鲜度闸：符号索引 / `docs/generated/{api,domains}.md` / `.mcp.json`。
+
+        这三件（加上已被 `DOC_INDEX_STALE` 罩住的 `docs-index.json`）都是**可重算的投影**，
+        但此前只有 docs-index 有闸 ⇒ 其余三件“写了就没人管旧”（本仓 2026-09-21 盘点：悬空）。
+        与 `DOC_INDEX_STALE` 同形：重建与盘上比，不等即红，修法＝重生它的那条命令。
+        纯静态、不写盘、不联网。
+        """
+        out: List[Violation] = []
+
+        # ① 符号索引（`k3dge where` 的判据面：旧索引会静默返回错位置）
+        try:
+            from k3dge.engine import search
+
+            idx_path = search.index_path(self.workspace_root)
+            if idx_path.is_file():
+                try:
+                    actual = json.loads(idx_path.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    actual = None
+                if actual != search.build_symbol_index(self.workspace_root):
+                    rel = str(idx_path.relative_to(self.workspace_root)).replace("\\", "/")
+                    out.append(
+                        Violation(
+                            "SYMBOL_INDEX_STALE",
+                            "symbol index is stale (rebuild differs)",
+                            file_path=rel,
+                            detail={"path": rel, "reason": "盘上内容与重建结果不同"},
+                        )
+                    )
+        except Exception as exc:  # 工具坏不得静默：报一次而非吞掉
+            out.append(
+                Violation(
+                    "SYMBOL_INDEX_STALE",
+                    f"symbol index check crashed: {exc}",
+                    file_path="docs/generated/symbol-index.json",
+                    detail={"path": "docs/generated/symbol-index.json", "reason": str(exc)},
+                )
+            )
+
+        # ② docs/generated/{api,domains}.md（`k3dge sync` 的产物）
+        try:
+            from k3dge.engine.generated_docs import render_manual_docs_content
+
+            for path, expected in render_manual_docs_content(self.workspace_root, manifest).items():
+                if not path.is_file():
+                    continue  # 缺文件不是“陈旧”（与 `validate_docs_index` 同口径：缺 ⇒ 不报）
+                rel = str(path.relative_to(self.workspace_root)).replace("\\", "/")
+                if path.read_text(encoding="utf-8") != expected:
+                    out.append(
+                        Violation(
+                            "DOCS_GENERATED_STALE",
+                            "generated doc is stale (re-render differs)",
+                            file_path=rel,
+                            detail={"path": rel, "reason": "与 `k3dge sync` 的重建结果不同"},
+                        )
+                    )
+        except Exception as exc:
+            out.append(
+                Violation(
+                    "DOCS_GENERATED_STALE",
+                    f"generated docs check crashed: {exc}",
+                    file_path="docs/generated",
+                    detail={"path": "docs/generated", "reason": str(exc)},
+                )
+            )
+
+        # ③ .mcp.json：声明 enabled 的 peer（能探到 sibling MCP 模块的）必须在 mcpServers 里
+        try:
+            out.extend(self._check_mcp_json())
+        except Exception as exc:
+            out.append(
+                Violation(
+                    "MCP_JSON_PEER_MISSING",
+                    f".mcp.json check crashed: {exc}",
+                    file_path=".mcp.json",
+                    detail={"path": ".mcp.json", "reason": str(exc)},
+                )
+            )
+        return out
+
+    def _check_mcp_json(self) -> List[Violation]:
+        """`.mcp.json` 的 peer 面 vs `.agent/pipeline.toml` 声明（同一探测函数，不开第二判据）。"""
+        from k3dge.engine import mcp_json as mj
+
+        cfg_path = self.workspace_root / ".agent" / "pipeline.toml"
+        doc = mj.load_mcp_document(self.workspace_root)
+        if not cfg_path.is_file() or doc is None:
+            return []  # 无声明/无文件 ⇒ 不造违例（缺文件归 PIPELINE_* 与 init 面）
+        try:
+            import tomllib as _toml
+        except ModuleNotFoundError:  # py3.10
+            try:
+                import tomli as _toml  # type: ignore
+            except ModuleNotFoundError:
+                return []
+        try:
+            cfg = _toml.loads(cfg_path.read_text(encoding="utf-8"))
+        except Exception:
+            return []  # 语法错由 PIPELINE_SCHEMA_INVALID 报，不在这里凑第二份
+        servers = doc.get("mcpServers")
+        if not isinstance(servers, dict):
+            return [
+                Violation(
+                    "MCP_JSON_PEER_MISSING",
+                    "`.mcp.json` has no mcpServers map",
+                    file_path=".mcp.json",
+                    detail={"path": ".mcp.json", "reason": "缺 mcpServers"},
+                )
+            ]
+        out: List[Violation] = []
+        if "k3dge" not in servers:
+            out.append(
+                Violation(
+                    "MCP_JSON_PEER_MISSING",
+                    "`.mcp.json` does not declare the k3dge server itself",
+                    file_path=".mcp.json",
+                    detail={"path": ".mcp.json", "peer": "k3dge"},
+                )
+            )
+        for pid, pcfg in (cfg.get("peers") or {}).items():
+            if not isinstance(pcfg, dict) or not pcfg.get("enabled", True) or pid == "k3dge":
+                continue
+            probe, mod, _pp = mj.probe_peer_mcp(self.workspace_root, pid)
+            if pid in servers or probe is None or mod is None:
+                continue  # 已声明 / sibling 不在（写侧本就会跳过，见 cli.mcp_peers 的回退告警）
+            out.append(
+                Violation(
+                    "MCP_JSON_PEER_MISSING",
+                    f"peer '{pid}' is declared enabled and resolvable but missing from `.mcp.json`",
+                    file_path=".mcp.json",
+                    detail={"path": ".mcp.json", "peer": pid},
+                )
+            )
+        return out
 
     def _check_domain_imports(self, domain: str, manifest: Manifest) -> List[Violation]:
         """Reverse-import ban: a domain may import another domain only if declared in depends_on (ADR-0001 decision 6)."""

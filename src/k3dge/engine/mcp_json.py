@@ -7,8 +7,9 @@ its own write-side parse.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Optional, Set, Tuple
 
 _MCP_CONFIG_REL = ".mcp.json"
 
@@ -41,3 +42,32 @@ def mcp_server_names(workspace: Path) -> Optional[Set[str]]:
         return None
     servers = data.get("mcpServers")
     return set(servers) if isinstance(servers, dict) else None
+
+
+def probe_peer_mcp(workspace: Path, pid: str) -> Tuple[Optional[Path], Optional[str], Optional[str]]:
+    """Locate a sibling peer MCP module + the PYTHONPATH that can import it.
+
+    **单一实现**：写侧（`cli.mcp_peers._sync_peers_into_mcp`）与新鲜度闸
+    （`evaluator` 的 `MCP_JSON_PEER_MISSING`）都走这里——否则"哪些 peer 该出现在
+    `.mcp.json`"会有两份判据，迟早漂移。纯路径探测，不改盘、不起进程。
+    """
+    sibling = workspace.parent / pid
+    alt_sibling = workspace / pid
+    probe = sibling if sibling.is_dir() else (alt_sibling if alt_sibling.is_dir() else None)
+    if probe is None:
+        return None, None, None
+    mod = None
+    if (probe / "src" / pid / "mcp.py").is_file():
+        mod = f"{pid}.mcp"
+    elif (probe / "src" / pid / "cli" / "mcp.py").is_file():
+        mod = f"{pid}.cli.mcp"
+    elif (probe / "pyproject.toml").is_file():
+        mod = f"{pid}.mcp"
+    py_path = None
+    src = probe / "src"
+    if src.is_dir():
+        try:
+            py_path = os.path.relpath(src, workspace)
+        except ValueError:
+            py_path = str(src)
+    return probe, mod, py_path
