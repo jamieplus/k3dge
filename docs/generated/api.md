@@ -213,6 +213,10 @@ audit_closed(workspace: Path, milestone_id: str) -> bool
 from __future__ import annotations
 from pathlib import Path
 from k3dge.engine.task_index import TITLE_RE
+mechanical_commit(sha: str, subject: str, body: str) -> bool
+    # doc: **机器造的**提交（不该进 CHANGELOG，也不算"漏项"）：
+build_notes_from_range(workspace: Path, previous_tag: str='') -> tuple
+    # doc: `<previous_tag>..HEAD` 的非机械提交 → `(notes, uncovered)`。
 # contract.py
 from __future__ import annotations
 from pathlib import Path

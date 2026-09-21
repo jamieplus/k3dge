@@ -745,11 +745,11 @@
       "tokens": "保证审计不可空转：`run_audit_flow` 必须看 `ok/skipped`，`audit-result` 闭集落进封版提交 trailer"
     },
     {
-      "path": "docs/tasks/2026-09-20-M10-refactor-changelog_from_range.md",
+      "path": "docs/tasks/2026-09-20-M10-refactor-changelog_from_range.done.md",
       "type": "tasks",
-      "id": "2026-09-20-M10-refactor-changelog_from_range",
+      "id": "2026-09-20-M10-refactor-changelog_from_range.done",
       "title": "CHANGELOG 改由提交区间生成：删\"每票 done 写一行\"的双写、闸只验不漏项",
-      "status": "idea",
+      "status": "done",
       "tokens": "CHANGELOG 改由提交区间生成：删\"每票 done 写一行\"的双写、闸只验不漏项"
     },
     {

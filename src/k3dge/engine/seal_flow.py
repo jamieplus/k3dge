@@ -214,12 +214,19 @@ def run_seal_flow(
         if no_version_bump:
             return True, "\n  版本: 跳过（--no-version-bump）"
         try:
+            from k3dge.engine.changelog import build_notes_from_range
             from k3dge.engine.version import append_changelog, bump_version, consume_unreleased
 
+            # CHANGELOG 由**提交区间**生成（ADR-0004 §2.1.12）：上一里程碑边界 tag .. HEAD 的
+            # 非机械提交，类型取 conventional 前缀。首个里程碑（无边界 tag）⇒ 回落
+            # Unreleased 累积（历史遗留路径）+ 通用行，不假装有区间。
+            notes, uncovered = build_notes_from_range(workspace)
+            if not notes:
+                notes = consume_unreleased(workspace) or f"Seal milestone {milestone_id}."
             new_v = bump_version(workspace, part="patch")
-            body = consume_unreleased(workspace)
-            append_changelog(workspace, new_v, notes=body or f"Seal milestone {milestone_id}.")
-            return True, f"\n  版本: {new_v}"
+            append_changelog(workspace, new_v, notes=notes)
+            gap = f"；{len(uncovered)} 条提交无 conventional 前缀（未成条目）" if uncovered else ""
+            return True, f"\n  版本: {new_v}{gap}"
         except Exception as exc:  # 告警而非静默：版本一半的状态必须可见
             return True, f"\n  版本: bump 失败（{str(exc)[:110]}）——已归档内容不回滚，人工确认"
 

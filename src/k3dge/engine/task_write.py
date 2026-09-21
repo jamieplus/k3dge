@@ -1,7 +1,7 @@
-"""Task 写入核心：创建 / 关闭（含报告闸、回填、CHANGELOG）。
+"""Task 写入核心：创建 / 关闭（含报告闸、回填、重挂）。
 
 Extracted from `engine/milestone.py` (A-1 第九块). All deps come from leaf modules
-(task_index / audit_report / changelog / milestone_pointer / milestone_files) — no cycle.
+(task_index / audit_report / milestone_pointer / milestone_files) — no cycle.
 """
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ from typing import List, Optional, Tuple
 
 from k3dge.engine import report_table
 from k3dge.engine.audit_report import _parse_audit_stats
-from k3dge.engine.changelog import _append_to_unreleased
 from k3dge.engine.milestone_files import _has_milestone_token, _is_doc_aux, _is_review_aux
 from k3dge.engine.milestone_pointer import _validate_milestone_id, get_current_milestone
 from k3dge.engine.task_index import MILESTONE_RE, TITLE_RE, parse_frontmatter
@@ -253,14 +252,6 @@ def _rename_task_done(target: Path) -> Path:
     return new_path
 
 
-def _append_task_changelog(workspace: Path, target: Path) -> None:
-    """Append the task title to CHANGELOG Unreleased; warn (non-blocking) on failure."""
-    if not _append_to_unreleased(workspace, target):
-        import sys
-
-        print(f"[WARN] mark_task_done: CHANGELOG update failed for {target.name}", file=sys.stderr)
-
-
 def _backfill_task_reviews(workspace: Path, target: Path) -> None:
     """Best-effort audit-review backfill when a task closes (never raises)."""
     import sys
@@ -280,7 +271,7 @@ def _backfill_task_reviews(workspace: Path, target: Path) -> None:
 
 
 def _finalize_task_done(workspace: Path, target: Path, content: str, fm: dict) -> Tuple[bool, str, Optional[Path]]:
-    """Report gate -> flip status -> rename -> changelog -> review backfill."""
+    """Report gate -> flip status -> rename -> review backfill（CHANGELOG 归封版，见 §2.1.12）。"""
     # ADR-0022: a task bound to an audit report can only close when that report has
     # no open 待修 findings (1 report = 1 task; closing the task == audit closure).
     report_rel = _task_report_pointer(content)
@@ -312,7 +303,8 @@ def _finalize_task_done(workspace: Path, target: Path, content: str, fm: dict) -
             return False, f"no Status field in {target.name}", target
         target.write_text(new_content, encoding="utf-8")
     target = _rename_task_done(target)
-    _append_task_changelog(workspace, target)
+    # CHANGELOG **不在这里写**（ADR-0004 §2.1.12）：它由封版时的提交区间生成——
+    # 每票各写一行是双写的来源（票改了 CHANGELOG 没改、没开票的改动漏掉，本会话反复遇到）。
     _backfill_task_reviews(workspace, target)
     from k3dge.engine import events
     events.emit(workspace, "task_done", task=target.name)

@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:67314a6c7faab969b6f23b9c678fbddaeb515bb85dfaac763c8d44947f89280e`
+- **Contract Hash**: `sha256:344fe4eeb05fd279442e31147b4116fd78537145e5bace9a6b814967bb9523be`
 - **Last Updated**: 2026-09-20
 
 ## 1. Domain Boundary & Responsibilities
@@ -90,6 +90,8 @@ audit_closed(workspace: Path, milestone_id: str) -> bool
 from __future__ import annotations
 from pathlib import Path
 from k3dge.engine.task_index import TITLE_RE
+mechanical_commit(sha: str, subject: str, body: str) -> bool
+build_notes_from_range(workspace: Path, previous_tag: str='') -> tuple
 from __future__ import annotations
 from pathlib import Path
 from typing import List
