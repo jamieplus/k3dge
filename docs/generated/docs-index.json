@@ -297,14 +297,6 @@
       "tokens": "Incident: 旧报告充闭环——ratchet 的「已闭环」只看本地账，M10 因此被封板"
     },
     {
-      "path": "docs/memo/2026-09-14-gap-trap-absorption.md",
-      "type": "memo",
-      "id": "2026-09-14-gap-trap-absorption",
-      "title": "Memo: gap-trap 吸收评估（proven-red / PR-body / 多语 gate / \"无闸规则即缺陷\"）",
-      "status": "",
-      "tokens": "Memo: gap-trap 吸收评估（proven-red / PR-body / 多语 gate / \"无闸规则即缺陷\"）"
-    },
-    {
       "path": "docs/memo/2026-09-21-sync-docs-updated-flag.md",
       "type": "memo",
       "id": "2026-09-21-sync-docs-updated-flag",
