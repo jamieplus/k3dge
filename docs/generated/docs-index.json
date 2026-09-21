@@ -297,14 +297,6 @@
       "tokens": "Incident: 旧报告充闭环——ratchet 的「已闭环」只看本地账，M10 因此被封板"
     },
     {
-      "path": "docs/memo/2026-09-13-agent-dev-tools-absorption-eval.md",
-      "type": "memo",
-      "id": "2026-09-13-agent-dev-tools-absorption-eval",
-      "title": "Memo: Agent 开发工具吸收评估——codegraph / open-code-review / worktrunk",
-      "status": "",
-      "tokens": "Memo: Agent 开发工具吸收评估——codegraph / open-code-review / worktrunk"
-    },
-    {
       "path": "docs/memo/2026-09-14-gap-trap-absorption.md",
       "type": "memo",
       "id": "2026-09-14-gap-trap-absorption",

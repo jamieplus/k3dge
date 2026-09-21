@@ -21,7 +21,7 @@ doc-audit: 文档作者合规审计（adr, architecture, guides 等 11 处）
 - `docs/adr/0026-projection-contract.md`
 - `docs/architecture/encyclopedia.md`
 - `docs/guides/mcp-bridge.md`
-- `docs/memo/2026-09-13-agent-dev-tools-absorption-eval.md`
+- `docs/memo/archive/2026-09-13-agent-dev-tools-absorption-eval.md`
 - `docs/memo/2026-09-14-gap-trap-absorption.md`
 - `docs/protocols/audit_default.md`
 - `docs/protocols/peer_contract.md`

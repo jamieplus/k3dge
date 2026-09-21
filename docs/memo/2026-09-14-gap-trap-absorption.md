@@ -23,6 +23,6 @@
 - mutation smoke（翻分支逼模块测试失败）：成本高、脆，先不列候选。
 
 ## 关联（指针，勿复述）
-- 判据：`ADR-0009`（吸收纪律）、`.agent/rules/09-absorption.md`、`docs/memo/2026-09-13-agent-dev-tools-absorption-eval.md`（同类账）。
+- 判据：`ADR-0009`（吸收纪律）、`.agent/rules/09-absorption.md`、`docs/memo/archive/2026-09-13-agent-dev-tools-absorption-eval.md`（同类账）。
 - 现状机制：`scripts/{pre-commit,commit-msg,gate.py}`、`engine/evaluator.py`(L2/覆盖)、§13 证据链、`templates/assets/`。
 - 对照物：`../gap-trap/gap-trap/reference/framework.md` §Gates（grep/instruction/ratchet/proven-red/mutation/PR-body）。

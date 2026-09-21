@@ -1,6 +1,13 @@
 # Memo: Agent 开发工具吸收评估——codegraph / open-code-review / worktrunk
 
-- **类型**: 可落地（三源；clean-room，许可均宽松）
+> **Legacy note（归档 2026-09-21）**：§4 全部 8 行已落或已判（逐行证据见各节及下表括注）。
+> 落地票面：k3dge `docs/tasks/archive/M9/2026-09-13-M9-feat-affected_tests.done.md`（自述**误置**，实现落 k3dit）、
+> k3dit `docs/tasks/archive/M9/2026-09-13-M9-feat-{affected_tests,rule_template_matching,position_reflection,eval_harness,file_bundling}.done.md`、
+> k3dge `docs/tasks/archive/M9/2026-09-13-M8-chore-eval_harness_needed.done.md`（跨仓拆出，只记账）、
+> k3che `docs/adr/0003-absorb-recall-mechanics.md` + `src/k3che/recall.py`。
+> **跨仓书账（非本仓动作，仅记事实）**：k3che 仓内 0003 仍 `Status: Draft`（待其维护者复核）；其 carrier 票 `docs/tasks/2026-09-05-feat-absorb_p3_recall_reflect_guard.md` 仍 `status: idea`（票面漂移：实现已在，票未关）。该 carrier 票三件在 k3che 侧均有落点：recall → `src/k3che/recall.py`；reflect（落 skill 编辑需人审）→ `src/k3che/learn.py` 的机械半 + 人审门（spec 收录 `should_learn`/`update_learned`）；guard-window → 同 `recall.py` 纪律；另 k3che 0002（incremental-index-refresh）吸走 continual-learning/recall 的“只处理变化”。
+
+- **类型**: 已落地（三源评估；clean-room，许可均宽松）——判定留档
 - **念头**: 扫 workspace 下三个开源项目（codegraph MIT、open-code-review Apache-2.0、worktrunk MIT/Apache-2.0），判**哪些能增强 k3dge 系统的能力**（而非扩基建/囤储备）。
 - **触发场景**: 2026-09-13 维护者道"下了 codegraph/open-code-review/worktrunk，评估直接用或吸收"；随后定方针：**不是扩基建/增储备，而是 enhance 系统、增强能力**。
 - **Date**: 2026-09-13
@@ -39,7 +46,7 @@ git worktree 管理器（为并行 agent）：`switch/list/merge/remove` + hooks
 | 定位+反射后处理（OCR） | **能力**（审计更真） | 做 → k3dit `feat-position_reflection` |
 | 依赖感知 + affected tests（codegraph/worktrunk） | **能力**（check/CI 更准） | 做 → k3dge `feat-affected_tests`（含最小图边 + 防漏选测） |
 | AACR-Bench 蓝本（OCR） | **能力**（评测可测） | 并入既有 k3dit `feat-eval_harness` |
-| FTS/explore 检索参照（codegraph） | 参照 | 并入既有 k3che `absorb_p3_recall_reflect_guard` |
+| FTS/explore 检索参照（codegraph） | 参照 | ✅ 已消费：并入 k3che `absorb_p3_recall_reflect_guard` → 落为 k3che 0003（absorb-recall-mechanics）+ `src/k3che/recall.py`（`scope_lock` / `order_by_mtime`）；检索面**明确归口** `CacheIndex`（倒排索引），**不引** SQLite+FTS 平台（该 ADR §2「Reopen when…」）|
 | SQLite+FTS 符号平台 | 基建（换存储） | **不囤**（并入 affected 的最小图边） |
 | 单强 MCP 工具 | 体验（非能力） | **不囤** |
 | Smart file bundling | 覆盖/体验 | **不囤**（并入参照，不单列） |
