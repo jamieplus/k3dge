@@ -39,10 +39,25 @@ engine/worktree.py        _run_landing_gate（:168）：sync → check → doc-g
   - **`check` 侧的同族覆盖只有一处**：`doc_catalog.validate_docs` 对 `docs/adr/obsolete/*` 跑 `check_retired_adr_dest`（`doc_catalog.py:429-440`）。
   - **两边都有**：`.schema.json` 结构（pre-commit 看 staged 内容，`check` 经 `doc_catalog.validate_docs` 看全量）、README/AUTHORING 存在性（pre-commit doc-gate / 落点闸与 CI 的 `--scan`）、域契约与 L2。
 - **兜底声称与实际不符（待实测）**：进程机械提交明确绕过 hook（`worktree.py:104`、`seal.py:408` 用 `--no-verify`，注释称「仍须 attestation，CI 全量验」），但 CI 的「全量」＝`check --force-full --with-tests`＝`evaluator` 的检查集，**不含**上面那批只由 pre-commit 触发的判据（`grep -n pure_refs src/k3dge/engine/evaluator.py` 零命中）。⇒ 这两类判据在机械提交路径上目前无第二触发点。
-  - **可复跑验证（待做）**：在 docs 里写一处悬空 `ADR-9999`，`k3dge check` 绿而 `scripts/pre-commit` 红 ⇒ 即证明该「兜底」不覆盖这两类判据。
+  - **实例（2026-09-21，本仓自己的提交）**：用 `k3dge commit -a`（内部 `--no-verify`）提交两份新 memo 时，memo 里作例子的 `ADR-9xxx` 字面**没被拦**——`k3dge commit` 只跑一致性 `check`，不跑引用闸；是提交后手工调 `pure_refs` 才扫出来的。
+  - **覆盖面比“提交那一刻”更窄**：闸只扫**当次 staged 的受管（非 aux、非 archive）文档**。全量复扫（命令见下）现有 **16 处悬空引用**仍潜伏（archive/aux/活跃 review 都没人再扫）。
+    ```
+    .venv/bin/python - <<'PY'
+    from pathlib import Path
+    from k3dge.engine import pure_refs as pr
+    ws = Path('.')
+    for p in sorted((ws/'docs').rglob('*.md')):
+        rel = str(p.relative_to(ws))
+        for code, msg in pr.check_dangling_adr(ws, rel, p.read_text(encoding='utf-8')):
+            print(code, rel, msg.split(': ', 1)[-1])
+    PY
+    ```
+  - **写法陷阱**：`check_dangling_adr` 先过 `pure_refs.strip_fences`，但它只认**行首**围栏（`^(`{3,}|~{3,})`）
+    ⇒ 缩进在**列表项里**的围栏**不豁免**（本 memo 第一版就踩了：示例字面在嵌套围栏里仍被扫出来）；
+    inline 反引号也不豁免（有意：真指针常写在反引号里）。安全写法：把围栏提到行首，或写成 `ADR-9xxx`（不匹配四位数字）。
 - **缺点**：三处触发点**主体不同**（git / k3dge / GitHub）。CI 那份不属 k3dge 的编排面——k3dge 只是被调用；把它纳入声明等于声称管得住外部。§2.7「字段即契约」：加字段可以，改语义要 ADR。
 - **判决**：值得，但**先分清要拆的是哪一件事**——(i)「清单写法」钩子化（把路径前缀→单元写进声明）只是省重复；(ii) 上面的**覆盖面缺口**才是事实本身，而它的解法可能是**补第二触发点**（落点闸/CI 也能跑那批判据），那不叫钩子化。
-- **门槛**：仍缺**危害实例**：“本地绿/CI 红”或“机械提交漏检”均未实测；覆盖面差异目前只是代码路径事实（`grep`）。过线后再定形态。
+- **门槛**：覆盖面差异已是**实测事实**（含一个实例：本仓 2026-09-21 那次提交漏检）；但“这算缺陷还是有意留”是意图问题——`ADR-0022 §2.2 🅰1` 已写明「格式在提交时硬闸、`check` 恒静态」⇒ 判为有意留（见 `LEFTOVERS` `PRE-01`/`PRE-02`），形态仍不定。
 
 ## 候选 B — pre-commit 里 12 个 detector 的逐个 `for`
 
