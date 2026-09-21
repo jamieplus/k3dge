@@ -1,12 +1,16 @@
 name: CI
 
+# 三道闸并行，都要绿。一道红不得挡住另一道的日志。
+# 不给任何提交类别豁免 attestation：进程 round work / 封版提交必须自己带 k3dge-commit 行
+# （engine.attest），与 `k3dge commit` 同一公式。空区间不得当「没什么可验」放行。
+
 on:
   push:
     branches: [main, master]
   pull_request:
 
 jobs:
-  gate:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,21 +25,60 @@ jobs:
         run: k3dge check --force-full --with-tests
       - name: Doc-gate (README + anchor per docs subdir)
         run: python3 scripts/pre-commit --scan
-      - name: Verify commit attestations
+
+  attest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install k3dge
+        run: pip install -e ".[dev]"
+      - name: Verify attestation on every commit in the event range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          base="${{ github.event.before }}"
-          head="${{ github.event.after }}"
-          if [ -n "$base" ] && [ -n "$head" ] && git rev-list "$base..$head" >/dev/null 2>&1; then
-            range="$base..$head"
-          elif git rev-list origin/main..HEAD >/dev/null 2>&1; then
-            range="origin/main..HEAD"
+          set -euo pipefail
+          zero=0000000000000000000000000000000000000000
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "${PR_BASE:-}" ]; then
+            range="${PR_BASE}..${HEAD_SHA}"
+          elif [ -n "${BEFORE:-}" ] && [ "$BEFORE" != "$zero" ] && [ -n "${AFTER:-}" ]; then
+            range="${BEFORE}..${AFTER}"
           else
-            range="HEAD~50..HEAD"
+            range="${HEAD_SHA}^..${HEAD_SHA}"
           fi
+          if [[ "$range" == *..* ]] && git rev-list "$range" >/dev/null 2>&1; then
+            commits=$(git rev-list "$range")
+          else
+            commits=$(git rev-parse "$HEAD_SHA")
+          fi
+          if [ -z "$commits" ]; then
+            echo "attest range '$range' is empty — refusing to skip" >&2
+            exit 1
+          fi
+          echo "verifying commits in $range:"
+          echo "$commits"
           bad=0
-          for h in $(git rev-list "$range"); do
+          for h in $commits; do
             k3dge verify-attest --commit "$h" || bad=1
           done
-          [ "$bad" -eq 0 ]
+          test "$bad" -eq 0
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install k3dge
+        run: pip install -e ".[dev]"
       - name: Tests
         run: pytest -q

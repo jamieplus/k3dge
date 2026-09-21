@@ -215,7 +215,7 @@ def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gat
 def _seal_gate_registry(workspace: Path, milestone_id: str) -> dict:
     """seal 前置闸的注册表 + ctx（**唯一构造处**：单错报告与全量查询共用一份判据）。"""
     tasks = scan_milestone_tasks(workspace, milestone_id)
-    pending = task_index.work_pending(tasks)
+    pending = task_index.work_pending(tasks, workspace)
     unfilled = scan_unfilled_guides(workspace)
     gate_fns = {
         "tasks_all_done": lambda _ctx: (
@@ -394,6 +394,9 @@ def _commit_all(workspace: Path, msg: str) -> Tuple[bool, str]:
     rc, out = _git(workspace, "add", "-A")
     if rc != 0:
         return False, f"暂存失败：{out[:160]}"
+    from k3dge.engine.attest import append_to_message
+
+    msg = append_to_message(workspace, msg, who="k3dge-process")
     with tempfile.NamedTemporaryFile("w", suffix=".msg", delete=False, encoding="utf-8") as fh:
         fh.write(msg)
         tmp = fh.name

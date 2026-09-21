@@ -52,5 +52,5 @@ k3dge milestone seal --yes M10
 
 ## 结案
 
-- landed_head 之后仅机械件仍覆盖；collected 优先于误 inflight。
-- 落点：milestone_audit._baseline_covers / _ratchet_audit_step；测试 test_mechanical_commits_after_landed_head_still_cover、test_collected_covers_even_with_inflight_false_submit。
+- 覆盖看 `landed_head^{tree} == fresh^{tree}`，不看作者/标题；树变了即拒。collected 优先于误 inflight。
+- 测试：`test_same_tree_after_landed_head_covers_content_change_does_not`、`test_collected_covers_even_with_inflight_false_submit`。

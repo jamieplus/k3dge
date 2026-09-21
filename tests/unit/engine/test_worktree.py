@@ -32,6 +32,12 @@ def test_ensure_present_advance(tmp_path):
     head = W.advance(ws, "J1")
     assert head and head == subprocess.run(["git", "rev-parse", "k3dit/J1"], cwd=ws, capture_output=True, text=True).stdout.strip()
     assert W.present(ws, "J1") == []                          # vanished 原料就位
+    from k3dge.engine.attest import verify_commit, PREFIX
+    body = subprocess.run(["git", "log", "-1", "--format=%B", head], cwd=ws,
+                          capture_output=True, text=True).stdout
+    assert PREFIX in body
+    ok, msg = verify_commit(ws, head)
+    assert ok, msg
 
 
 def test_non_ff_rejected(tmp_path):

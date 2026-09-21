@@ -35,7 +35,7 @@ status: closed
 | 合线后记下主干头 | `audit_flow.collect_audit` → `job["landed_head"]` | 已落 `dea69ca` |
 | B==landed_head 视为覆盖 | `milestone_audit._baseline_covers` | `test_rebased_collected_job_covers_landed_head` |
 | 主干再走非本单提交仍拒 | 同上测试后半 | 已落 |
-| 合线后仅机械件仍覆盖 | `_range_is_mechanical` | `test_mechanical_commits_after_landed_head_still_cover` |
+| 合线后树未变仍覆盖（不看作者/标题） | `_git_tree(landed_head)==_git_tree(fresh)` | `test_same_tree_after_landed_head_covers_content_change_does_not` |
 | collected 优先于误 inflight | `_ratchet_audit_step` 先认 done | `test_collected_covers_even_with_inflight_false_submit` |
 
 ## 4. 经验灌入

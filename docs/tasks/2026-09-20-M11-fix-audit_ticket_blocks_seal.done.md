@@ -46,5 +46,5 @@ test_evaluator.TestTaskGovernance.test_repo_tasks_conform 扫真仓，同一闸�
 
 ## 结案
 
-- `work_pending` 排除 `*-audit-audit_job_*`；collect 待修=0 写 `## 结案` 并 `mark_task_done`；结案标题闭集含 `## 回收记录`；`task done` 缺段补关票日期。
-- 测试：`test_audit_job_ticket_is_not_work_pending`。
+- `work_pending` 只豁免账本 `ticket_task` 指针（同名模式的人开票仍挡 `tasks_all_done`）；collect 待修=0 写带报告指针的 `## 结案` 再 `mark_task_done`。`task done` **不**代写结案。
+- 测试：`test_audit_job_ticket_is_not_work_pending`（账本有的豁免、同名假票仍 pending）。

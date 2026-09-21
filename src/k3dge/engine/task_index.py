@@ -12,19 +12,33 @@ from k3dge.engine.milestone_files import _is_doc_aux
 
 _ALLOWED_STATUS = frozenset({"idea", "deferred", "in-progress", "done"})
 
-#: `submit_audit` 建的工单票（`*-audit-audit_job_<id>.md`）。seal 相位 2 自己跑审计，
-#: 这类票不算「人待办」——算进去会把唯一入口卡在 tasks_all_done（M10 真跑）。
-_AUDIT_JOB_TICKET_MARK = "-audit-audit_job_"
+def audit_job_ticket_names(workspace: Path) -> set:
+    """棘轮工单票＝本地账 `ticket_task` 记下的路径，不是文件名模式。
+
+    文件名含 `-audit-audit_job_` 也能开给人干活；闸只认账本指针，避免改名绕过
+    `tasks_all_done`。账缺失 ⇒ 空集（无人待办豁免）。
+    """
+    import json
+
+    p = workspace / ".agent" / "audit_jobs.json"
+    if not p.is_file():
+        return set()
+    try:
+        raw = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    names: set = set()
+    for job in raw.get("jobs") or []:
+        rel = str(job.get("ticket_task") or "").replace("\\", "/").strip()
+        if rel:
+            names.add(Path(rel).name)
+    return names
 
 
-def is_audit_job_ticket(name: str) -> bool:
-    """文件名是棘轮工单票（submit 建的），不是人开的 audit 工作项。"""
-    return _AUDIT_JOB_TICKET_MARK in name
-
-
-def work_pending(tasks: List[MilestoneTask]) -> List[MilestoneTask]:
-    """人待办：未 done 且不是审计工单票。"""
-    return [t for t in tasks if t.status != "done" and not is_audit_job_ticket(t.path.name)]
+def work_pending(tasks: List[MilestoneTask], workspace: Optional[Path] = None) -> List[MilestoneTask]:
+    """人待办：未 done，且不是账本里的棘轮工单票。"""
+    skip = audit_job_ticket_names(workspace) if workspace is not None else set()
+    return [t for t in tasks if t.status != "done" and t.path.name not in skip]
 
 STATUS_RE = re.compile(r"-\s+\*\*Status\*\*:\s*([\w-]+)", re.IGNORECASE)
 MILESTONE_RE = re.compile(r"-\s+\*\*Milestone\*\*:\s*([^\n\r]+)", re.IGNORECASE)

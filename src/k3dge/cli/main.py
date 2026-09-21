@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -771,99 +770,9 @@ def _conventional_ok(msg: str) -> bool:
     return bool(_CONV_RE.match(msg or ""))
 
 
-_ATTEST_PREFIX = "k3dge-commit: "
-_ATTEST_DEFAULT_SECRET = "k3dge-local-attest-v1"
-_ATTEST_WORDLIST = [
-    "aura", "brick", "cedar", "delta", "ember", "flux", "glyph", "haven",
-    "iris", "jolt", "kiwi", "lumen", "moss", "nexus", "onyx", "prism",
-    "quill", "rune", "sage", "tide", "umber", "vault", "wisp", "xenon",
-    "yarn", "zephyr",
-]
+from k3dge.engine import attest as _attest
 
-
-def _attest_secret() -> str:
-    return os.environ.get("K3DGE_ATTEST_SECRET") or _ATTEST_DEFAULT_SECRET
-
-
-def _attest_tree_hash(workspace: Path) -> str:
-    import subprocess
-
-    return subprocess.run(
-        ["git", "write-tree"], cwd=workspace, capture_output=True, text=True
-    ).stdout.strip()
-
-
-def _attest_utc_minute(when_iso: str) -> datetime | None:
-    """Parse an ISO committer/generator stamp into an aware UTC datetime (naive = UTC)."""
-    from datetime import datetime, timezone
-
-    ts = (when_iso or "").strip()
-    try:
-        dt = datetime.fromisoformat(ts.replace("Z", "+00:00").replace("z", "+00:00"))
-    except ValueError:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-
-
-def _attest_window(when_iso: str) -> str:
-    # code-1: `%cI` carries the committer's local offset while generation stamps UTC;
-    # cut the minute window *after* normalising to UTC or the two sides never agree.
-    dt = _attest_utc_minute(when_iso)
-    if dt is None:
-        return when_iso[:16]  # unparsable legacy stamp: keep the old slice
-    return dt.strftime("%Y-%m-%dT%H:%M")  # minute precision — binds the token to a time window
-
-
-def _attest_windows(when_iso: str) -> list:
-    """Candidate windows: the commit minute plus the minute before it.
-
-    The token is minted *before* `git commit` runs, so a stamp taken at HH:MM:59.9
-    can land in a commit dated HH:MM+1:00; accepting only the exact minute made that
-    boundary race fail verification.
-    """
-    from datetime import timedelta
-
-    dt = _attest_utc_minute(when_iso)
-    if dt is None:
-        return [when_iso[:16]]
-    base = dt.replace(second=0, microsecond=0)
-    return [base.strftime("%Y-%m-%dT%H:%M"), (base - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M")]
-
-
-def _attest_token(workspace: Path, when_iso: str) -> str:
-    secret = _attest_secret()
-    tree = _attest_tree_hash(workspace)
-    window = _attest_window(when_iso)
-    digest = hashlib.sha256(f"{secret}|{window}|{tree}".encode()).hexdigest()
-    return _ATTEST_WORDLIST[int(digest, 16) % len(_ATTEST_WORDLIST)]
-
-
-def _attest_line(workspace: Path) -> str:
-    """Lightweight commit attestation: who + when + time-bound dictionary token.
-
-    The token = word(hash(secret + minute-window + tree)). It proves the line came
-    from the governed path *if* the secret is set via K3DGE_ATTEST_SECRET (raw
-    `git commit` has no secret to compute it). Without the env secret it falls back
-    to a built-in constant — a deterrent, not a proof. CI recomputes and compares.
-    """
-    import getpass
-    import subprocess
-    from datetime import datetime, timezone
-
-    who = ""
-    try:
-        who = subprocess.run(
-            ["git", "config", "user.name"], cwd=workspace, capture_output=True, text=True
-        ).stdout.strip()
-    except Exception:
-        who = ""
-    if not who:
-        who = getpass.getuser()
-    when = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    token = _attest_token(workspace, when)
-    return f"{_ATTEST_PREFIX}{who} @ {when} #{token}"
+_ATTEST_PREFIX = _attest.PREFIX
 
 
 def _rel_within_workspace(workspace: Path, p: str) -> Path:
@@ -955,7 +864,7 @@ def cmd_commit(args: argparse.Namespace) -> int:
     #    Self-attach the attestation trailer so k3dge commits are signed like hook commits.
     msg = args.message
     if _ATTEST_PREFIX not in msg:
-        msg = f"{msg}\n\n{_attest_line(workspace)}"
+        msg = _attest.append_to_message(workspace, msg)
     res = subprocess.run(
         ["git", "commit", "-m", msg, "--no-verify"],
         cwd=workspace,
@@ -971,54 +880,15 @@ def cmd_commit(args: argparse.Namespace) -> int:
 
 def cmd_commit_attest(args: argparse.Namespace) -> int:
     """Print the attestation trailer line for the live commit-msg hook to append."""
-    print(_attest_line(_find_workspace(Path.cwd())))
+    print(_attest.line(_find_workspace(Path.cwd())))
     return 0
-
-
-_ATTEST_RE = re.compile(r"^k3dge-commit: (.+?) @ (.+?) #([a-z]+)$")
 
 
 def cmd_verify_attest(args: argparse.Namespace) -> int:
-    """Verify a commit's attestation token (used by CI)."""
-    import subprocess
-
-    workspace = _find_workspace(Path.cwd())
-    h = args.commit
-    tree = subprocess.run(
-        ["git", "rev-parse", f"{h}^{{tree}}"], cwd=workspace, capture_output=True, text=True
-    ).stdout.strip()
-    when_iso = subprocess.run(
-        ["git", "show", "-s", "--format=%cI", h], cwd=workspace, capture_output=True, text=True
-    ).stdout.strip()
-    body = subprocess.run(
-        ["git", "log", "-1", "--format=%B", h], cwd=workspace, capture_output=True, text=True
-    ).stdout
-    m = None
-    for line in body.splitlines():
-        m = _ATTEST_RE.match(line.strip())
-        if m:
-            break
-    if not m:
-        print(f"[ATTEST] commit {h} missing attestation line", file=sys.stderr)
-        return 1
-    who, when, token = m.group(1), m.group(2), m.group(3)
-    secret = _attest_secret()
-    expected = [
-        _ATTEST_WORDLIST[
-            int(hashlib.sha256(f"{secret}|{w}|{tree}".encode()).hexdigest(), 16)
-            % len(_ATTEST_WORDLIST)
-        ]
-        for w in _attest_windows(when)
-    ]
-    if token not in expected:
-        print(
-            f"[ATTEST] commit {h} token mismatch (got '{token}', expected '{expected[0]}') "
-            f"-- attestation was not produced by the governed path",
-            file=sys.stderr,
-        )
-        return 1
-    print(f"[ATTEST] commit {h} OK ({who} @ {when})")
-    return 0
+    """Verify a commit's attestation token (used by CI). Every commit is in scope; no skip list."""
+    ok, msg = _attest.verify_commit(_find_workspace(Path.cwd()), args.commit)
+    print(msg, file=sys.stdout if ok else sys.stderr)
+    return 0 if ok else 1
 
 
 def cmd_check_msg(args: argparse.Namespace) -> int:

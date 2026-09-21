@@ -523,9 +523,7 @@ def check_adr_ref_retired(workspace: Path, rel: str, text: str) -> List[Ref]:
 #: 结案类标题的闭集（唯一源）。闸只验"有没有写"，内容归人/agent——
 #: **不做自动填充**：自动写占位等于制造伪合规（docs/tasks/archive/…feat-protocol-resolver
 #: 的既有教训：不把不可机检项伪装成可机检）。
-_CLOSURE_HEADINGS = (
-    "## 结案", "## 落地", "## 关闭理由", "## 收尾", "## 回填", "## 进度", "## 回收记录",
-)
+_CLOSURE_HEADINGS = ("## 结案", "## 落地", "## 关闭理由", "## 收尾", "## 回填", "## 进度")
 
 
 def check_task_closure_record(rel: str, text: str) -> List[Ref]:

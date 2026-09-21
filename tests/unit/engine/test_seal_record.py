@@ -73,6 +73,10 @@ class TestSealRecord(TestCase):
         # tag 指向**基线**（审哪版封哪版），不是封版提交
         self.assertEqual(_git(ws, "rev-parse", "M10^{commit}"), baseline)
         self.assertNotEqual(_git(ws, "rev-parse", "HEAD"), baseline)
+        from k3dge.engine.attest import PREFIX, verify_commit
+        self.assertIn(PREFIX, body)
+        ok, amsg = verify_commit(ws, _git(ws, "rev-parse", "HEAD"))
+        self.assertTrue(ok, amsg)
 
     def test_clean_tree_does_not_create_empty_commit(self) -> None:
         ws = _repo()

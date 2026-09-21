@@ -97,8 +97,11 @@ def advance(workspace: Path, job: str) -> Optional[str]:
     wt = ensure(workspace, job)
     if _git(wt, "status", "--porcelain").stdout.strip():
         _git(wt, "add", "-A")
+        from k3dge.engine.attest import append_to_message
+
+        msg = append_to_message(wt, f"round work {job}", who="k3dge-process")
         c = _git(wt, "-c", "user.name=k3dge-process", "-c", "user.email=noreply@k3dge.local",
-                 "commit", "--no-verify", "-m", f"round work {job}")  # 进程机械件不过被审仓 pre-commit（人的闸管人的提交）
+                 "commit", "--no-verify", "-m", msg)  # 进程机械件不过被审仓 pre-commit；仍须 attestation，CI 全量验
         if c.returncode != 0:
             raise RuntimeError(f"round commit failed: {(c.stderr or c.stdout)[:200]}")
     head = _git(wt, "rev-parse", "HEAD").stdout.strip()

@@ -112,32 +112,18 @@ def _git_is_ancestor(workspace: Path, anc: str, desc: str) -> bool:
     return r.returncode == 0
 
 
-def _range_is_mechanical(workspace: Path, a: str, b: str) -> bool:
-    """`a..b` 的提交全是进程机械件（合线 round work / 封版 chore / 作者 k3dge-process）。
-
-    中间夹了人的 feat/fix ⇒ 内容已走出本轮审计（INC-20260920 的 60 提交案）。
-    """
+def _git_tree(workspace: Path, oid: str) -> str:
+    """commit 的 tree id；认不出则空串。"""
     import subprocess
 
     try:
         r = subprocess.run(
-            ["git", "-C", str(workspace), "log", "--format=%an%x09%s", f"{a}..{b}"],
+            ["git", "-C", str(workspace), "rev-parse", f"{oid}^{{tree}}"],
             capture_output=True, text=True,
         )
     except OSError:  # pragma: no cover
-        return False
-    if r.returncode != 0:
-        return False
-    for ln in r.stdout.splitlines():
-        if not ln.strip():
-            continue
-        author, _, subject = ln.partition("\t")
-        if author.strip() == "k3dge-process":
-            continue
-        if subject.startswith("round work ") or subject.startswith("chore(seal):"):
-            continue
-        return False
-    return True
+        return ""
+    return r.stdout.strip() if r.returncode == 0 else ""
 
 
 def _baseline_covers(
@@ -148,17 +134,18 @@ def _baseline_covers(
     相等，或 B 是 job 基线的祖先 ⇒ 这单审的是 B 当时或之后的内容（本轮）。
     反过来（job 基线是 B 的祖先）⇒ 更早的内容，**不是本轮**（INC-20260920-AST）。
 
-    `landed_head`：`merge_back` 成功后的主干头。合线走 rebase 时 pre-rebase oid
-    与 HEAD 无祖先关系（hash 被重写）。B 等于它，或 B 在它之后但中间只有机械件
-    ⇒ 仍覆盖；夹了人的提交 ⇒ 仍拒。
+    `landed_head`：`merge_back` 成功后的主干头。合线 rebase 改 hash 后，覆盖看
+    **树是否还一样**（`landed_head^{tree} == fresh^{tree}`），不看作者/提交说明——
+    改树就是新内容，空提交才树不变。
     """
     if not fresh or not job_baseline:
         return False
     if fresh == job_baseline or (landed_head and fresh == landed_head):
         return True
-    if landed_head and _git_is_ancestor(workspace, landed_head, fresh) \
-            and _range_is_mechanical(workspace, landed_head, fresh):
-        return True
+    if landed_head:
+        t_land, t_fresh = _git_tree(workspace, landed_head), _git_tree(workspace, fresh)
+        if t_land and t_land == t_fresh:
+            return True
     return _git_is_ancestor(workspace, fresh, job_baseline)
 
 

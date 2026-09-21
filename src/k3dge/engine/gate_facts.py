@@ -206,7 +206,7 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "fix": "judgment", "severity": "block",
         "fact": "`{path}` 已翻 done 但没有结案记录——票是自包含事实源，不留落地痕迹，"
                 "后续就会出现「票里说待办、实际已做」的漂移",
-        "options": ["补一个结案类段并写清落地情况（`## 结案` / `## 落地` / `## 关闭理由` / `## 收尾` / `## 回填` / `## 进度` / `## 回收记录`）",
+        "options": ["补一个结案类段并写清落地情况（`## 结案` / `## 落地` / `## 关闭理由` / `## 收尾` / `## 回填` / `## 进度`）",
                     "票其实没做完 → 把 frontmatter status 改回 in-progress 并去掉 .done 后缀"],
         "pointers": ["docs/tasks/AUTHORING.md", "k3dge ADR-0012"],
     },
@@ -297,7 +297,7 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
     },
     "TEST_FAILURE": {
         "fix": "judgment", "severity": "block",
-        "fact": "域 {domain} 的测试未过（{reason}）——改代码还是改测试要人判",
+        "fact": "域 {domain} 的测试未过（{reason}）——改代码还是改测试要人判\n{pytest_tail}",
         "options": ["修代码让测试过（测试是契约）", "测试本身过期 → 改测试并同轮更新 spec 的 Verification Matrix", "确实卡住 → 按 AGENTS.md §12 转 docs/branches/ 并 stash，不第四次重试"],
         "pointers": ["docs/specs/<domain>/spec.md", "AGENTS.md §12"],
     },

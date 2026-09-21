@@ -225,6 +225,12 @@ def _run_batch_tests(
                 )
         return violations
     output = (result.stdout or "") + "\n" + (result.stderr or "")
+    # CI / 终端必须看见 pytest 正文：闸码 alone 不够修。打印不是豁免，是让 TEST_FAILURE 可观测。
+    print("=" * 60, flush=True)
+    print("pytest output (TEST_FAILURE)", flush=True)
+    print("=" * 60, flush=True)
+    print(output, flush=True)
+    tail = "\n".join(output.splitlines()[-40:])
     failed = {ref for ref in refs if ref in output and ("FAILED" in output or "failed" in output.lower())}
     if not failed:
         failed = set(refs)
@@ -236,7 +242,11 @@ def _run_batch_tests(
                     f"test '{ref}' failed",
                     domain=d,
                     file_path=_spec_violation_path(workspace, manifest, d),
-                    detail={"domain": d, "target": ref, "reason": "退出码非 0（--with-tests）"},
+                    detail={
+                        "domain": d, "target": ref,
+                        "reason": "退出码非 0（--with-tests）",
+                        "pytest_tail": tail,
+                    },
                 )
             )
     return violations
