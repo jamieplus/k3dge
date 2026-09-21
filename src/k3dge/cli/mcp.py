@@ -459,9 +459,20 @@ def k3dge_milestone_control(
         # Seal requires a closed audit. If not closed, run_seal_flow returns
         # `audit_needed` pointing back at the audit entry.
         from k3dge.engine import nextstep
+        from k3dge.engine.version import get_version
 
-# k3dit:pending code-2 sev=高 prio=P1 type=缺陷 MCP seal 未传 skip_enter_prompt，_Prompt.default() 读 stdio 非 tty ⇒ Prompt.ask(default_yes=False) 恒返回 False（prompt.py:48）⇒ 该工具恒返回 seal_declined，MCP 出口永远封不了板（CLI 有 --yes，MCP 无等价开关）evidence=非 tty 下调用 k3dge_milestone_control(action='seal') 返回 status=seal_declined
-        status, msg = run_seal_flow(ws, milestone_id)
+        def _read_version() -> str:
+            try:
+                return str(get_version(ws) or "")
+            except Exception:  # 版本读不到不影响封板事实，回执里留空即可
+                return ""
+
+# k3dit:fixnote code-2 seal 改传 skip_enter_prompt=True（MCP 无 tty，ask 恒 False⇒恒 seal_declined）
+        # MCP 出口没有交互通道：`_Prompt.ask(default_yes=False)` 在非 tty 恒返回 False
+        # （prompt.py:48），旧写法每次必 `seal_declined`，MCP 永远封不了板。工具调用本身就是
+        # "要封"的显式意图 ⇒ 走 CLI `--yes` 的等价开关；确认语义由调用方（宿主/人）承担。
+        prev = _read_version()
+        status, msg = run_seal_flow(ws, milestone_id, skip_enter_prompt=True)
         if status != "sealed":
             nxt = nextstep.load_persisted(ws)
             if nxt is None:
@@ -481,41 +492,26 @@ def k3dge_milestone_control(
                 indent=2,
                 ensure_ascii=False,
             )
-        try:
-            from k3dge.engine.version import append_changelog, bump_version, consume_unreleased, get_version
-
-            prev = get_version(ws)
-            new_v = bump_version(ws, part="patch")
-# k3dit:pending code-1 sev=高 prio=P1 type=正确性 MCP seal 在 run_seal_flow 已由相位3 version_bump 前进版号后再次 bump_version+consume_unreleased+append_changelog（mcp.py:487）⇒ 经 MCP 封板每次前进两个 patch、CHANGELOG 双段，且第二次改动落在封版提交之后使树变脏；CLI 同判定已只 bump 一次（main.py:747）evidence=调用 k3dge_milestone_control(action='seal') 前后 k3dge version show 相差两个 patch
-            body = consume_unreleased(ws)
-            notes = body if body else f"Seal milestone {milestone_id}."
-            append_changelog(ws, new_v, notes=notes)
-            return json.dumps(
-                {
-                    "milestone_id": milestone_id,
-                    "sealed": True,
-                    "status": status,
-                    "message": msg,
-                    "version": new_v,
-                    "previous_version": prev,
-                    "next": nextstep.NextStep.from_state("sealed", milestone_id).render_mcp(),
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-        except Exception as exc:
-            return json.dumps(
-                {
-                    "milestone_id": milestone_id,
-                    "sealed": True,
-                    "status": status,
-                    "message": msg,
-                    "version_bump_failed": str(exc),
-                    "next": nextstep.NextStep.from_state("sealed", milestone_id).render_mcp(),
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
+# k3dit:fixnote code-1 删 MCP 侧二次 bump：版号只由相位3 前进；version_bump_failed 改判据
+        # 版号前进是 `run_seal_flow` **相位 3**（`version_bump`）的职责（ADR-0004 §2.1.9/§2.1.11），
+        # CLI 同判定也只让它 bump 一次（main.py:747）。此处旧代码在封版提交**之后**又跑一遍
+        # `bump_version`+`consume_unreleased`+`append_changelog` ⇒ 每次前进两个 patch、CHANGELOG
+        # 双段，并把工作树弄脏。现在只**读**前后版号做回执。
+        # ADR-0004 §2.3 要求"MCP 侧 bump 失败不得静默"：字段名 `version_bump_failed` 保留，
+        # 判据改成可观察的事实——封板成功而版号没前进（相位 3 吞异常时正是这个形状）。
+        new_v = _read_version()
+        payload = {
+            "milestone_id": milestone_id,
+            "sealed": True,
+            "status": status,
+            "message": msg,
+            "version": new_v,
+            "previous_version": prev,
+            "next": nextstep.NextStep.from_state("sealed", milestone_id).render_mcp(),
+        }
+        if prev and new_v and prev == new_v:
+            payload["version_bump_failed"] = "封板后版号未前进（相位 3 version_bump 未成，见 message 版本行）"
+        return json.dumps(payload, indent=2, ensure_ascii=False)
 
     return _err("InvalidAction", f"Invalid action '{action}'. Choose from: status, align, audit, seal.")
 

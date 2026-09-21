@@ -20,7 +20,7 @@ from k3dge.engine.task_index import MILESTONE_RE, TITLE_RE, parse_frontmatter
 _TASK_TYPES = frozenset({"audit", "feat", "fix", "docs", "chore", "refactor"})
 
 
-# k3dit:pending value-20 sev=中 prio=P2 type=复杂度 _auto_backfill_reviews CC36（全仓最高）：审阅表模糊匹配（title/desc 前 15 字子串）+ 手工定位并插入回填段的字符串手术，易误翻状态且无直接测试 evidence=k3dge check
+# k3dit:fixnote value-20 有 report: 指针的票不再跑模糊回填（防误翻他报告）；CC 与补测留主仓
 def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, milestone: str | None) -> None:
     """Best-effort auto-backfill for audit reviews when a task is marked done.
 
@@ -259,6 +259,11 @@ def _backfill_task_reviews(workspace: Path, target: Path) -> None:
 
     try:
         t_content = target.read_text(encoding="utf-8")
+        if _task_report_pointer(t_content):
+            # ADR-0022（1 report = 1 task）：绑定报告的票，其报告行由席位翻钉 + `待修==0`
+            # 关票闸收口。这里再拿标题/描述前 15 字去**全仓** reviews 里模糊匹配，只会在
+            # 别的报告里误翻相近行（value-20 的害）⇒ 有 `report:` 指针就不猜。
+            return
         t_m = TITLE_RE.search(t_content)
         t_title = t_m.group(1).strip() if t_m else target.stem
         fm2 = parse_frontmatter(t_content)

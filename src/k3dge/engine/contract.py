@@ -168,6 +168,8 @@ class PythonExtractor(ContractExtractor):
 
 
 _EXTRACTORS: list[ContractExtractor] = []
+# drop-in 插件的进程内幂等缓存（绝对路径）；显式模块级，测试可直接清。
+_PLUGIN_ATTEMPTED: set[str] = set()
 
 
 def register_extractor(ext: ContractExtractor, *, override: bool = False) -> None:
@@ -189,26 +191,13 @@ def register_extractor(ext: ContractExtractor, *, override: bool = False) -> Non
         _EXTRACTORS.append(ext)
 
 
-# k3dit:pending value-21 sev=中 prio=P2 type=设计 _load_plugin_extractors CC23：单函数混装 manifest 规格导入、约定目录 drop-in、importlib 动态执行，并以函数属性 _attempted 兼作幂等缓存；manifest 分支又直接 _EXTRACTORS.append 绕过自家 register_extractor evidence=k3dge check
-def _load_plugin_extractors(manifest, workspace_root=None) -> None:
-    """Load third-party extractors from two sources (both feed `register_extractor`).
-
-    1. Manifest key: `extractors: ["mod" / "mod:attr", ...]` — explicit, for
-       out-of-repo modules and pip packages.
-    2. Convention directory: `<workspace>/.agent/extractors/*.py` — drop a file
-       that calls `register_extractor()` at import; no manifest edit, no command.
-       Files starting with `_` are skipped; each file is isolated (one bad file
-       warns and the rest still load).
-
-    Best-effort throughout: a broken plugin warns to stderr and is skipped —
-    a broken plugin must not red the gate (same policy as missing tree-sitter).
-    Idempotent per process: already-imported modules are not re-executed.
-    """
+# k3dit:fixnote value-21 拆两个 helper（manifest/drop-in）；manifest 分支改走 register_extractor
+# 幂等缓存从函数属性挪到模块级 `_PLUGIN_ATTEMPTED`（可测、可清），单函数不再混装三件事。
+def _load_manifest_extractors(specs: object) -> None:
+    """Source 1: `extractors: ["mod" | "mod:attr", ...]` — explicit, out-of-repo/pip."""
     import importlib
-    import importlib.util
     import sys
 
-    specs = (manifest.data.get("extractors") or []) if manifest is not None else []
     if not isinstance(specs, list):
         specs = []
     for spec in specs:
@@ -220,29 +209,30 @@ def _load_plugin_extractors(manifest, workspace_root=None) -> None:
             if attr:
                 ext = getattr(mod, attr)
                 if isinstance(ext, ContractExtractor) and ext not in _EXTRACTORS:
-                    _EXTRACTORS.append(ext)
+                    register_extractor(ext)
         except Exception as exc:  # noqa: BLE001 — plugin must not break the gate
             print(f"[WARN][EXTRACTOR] skipping '{spec}': {exc}", file=sys.stderr)
 
-    # Convention directory: drop-in plugins, no manifest edit needed.
-    root = workspace_root
-    if root is None and manifest is not None:
-        root = getattr(manifest, "workspace_root", None) or getattr(manifest, "workspace", None)
-    if root is None:
-        return
+
+def _load_dropin_extractors(root: Path) -> None:
+    """Source 2: `<workspace>/.agent/extractors/*.py` — drop-in, no manifest edit.
+
+    Files starting with `_` are skipped; each file is isolated (one bad file warns and
+    the rest still load). `_PLUGIN_ATTEMPTED` keeps re-invocations from re-executing.
+    """
+    import importlib.util
+    import sys
+
     plug_dir = Path(root) / ".agent" / "extractors"
     if not plug_dir.is_dir():
         return
-    attempted = getattr(_load_plugin_extractors, "_attempted", None)
-    if attempted is None:
-        attempted = _load_plugin_extractors._attempted = set()  # type: ignore[attr-defined]
     for plug_file in sorted(plug_dir.glob("*.py")):
         if plug_file.name.startswith("_"):
             continue
         mod_name = f"k3dge_plugin_{plug_file.stem}"
-        if mod_name in sys.modules or str(plug_file) in attempted:
+        if mod_name in sys.modules or str(plug_file) in _PLUGIN_ATTEMPTED:
             continue
-        attempted.add(str(plug_file))
+        _PLUGIN_ATTEMPTED.add(str(plug_file))
         try:
             spec_obj = importlib.util.spec_from_file_location(mod_name, plug_file)
             if spec_obj is None or spec_obj.loader is None:
@@ -253,6 +243,31 @@ def _load_plugin_extractors(manifest, workspace_root=None) -> None:
         except Exception as exc:  # noqa: BLE001 — one bad file must not block the rest
             sys.modules.pop(mod_name, None)
             print(f"[WARN][EXTRACTOR] skipping '{plug_file.name}': {exc}", file=sys.stderr)
+
+
+def _load_plugin_extractors(manifest, workspace_root=None) -> None:
+    """Load third-party extractors from two sources (both feed `register_extractor`).
+
+    1. Manifest key: `extractors: ["mod" / "mod:attr", ...]` — explicit, for
+       out-of-repo modules and pip packages（`_load_manifest_extractors`）.
+    2. Convention directory: `<workspace>/.agent/extractors/*.py` — drop a file
+       that calls `register_extractor()` at import; no manifest edit, no command
+       （`_load_dropin_extractors`）.
+
+    Best-effort throughout: a broken plugin warns to stderr and is skipped —
+    a broken plugin must not red the gate (same policy as missing tree-sitter).
+    Idempotent per process: already-imported modules are not re-executed
+    (`_PLUGIN_ATTEMPTED`).
+    """
+    specs = (manifest.data.get("extractors") or []) if manifest is not None else []
+    _load_manifest_extractors(specs)
+
+    root = workspace_root
+    if root is None and manifest is not None:
+        root = getattr(manifest, "workspace_root", None) or getattr(manifest, "workspace", None)
+    if root is None:
+        return
+    _load_dropin_extractors(Path(root))
 
 
 register_extractor(PythonExtractor())

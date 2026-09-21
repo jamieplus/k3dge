@@ -44,8 +44,8 @@ Denial reason and reopen condition live here only.
 | CC-12 | `worktree.strip_pins` CC13：线性树遍历 + 逐文件去钉 | 同上 |
 | CC-13 | `seal._seal_archive` CC18：线性文件操作（碰撞检查→搬文件→bump→rollback） | 同上 |
 | CC-14 | `seal._seal_review_gate` CC16：四个顺序检查（stub→pass→task list→兜底），51 行 | 同上 |
-<!-- k3dit:pending doc-2 sev=低 prio=P3 type=悬空指针 相对链接 `tasks/2026-09-16-M10-refactor-term_collision_cleanup.done.md` 缺 `../`，解析为 docs/reviews/tasks/（不存在） -->
-| TERM-01 | `scope` 一词四义：钉作用域（line/file/repo）/ 提交来源（external）/ 审计目标（milestone M10、docs）/ transport 路径（k3dit.actions.audit）。各自活于独立模块，语义相邻，风险仅在跨模块推理时误读 | [2026-09-16-M10-refactor-term_collision_cleanup.done.md](tasks/2026-09-16-M10-refactor-term_collision_cleanup.done.md) |
+<!-- k3dit:fixnote doc-2 链接补 `../`：docs/reviews/ 下相对 tasks/ 解析错目录，现指 docs/tasks/ -->
+| TERM-01 | `scope` 一词四义：钉作用域（line/file/repo）/ 提交来源（external）/ 审计目标（milestone M10、docs）/ transport 路径（k3dit.actions.audit）。各自活于独立模块，语义相邻，风险仅在跨模块推理时误读 | [2026-09-16-M10-refactor-term_collision_cleanup.done.md](../tasks/2026-09-16-M10-refactor-term_collision_cleanup.done.md) |
 | TERM-02 | `kind` 一词三义：钉种类（pending/leftover/…）/ 报告种类（audit/quality）/ 角色种类（gate/service）。同上，且各有枚举常量定义（`markers.KINDS`、`pipeline_schema` 校验） | 同上 |
 | TERM-03 | `state` 一词四义：审计 job 态 / next-step 态 / task status / `state_machine` 模块。同上 | 同上 |
 | DUP-01 | `AUX_NAMES` 在 `doc_catalog` 与 `pure_schema` 各一份：**刻意复制**（pre-commit 零依赖硬约束），已由 `test_aux_names_in_sync` 守卫抗漂移 | 同上 |

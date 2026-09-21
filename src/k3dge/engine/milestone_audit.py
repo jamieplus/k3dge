@@ -234,73 +234,68 @@ def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str =
     return "progress", f"工单 {j['job_id']} 对端态 {st.get('state')}，open={st.get('open', [])}。"
 
 
-# k3dit:pending value-23 sev=中 prio=P2 type=复杂度 run_audit_flow CC26：同一函数叠加 ratchet 步进委派与 legacy oneshot produce/verify 循环两套互斥审计形状，五处拒绝分支各自 render+persist NextStep evidence=k3dge check
-def run_audit_flow(
+# k3dit:fixnote value-23 两套审计形状各拆成函数；五处拒绝分支收口成 _reject_step 单源
+def _reject_step(
     workspace: Path,
     milestone_id: str,
+    code: str,
+    msg: str,
     *,
-    prompter: Optional[_Prompt] = None,
-    max_verify_attempts: int = 3,
-    fresh_baseline: str = "",
+    status: str = "refused",
 ) -> Tuple[str, str]:
-    """Independent audit entry: the merged audit module (ADR-0025) produces ONE
-    12-col report (k3dit audit leg; quality is a window inside the module, not an
-    independent peer). 待修==0 counts as "audited once"; verify checks that one
-    report. Returns (status, message); status ∈ {audited, rejected, escalated}.
-    Seal unlocks only after this closes (`run_seal_flow`).
+    """拒绝分支单源：Rejection → [NEXT] → persist → `(status, msg + CLI 尾行)`。
+
+    原来五处各写一遍 render+persist，任何一处漏 persist 就会让 CLI 回执与持久态
+    `[NEXT]` 分叉（value-23）。非拒绝态（escalated 等）不走这里。
+    """
+    from k3dge.engine import nextstep
+
+    ns = nextstep.next_for_rejection(milestone_id, gates.Rejection(code, msg))
+    nextstep.persist(workspace, ns)
+    return status, msg + "\n" + ns.render_cli()
+
+
+def _ratchet_audit_leg(
+    workspace: Path,
+    milestone_id: str,
+    prompt: _Prompt,
+    fresh_baseline: str,
+) -> Tuple[Optional[Tuple[str, str]], str]:
+    """棘轮审计腿（ADR-0025）：一次调用推一步，绝不在闸里等席。
+
+    Returns `(early, step_status)`：`early` 非 None ⇒ 步未 closed，直接把 `[NEXT]` 交回调用方；
+    为 None ⇒ 该腿已 `closed`，调用方继续走共用尾（verify / 收口）。
+    """
+    from k3dge.engine import nextstep
+
+    step_status, step_msg = _ratchet_audit_step(
+        workspace, milestone_id, io=prompt.out_stream, fresh_baseline=fresh_baseline)
+    if step_status == "closed":
+        return None, step_status
+    if step_status == "progress":
+        state, width = "ratchet_open", 120
+    elif step_status == "open":
+        state, width = "audit_open", 160
+    else:
+        state, width = "escalated", 0
+    ns = nextstep.NextStep.from_state(
+        state, milestone_id, reasons=[step_msg[:width]] if width else None)
+    return (state, step_msg + "\n" + ns.render_cli()), step_status
+
+
+def _oneshot_audit_leg(
+    workspace: Path,
+    milestone_id: str,
+    prompt: _Prompt,
+    streams: dict,
+    max_verify_attempts: int,
+) -> Tuple[str, str]:
+    """legacy oneshot 形状：produce → 收报告 → `待修>0` 就修 → verify 二次核对。
+
+    与棘轮腿互斥（ADR-0025）：棘轮闭环后 `streams` 为空，本函数只跑共用尾。
     """
     from k3dge.engine import audit_checklist as ac, audit_flow, nextstep
     from k3dge.engine.pipeline_runner import run_action
-
-    prompt = prompter or _Prompt.default()
-    # Initiating an audit resets the condition checklist (fresh verify budget +
-    # started_at stamp), whether triggered manually (`milestone audit`) or via a hook.
-    ac.reset_for_audit(workspace, milestone_id)
-
-    # 本轮基线 B（审计前取一次）：既是 durable 记录（trailer / tag）的取值，也是"本地账里那单
-    # 是不是本轮审计"的判据（陈旧单不得充闭环）。
-    if not fresh_baseline:
-        from k3dge.engine.seal import head_commit
-
-        fresh_baseline = head_commit(workspace)
-
-    ratchet = _audit_mode(workspace) == "ratchet"
-    if ratchet:
-        # 审计腿＝工单步进（ADR-0025）：一次调用推一步，绝不在闸里等席；步没 closed 就交回 [NEXT]。
-        step_status, step_msg = _ratchet_audit_step(workspace, milestone_id, io=prompt.out_stream,
-                                                    fresh_baseline=fresh_baseline)
-        if step_status != "closed":
-            if step_status == "progress":
-                return "ratchet_open", step_msg + "\n" + nextstep.NextStep.from_state(
-                    "ratchet_open", milestone_id, reasons=[step_msg[:120]]).render_cli()
-            if step_status == "open":
-                return "audit_open", step_msg + "\n" + nextstep.NextStep.from_state(
-                    "audit_open", milestone_id, reasons=[step_msg[:160]]).render_cli()
-            return "escalated", step_msg + "\n" + nextstep.NextStep.from_state(
-                "escalated", milestone_id).render_cli()
-
-    # 单报告（ADR-0025 合并审计模块）：一轮 = 一份 12 列；quality 是模块内窗口，
-    # 不再是独立 peer/report。ratchet 模式下审计腿已由步进器闭环，streams 空。
-    # 外部步读**声明面**（gates [checks.audit].stages_produce/stages_verify），
-    # 不再硬编码 action ref —— 原 pipeline.toml 的 [pipelines.*] 只有校验、无执行者。
-    from k3dge.engine import gates as _gates
-
-    _produce = _gates.stages(workspace, "audit", "produce")
-    _verify = _gates.stages(workspace, "audit", "verify")
-    streams = {"audit": (_produce[0] if _produce else "", _verify[0] if _verify else "")}
-    if ratchet:
-        streams.pop("audit", None)
-    elif not _produce:
-        # 声明面留空 ⇒ **一次都没跑**（不是"无需审计"）：与 skip 同族，不得当已审——
-        # 否则只要仓里有一份旧报告就能判闭环（本会话实测过这个配置层的洞）。
-        msg = (
-            "审计未声明：`[checks.audit].stages_produce` 为空 ⇒ 没有可跑的审计步；"
-            "声明面没给 = 一次都没跑，不得当已审（ADR-0004 §2.1.9/§2.1.11）。"
-            "要么在 `.agent/pipeline.toml` 声明审计步，要么不要 seal。"
-        )
-        _ns = nextstep.next_for_rejection(milestone_id, gates.Rejection("audit_noop", msg))
-        nextstep.persist(workspace, _ns)
-        return "refused", msg + "\n" + _ns.render_cli()
 
     # mandatory audit + fix loop, capped at `max_verify_attempts` verifies.
     degraded = False  # 任一跳降级（downgrades 非空）⇒ 结果记 degraded-manual（ADR-0004 §2.1.11）
@@ -334,11 +329,7 @@ def run_audit_flow(
                     f"{produced.detail[:80]}）——空转不得被仓里已有的报告兜成闭环"
                     "（ADR-0004 §2.1.11）；确认传输链与透镜可达后重跑。"
                 )
-                _ns = nextstep.next_for_rejection(
-                    milestone_id, gates.Rejection("audit_noop", msg)
-                )
-                nextstep.persist(workspace, _ns)
-                return "refused", msg + "\n" + _ns.render_cli()
+                return _reject_step(workspace, milestone_id, "audit_noop", msg)
             degraded = degraded or (call == "degraded-manual")
             found = _find_report(workspace, milestone_id, kind)
             if found is None:
@@ -361,11 +352,8 @@ def run_audit_flow(
                     + ("" if not produced.downgrades else
                        f" [本轮降级：{'; '.join(produced.downgrades)}]")
                 )
-                _ns = nextstep.next_for_rejection(
-                    milestone_id, gates.Rejection("audit_report_missing", msg)
-                )
-                nextstep.persist(workspace, _ns)
-                return "rejected", msg + "\n" + _ns.render_cli()
+                return _reject_step(
+                    workspace, milestone_id, "audit_report_missing", msg, status="rejected")
             report_path, report_text = found
             if degraded:  # 降级不静默：署名是降级可接受的前提（ADR-0004 §2.1.11）
                 from k3dge.engine.process_audit import _SIGN_KEYS, _field
@@ -376,11 +364,8 @@ def run_audit_flow(
                         f"审计降级到 manual 但报告缺署名/来源 {missing}（{report_path.name}）——"
                         "降级不静默：署名后可记 `degraded-manual` 继续（ADR-0004 §2.1.11）。"
                     )
-                    _ns = nextstep.next_for_rejection(
-                        milestone_id, gates.Rejection("audit_degraded_unsigned", msg)
-                    )
-                    nextstep.persist(workspace, _ns)
-                    return "refused", msg + "\n" + _ns.render_cli()
+                    return _reject_step(
+                        workspace, milestone_id, "audit_degraded_unsigned", msg)
             stats = _parse_audit_stats(report_text)
             _ensure_leftovers(workspace, report_text, report_path)
             pending_total += stats["待修"]
@@ -399,11 +384,8 @@ def run_audit_flow(
             default_yes=True,
         ):
             msg = f"Audit open: {pending_total} 项待修未修复且 agent 拒绝修复。"
-            _ns = nextstep.next_for_rejection(
-                milestone_id, gates.Rejection("audit_open_declined", msg)
-            )
-            nextstep.persist(workspace, _ns)
-            return "rejected", msg + "\n" + _ns.render_cli()
+            return _reject_step(
+                workspace, milestone_id, "audit_open_declined", msg, status="rejected")
         # agent fixes externally -> loop re-runs the audit report
         continue
 
@@ -433,3 +415,63 @@ def run_audit_flow(
     _ns = nextstep.seal_ready_for(workspace, milestone_id)
     nextstep.persist(workspace, _ns)
     return status, msg + "\n" + _ns.render_cli()
+
+
+def run_audit_flow(
+    workspace: Path,
+    milestone_id: str,
+    *,
+    prompter: Optional[_Prompt] = None,
+    max_verify_attempts: int = 3,
+    fresh_baseline: str = "",
+) -> Tuple[str, str]:
+    """Independent audit entry: the merged audit module (ADR-0025) produces ONE
+    12-col report (k3dit audit leg; quality is a window inside the module, not an
+    independent peer). 待修==0 counts as "audited once"; verify checks that one
+    report. Returns (status, message); status ∈ {audited, rejected, escalated}.
+    Seal unlocks only after this closes (`run_seal_flow`).
+
+    两套互斥审计形状各归其函数（value-23）：`_ratchet_audit_leg`（棘轮工单步进）与
+    `_oneshot_audit_leg`（produce/verify 循环）；本函数只做前置事实 + 路由。
+    """
+    from k3dge.engine import audit_checklist as ac
+    from k3dge.engine import gates as _gates
+
+    prompt = prompter or _Prompt.default()
+    # Initiating an audit resets the condition checklist (fresh verify budget +
+    # started_at stamp), whether triggered manually (`milestone audit`) or via a hook.
+    ac.reset_for_audit(workspace, milestone_id)
+
+    # 本轮基线 B（审计前取一次）：既是 durable 记录（trailer / tag）的取值，也是"本地账里那单
+    # 是不是本轮审计"的判据（陈旧单不得充闭环）。
+    if not fresh_baseline:
+        from k3dge.engine.seal import head_commit
+
+        fresh_baseline = head_commit(workspace)
+
+    ratchet = _audit_mode(workspace) == "ratchet"
+    if ratchet:
+        early, _step_status = _ratchet_audit_leg(workspace, milestone_id, prompt, fresh_baseline)
+        if early is not None:
+            return early
+
+    # 单报告（ADR-0025 合并审计模块）：一轮 = 一份 12 列；quality 是模块内窗口，
+    # 不再是独立 peer/report。ratchet 模式下审计腿已由步进器闭环，streams 空。
+    # 外部步读**声明面**（gates [checks.audit].stages_produce/stages_verify），
+    # 不再硬编码 action ref —— 原 pipeline.toml 的 [pipelines.*] 只有校验、无执行者。
+    _produce = _gates.stages(workspace, "audit", "produce")
+    _verify = _gates.stages(workspace, "audit", "verify")
+    streams = {"audit": (_produce[0] if _produce else "", _verify[0] if _verify else "")}
+    if ratchet:
+        streams.pop("audit", None)
+    elif not _produce:
+        # 声明面留空 ⇒ **一次都没跑**（不是"无需审计"）：与 skip 同族，不得当已审——
+        # 否则只要仓里有一份旧报告就能判闭环（本会话实测过这个配置层的洞）。
+        msg = (
+            "审计未声明：`[checks.audit].stages_produce` 为空 ⇒ 没有可跑的审计步；"
+            "声明面没给 = 一次都没跑，不得当已审（ADR-0004 §2.1.9/§2.1.11）。"
+            "要么在 `.agent/pipeline.toml` 声明审计步，要么不要 seal。"
+        )
+        return _reject_step(workspace, milestone_id, "audit_noop", msg)
+
+    return _oneshot_audit_leg(workspace, milestone_id, prompt, streams, max_verify_attempts)

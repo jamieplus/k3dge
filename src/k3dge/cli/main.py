@@ -883,8 +883,15 @@ def cmd_search(args: argparse.Namespace) -> int:
     if getattr(args, "path", None):
         # Path-listing mode: list files matching the glob (scoped alternative to `find`).
         matches = []
-# k3dit:pending code-3 sev=中 prio=P1 type=缺陷 workspace.glob(args.path) 未包 try：绝对/非法 pattern（如 '/etc/*'）在迭代时抛 NotImplementedError/ValueError 直接崩栈，下游 _rel_within_workspace 的 SEC-01 收敛在其之前够不到 evidence=k3dge search --path '/etc/*'
-        for p in workspace.glob(args.path):
+# k3dit:fixnote code-3 glob 包 try：非法/绝对 pattern 报错退 1，不再崩栈（SEC-01 收敛前先拒）
+        # 绝对或非法 pattern（`/etc/*`）在 pathlib 里以 ValueError / NotImplementedError 抛出，
+        # 且抛在 `SEC-01` 收敛（_rel_within_workspace）**之前** ⇒ 旧代码直接崩栈。
+        try:
+            candidates = list(workspace.glob(args.path))
+        except (ValueError, NotImplementedError, re.error) as exc:
+            print(f"[SEARCH] 非法 --path glob '{args.path}': {exc}", file=sys.stderr)
+            return 1
+        for p in candidates:
             try:
                 safe = _rel_within_workspace(workspace, str(p))
             except ValueError:
@@ -1117,7 +1124,16 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
-# k3dit:pending value-22 sev=中 prio=P2 type=结构 main.py 单模块 1349 行：18 个子命令 + 全部 cmd_* 处理器 + 约 210 行 build_parser 同处一文件，超 ADR-0003 千行阈值，应按职责拆分 evidence=wc -l src/k3dge/cli/main.py
+# k3dit:leftover value-22 体积属实，但本轮有意留：按 A-1 分块逐程消化，本窗无法验证搬迁
+    # 判读不驳：`wc -l src/k3dge/cli/main.py` = 1350，仍超 1000 行健康线（M7 quality Q-7 同口径）。
+    # 不本轮改的理由（how）：
+    # 1. 本窗是审计纯净版，**没有 tests/**；`cmd_*` + `build_parser` 外迁是跨文件 import 搬迁，
+    #    无测试可证 CLI 出口不回归（`status/next` 三出口同构那类断言都在主仓 tests 里）。
+    # 2. 该债按 A-1「上帝模块逐程消化」走：`engine/` 下 prompt/task_write/seal_flow/milestone_audit
+    #    等件即先例（各自 docstring 记「Extracted from engine/milestone.py A-1 第 N 块」）；
+    #    M7 quality Q-7 对同一体积债的裁定是「债已入登记票逐程消化；不接受整体销账」。
+    # 3. 拆 CLI 面同时动 `cli/main.py` 与 `cli/mcp.py` 的公开符号 ⇒ 必须与 spec/契约哈希同批
+    #    `k3dge sync`（AGENTS.md §12），超出这一张发现单的范围，需要独立里程碑 task。
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="k3dge",

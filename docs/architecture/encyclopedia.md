@@ -74,8 +74,8 @@
 | **审计线 Audit Line** | gate 类唯一输入形式：一单一线（`k3dit/<单>` 分支 + worktree checkout），锁点 L 即 `baseline`；袋/独立库/打包器全部退役 | ADR-0025；`peer_contract §3` |
 | **棘轮 Ratchet** | 一工单 = 一快照，单内审↔修可多程；submit/collect 两态；`claim` 即续租；快照推进一律 `git update-ref` CAS | `peer_contract §1.4` |
 | **席位 seat** | 审计机构经 seat 连接组件上岗；`sign-report` 署名才算结案 | `peer_contract §1.4` / §2 |
-<!-- k3dit:pending doc-4 sev=中 prio=P2 type=冲突 §3.2/§4/§5/§6 四处仍把 doc-audit 写成现行「非阻断报告+建票」机制（:121、:147、:185 同）；ADR-0022 §2.2 🅰1 已退休该路径（audit_default.md:40），未同步 -->
-| **doc-audit** | `check` 后、**非阻断**的文档作者合规审计：k3dit 报告 + 建带 Milestone 的 task | ADR-0022 |
+<!-- k3dit:fixnote doc-4 §3.2/§3.3/§5/§6 四处同步「三层」口径；doc-audit 报告+票路径退休 -->
+| **doc 合规三层** | ① 提交时结构闸 + 新建首次排查（`DOC_NEW_UNSCREENED`，阻断一次）② seal 轮确定性规约化 `k3dge doc fix`（封板前置 `docs_normalized`＝耐久闸不是票）③ 作者合规透镜（里程碑审计轮）。原「`check` 后非阻断 `k3dge doc-audit` 出报告 + 建票」路径**已退休** | ADR-0022 §2.2 🅰1 |
 | **预筛 Pre-filter** | 人工入口审计的三条件复用（闭环报告 + 基线同 + lens 版本同）；自动入口不预筛 | `peer_contract §7` |
 
 ### 3.3 文档体系
@@ -119,7 +119,7 @@
 | `docs/branches/` | 红闸分支勘误记录 | 见 `docs/branches/` | — |
 | `docs/protocols/` | 审计/质量/复核协议 + Peer Contract | 改动 = 契约变更，需 `k3dge sync` + 下游跟随 | `k3dge doc list --type protocols` |
 
-> 结构门禁（commit）：staged `docs/**` 需该类型 `README.md` + `AUTHORING.md` 齐；`check` 绿后给 `[NEXT] doc_audit`（`k3dge doc-audit` 非阻断，ADR-0022）。
+> 结构门禁（commit）：staged `docs/**` 需该类型 `README.md` + `AUTHORING.md` 齐；新建主观撰写类文档先排查（`DOC_NEW_UNSCREENED` 阻断一次）；软规约化在 seal 轮（`k3dge doc fix`，`[NEXT] doc_fix` 提示，封板前置 `docs_normalized`）；语义合规在里程碑审计轮（ADR-0022 §2.2 🅰1）。
 
 ## 5. 决策索引（ADR 全表）
 
@@ -145,7 +145,7 @@
 | --- | --- | --- |
 | ADR-0004 | milestone-lifecycle-governance | 里程碑生命周期/封板状态机与执行口径 |
 | ADR-0008 | unsolicited-doc-triggers | 文档改动触发的非请求式审计触发器 |
-| ADR-0022 | §2.2（doc-audit 后置、非阻断；原独立 ADR 并入） | `doc-audit` 在 check 之后、非阻断，建带 Milestone 的 task |
+| ADR-0022 | §2.2（doc 合规三层；原独立 ADR 并入） | 硬闸 + 新建首次排查 + seal 轮 `doc fix`；「报告+建票」路径已退休（🅰1） |
 | ADR-0022 | task-maps-to-audit-report | task 映射到审计报告条目 |
 
 ### Agent 与 harness
@@ -183,7 +183,7 @@
 | 里程碑 | `k3dge milestone audit <id>`（棘轮步进）、`k3dge milestone seal <id>`、`k3dge milestone align` |
 | 任务 | `k3dge task list --json` / `k3dge task create` / `k3dge task done` |
 | 文档寻址 | `k3dge doc list` / `k3dge doc where <id>` / `k3dge doc grep <word> [--line]` |
-| 文档审计 | `k3dge doc-audit`（check 之后、非阻断，ADR-0022） |
+| 文档规约化 | `k3dge doc fix [--dry-run]`（seal 轮、闭集规则，解封板前置 `docs_normalized`；ADR-0022 §2.2 🅰1。作者合规在里程碑审计轮，无 `doc-audit` 命令） |
 | 符号定位 | `k3dge where <symbol>`（file:line）；`k3dge search` / `k3dge index` |
 | 审计钉 | `k3dge markers [--json|--check]` |
 | 送检与棘轮 | `k3dge audit <submit|status|advance|close>`（审计线：锁线→交件→验→merge→删线） |
