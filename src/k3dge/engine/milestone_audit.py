@@ -234,6 +234,7 @@ def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str =
     return "progress", f"工单 {j['job_id']} 对端态 {st.get('state')}，open={st.get('open', [])}。"
 
 
+# k3dit:pending value-23 sev=中 prio=P2 type=复杂度 run_audit_flow CC26：同一函数叠加 ratchet 步进委派与 legacy oneshot produce/verify 循环两套互斥审计形状，五处拒绝分支各自 render+persist NextStep evidence=k3dge check
 def run_audit_flow(
     workspace: Path,
     milestone_id: str,

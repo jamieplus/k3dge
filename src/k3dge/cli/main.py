@@ -1117,6 +1117,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
+# k3dit:pending value-22 sev=中 prio=P2 type=结构 main.py 单模块 1349 行：18 个子命令 + 全部 cmd_* 处理器 + 约 210 行 build_parser 同处一文件，超 ADR-0003 千行阈值，应按职责拆分 evidence=wc -l src/k3dge/cli/main.py
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="k3dge",

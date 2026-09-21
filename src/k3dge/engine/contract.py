@@ -189,6 +189,7 @@ def register_extractor(ext: ContractExtractor, *, override: bool = False) -> Non
         _EXTRACTORS.append(ext)
 
 
+# k3dit:pending value-21 sev=中 prio=P2 type=设计 _load_plugin_extractors CC23：单函数混装 manifest 规格导入、约定目录 drop-in、importlib 动态执行，并以函数属性 _attempted 兼作幂等缓存；manifest 分支又直接 _EXTRACTORS.append 绕过自家 register_extractor evidence=k3dge check
 def _load_plugin_extractors(manifest, workspace_root=None) -> None:
     """Load third-party extractors from two sources (both feed `register_extractor`).
 

@@ -20,6 +20,7 @@ from k3dge.engine.task_index import MILESTONE_RE, TITLE_RE, parse_frontmatter
 _TASK_TYPES = frozenset({"audit", "feat", "fix", "docs", "chore", "refactor"})
 
 
+# k3dit:pending value-20 sev=中 prio=P2 type=复杂度 _auto_backfill_reviews CC36（全仓最高）：审阅表模糊匹配（title/desc 前 15 字子串）+ 手工定位并插入回填段的字符串手术，易误翻状态且无直接测试 evidence=k3dge check
 def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, milestone: str | None) -> None:
     """Best-effort auto-backfill for audit reviews when a task is marked done.
 
