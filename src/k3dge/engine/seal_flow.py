@@ -99,14 +99,19 @@ def _architecture_staleness(workspace: Path, milestone_id: str) -> str:
     if rc != 0:
         return f"（读 {tag}..HEAD 失败，未能对账架构文档）"
     files = [f for f in out.splitlines() if f.strip()]
-    arch_rel = "docs/architecture/overview.md"
+    docs = ("docs/architecture/overview.md", "docs/architecture/encyclopedia.md")
     code = [f for f in files if f.startswith(("src/", "docs/specs/"))]
-    if arch_rel in files:
-        return f"✅ `{arch_rel}` 在 `{tag}..HEAD` 区间内已更新（{len(code)} 个 src/spec 文件也变过）"
+    touched = [d for d in docs if d in files]
+    missing = [d for d in docs if d not in files]
     if not code:
-        return f"✅ 自 `{tag}` 以来 `src/`/`docs/specs/` 无改动 ⇒ 架构文档无需对账"
+        return f"✅ 自 `{tag}` 以来 `src/`/`docs/specs/` 无改动 ⇒ 设计文档无需对账"
+    if not missing:
+        return f"✅ `{'`/`'.join(docs)}` 在 `{tag}..HEAD` 区间内都已更新（{len(code)} 个 src/spec 文件也变过）"
+    if touched:
+        return (f"⚠️ `{'`/`'.join(missing)}` 自 `{tag}` 以来**未更新**（`{'`/`'.join(touched)}` 已更新），"
+                f"而区间内 `src/`/`docs/specs/` 有 {len(code)} 个文件改动 ⇒ 收摊时对齐（无变化就注明“无需改”）")
     return (
-        f"⚠️ `{arch_rel}` 自 `{tag}` 以来**未更新**，而区间内 `src/`/`docs/specs/` 有 "
+        f"⚠️ `{'`/`'.join(missing)}` 自 `{tag}` 以来**未更新**（两件都没动），而区间内 `src/`/`docs/specs/` 有 "
         f"{len(code)} 个文件改动 ⇒ 本里程碑收摊时对齐（无实际变化就在清单里注明“无需改”）"
     )
 
@@ -154,7 +159,7 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
                 "- [ ] 删除/折叠与现行方案无关的草稿、分支说明",
                 "",
                 "## 3. 更新设计文档",
-                f"- [ ] `docs/architecture/overview.md` 对齐到已封板的现实 —— {arch_fact}",
+                f"- [ ] 设计文档（`overview.md` / `encyclopedia.md`）对齐到已封板的现实 —— {arch_fact}",
                 "- [ ] 相关 ADR 标注 supersedes / 现行范围",
                 "",
                 "## 4. 提交里程碑",

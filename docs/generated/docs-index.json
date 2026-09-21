@@ -481,6 +481,14 @@
       "tokens": "合线 rebase 后 `_baseline_covers` 把本轮审计判成旧单，再建单死锁封板"
     },
     {
+      "path": "docs/tasks/2026-09-21-M11-feat-arch_table_gate.done.md",
+      "type": "tasks",
+      "id": "2026-09-21-M11-feat-arch_table_gate.done",
+      "title": "架构文档 seal 覆盖（overview + encyclopedia）+ 域表对账闸 `ARCH_TABLE_DRIFT`",
+      "status": "done",
+      "tokens": "架构文档 seal 覆盖（overview + encyclopedia）+ 域表对账闸 `ARCH_TABLE_DRIFT`"
+    },
+    {
       "path": "docs/tasks/2026-09-21-M11-fix-commit_runs_hooks.done.md",
       "type": "tasks",
       "id": "2026-09-21-M11-fix-commit_runs_hooks.done",

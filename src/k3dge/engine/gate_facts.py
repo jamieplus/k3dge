@@ -65,6 +65,16 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         ],
         "pointers": ["k3dge sync", "docs/generated/", "AGENTS.md §12"],
     },
+    "ARCH_TABLE_DRIFT": {
+        "severity": "block", "fix": "judgment",
+        "fact": "`{path}` 的域表与 `.agent/manifest.json` 不一致（`{domain}` 的 `{col}`）——表行是事实投影"
+                "（域/源码/spec/tests/depends_on），描述列是散文不在本闸判据内。**方向要人判**：是文档过时，"
+                "还是 manifest 改了没同步",
+        "options": ["文档过时 → 按 manifest 改表行（或重跑 k3dge sync 后对照 docs/generated/domains.md）",
+                    "manifest 才是错的 → 先改 manifest，再同步两张表与两张 Reference 表"],
+        "pointers": ["docs/architecture/overview.md §1", "docs/architecture/encyclopedia.md §2",
+                     ".agent/manifest.json", "k3dge sync"],
+    },
     "SYMBOL_INDEX_STALE": {
         "severity": "block", "fix": "deterministic",
         "fix_hint": "k3dge index（重生 docs/generated/symbol-index.json）",

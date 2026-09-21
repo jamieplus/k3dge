@@ -762,13 +762,13 @@
   "facts_of": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 524
+      "line": 534
     }
   ],
   "fill": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 476
+      "line": 486
     }
   ],
   "find_orphan_adrs": [
@@ -810,7 +810,7 @@
   "fix_kind": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 454
+      "line": 464
     }
   ],
   "format_seal_trailers": [
@@ -936,7 +936,7 @@
   "is_declared": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 464
+      "line": 474
     }
   ],
   "is_screenable_new_doc": [
@@ -1316,7 +1316,7 @@
   "projection": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 514
+      "line": 524
     }
   ],
   "prune": [
@@ -1400,7 +1400,7 @@
   "render": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 488
+      "line": 498
     }
   ],
   "render_checklist": [
@@ -1520,7 +1520,7 @@
   "run_seal_flow": [
     {
       "file": "src/k3dge/engine/seal_flow.py",
-      "line": 174
+      "line": 179
     }
   ],
   "satisfied_ids": [
@@ -1622,7 +1622,7 @@
   "severity": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 469
+      "line": 479
     }
   ],
   "show_job": [

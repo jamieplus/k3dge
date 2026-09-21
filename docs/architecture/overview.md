@@ -1,6 +1,6 @@
 # Architecture — 系统全貌（System Overview）
 
-> 人写常驻 + `k3dge sync` 聚合校验。域级契约在 `docs/specs/<domain>/spec.md`，本文件只讲**域间关系与全局不变量**。
+> 人写常驻；§1 域表由 `k3dge check` 与 `.agent/manifest.json` 对账（`ARCH_TABLE_DRIFT`）。域级契约在 `docs/specs/<domain>/spec.md`，本文件只讲**域间关系与全局不变量**。
 > 想快速定向 / 查术语 / 找文档入口，先看 [`encyclopedia.md`](encyclopedia.md)（知识地图，非第二套叙事）。
 > 本文档遵循 **Diátaxis**（`guides`=教程/操作指南、`generated`=Reference 自动生成、`architecture` 本文件=`解释`）与 **C4-C1** 上下文视图。
 
