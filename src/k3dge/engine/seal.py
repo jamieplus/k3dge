@@ -263,17 +263,12 @@ def seal_checklist(workspace: Path, milestone_id: str) -> list:
 def unmet_seal_preconditions(workspace: Path, milestone_id: str) -> list:
     """**需人先办**的未过闸 `[(gate_id, message)]`（由 `seal_checklist` 派生，单一判据源）。
 
-    不含"seal 自己会跑"的项（`auto_satisfied_ids`）——把 `align_pass` 列成"需你先办"是
+    不含"seal 自己会跑"的项（`nodes.satisfied_ids`）——把 `align_pass` 列成"需你先办"是
     误导：`seal` 的第一个动作就是 `full_matrix`（跑 align + 写 marker），前置闸是在它之后
     才评估的。这类项在清单里以 ⚙️ 呈现（跑失败则以 align 的理由拒）。
     """
     return [(gid, msg) for gid, ok, msg, auto in seal_checklist(workspace, milestone_id)
             if not ok and not auto]
-
-
-def auto_pending_seal_gates(workspace: Path, milestone_id: str) -> list:
-    """"seal 会自己跑、但现在还没跑"的前置闸 id（清单里的 ⚙️ 项）。"""
-    return [gid for gid, ok, _m, auto in seal_checklist(workspace, milestone_id) if auto]
 
 
 def render_checklist(workspace: Path, milestone_id: str) -> str:
@@ -474,10 +469,3 @@ def seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]:
     if ok:
         return True, out
     return False, gates.rejection(out, "archive_failed")
-
-
-def auto_satisfied_ids(workspace: Path, op: str) -> set:
-    """兼容别名 → `nodes.satisfied_ids`（归属在节点声明层）。"""
-    from k3dge.engine import nodes
-
-    return nodes.satisfied_ids(workspace, op)

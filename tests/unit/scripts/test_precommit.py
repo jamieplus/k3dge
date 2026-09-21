@@ -153,3 +153,25 @@ class TestScreenGateWiring(unittest.TestCase):
                 raise RuntimeError("boom")
 
         self.assertEqual(hook.run_screen_gate(["docs/adr/0028-x.md"], Boom()), [])
+
+
+class TestDeclaredFactsSelfCheck(unittest.TestCase):
+    """声明面 ↔ 产出点：声明里的占位键必须被检查器喂到（2026-09-21 起 `facts_of` 有生产消费者）。"""
+
+    def test_missing_facts_are_reported(self):
+        from k3dge.engine import gate_facts
+
+        missing = hook.missing_declared_facts("CONTRACT_DRIFT", {"path": "docs/specs/x.md"}, gate_facts)
+        self.assertIn("expected_hash", missing)
+        self.assertIn("actual_hash", missing)
+
+    def test_complete_facts_report_nothing(self):
+        from k3dge.engine import gate_facts
+
+        facts = {"path": "x", "expected_hash": "a", "actual_hash": "b"}
+        self.assertEqual(hook.missing_declared_facts("CONTRACT_DRIFT", facts, gate_facts), [])
+
+    def test_undeclared_code_is_not_reported(self):
+        from k3dge.engine import gate_facts
+
+        self.assertEqual(hook.missing_declared_facts("SOMETHING_NEW", {}, gate_facts), [])

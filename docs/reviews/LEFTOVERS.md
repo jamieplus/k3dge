@@ -59,4 +59,8 @@ Denial reason and reopen condition live here only.
 | PRE-04 | **根文件（`AGENTS.md`/`README.md`）里的路径引用不在任何闸面**（pre-commit 只扫 `docs/**`）。实测 4 处"缺落点"全是约定/引文：`engine/audit_trigger.py`（域相对写法）、`.agent/gates.toml`（历史引文）、`../k3dit/...`（跨仓）。直接设闸≈高误报（同 INTRO-01 结论）⇒ 有意留，只记账 | 同上 |
 | PRE-06 | `DOCS_TOML_KEY_UNKNOWN` **只看键、不看文件**：`= true` 而文件未生成是收尾流程常态（`generate-docs.sh` 收尾才落桩）⇒ 不报；"配了却没生成"目前无人管（收尾清单 advisory）| 同上 |
 | PRE-05 | **`INIT_DELIVERED_DOCS` 是手维护清单**（init 下发件的排查面豁免）：新增下发文档时要手动加，否则下游第一次提交会被 `DOC_NEW_UNSCREENED` 拦。Reopen：出现一次"新下发件把下游首次提交拦了"的实例 | 同上 |
+| FACTS-01 | **`gate_facts.fix_kind` 生产侧无调用**（只在 `test_gate_facts` / `test_doc_fix` 里用）：它服务一条**真实的交叉核对守卫**——`doc_fix.FIXABLE_RULES` ⇔ 声明里 `fix=="deterministic"`。⇒ **有意留，别再当死代码删**（2026-09-21 悬空设计盘点时被误判过一次） | [2026-09-21-M11-fix-dangling_design.done.md](../tasks/2026-09-21-M11-fix-dangling_design.done.md) |
+| EVENT-01 | **`events.read_events` 仓内零读者**（只有测试 + `docs/generated/api.md` 的接口块）：`.k3dge/events.jsonl` 是**对外事实供给**（ADR-0026 §2.6 的 D 线闭集之一：状态可见/事实供给/幂等步进），消费者在仓外（席位/agent）⇒ 有意留，别删 | 同上 |
+| AUDIT-01 | **`milestone_audit` 的 oneshot 形状当前不可达**（`.agent/pipeline.toml` 是 `[roles.audit].mode="ratchet"`，而声明面允许切回 `oneshot`）⇒ 配置相关路径，非死代码；**有意留**（切模式即启用） | 同上 |
 | value-22 | `cli/main.py` 单模块超千行（原 0003，已并入 `ADR-0018 §2.12`）：体积属实，按 A-1 分块逐程消化，本轮有意留 | [2026-09-20-M10-audit.md](archive/M10/2026-09-20-M10-audit.md) |
+

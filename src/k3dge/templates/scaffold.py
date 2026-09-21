@@ -181,11 +181,6 @@ def ensure_mcp_config(target: Path) -> bool:
     # Peers from pipeline.toml are merged on demand via `k3dge mcp sync` (not scaffold time)
 
 
-def _ensure_mcp_config(target: Path) -> bool:
-    """Deprecated alias for ensure_mcp_config."""
-    return ensure_mcp_config(target)
-
-
 def _pipeline_servers(target: Path) -> set:
     """Server names the generated pipeline references（`roles.*.bind` ∪ `[peers.*]`，除 k3dge）。"""
     import sys

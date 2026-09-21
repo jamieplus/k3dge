@@ -543,6 +543,14 @@
       "title": "SYNC-01 文案不实 + task 状态词表双源 + 落点闸 docstring 错名",
       "status": "done",
       "tokens": "SYNC-01 文案不实 + task 状态词表双源 + 落点闸 docstring 错名"
+    },
+    {
+      "path": "docs/tasks/2026-09-21-M11-refactor-dangling_design.done.md",
+      "type": "tasks",
+      "id": "2026-09-21-M11-refactor-dangling_design.done",
+      "title": "悬空设计盘点：删 3 个零调用 API + `facts_of` 接入生产自检",
+      "status": "done",
+      "tokens": "悬空设计盘点：删 3 个零调用 API + `facts_of` 接入生产自检"
     }
   ]
 }

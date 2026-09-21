@@ -340,6 +340,8 @@ staged_added() -> list[str]
     # doc: 本次提交**新增**的文件（`--no-renames`：改名算 A+D，新路径须重新排查）。
 relevant_for_check(files: list[str]) -> bool
 check_one(rel: str) -> list[str]
+missing_declared_facts(code: str, facts: dict, gate_facts=None) -> list
+    # doc: 声明里用到的占位键中，调用方**没给**的那些。
 run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -> tuple[list[str], list[str]]
     # doc: Returns (blocking, non_blocking). Staged content only.
 run_screen_gate(added: list[str], pure_refs, gate_facts=None) -> list[tuple[str, str]]
@@ -843,8 +845,6 @@ seal_checklist(workspace: Path, milestone_id: str) -> list
     # doc: **全量**封板前置清单：`[(gate_id, ok, message)]`，顺序＝声明序。
 unmet_seal_preconditions(workspace: Path, milestone_id: str) -> list
     # doc: **需人先办**的未过闸 `[(gate_id, message)]`（由 `seal_checklist` 派生，单一判据源）。
-auto_pending_seal_gates(workspace: Path, milestone_id: str) -> list
-    # doc: "seal 会自己跑、但现在还没跑"的前置闸 id（清单里的 ⚙️ 项）。
 render_checklist(workspace: Path, milestone_id: str) -> str
     # doc: 清单的人读投影（✓/✗ + 原因），供 seal 拒绝信息与 `seal-check` 共用。
 SEAL_TRAILER_KEYS = ('seal-milestone', 'audit-baseline', 'audit-seat', 'audit-result')
@@ -860,8 +860,6 @@ seal_record(workspace: Path, milestone_id: str, *, baseline: str, seat: str='', 
     # doc: 相位 3 的持久记录：**封版提交**（归档/提版/收摊/审计产出一起进）+ 边界 tag。
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
     # doc: 纯归档动作：id 合法 + 有任务 + 状态合法 → `_seal_archive`。策略闸在 `seal_preconditions_error`。
-auto_satisfied_ids(workspace: Path, op: str) -> set
-    # doc: 兼容别名 → `nodes.satisfied_ids`（归属在节点声明层）。
 # seal_flow.py
 from __future__ import annotations
 from pathlib import Path

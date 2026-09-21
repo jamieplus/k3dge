@@ -140,6 +140,21 @@ def _is_aux(name: str, aux: frozenset) -> bool:
     return name in aux
 
 
+#: 本轮渲染时"声明要的事实、检查器没给"的 `(code, missing)`（自检信号，见 `missing_declared_facts`）
+_MISSING_FACTS: set = set()
+
+
+def missing_declared_facts(code: str, facts: dict, gate_facts=None) -> list:
+    """声明里用到的占位键中，调用方**没给**的那些。
+
+    这是"声明面 ↔ 产出点"漂移的早期信号：代码表里写了 `{peer}` 而检查器不传 `peer`，渲染出来就是
+    字面 `{peer}`（`_SafeFacts` 只保证不崩，不保证正确）。消费者＝`_add()`（累积）+ 闸尾统一 WARN。
+    """
+    if gate_facts is None:
+        return []
+    return [k for k in gate_facts.facts_of(code) if k not in facts]
+
+
 def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -> tuple[list[str], list[str]]:
     """Returns (blocking, non_blocking). Staged content only.
 
@@ -159,6 +174,8 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -
             if where:
                 f["path"] = where
             f.update(facts or {})
+            for miss in missing_declared_facts(code, f, gate_facts):
+                _MISSING_FACTS.add((code, miss))
             # 检查器原文作为 detail 带出（过渡约定：尚未结构化的检查器不丢信息）
             text = gate_facts.render(code, f, where=where, detail=msg)
         line = text or (f"{where}: [{code}] {msg}" if where else f"[{code}] {msg}")
@@ -368,6 +385,16 @@ def main() -> int:
                 rc = 1
             else:
                 print("[k3dge screen] PASS (无待排查的新建受管文档)")
+
+    if _MISSING_FACTS:
+        # 工具自检：声明要的事实没给全 ⇒ 渲染会留字面 `{key}`。**不阻断提交**（这是我们的 bug，不是仓的）
+        by_code: dict = {}
+        for code, key in sorted(_MISSING_FACTS):
+            by_code.setdefault(code, []).append(key)
+        print("[k3dge facts] WARN: 声明要的事实未提供（渲染会留占位符；检查器或 gate_facts 需对齐）:")
+        for code, keys in by_code.items():
+            print(f"  - {code}: 缺 {', '.join(keys)}")
+        _MISSING_FACTS.clear()
 
     # 一致性闸（`k3dge check`）**不在这里**：进程动作由薄壳 hook 看 `relevant_for_check()` 自己调
     # `scripts/gate.py`（本模块只出判据、不替调用方起进程）。

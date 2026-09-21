@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:49fb0850e7049f42ea451bbf4bd2168a651732311f2539a7db91fd5312139224`
+- **Contract Hash**: `sha256:0a6a881033a057e43410c8645e1df6c76e921f4cd4a3a8fbe5848670b582f56c`
 - **Last Updated**: 2026-09-21
 
 ## 1. Domain Boundary & Responsibilities
@@ -187,6 +187,7 @@ staged_files() -> list[str]
 staged_added() -> list[str]
 relevant_for_check(files: list[str]) -> bool
 check_one(rel: str) -> list[str]
+missing_declared_facts(code: str, facts: dict, gate_facts=None) -> list
 run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -> tuple[list[str], list[str]]
 run_screen_gate(added: list[str], pure_refs, gate_facts=None) -> list[tuple[str, str]]
 main() -> int
@@ -557,7 +558,6 @@ scan_unfilled_guides(workspace: Path) -> List[str]
 seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gates.Rejection]
 seal_checklist(workspace: Path, milestone_id: str) -> list
 unmet_seal_preconditions(workspace: Path, milestone_id: str) -> list
-auto_pending_seal_gates(workspace: Path, milestone_id: str) -> list
 render_checklist(workspace: Path, milestone_id: str) -> str
 SEAL_TRAILER_KEYS = ('seal-milestone', 'audit-baseline', 'audit-seat', 'audit-result')
 head_commit(workspace: Path) -> str
@@ -566,7 +566,6 @@ parse_seal_trailers(text: str) -> dict
 tag_audit_baseline(workspace: Path, milestone_id: str, baseline: str, *, trailers: str='') -> Tuple[bool, str]
 seal_record(workspace: Path, milestone_id: str, *, baseline: str, seat: str='', result: str='', subject: str='') -> Tuple[bool, str]
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
-auto_satisfied_ids(workspace: Path, op: str) -> set
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional

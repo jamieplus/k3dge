@@ -532,14 +532,15 @@ class TestSealChecklist(unittest.TestCase):
     def test_align_pass_is_marked_auto_not_todo(self) -> None:
         """`align_pass` 由 seal 自己的第一个动作（`full_matrix`→跑 align+写 marker）满足
         ⇒ 清单里是 ⚙️（auto），**不算"需你先办"**（否则误导操作者去手跑 align）。"""
-        from k3dge.engine.seal import auto_pending_seal_gates, render_checklist, unmet_seal_preconditions
+        from k3dge.engine import nodes
+        from k3dge.engine.seal import render_checklist, unmet_seal_preconditions
 
         _write_task(self.ws / "docs/tasks/x.md", "done", "M10")
         _set_seal_gates(self.ws, "align_pass")
         text = render_checklist(self.ws, "M10")
         self.assertIn("⚙️ align_pass", text)
         self.assertNotIn("❌ align_pass", text)
-        self.assertEqual(auto_pending_seal_gates(self.ws, "M10"), ["align_pass"])
+        self.assertIn("align_pass", nodes.satisfied_ids(self.ws, "seal"))
         self.assertEqual(unmet_seal_preconditions(self.ws, "M10"), [])   # 无需人先办
 
     def test_audit_refusal_also_carries_the_checklist(self) -> None:

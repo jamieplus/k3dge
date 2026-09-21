@@ -215,18 +215,6 @@
       "line": 59
     }
   ],
-  "auto_pending_seal_gates": [
-    {
-      "file": "src/k3dge/engine/seal.py",
-      "line": 274
-    }
-  ],
-  "auto_satisfied_ids": [
-    {
-      "file": "src/k3dge/engine/seal.py",
-      "line": 479
-    }
-  ],
   "begin_run": [
     {
       "file": "src/k3dge/engine/nextstep.py",
@@ -822,7 +810,7 @@
   "format_seal_trailers": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 329
+      "line": 324
     }
   ],
   "format_version": [
@@ -930,7 +918,7 @@
   "head_commit": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 323
+      "line": 318
     }
   ],
   "index_path": [
@@ -1128,7 +1116,7 @@
   "main": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 302
+      "line": 319
     },
     {
       "file": "src/k3dge/cli/main.py",
@@ -1136,7 +1124,7 @@
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 359
+      "line": 354
     }
   ],
   "managed_docs": [
@@ -1183,6 +1171,12 @@
     {
       "file": "src/k3dge/engine/milestone_files.py",
       "line": 59
+    }
+  ],
+  "missing_declared_facts": [
+    {
+      "file": "src/k3dge/engine/doc_gate.py",
+      "line": 147
     }
   ],
   "next_for_rejection": [
@@ -1248,7 +1242,7 @@
   "parse_seal_trailers": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 341
+      "line": 336
     }
   ],
   "parse_sidecar": [
@@ -1422,7 +1416,7 @@
   "render_checklist": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 279
+      "line": 274
     }
   ],
   "render_manual_docs": [
@@ -1536,13 +1530,13 @@
   "run_schema_gate": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 143
+      "line": 158
     }
   ],
   "run_screen_gate": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 242
+      "line": 259
     }
   ],
   "run_seal_flow": [
@@ -1560,7 +1554,7 @@
   "scaffold": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 269
+      "line": 264
     }
   ],
   "scan": [
@@ -1608,7 +1602,7 @@
   "seal_milestone": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 449
+      "line": 444
     }
   ],
   "seal_preconditions_error": [
@@ -1626,7 +1620,7 @@
   "seal_record": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 419
+      "line": 414
     }
   ],
   "search": [
@@ -1750,7 +1744,7 @@
   "tag_audit_baseline": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 358
+      "line": 353
     }
   ],
   "tasks_after_boundary": [
