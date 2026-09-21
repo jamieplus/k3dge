@@ -134,6 +134,7 @@ sequenceDiagram
 
 > 命令结果末尾统一附 `[NEXT] state=… milestone=…` 一行提示（MCP 同构 JSON `next` 字段），只给合法下一步、不替人决定；优先级 `pending_findings > ratchet_open > seal_ready > audit_suggested`，状态与 reasons 的唯一来源在 `engine/nextstep.STATE_OPTIONS` + `engine/audit_trigger.py`，与本节同一张状态机。新建 `src/` 域给 `new_domain`（是否算持久设计、写得对不对仍归 k3dit/人）；`overview.md` 更新已移出钩子、进 closure。
 >
+<!-- k3dit:pending doc-3 sev=中 prio=P2 type=冲突 仍写「docs 改动 → `[NEXT] doc_audit` → k3dge doc-audit 出报告+建票」为现行机制；ADR-0022 §2.2 🅰1 已退休该路径（audit_default.md:40 与 AGENTS.md §12 为三层），本文未同步 -->
 > **T-01 边界（doc-audit，ADR-0022）**：`check` 恒静态、不跑透镜。docs 改动时 `check` 绿后给 `[NEXT] doc_audit`，由 `k3dge doc-audit`（**之后**、**非阻断**）出 k3dit 报告 + 建带 `Milestone` 的 task；task 进 backlog 由封板「全 done」闸兜底。ADR 冲突/覆盖只在里程碑审计，不进每次 commit。
 
 ## 8. 决策与有意留索引

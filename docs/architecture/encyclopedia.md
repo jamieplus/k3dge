@@ -74,6 +74,7 @@
 | **审计线 Audit Line** | gate 类唯一输入形式：一单一线（`k3dit/<单>` 分支 + worktree checkout），锁点 L 即 `baseline`；袋/独立库/打包器全部退役 | ADR-0025；`peer_contract §3` |
 | **棘轮 Ratchet** | 一工单 = 一快照，单内审↔修可多程；submit/collect 两态；`claim` 即续租；快照推进一律 `git update-ref` CAS | `peer_contract §1.4` |
 | **席位 seat** | 审计机构经 seat 连接组件上岗；`sign-report` 署名才算结案 | `peer_contract §1.4` / §2 |
+<!-- k3dit:pending doc-4 sev=中 prio=P2 type=冲突 §3.2/§4/§5/§6 四处仍把 doc-audit 写成现行「非阻断报告+建票」机制（:121、:147、:185 同）；ADR-0022 §2.2 🅰1 已退休该路径（audit_default.md:40），未同步 -->
 | **doc-audit** | `check` 后、**非阻断**的文档作者合规审计：k3dit 报告 + 建带 Milestone 的 task | ADR-0022 |
 | **预筛 Pre-filter** | 人工入口审计的三条件复用（闭环报告 + 基线同 + lens 版本同）；自动入口不预筛 | `peer_contract §7` |
 

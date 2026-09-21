@@ -109,5 +109,6 @@ k3dge mcp probe --json     # 同上的机读形态；全活 exit 0，有死 exit
 ## 相关
 
 * 实现：`src/k3dge/cli/mcp.py`
+<!-- k3dit:pending doc-1 sev=中 prio=P2 type=悬空指针 `src/k3dge/engine/milestone.py` 已随 drop_milestone_facade 删除（engine 下无此文件），指针悬空 -->
 * 契约：`src/k3dge/engine/contract.py`（`include_doc` 与哈希正交）、`src/k3dge/engine/milestone.py`（三闸机）
 * 验证：`k3dge check --force-full --with-tests` / `pytest -q`
