@@ -51,4 +51,7 @@ Denial reason and reopen condition live here only.
 | INTRO-01 | 规则 12「引入纪律」prose-only 无闸：判据是决策质量非文件事实。曾试把筛子 2（接入点）机检——实测 20 子命令中 13 个无到达路径（65% 误报），不可用 | [memo §S9](../memo/archive/2026-09-16-orchestration-form-exploration.md) |
 | ADR-01 | 12 条 ADR 的 `Note` 仍是旧式修订日志（①②③…）；AUTHORING 已定「修订痕迹全进 `Amended-by`」——迁移未做，无实测危害 | [0006](../adr/0006-mcp-foreign-harness-injection.md)（已迁样板） |
 | NEXT-01 | `[NEXT] state=seal_ready` 与 `seal_preconditions_error` 是两份源：前者不读封板前置，故 Proposed ADR / 未 done 任务仍在时仍报「可封板」 | [0026](../adr/0026-projection-contract.md) |
+| SYNC-01 | `docs_updated` 标志只含 manual docs：只重生 `docs-index.json` 时 MCP 报 `up_to_date: true`（同一快照实际写了盘）。**CLI 文案已修（2026-09-21，`2026-09-21-M11-fix-memo_review_landing`）**；MCP 字段语义仍窄（reopen 条件见 memo）| [2026-09-21-sync-docs-updated-flag.md](../memo/2026-09-21-sync-docs-updated-flag.md) |
+| PRE-01 | 引用闸（悬空 ADR / 名实一致 / markdown 完整性）**只在提交时**生效（`ADR-0022 §2.2 🅰1`：`pre-commit` 是格式硬闸、`check` 恒静态）；机械提交（审计线/封版的 `--no-verify`，`worktree.py:104`/`seal.py:408`）与 CI 的 `check` 都不跑它。有意留：判定归“提交那一刻”，不因此在 `check` 里长第二份判据面 | [2026-09-21-hookization-surface-inventory.md](../memo/2026-09-21-hookization-surface-inventory.md) |
+| FSM-01 | `state_machine.resolve()` 无生产消费者：状态转移在生产路径上由 `task done` 直写 status + align/seal 事后验合法性（`_ALLOWED_STATUS`）承担。`TRANSITIONS` 反而已有消费者（`summary()` → `k3dge status --json` 观测件）⇒ 表留、`resolve()` 留（删无收益；补“两处相等”类守卫是同义反复） | 同上 |
 | value-22 | `cli/main.py` 单模块超千行（ADR-0003）：体积属实，按 A-1 分块逐程消化，本轮有意留 | [2026-09-20-M10-audit.md](archive/M10/2026-09-20-M10-audit.md) |

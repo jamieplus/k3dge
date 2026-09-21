@@ -926,6 +926,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 from typing import Optional
+from k3dge.engine.state_machine import TaskState
 audit_job_ticket_names(workspace: Path) -> set
     # doc: 棘轮工单票＝本地账 `ticket_task` 记下的路径，不是文件名模式。
 work_pending(tasks: List[MilestoneTask], workspace: Optional[Path]=None) -> List[MilestoneTask]

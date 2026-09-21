@@ -9,8 +9,11 @@ from pathlib import Path
 from typing import List, Optional
 
 from k3dge.engine.milestone_files import _is_doc_aux
+from k3dge.engine.state_machine import TaskState
 
-_ALLOWED_STATUS = frozenset({"idea", "deferred", "in-progress", "done"})
+#: 合法 task status（**派生**，不另写一份词表）：词表的拥有者是 `state_machine.TaskState`，
+#: 这里是它的消费者视图（align/seal 的 `invalid_task_status` 判据也用它）。
+_ALLOWED_STATUS = frozenset(s.value for s in TaskState)
 
 def audit_job_ticket_names(workspace: Path) -> set:
     """棘轮工单票＝本地账 `ticket_task` 记下的路径，不是文件名模式。

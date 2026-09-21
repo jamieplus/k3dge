@@ -252,8 +252,9 @@ def cmd_sync(args: argparse.Namespace) -> int:
     workspace = _find_workspace(Path.cwd())
     changed, docs_updated = sync_all(workspace, domains=args.domains)
     if not changed and not docs_updated:
-        print("[SYNC] Contracts already up to date.")
-        _append_log(workspace, f"[{datetime.datetime.now().isoformat()}] sync -> up-to-date")
+        # 陈述事实：契约无变化 ≠ 本轮没写盘（docs-index 每次 sync 都会重生，见 sync_docs_index）。
+        print("[SYNC] No spec contract changes (derived docs/index are rewritten only when stale).")
+        _append_log(workspace, f"[{datetime.datetime.now().isoformat()}] sync -> no-contract-changes")
         return 0
     for domain in changed:
         print(f"[SYNC] Updated spec contract: {domain}")

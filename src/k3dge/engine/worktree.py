@@ -221,7 +221,7 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
     (base..br] `rebase --onto` 重演到主干头（线提交全是机械件，重演即普通 git）
     再 ff；冲突 ⇒ abort 复原＋升级人工。真 merge 不再使用（审计线模型）。
 
-    **落点机械闸**：ff 主干的**同一瞬间**跑 `run_landing_gate`；红则 `reset --hard`
+    **落点机械闸**：ff 主干的**同一瞬间**跑 `_run_landing_gate`；红则 `reset --hard`
     回滚主干（先验后并）——审计成果仍在线上，交人工/重审。
     accept_dirty：编排进程自己写的件（工单 task/报告落盘/state 文件）——
     守卫防的是"人的未提交工作被卷进去"，不该拦自己刚写的字。

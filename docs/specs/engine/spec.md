@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:ff0a40e57eec5aec7d8264908ce71bdf742ab0fa30a6907e07b3625271bc8a7d`
-- **Last Updated**: 2026-09-20
+- **Contract Hash**: `sha256:14b7368db5f9da4024bef0c9e93829ec487aee36a127864eabe04fcb5ca8615f`
+- **Last Updated**: 2026-09-21
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -622,6 +622,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 from typing import Optional
+from k3dge.engine.state_machine import TaskState
 audit_job_ticket_names(workspace: Path) -> set
 work_pending(tasks: List[MilestoneTask], workspace: Optional[Path]=None) -> List[MilestoneTask]
 STATUS_RE = re.compile('-\\s+\\*\\*Status\\*\\*:\\s*([\\w-]+)', re.IGNORECASE)

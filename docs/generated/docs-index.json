@@ -313,6 +313,22 @@
       "tokens": "Memo: gap-trap 吸收评估（proven-red / PR-body / 多语 gate / \"无闸规则即缺陷\"）"
     },
     {
+      "path": "docs/memo/2026-09-21-hookization-surface-inventory.md",
+      "type": "memo",
+      "id": "2026-09-21-hookization-surface-inventory",
+      "title": "Memo: 硬编码 → 生命周期钩子：可拆面盘点与取舍",
+      "status": "",
+      "tokens": "Memo: 硬编码 → 生命周期钩子：可拆面盘点与取舍"
+    },
+    {
+      "path": "docs/memo/2026-09-21-sync-docs-updated-flag.md",
+      "type": "memo",
+      "id": "2026-09-21-sync-docs-updated-flag",
+      "title": "Memo: `sync` 的 `docs_updated` 标志不含索引写盘 —— 打印/MCP 说\"无改动\"，同一快照其实改了文件",
+      "status": "",
+      "tokens": "Memo: `sync` 的 `docs_updated` 标志不含索引写盘 —— 打印/MCP 说\"无改动\"，同一快照其实改了文件"
+    },
+    {
       "path": "docs/protocols/audit_default.md",
       "type": "protocols",
       "id": "audit_default",
@@ -487,6 +503,14 @@
       "title": "合线 rebase 后 `_baseline_covers` 把本轮审计判成旧单，再建单死锁封板",
       "status": "done",
       "tokens": "合线 rebase 后 `_baseline_covers` 把本轮审计判成旧单，再建单死锁封板"
+    },
+    {
+      "path": "docs/tasks/2026-09-21-M11-fix-memo_review_landing.done.md",
+      "type": "tasks",
+      "id": "2026-09-21-M11-fix-memo_review_landing.done",
+      "title": "SYNC-01 文案不实 + task 状态词表双源 + 落点闸 docstring 错名",
+      "status": "done",
+      "tokens": "SYNC-01 文案不实 + task 状态词表双源 + 落点闸 docstring 错名"
     }
   ]
 }
