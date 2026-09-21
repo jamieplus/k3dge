@@ -74,6 +74,23 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
                     "状态刚改名 → 同步改文档表；确属新增实验态 → 仍要写进表（闭集是给人看的）"],
         "pointers": ["docs/architecture/overview.md §6", "engine/nextstep.py", "engine/state_machine.py"],
     },
+    "EXTRACTOR_PLUGIN_STALE": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "k3dge extractor sync（按 .agent/extractors.toml 重生 .agent/extractors/*.py）",
+        "fact": "抽取器插件与配置不一致（{languages}）——插件是配置的**渲染物**，改了配置没 sync 就会"
+                "用旧规则抽接口（契约哈希随之失真）",
+        "options": ["k3dge extractor sync（重生插件）",
+                    "配置本不该变 → 回退 .agent/extractors.toml 的改动"],
+        "pointers": [".agent/extractors.toml", "k3dge extractor sync", "docs/specs/sync/spec.md"],
+    },
+    "DOCS_TOML_KEY_UNKNOWN": {
+        "severity": "warn", "fix": "judgment",
+        "fact": "`.agent/docs.toml` 的 `{key} = true` 没有落点——键表由 `scripts/generate-docs.sh` 的 `gen` 行持有，"
+                "写下脚本不认识的键（或目标文件尚未生成）只会静默落空",
+        "options": ["收尾时跑 `./scripts/generate-docs.sh`（按配置生成桩）",
+                    "键写错了 → 改成脚本支持的键（见该脚本的 gen 行）"],
+        "pointers": [".agent/docs.toml", "scripts/generate-docs.sh"],
+    },
     "ARCH_TABLE_DRIFT": {
         "severity": "block", "fix": "judgment",
         "fact": "`{path}` 的域表与 `.agent/manifest.json` 不一致（`{domain}` 的 `{col}`）——表行是事实投影"

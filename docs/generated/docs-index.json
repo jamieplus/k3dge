@@ -521,6 +521,14 @@
       "tokens": "悬空生成路径归位：生成物新鲜度闸 + README layout 并入 sync + 删 changelog 死簇 + 架构 seal 收口"
     },
     {
+      "path": "docs/tasks/2026-09-21-M11-fix-drift_gates_batch.done.md",
+      "type": "tasks",
+      "id": "2026-09-21-M11-fix-drift_gates_batch.done",
+      "title": "同批小闸：状态表 priority 数字对账 + 抽取器插件新鲜度 + docs.toml 键落点",
+      "status": "done",
+      "tokens": "同批小闸：状态表 priority 数字对账 + 抽取器插件新鲜度 + docs.toml 键落点"
+    },
+    {
       "path": "docs/tasks/2026-09-21-M11-fix-hooks_reach_downstream.done.md",
       "type": "tasks",
       "id": "2026-09-21-M11-fix-hooks_reach_downstream.done",

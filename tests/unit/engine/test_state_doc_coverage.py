@@ -29,7 +29,7 @@ def _make_repo(tmp: Path) -> Path:
 
 def _full_overview() -> str:
     lines = ["# Arch", "", "## 6. 状态机", ""]
-    lines += [f"| 4 | `{s}` | 是 | … |" for s in sorted(nextstep.STATE_OPTIONS)]
+    lines += [f"| {nextstep.STATE_OPTIONS[s]['priority']} | `{s}` | 是 | … |" for s in sorted(nextstep.STATE_OPTIONS)]
     lines += [f"| 现态 `{s.value}` | 迁移 | 次态 |" for s in state_machine.TaskState]
     return "\n".join(lines) + "\n"
 

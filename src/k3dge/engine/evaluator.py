@@ -360,6 +360,10 @@ class ConsistencyEngine:
 
         violations.extend(self._check_generated_projections(manifest))
 
+        violations.extend(self._check_extractor_plugins())
+
+        violations.extend(self._check_docs_toml())
+
         violations.extend(self._check_architecture_tables(manifest))
 
         violations.extend(self._check_state_doc_coverage())
@@ -957,17 +961,30 @@ class ConsistencyEngine:
         if not any(f"`{s}`" in text for s in states):
             return []
         missing = [s for s in states if f"`{s}`" not in text]
-        if not missing:
-            return []
-        return [
-            Violation(
-                "ARCH_STATE_DOC_DRIFT",
-                f"{rel} 未列全状态闭集（缺 {missing}）——状态源在 `engine/nextstep.STATE_OPTIONS` / "
-                f"`engine/state_machine.TaskState`，文档缺项等于静默过时",
-                file_path=rel,
-                detail={"path": rel, "missing": missing},
+        out: List[Violation] = []
+        if missing:
+            out.append(
+                Violation(
+                    "ARCH_STATE_DOC_DRIFT",
+                    f"{rel} 未列全状态闭集（缺 {missing}）——状态源在 `engine/nextstep.STATE_OPTIONS` / "
+                    f"`engine/state_machine.TaskState`，文档缺项等于静默过时",
+                    file_path=rel,
+                    detail={"path": rel, "missing": missing},
+                )
             )
-        ]
+        # 表里写了 priority 就要与代码一致（**数字**也漂移过：2026-09-21 发现旧文写反了 ratchet_open）
+        for prio, state in re.findall(r"^\|\s*(\d+)\s*\|\s*`([a-z_]+)`\s*\|", text, re.MULTILINE):
+            want = nextstep.STATE_OPTIONS.get(state, {}).get("priority")
+            if want is not None and int(prio) != int(want):
+                out.append(
+                    Violation(
+                        "ARCH_STATE_DOC_DRIFT",
+                        f"{rel} 的 `{state}` priority 写成 {prio}，代码是 {want}",
+                        file_path=rel,
+                        detail={"path": rel, "state": state, "got": int(prio), "want": int(want)},
+                    )
+                )
+        return out
 
     def _check_architecture_tables(self, manifest: Manifest) -> List[Violation]:
         """设计文档里的**域表**必须与 manifest 对齐（表行是事实，不是散文）。
@@ -1020,6 +1037,79 @@ class ConsistencyEngine:
                                         "got": got, "want": want},
                             )
                         )
+        return out
+
+    def _check_extractor_plugins(self) -> List[Violation]:
+        """`.agent/extractors/<lang>.py` 必须是 `.agent/extractors.toml` 的**当前渲染**（改了配置没 sync ⇒ 静默用过时插件）。"""
+        try:
+            from k3dge.engine import extractor_gen
+
+            ws = self.workspace_root
+            if not ((ws / ".agent" / "extractors.toml").is_file() or (ws / ".agent" / "extractors").is_dir()):
+                return []
+            missing = []
+            for name, row in extractor_gen.resolve_languages(ws).items():
+                dest = ws / extractor_gen.PLUGDIR_REL / f"{name}.py"
+                want = extractor_gen.render_plugin(name, row)
+                got = dest.read_text(encoding="utf-8") if dest.is_file() else None
+                if got != want:
+                    missing.append(name)
+            if not missing:
+                return []
+            return [
+                Violation(
+                    "EXTRACTOR_PLUGIN_STALE",
+                    f"抽取器插件与配置不一致（{missing}）——由 `k3dge extractor sync` 重生",
+                    file_path=extractor_gen.PLUGDIR_REL,
+                    detail={"path": extractor_gen.PLUGDIR_REL, "languages": missing},
+                )
+            ]
+        except Exception as exc:
+            return [
+                Violation(
+                    "EXTRACTOR_PLUGIN_STALE",
+                    f"extractor plugin check crashed: {exc}",
+                    file_path=".agent/extractors",
+                    detail={"path": ".agent/extractors", "reason": str(exc)},
+                )
+            ]
+
+    def _check_docs_toml(self) -> List[Violation]:
+        """`.agent/docs.toml` 的 `= true` 键必须真的会被 `scripts/generate-docs.sh` 处理，且目标文件在。
+
+        键表**不在这里另造一份**：直接从写脚本自己的 `gen "<key>" "<file>" "<title>"` 行读
+        （写侧是唯一声明处）；读不到任何 `gen` 行 ⇒ 跳过（脚本形态变了不误报）。
+        """
+        cfg = self.workspace_root / ".agent" / "docs.toml"
+        script = self.workspace_root / "scripts" / "generate-docs.sh"
+        if not cfg.is_file() or not script.is_file():
+            return []
+        try:
+            table = dict(
+                (k, f) for k, f, _t in re.findall(r'gen\s+"([a-z_]+)"\s+"([^"]+)"\s+"([^"]*)"', script.read_text(encoding="utf-8"))
+            )
+            enabled = re.findall(r"^\s*([a-z_]+)\s*=\s*true\b", cfg.read_text(encoding="utf-8"), re.MULTILINE)
+        except (OSError, UnicodeDecodeError):
+            return []
+        if not table:
+            return []
+        out: List[Violation] = []
+        for key in enabled:
+            target = table.get(key)
+            if key == "readme":
+                target = "README.md"   # readme 走专门分支（刷新布局/基础版），不在 gen 表里
+            if target is None:
+                out.append(
+                    Violation(
+                        "DOCS_TOML_KEY_UNKNOWN",
+                        f"`.agent/docs.toml` 的 `{key} = true` 不会被 `scripts/generate-docs.sh` 处理（键表见该脚本的 gen 行）",
+                        file_path=".agent/docs.toml",
+                        detail={"path": ".agent/docs.toml", "key": key},
+                    )
+                )
+                continue
+            # 只查"键脚本认不认识"：`= true` 而文件尚未生成是**收尾流程的常态**（`generate-docs.sh` 在
+            # 工程收尾时才落桩），报它会把每个刚 init 的仓都打红。
         return out
 
     def _check_domain_imports(self, domain: str, manifest: Manifest) -> List[Violation]:
