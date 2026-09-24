@@ -57,7 +57,7 @@ def test_seal_preconditions_default_and_override():
         # （报告降为可选产物、边界改由 `tag <M>=<B>` 表达）
         assert gates.preconditions(ws, "seal") == [
             "tasks_all_done", "align_pass", "guides_filled",
-            "adrs_all_accepted", "adr_landed", "docs_normalized",
+            "adrs_all_accepted", "adr_landed", "adr_amend_format", "docs_normalized",
         ]
         # 三相位＝声明序：预审(full_matrix) → 审计(audit) → 审核后(archive/version_bump/seal_record/…)
         assert gates.actions(ws, "seal") == [

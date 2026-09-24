@@ -122,7 +122,7 @@
   "actions": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 185
+      "line": 186
     }
   ],
   "adr_landed": [
@@ -152,7 +152,13 @@
   "all_stage_refs": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 172
+      "line": 173
+    }
+  ],
+  "amend_format": [
+    {
+      "file": "src/k3dge/engine/adr_gate.py",
+      "line": 185
     }
   ],
   "analyze_adr_coverage": [
@@ -692,7 +698,7 @@
   "decl": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 70
+      "line": 71
     }
   ],
   "describe_extractors": [
@@ -810,7 +816,7 @@
   "format_seal_trailers": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 324
+      "line": 325
     }
   ],
   "format_version": [
@@ -822,7 +828,7 @@
   "get": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 151
+      "line": 152
     }
   ],
   "get_changed_files": [
@@ -918,7 +924,7 @@
   "head_commit": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 318
+      "line": 319
     }
   ],
   "index_path": [
@@ -1044,13 +1050,13 @@
   "kind": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 77
+      "line": 78
     }
   ],
   "legacy_config_present": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 146
+      "line": 147
     }
   ],
   "lifecycle_next": [
@@ -1080,7 +1086,7 @@
   "load": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 123
+      "line": 124
     }
   ],
   "load_all": [
@@ -1194,7 +1200,7 @@
   "on_error": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 81
+      "line": 82
     }
   ],
   "open_ratchet_jobs": [
@@ -1242,7 +1248,7 @@
   "parse_seal_trailers": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 336
+      "line": 337
     }
   ],
   "parse_sidecar": [
@@ -1290,7 +1296,7 @@
   "preconditions": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 156
+      "line": 157
     }
   ],
   "premature_archive_hint": [
@@ -1416,7 +1422,7 @@
   "render_checklist": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 274
+      "line": 275
     }
   ],
   "render_manual_docs": [
@@ -1524,7 +1530,7 @@
   "run_phase": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 99
+      "line": 100
     }
   ],
   "run_schema_gate": [
@@ -1548,7 +1554,7 @@
   "satisfied_ids": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 86
+      "line": 87
     }
   ],
   "scaffold": [
@@ -1596,13 +1602,13 @@
   "seal_checklist": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 239
+      "line": 240
     }
   ],
   "seal_milestone": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 444
+      "line": 445
     }
   ],
   "seal_preconditions_error": [
@@ -1620,7 +1626,7 @@
   "seal_record": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 414
+      "line": 415
     }
   ],
   "search": [
@@ -1680,7 +1686,7 @@
   "stages": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 161
+      "line": 162
     }
   ],
   "strip_code_spans": [
@@ -1744,7 +1750,7 @@
   "tag_audit_baseline": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 353
+      "line": 354
     }
   ],
   "tasks_after_boundary": [
@@ -1768,7 +1774,7 @@
   "unmet_seal_preconditions": [
     {
       "file": "src/k3dge/engine/seal.py",
-      "line": 263
+      "line": 264
     }
   ],
   "utc_minute": [

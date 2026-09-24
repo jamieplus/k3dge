@@ -89,7 +89,8 @@ DEFAULTS: Dict[str, Any] = {
         # 已移出（ADR-0004 §2.1.3/§2.1.9/§2.1.10）：报告存在性（`audit_closed`/`evidence_chain`）
         # 与基线新鲜度（`audit_fresh`）——报告降为可选产物，边界由 `tag <M>=<B>` 表达。
         "seal": {"preconditions": ["tasks_all_done", "align_pass", "guides_filled",
-                                   "adrs_all_accepted", "adr_landed", "docs_normalized"],
+                                   "adrs_all_accepted", "adr_landed", "adr_amend_format",
+                                   "docs_normalized"],
                  "actions": ["full_matrix", "audit", "archive", "version_bump",
                              "closure_note", "seal_record", "prune"]},
         "align": {"preconditions": ["tasks_all_done"], "actions": ["full_matrix"]},

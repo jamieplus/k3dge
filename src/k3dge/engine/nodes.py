@@ -36,6 +36,7 @@ NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {
     "guides_filled": {"kind": "projection", "on_error": "stop"},
     "adrs_all_accepted": {"kind": "projection", "on_error": "stop"},
     "adr_landed": {"kind": "projection", "on_error": "stop"},
+    "adr_amend_format": {"kind": "projection", "on_error": "stop"},   # ADR amend/footnote 形态（2026-09-24）
     "docs_normalized": {"kind": "projection", "on_error": "stop"},   # 只读检测（doc_fix.scan）
     # --- seal 动作（顺序＝声明序＝ADR-0004 §2.1.9 的三相位）---
     # `satisfies`：该动作会满足哪个前置闸（声明式，供"封板清单"区分

@@ -105,7 +105,7 @@ transports = [
 # 预审＝进**审计**的门槛（ADR-0004 §2.1.9 相位 1）。`align_pass` 由第一个动作
 # `full_matrix` 满足（[nodes.full_matrix].satisfies）⇒ 清单显示 ⚙️，不需预先手跑 align。
 preconditions = ["tasks_all_done", "align_pass", "guides_filled", "adrs_all_accepted",
-                 "adr_landed", "docs_normalized"]   # 耐久＝闸：规约化须在封板前做完
+                 "adr_landed", "adr_amend_format", "docs_normalized"]   # 耐久＝闸：规约化须在封板前做完
 # 顺序＝三相位：预审(full_matrix) → 审计(audit) → 审核后(archive + 收摊清单 + 派生件清理)
 # 已移出前置闸：audit_closed / evidence_chain（报告降为可选产物）、audit_fresh（边界改由
 # `tag <M>=<B>` 表达）——见 ADR-0004 §2.1.3/§2.1.9/§2.1.10。

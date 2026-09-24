@@ -229,6 +229,7 @@ def _seal_gate_registry(workspace: Path, milestone_id: str) -> dict:
         ),
         "adrs_all_accepted": lambda _ctx: adr_gate.adrs_all_accepted(workspace),
         "adr_landed": lambda _ctx: adr_gate.adr_landed(workspace),
+        "adr_amend_format": lambda _ctx: adr_gate.amend_format(workspace),
         "docs_normalized": lambda _ctx: _docs_normalized_error(workspace),
     }
     ctx = {"workspace": workspace, "milestone_id": milestone_id,
