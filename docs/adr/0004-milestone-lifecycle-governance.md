@@ -2,9 +2,9 @@
 Status: Accepted
 Supersedes: -
 Amended-by:
-  - 🅰3 | Core Maintainer | 2026-09-21 | 相位 3 先刷**纯投影**、不跑整条 `sync`（事实源写归审前）；派生件新鲜度归闸（`DOC_INDEX_STALE`/`DOCS_GENERATED_STALE`/`SYMBOL_INDEX_STALE`/`EXTRACTOR_PLUGIN_STALE`）+ `k3dge where` 自愈
-  - 🅰2 | Core Maintainer | 2026-09-20 | `degraded-manual` 的定义扩到「**manual 传输**（不论它在链里是不是首选）」——判"有没有独立透镜"（事实），不判"相对预期链的位置"
   - 🅰1 | Core Maintainer | 2026-09-20 | 审计＝封版主体：唯一入口 `seal`（预审 align → 审计 → 审核后自动化）；版号由**审计正常返回**推进；边界＝审计基线（`tag <M> = <B>`），基线之后归下一里程碑；报告降级为可选产物；完成记录＝封版提交 trailer；运行态与 durable 分层；CHANGELOG 由提交区间生成
+  - 🅰2 | Core Maintainer | 2026-09-20 | `degraded-manual` 的定义扩到「**manual 传输**（不论它在链里是不是首选）」——判"有没有独立透镜"（事实），不判"相对预期链的位置"
+  - 🅰3 | Core Maintainer | 2026-09-21 | 相位 3 先刷**纯投影**、不跑整条 `sync`（事实源写归审前）；派生件新鲜度归闸（`DOC_INDEX_STALE`/`DOCS_GENERATED_STALE`/`SYMBOL_INDEX_STALE`/`EXTRACTOR_PLUGIN_STALE`）+ `k3dge where` 自愈
 Landed-by: src/k3dge/engine/seal_flow.py
 Date: 2026-08-23
 Deciders: Core Maintainer

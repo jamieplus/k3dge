@@ -35,6 +35,10 @@ FIXABLE_RULES: Tuple[str, ...] = (
     "MD_CRLF",
     "MD_NO_FINAL_NEWLINE",
     "TASK_BODY_META_REDUNDANT",
+    # ADR amend/footnote 形态（2026-09-24）：这些都是**固定规则**，不需要 agent 参与
+    "ADR_AMEND_ORDER",            # 条目前缀补齐 + 按 append 序（升序）重排
+    "ADR_FOOTNOTE_TAIL",          # 脚注定义移到文末
+    "ADR_AMEND_MARKER_TEXT",      # 正文里的"（🅰N，…）"→ 对应脚注引用
 )
 
 #: 不扫的目录：派生面/历史面/退役面（各有其权威源，改它们没意义或有害）
@@ -61,6 +65,10 @@ def managed_docs(workspace: Path) -> List[Path]:
 def _codes(rel: str, text: str) -> List[str]:
     codes = [c for c, _ in pure_refs.check_markdown_text(text, rel)]
     codes += [c for c, _ in pure_refs.check_task_body_meta_redundant(rel, text)]
+    if rel.startswith("docs/adr/"):
+        from k3dge.engine.pure_schema import check_amend
+
+        codes += [c for c, _, _ in check_amend({"enabled": True}, {}, Path(rel).name, text)]
     return [c for c in codes if c in FIXABLE_RULES]
 
 
@@ -77,10 +85,73 @@ def _fix(rel: str, text: str, codes: List[str]) -> Tuple[str, List[str]]:
     if "TASK_BODY_META_REDUNDANT" in codes:
         out = _BODY_META_RE.sub("", out)
         applied.append("TASK_BODY_META_REDUNDANT")
+    if "ADR_AMEND_ORDER" in codes:
+        out = _fix_amend_order(out)
+        applied.append("ADR_AMEND_ORDER")
+    if "ADR_FOOTNOTE_TAIL" in codes:
+        out = _fix_footnote_tail(out)
+        applied.append("ADR_FOOTNOTE_TAIL")
+    if "ADR_AMEND_MARKER_TEXT" in codes:
+        out = _fix_marker_text(out)
+        applied.append("ADR_AMEND_MARKER_TEXT")
     if "MD_NO_FINAL_NEWLINE" in codes:
         out = out.rstrip("\n") + "\n"
         applied.append("MD_NO_FINAL_NEWLINE")
     return out, applied
+
+
+def _fix_amend_order(text: str) -> str:
+    """补 `🅰N |` 前缀 + 按 append 序（升序）重排 `Amended-by` 列表（确定性）。"""
+    m = re.search(r"^Amended-by:\s*\n((?:\s+-.*\n)+)", text, re.M)
+    if not m:
+        return text
+    entries = [ln.rstrip("\n") for ln in m.group(1).splitlines() if ln.strip()]
+    fixed = []
+    for ln in entries:
+        mm = re.match(r"^(\s*-\s*)(\d+)(\s*\|.*)$", ln)
+        fixed.append(f"{mm.group(1)}🅰{mm.group(2)}{mm.group(3)}" if mm else ln)
+    fixed.sort(key=lambda ln: int(re.search(r"🅰(\d+)", ln).group(1)) if "🅰" in ln else 0)
+    return text[:m.start(1)] + "\n".join(fixed) + "\n" + text[m.end(1):]
+
+
+def _fix_footnote_tail(text: str) -> str:
+    """把 `[^🅰…]:` 定义块（含缩进续行）整体移到文末（确定性；保持定义间原有顺序）。"""
+    lines = text.splitlines()
+    blocks: List[List[str]] = []
+    keep: List[str] = []
+    i = 0
+    while i < len(lines):
+        if lines[i].startswith("[^🅰"):
+            blk = [lines[i]]
+            i += 1
+            while i < len(lines) and (not lines[i].strip() or lines[i].startswith((" ", "\t"))):
+                blk.append(lines[i])
+                i += 1
+            while blk and not blk[-1].strip():
+                blk.pop()
+            blocks.append(blk)
+            continue
+        keep.append(lines[i])
+        i += 1
+    while keep and not keep[-1].strip():
+        keep.pop()
+    for blk in blocks:
+        keep += [""] + blk
+    return "\n".join(keep).rstrip("\n") + "\n"
+
+
+def _fix_marker_text(text: str) -> str:
+    """`（🅰N，…）` → 该 N 的**唯一**脚注引用；N 有多个定义或无定义时不动（留闸报）。"""
+    defs: Dict[str, List[str]] = {}
+    for m in re.finditer(r"^\[\^(🅰\d+)\.(\d+)\]:", text, re.M):
+        defs.setdefault(m.group(1), []).append(m.group(2))
+
+    def sub(m):
+        n = m.group(1)
+        ids = defs.get(n) or []
+        return f"[^{n}.{ids[0]}]" if len(ids) == 1 else m.group(0)
+
+    return re.sub(r"（(🅰\d+)[，,][^）]*）", sub, text)
 
 
 def scan(workspace: Path) -> List[Dict[str, str]]:

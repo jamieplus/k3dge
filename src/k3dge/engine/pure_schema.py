@@ -279,6 +279,63 @@ def check_index_ref(
     return []
 
 
+def check_amend(block: Any, codes: Dict[str, Any], filename: str, text: str) -> List[Check]:
+    """ADR `Amended-by` 与 footnote 标记的形态（2026-09-24）。
+
+    为什么进 schema 引擎而不是只挂 seal：`k3dge check` 才是**平时**的闸；只挂 seal 的话，
+    漂移要活到封板才红（实测：注掉一个 `[^🅰2.1]` 引用后 `k3dge check` 仍 GREEN）。
+    权威形态＝k3ge 自家 ADR（`- 🅰N | 席位 | 日期 | 简述`，降序；定义集中在文末）。
+
+    判据：① 条目前缀 `- 🅰N |`；② 号唯一且单调；③ 引用/定义双向闭合（引用只从非定义行取）；
+    ④ 定义行全在最后一个 `## ` 之后。
+    """
+    if not block:
+        return []
+    c_order = code_for((codes or {}), "amend_order", "ADR_AMEND_ORDER")
+    c_tail = code_for((codes or {}), "footnote_tail", "ADR_FOOTNOTE_TAIL")
+    c_marker = code_for((codes or {}), "amend_marker_text", "ADR_AMEND_MARKER_TEXT")
+    c_ref = code_for((codes or {}), "amend_ref", "ADR_AMEND_REF")
+    c_orphan = code_for((codes or {}), "footnote_orphan", "ADR_FOOTNOTE_ORPHAN")
+    out: List[Check] = []
+    lines = text.splitlines()
+    nums: List[int] = []
+    body_text = "\n".join(l for l in lines if not l.startswith("[^🅰"))
+    m = re.search(r"^Amended-by:\s*\n((?:\s+-.*\n)+)", text, re.M)
+    if m:
+        for ln in m.group(1).splitlines():
+            if not ln.strip():
+                continue
+            mm = re.match(r"^\s*-\s*🅰(\d+)\s*\|", ln)
+            if not mm:
+                out.append((c_order, f"Amended-by 条目缺 '🅰N |' 前缀：{ln.strip()[:48]}", "file"))
+            else:
+                nums.append(int(mm.group(1)))
+        if len(set(nums)) != len(nums):
+            out.append((c_order, f"Amended-by 号重复：{sorted(nums)}", "file"))
+        elif nums != sorted(nums):
+            # 顺序＝**append 序**（升序）：追加一条就是往下列，不倒插、不重排（2026-09-24 定）
+            out.append((c_order, f"Amended-by 号非升序（应为 append 序）：{nums}", "file"))
+        # 每条修订必须在正文被引用（脚注标记或 `> **🅰N 起**` 段级块）
+        for n in sorted(set(nums)):
+            if not re.search(rf"\[\^🅰{n}\.\d+\]", body_text) and \
+               not re.search(rf"\*\*🅰{n}\b", body_text):
+                out.append((c_ref, f"Amended-by 的 🅰{n} 在正文没有引用（脚注标或段级块）", "file"))
+        # 正文不得用带文字的括号标记（`（🅰2，2026-09-21）`）——那是脚注引用的旧写法
+        for m2 in re.finditer(r"（🅰\d+[，,][^）]*）", body_text):
+            out.append((c_marker, f"正文里的括号标记应改为脚注引用：{m2.group(0)[:32]}", "file"))
+    refs = set(re.findall(r"\[\^(🅰\d+\.\d+)\]", body_text))
+    defs = set(re.findall(r"^\[\^(🅰\d+\.\d+)\]:", text, re.M))
+    if defs - refs:
+        out.append((c_orphan, f"脚注定义了却没被引用：{sorted(defs - refs)}", "file"))
+    if refs - defs:
+        out.append((c_orphan, f"脚注引用没有定义：{sorted(refs - defs)}", "file"))
+    last_sec = max((i for i, l in enumerate(lines) if l.startswith("## ")), default=-1)
+    deflines = [i for i, l in enumerate(lines) if l.startswith("[^🅰")]
+    if deflines and not all(i > last_sec for i in deflines):
+        out.append((c_tail, "脚注定义未集中在文末（穿插正文）", "file"))
+    return out
+
+
 def check_content(
     schema: Dict[str, Any],
     filename: str,
@@ -294,6 +351,7 @@ def check_content(
     out += check_section_ordering(schema.get("section_order"), codes, filename, text)
     out += check_frontmatter(schema.get("frontmatter"), codes, filename, text)
     out += check_headers(schema.get("headers"), codes, filename, text)
+    out += check_amend(schema.get("amend"), codes, filename, text)
     return out
 
 

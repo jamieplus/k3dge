@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import List, Optional
@@ -183,47 +184,20 @@ def _mark_superseded(text: str, by_id: str) -> str:
 
 
 def amend_format(workspace: Path) -> Optional[str]:
-    """ADR `Amended-by` 与 footnote 标记的**形态闸**（2026-09-24）。
+    """seal 预审入口：**委托** `pure_schema.check_amend`（与 `k3dge check` 同一实现，避免两套判据）。
 
-    动因（实测，非推测）：k3dit 的 `0001` 条目漏 `🅰` 前缀、正文用 `（🅰2，日期）` 这类非脚注写法、
-    且 `[^🅰2.1]` 定义了却没人引用；`0007` 的 `Amended-by` 号非单调（6 排在 5 前）、脚注定义穿插在
-    §3 与 §4 之间。权威形态＝k3ge 自家 ADR（0004：`- 🅰N | 席位 | 日期 | 简述`，降序，定义集中在文末）。
-
-    判据（对 k3ge 全部 ADR 零违规，故可作硬闸）：
-    ① 条目前缀 `- 🅰N |`；② 号唯一且单调（升/降皆可）；③ 引用与定义双向闭合；
-    ④ 定义行全部位于最后一个 `## ` 之后（不穿插正文）。
+    判据与动因见 `pure_schema.check_amend` 的 docstring；此处只做"扫 ADR 目录 + 汇总一句话"。
     """
+    from k3dge.engine.pure_schema import check_amend
+
     probs: List[str] = []
+    schema_path = Path(workspace) / "docs" / "adr" / ".schema.json"
+    try:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        schema = {}
     for f in _adr_files(workspace):
-        text = f.read_text(encoding="utf-8")
-        lines = text.splitlines()
-        nums: List[int] = []
-        m = re.search(r"^Amended-by:\s*\n((?:\s+-.*\n)+)", text, re.M)
-        if m:
-            for ln in m.group(1).splitlines():
-                if not ln.strip():
-                    continue
-                mm = re.match(r"^\s*-\s*🅰(\d+)\s*\|", ln)
-                if not mm:
-                    probs.append(f"{f.name}: Amended-by 条目缺 '🅰N |' 前缀 → {ln.strip()[:40]}")
-                else:
-                    nums.append(int(mm.group(1)))
-            if len(set(nums)) != len(nums):
-                probs.append(f"{f.name}: Amended-by 号重复 {sorted(nums)}")
-            elif nums and not (nums == sorted(nums) or nums == sorted(nums, reverse=True)):
-                probs.append(f"{f.name}: Amended-by 号非单调 {nums}")
-        # 引用只从**非定义行**取：定义写法 `[^🅰1.1]:` 本身会被引用正则匹配到（否则该方向永远不触发）
-        body_text = "\n".join(l for l in lines if not l.startswith("[^🅰"))
-        refs = set(re.findall(r"\[\^(🅰\d+\.\d+)\]", body_text))
-        defs = set(re.findall(r"^\[\^(🅰\d+\.\d+)\]:", text, re.M))
-        if defs - refs:
-            probs.append(f"{f.name}: 脚注定义了却没被引用 {sorted(defs - refs)}")
-        if refs - defs:
-            probs.append(f"{f.name}: 脚注引用没有定义 {sorted(refs - defs)}")
-        last_sec = max((i for i, l in enumerate(lines) if l.startswith("## ")), default=-1)
-        deflines = [i for i, l in enumerate(lines) if l.startswith("[^🅰")]
-        if deflines and not all(i > last_sec for i in deflines):
-            probs.append(f"{f.name}: 脚注定义未集中在文末（穿插正文）")
+        for code, msg, _scope in check_amend(schema.get("amend"), schema.get("codes") or {},
+                                             f.name, f.read_text(encoding="utf-8")):
+            probs.append(f"{f.name}: {msg}")
     return None if not probs else "ADR amend 形态不合规：" + "；".join(probs[:4])
-
-

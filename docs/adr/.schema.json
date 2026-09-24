@@ -24,6 +24,15 @@
     "frontmatter": "ADR_FRONTMATTER_MISSING",
     "sections": "ADR_SECTIONS_MISSING",
     "section_order": "ADR_SECTION_ORDER",
-    "unique": "ADR_NUMBER_COLLISION"
+    "unique": "ADR_NUMBER_COLLISION",
+    "amend": "ADR_AMEND_FORMAT",
+    "amend_order": "ADR_AMEND_ORDER",
+    "footnote_tail": "ADR_FOOTNOTE_TAIL",
+    "amend_marker_text": "ADR_AMEND_MARKER_TEXT",
+    "amend_ref": "ADR_AMEND_REF",
+    "footnote_orphan": "ADR_FOOTNOTE_ORPHAN"
+  },
+  "amend": {
+    "enabled": true
   }
 }

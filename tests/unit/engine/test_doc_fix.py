@@ -136,3 +136,29 @@ class TestNextHint(unittest.TestCase):
         d = self._ws_with_deviation()
         doc_fix.apply(d)
         self.assertEqual([s for s in _collect_hints(d) if s.state == "doc_fix"], [])
+
+
+def test_adr_amend_rules_are_deterministically_fixable(tmp_path, monkeypatch):
+    """ADR 三规则（顺序/占位括号/脚注位置）都能**确定性修**并幂等——不需要 agent 参与。"""
+    from k3dge.engine import doc_fix
+
+    d = tmp_path / "docs" / "adr"
+    d.mkdir(parents=True)
+    (d / ".schema.json").write_text('{"amend": {"enabled": true}}', encoding="utf-8")
+    p = d / "0001-t.md"
+    p.write_text(
+        "---\nStatus: Accepted\nAmended-by:\n  - 2 | A | 2026-01-02 | b\n  - 1 | B | 2026-01-01 | a\n"
+        "Landed-by: x.py\nDate: 2026-01-01\n---\n\n# ADR-0001: t\n\n## 1. 上下文 (Context)\n\n"
+        "[^🅰1.1]: 修改：甲\n\n## 2. 决策 (Decision)\n\n### 2.4 X（🅰2，2026-01-02）\n\n正文[^🅰1.1]\n"
+        "\n[^🅰2.1]: 修改：乙\n",
+        encoding="utf-8")
+    doc_fix.apply(tmp_path)
+    out = p.read_text(encoding="utf-8")
+    assert "  - 🅰1 | B | 2026-01-01 | a\n  - 🅰2 | A | 2026-01-02 | b" in out     # 前缀 + 升序
+    assert "### 2.4 X[^🅰2.1]" in out or "### 2.4 X[^🅰2" in out               # 括号 → 引用
+    # 定义集中在文末：最后一个非空行是脚注定义，且它位于最后一个 '## ' 之后
+    last_def = [i for i, l in enumerate(out.splitlines()) if l.startswith("[^🅰")][-1]
+    last_sec = [i for i, l in enumerate(out.splitlines()) if l.startswith("## ")][-1]
+    assert last_def > last_sec, out
+    assert doc_fix.scan(tmp_path) == [] or all(x["rule"] not in doc_fix.FIXABLE_RULES
+                                                for x in doc_fix.scan(tmp_path))    # 幂等

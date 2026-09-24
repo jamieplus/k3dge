@@ -128,13 +128,13 @@
   "adr_landed": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 59
+      "line": 60
     }
   ],
   "adrs_all_accepted": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 37
+      "line": 38
     }
   ],
   "advance": [
@@ -158,7 +158,7 @@
   "amend_format": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 185
+      "line": 186
     }
   ],
   "analyze_adr_coverage": [
@@ -182,7 +182,7 @@
   "apply": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 100
+      "line": 171
     }
   ],
   "archived_milestone_tasks": [
@@ -347,6 +347,12 @@
       "line": 521
     }
   ],
+  "check_amend": [
+    {
+      "file": "src/k3dge/engine/pure_schema.py",
+      "line": 282
+    }
+  ],
   "check_completeness": [
     {
       "file": "src/k3dge/engine/state_machine.py",
@@ -356,7 +362,7 @@
   "check_content": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 282
+      "line": 339
     }
   ],
   "check_dangling_adr": [
@@ -368,7 +374,7 @@
   "check_file": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 300
+      "line": 358
     }
   ],
   "check_filename": [
@@ -762,13 +768,13 @@
   "facts_of": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 560
+      "line": 596
     }
   ],
   "fill": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 512
+      "line": 548
     }
   ],
   "find_orphan_adrs": [
@@ -810,7 +816,7 @@
   "fix_kind": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 490
+      "line": 526
     }
   ],
   "format_seal_trailers": [
@@ -936,7 +942,7 @@
   "is_declared": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 500
+      "line": 536
     }
   ],
   "is_screenable_new_doc": [
@@ -1136,7 +1142,7 @@
   "managed_docs": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 46
+      "line": 50
     }
   ],
   "mark_task_done": [
@@ -1326,7 +1332,7 @@
   "projection": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 550
+      "line": 586
     }
   ],
   "prune": [
@@ -1380,7 +1386,7 @@
   "reconcile_supersedes": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 81
+      "line": 82
     }
   ],
   "record_screen_ack": [
@@ -1416,7 +1422,7 @@
   "render": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 524
+      "line": 560
     }
   ],
   "render_checklist": [
@@ -1566,7 +1572,7 @@
   "scan": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 86
+      "line": 157
     }
   ],
   "scan_milestone_tasks": [
@@ -1656,7 +1662,7 @@
   "severity": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 505
+      "line": 541
     }
   ],
   "show_job": [

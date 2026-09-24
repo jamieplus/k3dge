@@ -213,6 +213,42 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
                     "确属历史陈述 → 去掉 `ADR-` 前缀写成事件（如「原 0020 harness 职责划分」）"],
         "pointers": ["docs/adr/obsolete/README.md（退役账本）", "k3dge doc list --type adr"],
     },
+    # --- ADR amend/footnote 形态（pure_schema.check_amend，2026-09-24）---
+    "ADR_AMEND_ORDER": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "`k3dge doc fix`：补 `🅰N |` 前缀 + 按 **append 序（升序）** 重排 Amended-by",
+        "fact": "`{path}` 的 `Amended-by` 前缀缺失/号重复/非升序——纯格式，进程按固定规则修",
+        "options": ["`k3dge doc fix` 自动修（幂等）", "确需非常规顺序 → 改 AUTHORING/schema（改声明，不改闸）"],
+        "pointers": ["docs/adr/AUTHORING.md", "k3dge doc fix"],
+    },
+    "ADR_FOOTNOTE_TAIL": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "`k3dge doc fix`：把 `[^🅰…]:` 定义块整体移到文末",
+        "fact": "`{path}` 的 ADR 脚注定义穿插在正文中——纯排版，进程可修",
+        "options": ["`k3dge doc fix` 自动修", "定义该留在正文 → 改 AUTHORING（改声明，不改闸）"],
+        "pointers": ["docs/adr/AUTHORING.md"],
+    },
+    "ADR_AMEND_MARKER_TEXT": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "`k3dge doc fix`：`（🅰N，…）` → 该 N 的唯一脚注引用",
+        "fact": "`{path}` 正文用了带文字的括号标记，而不是脚注引用——固定写法，进程可修",
+        "options": ["`k3dge doc fix` 自动修", "N 有多个脚注定义（歧义）→ 人/席指定用哪条"],
+        "pointers": ["docs/adr/AUTHORING.md"],
+    },
+    "ADR_AMEND_REF": {
+        "severity": "block", "fix": "judgment",
+        "fix_hint": "在正文描述该改动的那句话尾补 `[^🅰N.M]`（位置需要读懂语义）",
+        "fact": "`{path}` 的某条修订在正文没有任何引用——读者顺号找不到落点",
+        "options": ["补引用（人/席判断落点）", "该修订不该留痕 → 从 Amended-by 删掉并说明"],
+        "pointers": ["docs/adr/AUTHORING.md"],
+    },
+    "ADR_FOOTNOTE_ORPHAN": {
+        "severity": "block", "fix": "judgment",
+        "fix_hint": "定义了却没引用 ⇒ 删定义或补引用；引用了却没定义 ⇒ 补定义",
+        "fact": "`{path}` 的脚注引用与定义不闭合（双向）",
+        "options": ["补齐闭合（人/席）", "确属历史残留 → 删除该定义"],
+        "pointers": ["docs/adr/AUTHORING.md"],
+    },
     # --- markdown 完整性（pure_refs B3）---
     "MD_TRAILING_WS": {
         "severity": "block", "fix": "deterministic",
