@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import json
+
 from k3dge.engine import doc_fix, gate_facts
 
 
@@ -27,6 +29,27 @@ class TestRuleSetConsistency(unittest.TestCase):
         for rule in doc_fix.FIXABLE_RULES:
             self.assertTrue(gate_facts.is_declared(rule), rule)
             self.assertEqual(gate_facts.fix_kind(rule), "deterministic", rule)
+
+    def test_every_deterministic_code_has_a_consumer(self):
+        """**反方向**守卫（2026-09-24 补）：声明'进程可修'的码，必须挂上消费者——
+        要么进 `doc_fix.FIXABLE_RULES`（本模块能改），要么进 `doc_fix.BY_COMMAND`（既有命令修）。
+        动因：新加一条可机检规则时，闸/码都能加，但"谁来修"没人问 ⇒ 会退化成"只红不修"。
+        """
+        for code, spec in gate_facts.GATE_FACTS.items():
+            if gate_facts.fix_kind(code) != "deterministic":
+                continue
+            self.assertTrue(code in doc_fix.FIXABLE_RULES or code in doc_fix.BY_COMMAND,
+                            f"{code} 声明 deterministic 但没有消费者：加 doc_fix 规则或登记 BY_COMMAND")
+
+    def test_nextstep_doc_fix_covers_the_fixable_set(self):
+        """`[NEXT] doc_fix` 是这条链的**引导面**：它必须存在且指向 `k3dge doc fix`（否则红在闸、
+        没人被告知怎么修）。"""
+        from k3dge.engine import nextstep
+
+        spec = nextstep.STATE_OPTIONS.get("doc_fix") or nextstep.GATE_NEXT.get("doc_fix")
+        blob = json.dumps(spec, ensure_ascii=False) if spec else ""
+        self.assertTrue(spec, "nextstep 缺 doc_fix 引导")
+        self.assertIn("k3dge doc fix", blob)
 
     def test_encoding_is_not_in_scope(self):
         """`MD_ENCODING` 属判断类（源编码猜错会损坏文件）⇒ 不得进修复器。"""

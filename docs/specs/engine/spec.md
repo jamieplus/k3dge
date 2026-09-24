@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:88fbd83f7b20f8609a748f5a7640686e9efe0c5cde021dd12951ec19866ee7ca`
+- **Contract Hash**: `sha256:1fb0cee98a17d1d58f714a622124540b00473e561fea472dbc671588fb7d4c69`
 - **Last Updated**: 2026-09-24
 
 ## 1. Domain Boundary & Responsibilities
@@ -174,7 +174,8 @@ from typing import Dict
 from typing import List
 from typing import Tuple
 from k3dge.engine import pure_refs
-FIXABLE_RULES: Tuple[str, ...] = ('MD_TRAILING_WS', 'MD_CRLF', 'MD_NO_FINAL_NEWLINE', 'TASK_BODY_META_REDUNDANT', 'ADR_AMEND_ORDER', 'ADR_FOOTNOTE_TAIL', 'ADR_AMEND_MARKER_TEXT')
+FIXABLE_RULES: Tuple[str, ...] = ('MD_TRAILING_WS', 'MD_CRLF', 'MD_NO_FINAL_NEWLINE', 'TASK_BODY_META_REDUNDANT', 'ADR_AMEND_ORDER', 'ADR_FOOTNOTE_TAIL', 'ADR_AMEND_MARKER_TEXT', 'INCIDENT_ID_REDUNDANT')
+BY_COMMAND: Dict[str, str] = {'DOC_INDEX_STALE': 'k3dge sync', 'CONTRACT_DRIFT': 'k3dge sync', 'CONTRACT_HASH_MISSING': 'k3dge sync', 'ADR_SUPERSEDE_UNRECONCILED': 'k3dge sync', 'VERSION_MISMATCH': 'k3dge version bump', 'EXTRACTOR_PLUGIN_STALE': 'k3dge extractor sync', 'SYMBOL_INDEX_STALE': 'k3dge index', 'DOCS_GENERATED_STALE': 'k3dge sync', 'MCP_JSON_PEER_MISSING': 'k3dge mcp sync'}
 managed_docs(workspace: Path) -> List[Path]
 scan(workspace: Path) -> List[Dict[str, str]]
 apply(workspace: Path, *, dry_run: bool=False) -> Dict[str, object]

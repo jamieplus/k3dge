@@ -182,7 +182,7 @@
   "apply": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 171
+      "line": 198
     }
   ],
   "archived_milestone_tasks": [
@@ -1142,7 +1142,7 @@
   "managed_docs": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 50
+      "line": 65
     }
   ],
   "mark_task_done": [
@@ -1572,7 +1572,7 @@
   "scan": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 157
+      "line": 184
     }
   ],
   "scan_milestone_tasks": [

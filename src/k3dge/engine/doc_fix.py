@@ -39,7 +39,22 @@ FIXABLE_RULES: Tuple[str, ...] = (
     "ADR_AMEND_ORDER",            # 条目前缀补齐 + 按 append 序（升序）重排
     "ADR_FOOTNOTE_TAIL",          # 脚注定义移到文末
     "ADR_AMEND_MARKER_TEXT",      # 正文里的"（🅰N，…）"→ 对应脚注引用
+    "INCIDENT_ID_REDUNDANT",      # 删 frontmatter 里与文件名重复的 `id:` 行（fix_hint 早就这么写，缺实现）
 )
+
+#: 由**既有命令**修的 deterministic 码（不进本模块，避免第二实现）——登记表＝机检的消费者面。
+#: 新码若声明 `fix=deterministic`，必须要么进 FIXABLE_RULES（本模块能改），要么进 BY_COMMAND。
+BY_COMMAND: Dict[str, str] = {
+    "DOC_INDEX_STALE": "k3dge sync",
+    "CONTRACT_DRIFT": "k3dge sync",
+    "CONTRACT_HASH_MISSING": "k3dge sync",
+    "ADR_SUPERSEDE_UNRECONCILED": "k3dge sync",
+    "VERSION_MISMATCH": "k3dge version bump",
+    "EXTRACTOR_PLUGIN_STALE": "k3dge extractor sync",
+    "SYMBOL_INDEX_STALE": "k3dge index",
+    "DOCS_GENERATED_STALE": "k3dge sync",
+    "MCP_JSON_PEER_MISSING": "k3dge mcp sync",
+}
 
 #: 不扫的目录：派生面/历史面/退役面（各有其权威源，改它们没意义或有害）
 _SKIP_PARTS = frozenset({"archive", "generated", "obsolete"})
@@ -85,6 +100,9 @@ def _fix(rel: str, text: str, codes: List[str]) -> Tuple[str, List[str]]:
     if "TASK_BODY_META_REDUNDANT" in codes:
         out = _BODY_META_RE.sub("", out)
         applied.append("TASK_BODY_META_REDUNDANT")
+    if "INCIDENT_ID_REDUNDANT" in codes:
+        out = _fix_incident_id(out)
+        applied.append("INCIDENT_ID_REDUNDANT")
     if "ADR_AMEND_ORDER" in codes:
         out = _fix_amend_order(out)
         applied.append("ADR_AMEND_ORDER")
@@ -98,6 +116,15 @@ def _fix(rel: str, text: str, codes: List[str]) -> Tuple[str, List[str]]:
         out = out.rstrip("\n") + "\n"
         applied.append("MD_NO_FINAL_NEWLINE")
     return out, applied
+
+
+def _fix_incident_id(text: str) -> str:
+    """删 frontmatter 里的 `id:` 行（身份唯一源＝文件名；该键无消费者）。只在首个 frontmatter 块内改。"""
+    m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+    if not m:
+        return text
+    fm = [ln for ln in m.group(1).splitlines() if not re.match(r"^id\s*:", ln)]
+    return "---\n" + "\n".join(fm) + "\n---\n" + text[m.end():]
 
 
 def _fix_amend_order(text: str) -> str:

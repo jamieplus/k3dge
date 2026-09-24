@@ -56,7 +56,7 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 | CHANGELOG 条目 | **不由 `task done` 写**（双写＝漏项/漂移的来源）：封版时由**提交区间**生成（上一里程碑 `tag` .. HEAD 的非机械提交，类型取 conventional 前缀，ADR-0004 §2.1.12）；闸只验不漏项（无前缀的提交进 `uncovered` 告警），写得好归人 |
 | Move/delete fact source | Update all pointers; memo target gone → move back |
 | 票落在边界之后（`[GATE WARN] TASK_MILESTONE_AFTER_BOUNDARY`） | advisory：`k3dge milestone reassign <M> --to <新里程碑>`（frontmatter + 文件名同改，幂等、`--dry-run` 可预览）；不阻断——归属判定归人，闸只说「边界那一版还没有它」 |
-| 新增一条可机检规则（`check`/schema/hook 能红的那种） | 同轮配闸（违规码或消费者）；只写进 `AGENTS.md`/`.agent/rules` 散文、没有到达执行者 → 本轮补闸或标有意留。**不**因此硬阻断人写的散文 |
+| 新增一条可机检规则（`check`/schema/hook 能红的那种） | 同轮配**三件**：①违规码（`engine/gate_facts.py`）②消费者＝修复器（`engine/doc_fix.py` 的 `FIXABLE_RULES`）**或**命令（`doc_fix.BY_COMMAND`）③`[NEXT]` 引导（`engine/nextstep.py` 的 `GATE_NEXT`）。反向机检兜住：`tests/unit/engine/test_doc_fix.py::TestRuleSetConsistency::test_every_deterministic_code_has_a_consumer`（码声明 deterministic 却没消费者 ⇒ 红）。只写进 `AGENTS.md`/`.agent/rules` 散文、没有到达执行者 → 本轮补闸或标有意留。**不**因此硬阻断人写的散文 |
 
 ## 13. Evidence Chain (ADR-0012)
 
