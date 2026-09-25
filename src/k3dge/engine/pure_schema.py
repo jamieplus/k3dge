@@ -284,7 +284,7 @@ def check_amend(block: Any, codes: Dict[str, Any], filename: str, text: str) -> 
 
     为什么进 schema 引擎而不是只挂 seal：`k3dge check` 才是**平时**的闸；只挂 seal 的话，
     漂移要活到封板才红（实测：注掉一个 `[^🅰2.1]` 引用后 `k3dge check` 仍 GREEN）。
-    权威形态＝k3ge 自家 ADR（`- 🅰N | 席位 | 日期 | 简述`，降序；定义集中在文末）。
+    权威形态＝k3dge 自家 ADR（`- 🅰N | 席位 | 日期 | 简述`，降序；定义集中在文末）。
 
     判据：① 条目前缀 `- 🅰N |`；② 号唯一且单调；③ 引用/定义双向闭合（引用只从非定义行取）；
     ④ 定义行全在最后一个 `## ` 之后。
