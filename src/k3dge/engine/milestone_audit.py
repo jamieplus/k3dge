@@ -451,6 +451,55 @@ def _oneshot_audit_leg(
     return status, msg + "\n" + _ns.render_cli()
 
 
+def _bundle_audit_leg(
+    workspace: Path,
+    milestone_id: str,
+    prompt: _Prompt,
+    fresh_baseline: str,
+) -> Tuple[Optional[Tuple[str, str]], str]:
+    """**bundle 审计腿**（ADR-0028 消费方）：冻结基线 → k3dit 路径入口产包 → 消费侧验+落补丁。
+
+    与 ratchet 的区别：不做"工单步进 / 写回重试"——一次性拿到**包**（`code/ report findings
+    patches manifest`），由 k3ge 自己 apply 与落账（ADR-0028 §2.9：k3dit 不接管送审方版本）。
+    返回 `(early, step_status)`：`early` 非 None ⇒ 未闭环，交回 `[NEXT]`；None ⇒ 已闭环，走共用尾。
+    """
+    from k3dge.engine import audit_bundle as ab
+
+    if not ab.find_k3dit(workspace):
+        return _reject_step(
+            workspace, milestone_id, "audit_bundle_no_k3dit",
+            "审计腿声明为 bundle，但找不到 k3dit（设 K3DIT_BIN 或装到 PATH/兄弟仓）"
+            "——声明面与实现面不符时**不得**静默降级成别的形状（ADR-0004 §2.1.11）。"), ""
+
+    out = workspace / ".k3dit" / f"bundle-{(fresh_baseline or 'head')[:12]}"
+    ran = ab.run_path_audit(workspace, out, mode="full")
+    payload = ran.get("payload") or {}
+    if not ran.get("ok"):
+        return _reject_step(workspace, milestone_id, "audit_bundle_run_failed",
+                            f"k3dit 产包失败（rc={ran.get('rc')}）：{ran.get('detail') or ''}"), ""
+    if str(payload.get("status") or "") != "closed" or payload.get("incomplete"):
+        return _reject_step(
+            workspace, milestone_id, "audit_bundle_not_closed",
+            f"k3dit 未闭环（status={payload.get('status')!r} unclosed={payload.get('unclosed')}"
+            f"）⇒ 不得当已审；产物留在 {out} 供人核（ADR-0004 §2.1.9）。"), ""
+
+    res = ab.consume(workspace, out, expect_input=str(workspace))
+    if not res.get("ok"):
+        return _reject_step(workspace, milestone_id, "audit_bundle_consume_failed",
+                            f"消费交付包失败（{res.get('error')}）：{res.get('detail') or ''}"), ""
+    # 落树 + 提交（**不写 Audit-* trailer**：那些由封版相位 3 一次写清，判据只认 git 事实）
+    files = (res.get("apply") or {}).get("files") or []
+    digest = str(res.get("digest") or "")[:12]
+    jid = str((res.get("facts") or {}).get("job_id") or "")
+    commit = ""
+    if files:
+        commit = ab.commit_applied(workspace, f"fix(audit): k3dit 交付包落树（job {jid or '-'}，包 {digest}）",
+                                   files)
+    msg = (f"Milestone {milestone_id}: bundle 审计腿闭环（k3dit job {jid or '-'}，包 {digest}，"
+           f"落 {len(files)} 文件{('，提交 ' + commit[:12]) if commit else ''}）。")
+    return None, msg
+
+
 def run_audit_flow(
     workspace: Path,
     milestone_id: str,
@@ -483,8 +532,16 @@ def run_audit_flow(
 
         fresh_baseline = head_commit(workspace)
 
-    ratchet = _audit_mode(workspace) == "ratchet"
-    if ratchet:
+    _mode = _audit_mode(workspace)
+    if _mode == "bundle":
+        # bundle 审计腿（ADR-0028 消费方）：一次性产包 + 消费，不做棘轮步进。
+        # 闭环后**落到共用尾**（verify 步 + nextstep persist），与棘轮腿同形；未闭环则提前返回。
+        early, _bmsg = _bundle_audit_leg(workspace, milestone_id, prompt, fresh_baseline)
+        if early is not None:
+            return early
+
+    ratchet = _mode in ("ratchet", "bundle")
+    if ratchet and _mode == "ratchet":
         early, _step_status = _ratchet_audit_leg(workspace, milestone_id, prompt, fresh_baseline)
         if early is not None:
             return early

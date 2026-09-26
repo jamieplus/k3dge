@@ -298,8 +298,24 @@ def probe_servers(workspace: Path, timeout: int = 20) -> List[Tuple[str, bool, s
 # ---------------------------------------------------------------------------
 
 
-def _run_cli(workspace: Path, command: str, timeout: int, io) -> TransportResult:
+def _cli_command(command: str, arguments: Optional[dict]) -> str:
+    """把 `{key}` 占位替换成实参（`{bundle}`/`{milestone_id}`/`{path}`…）。
+
+    为什么不用 `str.format`：shell 命令里 `{}`（brace expansion/awk 脚本）很常见，format 会把它们
+    当占位符炸掉。这里只做**已知键**的字面替换，未提供的键原样保留（可见地不生效，好过静默错替换）。
+    """
+    out = command or ""
+    for k, v in (arguments or {}).items():
+        if v is None:
+            continue
+        out = out.replace("{" + str(k) + "}", str(v))
+    return out
+
+
+def _run_cli(workspace: Path, command: str, timeout: int, io,
+             arguments: Optional[dict] = None) -> TransportResult:
     # k3dit:leftover F-4 @line shell=True 属仓内受信配置（席裁有意留）
+    command = _cli_command(command, arguments)
     try:
         proc = subprocess.run(
             command,
@@ -381,7 +397,7 @@ def run_action(
             merged.update(arguments or {})
             res = _run_mcp(workspace, peer, str(t.get("tool", "")), timeout, io, merged)
         elif prov == "cli":
-            res = _run_cli(workspace, str(t.get("command", "")), timeout, io)
+            res = _run_cli(workspace, str(t.get("command", "")), timeout, io, arguments)
         elif prov == "manual":
             # The failed transport above already emitted its own WARN[DOWNGRADE] with
             # to=manual; emitting again here would double-report one downgrade.

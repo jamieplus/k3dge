@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:1fb0cee98a17d1d58f714a622124540b00473e561fea472dbc671588fb7d4c69`
-- **Last Updated**: 2026-09-24
+- **Contract Hash**: `sha256:bae702257ea0ce1293b0eaeb620414b0cee53270bf9133da0d02d7039214d272`
+- **Last Updated**: 2026-09-26
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -63,6 +63,22 @@ token(workspace: Path, when_iso: str) -> str
 line(workspace: Path, who: str='') -> str
 append_to_message(workspace: Path, msg: str, who: str='') -> str
 verify_commit(workspace: Path, h: str) -> Tuple[bool, str]
+from __future__ import annotations
+from pathlib import Path
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+SUPPORTED_BUNDLE_VERSIONS = (1,)
+K3DIT_ENV = 'K3DIT_BIN'
+find_k3dit(workspace: Path) -> Optional[List[str]]
+run_path_audit(workspace: Path, out: Path, *, mode: str='full', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict
+verify_bundle(bundle: Path, *, k3dit: Optional[List[str]]=None, timeout: int=600) -> dict
+bundle_facts(bundle: Path) -> dict
+bundle_digest(bundle: Path) -> str
+apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False) -> dict
+commit_applied(workspace: Path, message: str, files: List[str]) -> str
+consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None) -> dict
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
@@ -777,6 +793,7 @@ stateDiagram-v2
 | TC-ENG-29 | L1 | `.agent/extractors.toml` 改了但 `.agent/extractors/*.py` 未重生（或用旧渲染/手改过） | 违反 `EXTRACTOR_PLUGIN_STALE`；无配置不报 | `tests/unit/engine/test_projection_drift_gates.py::test_hand_edited_plugin_is_violation` |
 | TC-ENG-30 | L1 | `.agent/docs.toml` 有脚本不认识的 `= true` 键，或目标文件不存在 | 违反 `DOCS_TOML_KEY_UNKNOWN`（warn）；读不到 `gen` 行则跳过 | `tests/unit/engine/test_projection_drift_gates.py::test_unknown_key_is_violation` |
 | TC-ENG-31 | L1 | 文档状态表的 priority 数字与 `STATE_OPTIONS` 不符 | 违反 `ARCH_STATE_DOC_DRIFT`（同码，detail 给 got/want） | `tests/unit/engine/test_state_doc_coverage.py::test_full_state_set_passes` |
+| TC-ENG-32 | L1 | k3dit 交付包消费：异版/未闭环/自证失败/脏树/输入身份不符 | 各自 fail-clear 拒绝；标准 `git apply` 按序落补丁、dry-run 零改动 | `tests/unit/engine/test_audit_bundle.py` |
 
 ## 5. Fact-Source Gate Matrix (三元门禁矩阵)
 

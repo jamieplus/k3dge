@@ -177,3 +177,11 @@ kind = "projection"
 on_error = "stop"
 satisfies = ["align_pass"]   # 本动作跑 align 并写 align-pass marker ⇒ 该前置闸由 seal 自己满足
                              # （清单里显示 ⚙️，不算"需你先办"）
+
+# ── bundle 审计腿（ADR-0025 §2.9.6 / k3dit 仓 0028 消费方）─────────────────────────
+# 形状切换＝改一行（role 的 mode）：`oneshot`（缺省）/`ratchet`/`bundle`。
+#   [roles.audit]
+#   bind = "k3dit"
+#   mode = "bundle"      # k3ge 冻结基线 → 调 k3dit 路径入口产包 → 验包 → 按 apply_order 落补丁
+# cli 传输支持已知占位：`command = "k3dit audit --verify {bundle}"`（`{bundle}`/`{milestone_id}`/`{path}`）。
+# 翻转前须知：bundle 腿需要 k3dit 在场（`K3DIT_BIN` 或 PATH/兄弟仓），且会真跑一次完整审计（分钟级、付费）。

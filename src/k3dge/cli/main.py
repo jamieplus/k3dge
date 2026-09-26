@@ -587,6 +587,29 @@ def cmd_audit(args: argparse.Namespace) -> int:
     elif args.audit_action == "materialize":
         r = audit_flow.materialize(workspace, tok or "", getattr(args, "oid", "") or "",
                                    getattr(args, "dest", "") or "")
+    elif args.audit_action == "bundle":
+        # k3dit 交付包消费侧（ADR-0028）：验契约 → 自证 → 标准 `git apply` 落补丁。
+        # 不推进版号、不封板（那些归 seal 相位）；这里只把"意图与证据"变成树上的改动事实。
+        from k3dge.engine import audit_bundle as ab
+
+        bundle = Path(tok) if tok else Path(getattr(args, "bundle_out", "") or (workspace / ".k3dit" / "bundle"))
+        if getattr(args, "run", False) or not (bundle / "manifest.json").is_file():
+            out_dir = Path(getattr(args, "bundle_out", "") or bundle)
+            ran = ab.run_path_audit(workspace, out_dir, mode=getattr(args, "bundle_mode", "full") or "full")
+            print(json.dumps({"stage": "run", "out": str(out_dir),
+                              "rc": ran.get("rc"), "ok": ran.get("ok"),
+                              "payload": ran.get("payload"), "detail": ran.get("detail")},
+                             ensure_ascii=False))
+            if not ran.get("ok"):
+                return 1
+            bundle = out_dir
+        target = Path(getattr(args, "into", "") or workspace).resolve()
+        res = ab.consume(target, bundle, dry_run=bool(getattr(args, "dry_run", False)),
+                         expect_input=str(target))
+        print(json.dumps(res, ensure_ascii=False))
+        _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] audit bundle "
+                               f"{bundle} ok={res.get('ok')} dry={bool(getattr(args, 'dry_run', False))}")
+        return 0 if res.get("ok") else 1
     elif args.audit_action == "advance":
         r = audit_flow.advance_line(workspace, tok or "adhoc",
                                     by=getattr(args, "by", "") or "manual")  # 提版+重钉+推 present
@@ -1159,7 +1182,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_mk.set_defaults(func=cmd_markers)
 
     p_aud = sub.add_parser("audit", help="审计线棘轮：submit/status/show/advance/materialize/close（ADR-0025；工作区=CWD）")
-    p_aud.add_argument("audit_action", choices=["submit", "status", "show", "advance", "materialize", "close"])
+    p_aud.add_argument("audit_action",
+                       choices=["submit", "status", "show", "advance", "materialize", "close", "bundle"])
     p_aud.add_argument("job_or_milestone", nargs="?", default="", help="status/show/materialize:job_id 或里程碑；advance:线名；close:milestone")
     p_aud.add_argument("--milestone", default="", help="submit：挂里程碑 id")
     p_aud.add_argument("--target", action="append", default=[], help="submit：送检路径（可多次）")
@@ -1167,6 +1191,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_aud.add_argument("--by", default="manual", help="advance：调用方身份（hall/修席窗/人），落账可审计")
     p_aud.add_argument("--oid", default="", help="materialize：版本（缺=在办单基线）")
     p_aud.add_argument("--dest", default="", help="materialize：物化目录（默认 .k3dge/mat/<单>/<oid12>）")
+    p_aud.add_argument("--run", action="store_true",
+                       help="bundle：先跑 k3dit 路径入口产包再消费（缺省只消费已存在的包）")
+    p_aud.add_argument("--mode", dest="bundle_mode", choices=["audit-only", "full"], default="full",
+                       help="bundle --run：k3dit 模式（缺省 full＝判读+修+复核）")
+    p_aud.add_argument("--bundle-out", default="", help="bundle --run：产包目录（缺省 .k3dit/bundle）")
+    p_aud.add_argument("--dry-run", action="store_true",
+                       help="bundle：只验契约与 `git apply --check`，不落补丁")
+    p_aud.add_argument("--into", default="", help="bundle：落补丁的目标目录（缺省=当前工作区）")
     p_aud.set_defaults(func=cmd_audit)
     p_mcp.set_defaults(func=cmd_mcp)
 
