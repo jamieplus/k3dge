@@ -28,15 +28,9 @@ class TestCli(unittest.TestCase):
             cwd = os.getcwd()
             os.chdir(d)
             try:
-                rc2 = main(["audit", "submit"])  # 无 .mcp.json ⇒ 对端不可达 ⇒ rc 1，不崩
-                self.assertEqual(rc2, 1)
-                rc3 = main(["audit", "status", "J-ghost"])  # status 半边同样不许 AttributeError
-                self.assertEqual(rc3, 1)
-                rc4 = main(["audit", "show"])  # 读本地账，无单也 ok
-                self.assertEqual(rc4, 0)
-                rc5 = main(["audit", "materialize", "--oid", "HEAD", "--dest", "mat"])
-                self.assertEqual(rc5, 0)  # 只读物化，不碰线
-                self.assertTrue((d / "mat" / "src" / "a.py").is_file())
+                # 对等审计线动词已退休（2026-09-26）：一律**明确拒绝**并给指引（不静默、不崩）
+                for verb in ("submit", "status", "show", "materialize", "close", "advance"):
+                    self.assertEqual(main(["audit", verb, "X"]), 1, verb)
             finally:
                 os.chdir(cwd)
 

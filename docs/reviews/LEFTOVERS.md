@@ -64,3 +64,18 @@ Denial reason and reopen condition live here only.
 | AUDIT-01 | **`milestone_audit` 的 oneshot 形状当前不可达**（`.agent/pipeline.toml` 是 `[roles.audit].mode="ratchet"`，而声明面允许切回 `oneshot`）⇒ 配置相关路径，非死代码；**有意留**（切模式即启用） | 同上 |
 | value-22 | `cli/main.py` 单模块超千行（原 0003，已并入 `ADR-0018 §2.12`）：体积属实，按 A-1 分块逐程消化，本轮有意留 | [2026-09-20-M10-audit.md](archive/M10/2026-09-20-M10-audit.md) |
 
+
+## RATCHET-01 棘轮残余（形状已退休，残留件待清）
+
+- **已做**：`_ratchet_audit_leg`/`_ratchet_audit_step` 删除；`mode="ratchet"` 改为**显式拒绝**（带迁移指引）；
+  `k3dge audit` 的六个对等动词（submit/status/show/advance/materialize/close）改为**拒绝并指路**；棘轮测试类删除，
+  换成"退休拒绝"用例；ADR-0025 §2.9.6 amend 🅰3。
+- **残留（代码在、无人用）**：`engine/audit_flow.py` 里那六个 verb 的实现仍在（测试已删，仅 CLI 入口拒绝）；
+  `open_ratchet_jobs` + `[NEXT] ratchet_open` 状态（既无写入者）与 `docs/protocols/peer_contract.md` §1.4 的棘轮协议。
+- **下一步（要一次做完，别分半）**：删 `audit_flow.py` 的六个 verb 与其私有件（`_load_state`/`_save_state`/`_state_path`/
+  `_find_awaiting`/`_parse_envelope`/`_recent_downgrades`/`STATE_REL`）→ 删 `open_ratchet_jobs` 与 `ratchet_open` 状态
+  （同步 `nextstep.STATE_OPTIONS` + `docs/architecture/overview.md` §6 状态表，闸 `ARCH_STATE_DOC_DRIFT` 会逼你一起改）
+  → 改 `peer_contract.md` §1.4 → 删 AGENTS 该行。
+- **本次两次自伤（如实记）**：① 用 `sed 's/k3ge/k3dge/'` 式**子串**正则删"含 audit_flow 的行"时，连带删掉了
+  `import audit_evidence` 与 `import persist_external_audit_report`（`run_audit_flow` 含该子串）⇒ 由测试当场抓出并修；
+  ② 更早一次替换把 `_attest` 别名/`_rel_within_workspace` 一起删掉（`commit-attest` 崩）。教训：删行用**词边界**，改完立刻跑全量。

@@ -208,69 +208,6 @@ def _audit_mode(workspace: Path, role: str = "audit") -> str:
         return "oneshot"
 
 
-def _ratchet_audit_step(workspace: Path, milestone_id: str, io=None, role: str = "audit",
-                        fresh_baseline: str = "") -> Tuple[str, str]:
-    """审计腿一步（ratchet）：建单→探单→collect→（merge 欠账幂等重试）。一步一返回，进程不等人。
-
-    `fresh_baseline`＝本轮封版基线 B（seal 相位 2 在审计**之前**取的 HEAD）：用来判"本地账里
-    那单是不是**本轮**的审计"——陈旧单不接受（否则旧报告就会充闭环，实测过）。
-    """
-    from k3dge.engine import audit_flow
-    from k3dge.engine import worktree as _wt
-
-    state = audit_flow._load_state(workspace)
-    mine = [j for j in state.get("jobs", []) if j.get("milestone_id") == milestone_id
-            and j.get("role", "audit") == role]
-    pending_merge = [j for j in mine if j.get("state") == "collected" and not j.get("merge_ok", True)]
-    if pending_merge:
-        j = pending_merge[-1]
-        # 编排自家产物（state/checklist/reviews/tasks）不是"人的未提交"；原则性白名单
-        r = _wt.merge_back(workspace, j.get("milestone_id") or "adhoc",
-                           accept_dirty=(audit_flow.STATE_REL, ".agent/audit_checklist.json",
-                                         "docs/reviews/", "docs/tasks/"))
-        if r.get("ok"):
-            j["merge_ok"] = True
-            audit_flow._save_state(workspace, state)
-            return "closed", f"写回重试成功（{r.get('mode')}）。"
-        return "stalled", f"写回仍未闭（{r.get('mode')}）：{r.get('message', '')[:90]}——人工 rebase 后再跑本命令幂等重试。"
-    inflight = [j for j in mine if j.get("state") not in ("collected", "failed")]
-    done = [j for j in mine if j.get("state") == "collected" and j.get("merge_ok", True)]
-    if done:
-        # 先认本轮已闭环：误 submit 留下的 inflight 不得压过 collected（M10 真跑死锁）。
-        ok, why = _closed_job_evidence(workspace, done[-1], fresh_baseline)
-        if ok:
-            return "closed", f"{why}。"
-        _stale_note = f"本地账里那单不算本轮审计（{why}）⇒ 需要本轮新单。"
-    else:
-        _stale_note = ""
-    if inflight:
-        j = inflight[-1]
-        st = audit_flow.peer_status(workspace, j["job_id"], io=io)
-        if not st.get("ok"):
-            return "progress", f"工单 {j['job_id']} 对端不可探：{str(st.get('message', ''))[:80]}"
-        if st.get("escalated"):
-            return "stalled", f"工单 {j['job_id']} 有升级条目 {st['escalated']}：等人 k3dit adjudicate。"
-        if st.get("state") == "done":
-            c = audit_flow.collect_audit(workspace, milestone_id, j["job_id"], io=io)
-            if c.get("ok"):
-                if c.get("state") == "open":
-                    return "open", (f"未尽项报告已落盘 {c.get('report')}（待修 {c.get('pending')}）："
-                                    "需人工/CLI agent 处理未关项后重审（如配对文件只需 `k3dge sync`）。")
-                if c.get("merge", {}).get("ok") is False:
-                    return "stalled", f"报告已落盘但写回未闭：{c['merge'].get('message', '')[:90]}"
-                return "closed", (f"签署报告落盘 {c.get('report')}；写回 "
-                                  f"{c.get('merge', {}).get('mode', 'n/a')}；待修 {c.get('pending')}。")
-            return "progress", f"collect 未通过：{str(c.get('message') or c.get('error') or c.get('state'))[:100]}"
-        return "progress", f"工单 {j['job_id']} 对端态 {st.get('state')}，open={st.get('open', [])}。"
-    r = audit_flow.submit_audit(workspace, milestone_id, io=io, role=role)
-    if not r.get("ok"):
-        reason = str(r.get("detail") or r.get("state"))[:120]
-        return "stalled", f"{_stale_note}建单失败：{reason}"
-    return "progress", (
-        f"{_stale_note}棘轮工单已建：{r['job_id']}（{role} 腿判据在机构侧席位，k3dge 不代笔）。"
-    )
-
-
 def _reject_step(
     workspace: Path,
     milestone_id: str,
@@ -289,34 +226,6 @@ def _reject_step(
     ns = nextstep.next_for_rejection(milestone_id, gates.Rejection(code, msg))
     nextstep.persist(workspace, ns)
     return status, msg + "\n" + ns.render_cli()
-
-
-def _ratchet_audit_leg(
-    workspace: Path,
-    milestone_id: str,
-    prompt: _Prompt,
-    fresh_baseline: str,
-) -> Tuple[Optional[Tuple[str, str]], str]:
-    """棘轮审计腿（ADR-0025）：一次调用推一步，绝不在闸里等席。
-
-    Returns `(early, step_status)`：`early` 非 None ⇒ 步未 closed，直接把 `[NEXT]` 交回调用方；
-    为 None ⇒ 该腿已 `closed`，调用方继续走共用尾（verify / 收口）。
-    """
-    from k3dge.engine import nextstep
-
-    step_status, step_msg = _ratchet_audit_step(
-        workspace, milestone_id, io=prompt.out_stream, fresh_baseline=fresh_baseline)
-    if step_status == "closed":
-        return None, step_status
-    if step_status == "progress":
-        state, width = "ratchet_open", 120
-    elif step_status == "open":
-        state, width = "audit_open", 160
-    else:
-        state, width = "escalated", 0
-    ns = nextstep.NextStep.from_state(
-        state, milestone_id, reasons=[step_msg[:width]] if width else None)
-    return (state, step_msg + "\n" + ns.render_cli()), step_status
 
 
 def _oneshot_audit_leg(
@@ -530,8 +439,9 @@ def run_audit_flow(
     report. Returns (status, message); status ∈ {audited, rejected, escalated}.
     Seal unlocks only after this closes (`run_seal_flow`).
 
-    两套互斥审计形状各归其函数（value-23）：`_ratchet_audit_leg`（棘轮工单步进）与
-    `_oneshot_audit_leg`（produce/verify 循环）；本函数只做前置事实 + 路由。
+    两种审计腿形状各归其函数：`_bundle_audit_leg`（本地命令行工具 k3dit，产包→消费，推荐）与
+    `_oneshot_audit_leg`（显式声明的外部 produce/verify 步，给真正的对等 harness）；本函数只做前置事实 + 路由。
+    （棘轮形状已退休，声明它会被显式拒绝。）
     """
     from k3dge.engine import audit_checklist as ac
     from k3dge.engine import gates as _gates
@@ -550,18 +460,20 @@ def run_audit_flow(
 
     _mode = _audit_mode(workspace)
     if _mode == "bundle":
-        # bundle 审计腿（k3dit 仓 0028 消费方）：一次性产包 + 消费，不做棘轮步进。
-        # 闭环后**落到共用尾**（verify 步 + nextstep persist），与棘轮腿同形；未闭环则提前返回。
+        # bundle 审计腿：k3dit 是**本地命令行工具**（与 `git` 同层）⇒ 按 argv 调用、读包、落树、落账。
+        # 闭环后**落到共用尾**（verify 步 + nextstep persist），与 oneshot 腿同形；未闭环则提前返回。
         early, _bmsg = _bundle_audit_leg(workspace, milestone_id, prompt, fresh_baseline)
         if early is not None:
             return early
+    elif _mode == "ratchet":
+        # 棘轮形状已退休（2026-09-26）：它要的对端 verb（submit/collect/present/status）随 k3dit 的
+        # MCP 服务端面一并消失。**显式拒绝**而不是静默换成别的形状（ADR-0004 §2.1.11）。
+        return _reject_step(
+            workspace, milestone_id, "audit_ratchet_retired",
+            '审计腿声明为 `mode = "ratchet"`，但棘轮形状已退休：改用 `mode = "bundle"`（本地工具 k3dit，'
+            '推荐）或 `mode = "oneshot"`（显式声明外部 produce/verify 步）。')
 
-    ratchet = _mode in ("ratchet", "bundle")
-    if ratchet and _mode == "ratchet":
-        early, _step_status = _ratchet_audit_leg(workspace, milestone_id, prompt, fresh_baseline)
-        if early is not None:
-            return early
-
+    ratchet = False
     # 单报告（ADR-0025 合并审计模块）：一轮 = 一份 12 列；quality 是模块内窗口，
     # 不再是独立 peer/report。ratchet 模式下审计腿已由步进器闭环，streams 空。
     # 外部步读**声明面**（gates [checks.audit].stages_produce/stages_verify），
@@ -569,9 +481,7 @@ def run_audit_flow(
     _produce = _gates.stages(workspace, "audit", "produce")
     _verify = _gates.stages(workspace, "audit", "verify")
     streams = {"audit": (_produce[0] if _produce else "", _verify[0] if _verify else "")}
-    if ratchet:
-        streams.pop("audit", None)
-    elif not _produce:
+    if not _produce:
         # 声明面留空 ⇒ **一次都没跑**（不是"无需审计"）：与 skip 同族，不得当已审——
         # 否则只要仓里有一份旧报告就能判闭环（本会话实测过这个配置层的洞）。
         msg = (
