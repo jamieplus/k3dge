@@ -182,7 +182,7 @@
   "apply_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 188
+      "line": 189
     }
   ],
   "archived_milestone_tasks": [
@@ -278,7 +278,7 @@
   "build_parser": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1040
+      "line": 1044
     }
   ],
   "build_server_params": [
@@ -320,13 +320,13 @@
   "bundle_digest": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 125
+      "line": 126
     }
   ],
   "bundle_facts": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 106
+      "line": 107
     }
   ],
   "cache_observability": [
@@ -530,19 +530,19 @@
   "cmd_check_msg": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 925
+      "line": 929
     }
   ],
   "cmd_commit": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 863
+      "line": 867
     }
   ],
   "cmd_commit_attest": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 912
+      "line": 916
     }
   ],
   "cmd_doc": [
@@ -560,13 +560,13 @@
   "cmd_incident": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 941
+      "line": 945
     }
   ],
   "cmd_index": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 854
+      "line": 858
     }
   ],
   "cmd_init": [
@@ -578,7 +578,7 @@
   "cmd_markers": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 603
+      "line": 607
     }
   ],
   "cmd_mcp": [
@@ -602,19 +602,19 @@
   "cmd_milestone": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 637
+      "line": 641
     }
   ],
   "cmd_search": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 811
+      "line": 815
     }
   ],
   "cmd_status": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 963
+      "line": 967
     }
   ],
   "cmd_sync": [
@@ -632,7 +632,7 @@
   "cmd_verify_attest": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 918
+      "line": 922
     }
   ],
   "cmd_version": [
@@ -644,7 +644,7 @@
   "cmd_where": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 841
+      "line": 845
     }
   ],
   "code_for": [
@@ -662,7 +662,7 @@
   "commit_applied": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 218
+      "line": 219
     }
   ],
   "completeness_violations": [
@@ -686,7 +686,7 @@
   "consume": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 237
+      "line": 238
     }
   ],
   "consume_unreleased": [
@@ -1156,7 +1156,7 @@
     },
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1258
+      "line": 1264
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
@@ -1226,7 +1226,7 @@
   "old_name_warnings": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 780
+      "line": 784
     }
   ],
   "on_error": [
@@ -1526,7 +1526,7 @@
   "run_audit_flow": [
     {
       "file": "src/k3dge/engine/milestone_audit.py",
-      "line": 428
+      "line": 460
     }
   ],
   "run_milestone_alignment": [
@@ -1824,7 +1824,7 @@
   "verify_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 92
+      "line": 93
     }
   ],
   "verify_commit": [

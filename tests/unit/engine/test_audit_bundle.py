@@ -184,3 +184,67 @@ def test_bundle_audit_leg_routes_and_fails_clear(tmp_path, monkeypatch):
                             capture_output=True, text=True).stdout
     assert ".k3dit" not in status and ".k3ge" not in status, status
     assert not (ws / ".k3dit").exists()
+
+
+def test_run_path_audit_passes_mode_and_pins(tmp_path, monkeypatch):
+    """工具参数必须**传到位**：`--mode` 与 `--pins` 是 k3dit 的两个运行旋钮（纯审计/钉只随包）。"""
+    seen = {}
+
+    def _fake_run(argv, cwd, timeout):
+        seen["argv"] = argv
+        return 0, '{"ok": true, "status": "closed"}'
+
+    monkeypatch.setattr(ab, "_run", _fake_run)
+    monkeypatch.setattr(ab, "find_k3dit", lambda w: ["k3dit"])
+    ab.run_path_audit(tmp_path, tmp_path / "b", mode="audit-only", pins="artifact")
+    argv = seen["argv"]
+    assert argv[argv.index("--mode") + 1] == "audit-only"
+    assert argv[argv.index("--pins") + 1] == "artifact"
+
+
+def test_leg_reads_tool_knobs_from_declaration_and_audit_only_is_evidence_only(tmp_path, monkeypatch):
+    """工具运行参数走**声明面**（`[roles.audit] k3dit_mode/k3dit_pins`），不在腿里写死。
+
+    纯审计（`k3dit_mode = "audit-only"`）＝**只出证据不封板**：报告必须落 `docs/reviews/`，
+    包按 `apply_order` 落钉，然后以 `refused(audit_evidence_only)` 交回（`status=partial` 是设计）。
+    """
+    from k3dge.engine import milestone_audit as ma
+    from k3dge.engine.audit_report import _find_report
+
+    ws = _repo(tmp_path)
+    (ws / ".agent").mkdir(exist_ok=True)
+    (ws / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\n'
+        'k3dit_mode = "audit-only"\nk3dit_pins = "artifact"\n', encoding="utf-8")
+    monkeypatch.setattr(ab, "find_k3dit", lambda w: ["k3dit"])
+
+    calls = {}
+
+    def _fake_run(w, out, *, mode="full", pins="inplace", **k):
+        calls["mode"], calls["pins"] = mode, pins
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "report.md").write_text(
+            "# 审计\n\n| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n", encoding="utf-8")
+        return {"ok": True, "rc": 0, "payload": {"status": "partial", "unclosed": 3}}
+
+    monkeypatch.setattr(ab, "run_path_audit", _fake_run)
+    consumed = {}
+
+    def _fake_consume(w, b, **k):
+        consumed.update(k)
+        return {"ok": True, "apply": {"files": []}, "facts": {"job_id": "j1"}, "digest": "e" * 64}
+
+    monkeypatch.setattr(ab, "consume", _fake_consume)
+    monkeypatch.setattr(ab, "commit_applied", lambda w, m, f: "c" * 40)
+    early, _ = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
+    assert calls == {"mode": "audit-only", "pins": "artifact"}      # 声明面被读到并传下去
+    assert consumed.get("require_closed") is False                  # partial 不进 NOT_CLOSED
+    assert early is not None and early[0] == "refused" and "只出证据" in early[1]
+    assert _find_report(ws, "M77", "audit"), "纯审计也要落报告（证据）"
+
+    # 非法取值 ⇒ 拒绝（不静默按缺省跑）
+    (ws / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\nk3dit_mode = "quick"\n', encoding="utf-8")
+    early2, _ = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
+    assert early2 is not None and early2[0] == "refused" and "不合法" in early2[1]

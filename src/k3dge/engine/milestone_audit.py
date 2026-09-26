@@ -190,6 +190,21 @@ def _closed_job_evidence(workspace: Path, job: dict, fresh_baseline: str) -> Tup
     return True, f"本里程碑签署报告已闭环（{rel}；待修 0）"
 
 
+def _role_opt(workspace: Path, role: str, key: str, default: str) -> str:
+    """读 `[roles.<role>] <key>`（缺省 ⇒ default）。工具运行参数走声明面（唯一声明源），不在腿里写死。"""
+    try:
+        import tomllib
+    except ModuleNotFoundError:      # pragma: no cover
+        import tomli as tomllib      # type: ignore
+
+    try:
+        data = tomllib.loads((workspace / ".agent" / "pipeline.toml").read_text(encoding="utf-8"))
+        val = (data.get("roles", {}).get(role) or {}).get(key)
+        return str(val) if val not in (None, "") else default
+    except Exception:
+        return default
+
+
 def _audit_mode(workspace: Path, role: str = "audit") -> str:
     """审计腿形状：`[roles.audit] mode="ratchet"`＝工单模式（ADR-0025）；缺省 oneshot（旧一次性形）。
 
@@ -386,18 +401,29 @@ def _bundle_audit_leg(
     #（旧位置 `<workspace>/.k3dit/bundle-*` 会在被审仓里留未跟踪目录 ⇒ 消费方 status/gate 变脏）。
     cache_root = Path(os.environ.get("K3GE_AUDIT_CACHE") or (Path(tempfile.gettempdir()) / "k3ge-audit"))
     out = cache_root / f"{milestone_id}-{(fresh_baseline or 'head')[:12]}"
-    ran = ab.run_path_audit(workspace, out, mode="full")
+    k3dit_mode = _role_opt(workspace, "audit", "k3dit_mode", "full")
+    k3dit_pins = _role_opt(workspace, "audit", "k3dit_pins", "inplace")
+    if k3dit_mode not in ("full", "audit-only"):
+        return _reject_step(workspace, milestone_id, "audit_bad_k3dit_mode",
+                            f'[roles.audit] k3dit_mode={k3dit_mode!r} 不合法（full / audit-only）'), ""
+    if k3dit_pins not in ("inplace", "artifact"):
+        return _reject_step(workspace, milestone_id, "audit_bad_k3dit_pins",
+                            f'[roles.audit] k3dit_pins={k3dit_pins!r} 不合法（inplace / artifact）'), ""
+    ran = ab.run_path_audit(workspace, out, mode=k3dit_mode, pins=k3dit_pins)
     payload = ran.get("payload") or {}
     if not ran.get("ok"):
         return _reject_step(workspace, milestone_id, "audit_bundle_run_failed",
                             f"k3dit 产包失败（rc={ran.get('rc')}）：{ran.get('detail') or ''}"), ""
-    if str(payload.get("status") or "") != "closed" or payload.get("incomplete"):
+    # 纯审计（audit-only）：`status=partial` 是设计（钉留树）；它**只出证据，不构成封板依据** ⇒ 落报告后
+    # 以 refused 交回（带理由），不推进任何"已审"判定。full 才要求闭环。
+    audit_only = k3dit_mode == "audit-only"
+    if not audit_only and (str(payload.get("status") or "") != "closed" or payload.get("incomplete")):
         return _reject_step(
             workspace, milestone_id, "audit_bundle_not_closed",
             f"k3dit 未闭环（status={payload.get('status')!r} unclosed={payload.get('unclosed')}"
             f"）⇒ 不得当已审；产物留在 {out} 供人核（ADR-0004 §2.1.9）。"), ""
 
-    res = ab.consume(workspace, out, expect_input=str(workspace))
+    res = ab.consume(workspace, out, expect_input=str(workspace), require_closed=not audit_only)
     if not res.get("ok"):
         return _reject_step(workspace, milestone_id, "audit_bundle_consume_failed",
                             f"消费交付包失败（{res.get('error')}）：{res.get('detail') or ''}"), ""
@@ -420,6 +446,12 @@ def _bundle_audit_leg(
         # 报告与补丁一起提交：审计的"产物 + 落地"落在同一次提交上（封版相位再写 trailer/边界 tag）
         commit = ab.commit_applied(workspace, f"fix(audit): k3dit 交付包落树（job {jid or '-'}，包 {digest}）",
                                    [*files, rel_report])
+    if audit_only:
+        return _reject_step(
+            workspace, milestone_id, "audit_evidence_only",
+            f"纯审计（`k3dit_mode = \"audit-only\"`）只出证据，不构成封板依据：报告落盘 {rel_report}，"
+            f"落 {len(files)} 文件{('，提交 ' + commit[:12]) if commit else ''}。要封板请把 "
+            f'`[roles.audit] k3dit_mode` 改为 "full"（判读+修+复核，待修=0）再跑。'), ""
     msg = (f"Milestone {milestone_id}: bundle 审计腿闭环（工具 k3dit job {jid or '-'}，包 {digest}，"
            f"落 {len(files)} 文件，报告 {rel_report}{('，提交 ' + commit[:12]) if commit else ''}）。")
     return None, msg

@@ -72,14 +72,15 @@ def _last_json(text: str) -> Optional[dict]:
     return None
 
 
-def run_path_audit(workspace: Path, out: Path, *, mode: str = "full", timeout: int = 3600,
-                   k3dit: Optional[List[str]] = None) -> dict:
-    """跑 k3dit 路径入口（cli 传输的实体）。返回 {ok, rc, out, payload, detail}。"""
+def run_path_audit(workspace: Path, out: Path, *, mode: str = "full", pins: str = "inplace",
+                   timeout: int = 3600, k3dit: Optional[List[str]] = None) -> dict:
+    """跑 k3dit 路径入口（工具调用）。`mode`＝工具运行模式（full / audit-only）；
+    `pins`＝钉的落地形态（inplace＝钉留树 / artifact＝钉只随包）。返回 {ok, rc, out, payload, detail}。"""
     argv0 = k3dit or find_k3dit(workspace)
     if not argv0:
         return {"ok": False, "rc": 127, "detail": f"找不到 k3dit（设 {K3DIT_ENV} 或装到 PATH/兄弟仓）"}
     argv = [*argv0, "audit", "--path", str(workspace), "--out", str(out),
-            "--mode", mode, "--format", "json"]
+            "--mode", mode, "--pins", pins, "--format", "json"]
     rc, text = _run(argv, workspace, timeout)
     payload = _last_json(text)
     if rc not in (0, 3):
@@ -235,7 +236,8 @@ def commit_applied(workspace: Path, message: str, files: List[str]) -> str:
 
 
 def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
-            k3dit: Optional[List[str]] = None, expect_input: Optional[str] = None) -> dict:
+            k3dit: Optional[List[str]] = None, expect_input: Optional[str] = None,
+            require_closed: bool = True) -> dict:
     """**消费一只包**：验契约 → 输入身份 → 自证 → 落补丁。
 
     `expect_input` 非空时校验 `manifest.input` 与它同指一处（realpath 比较）——包的输入身份是
@@ -259,7 +261,9 @@ def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
                         "detail": f"包是为 {got} 做的，而当前目标是 {want}（用 --into 指定目标目录）"}
         except OSError:      # pragma: no cover - 路径解析异常不该拦住消费
             pass
-    if str(facts.get("status") or "") != "closed":
+    # `require_closed=False` 只给 **纯审计**（`--mode audit-only`）：它的 `status=partial` 是设计
+    #（钉留树＝待修队列），不是失败；消费侧照常自证 + 按 apply_order 落补丁（通常只剩 pins.patch）。
+    if require_closed and str(facts.get("status") or "") != "closed":
         return {"ok": False, "error": "NOT_CLOSED", "facts": facts,
                 "detail": f"status={facts.get('status')!r}（unclosed={facts.get('unclosed')}）"
                           f"——未闭环的包不得当已审"}

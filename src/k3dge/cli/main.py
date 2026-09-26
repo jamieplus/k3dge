@@ -585,7 +585,9 @@ def cmd_audit(args: argparse.Namespace) -> int:
     bundle = Path(tok) if tok else Path(getattr(args, "bundle_out", "") or (workspace / ".k3dit" / "bundle"))
     if getattr(args, "run", False) or not (bundle / "manifest.json").is_file():
         out_dir = Path(getattr(args, "bundle_out", "") or bundle)
-        ran = ab.run_path_audit(workspace, out_dir, mode=getattr(args, "bundle_mode", "full") or "full")
+        _m = getattr(args, "bundle_mode", "full") or "full"
+        ran = ab.run_path_audit(workspace, out_dir, mode=_m,
+                                pins=getattr(args, "bundle_pins", "inplace") or "inplace")
         print(json.dumps({"stage": "run", "out": str(out_dir), "rc": ran.get("rc"), "ok": ran.get("ok"),
                           "payload": ran.get("payload"), "detail": ran.get("detail")}, ensure_ascii=False))
         if not ran.get("ok"):
@@ -593,7 +595,9 @@ def cmd_audit(args: argparse.Namespace) -> int:
         bundle = out_dir
     target = Path(getattr(args, "into", "") or workspace).resolve()
     res = ab.consume(target, bundle, dry_run=bool(getattr(args, "dry_run", False)),
-                     expect_input=str(target))
+                     expect_input=str(target),
+                     # 纯审计包 status=partial 是设计（钉留树）⇒ 不进 NOT_CLOSED 分支
+                     require_closed=(getattr(args, "bundle_mode", "full") or "full") != "audit-only")
     print(json.dumps(res, ensure_ascii=False))
     _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] audit bundle "
                            f"{bundle} ok={res.get('ok')} dry={bool(getattr(args, 'dry_run', False))}")
@@ -1190,6 +1194,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_aud.add_argument("job_or_milestone", nargs="?", default="", help="status/show/materialize:job_id 或里程碑；advance:线名；close:milestone")
     p_aud.add_argument("--run", action="store_true",
                        help="bundle：先跑 k3dit 路径入口产包再消费（缺省只消费已存在的包）")
+    p_aud.add_argument("--pins", dest="bundle_pins", choices=["inplace", "artifact"], default="inplace",
+                       help="bundle：钉的落地形态（inplace＝钉留树 / artifact＝钉只随包）")
     p_aud.add_argument("--mode", dest="bundle_mode", choices=["audit-only", "full"], default="full",
                        help="bundle --run：k3dit 模式（缺省 full＝判读+修+复核）")
     p_aud.add_argument("--bundle-out", default="", help="bundle --run：产包目录（缺省 .k3dit/bundle）")

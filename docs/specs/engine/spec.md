@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:665075fcc8cfd80e590e0f7f7e27cb88c3b84c9598e5119ad7b9d214c02dfe30`
+- **Contract Hash**: `sha256:42877b29c58ba0af824919d5ce80a76600ffa9cb2dd1be9fe953239276d8e7c4`
 - **Last Updated**: 2026-09-26
 
 ## 1. Domain Boundary & Responsibilities
@@ -72,13 +72,13 @@ from typing import Tuple
 SUPPORTED_BUNDLE_VERSIONS = (1,)
 K3DIT_ENV = 'K3DIT_BIN'
 find_k3dit(workspace: Path) -> Optional[List[str]]
-run_path_audit(workspace: Path, out: Path, *, mode: str='full', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict
+run_path_audit(workspace: Path, out: Path, *, mode: str='full', pins: str='inplace', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict
 verify_bundle(bundle: Path, *, k3dit: Optional[List[str]]=None, timeout: int=600) -> dict
 bundle_facts(bundle: Path) -> dict
 bundle_digest(bundle: Path) -> str
 apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False) -> dict
 commit_applied(workspace: Path, message: str, files: List[str]) -> str
-consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None) -> dict
+consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None, require_closed: bool=True) -> dict
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional

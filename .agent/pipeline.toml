@@ -25,6 +25,11 @@ bind = "k3dit"
 # `bind` 只声明"谁审"（工具名，和 `git` 同层）；本地命令行工具**不注册 peer、不声明 transport**。
 # 2026-09-26 从 `ratchet` 迁来：棘轮要的 verb 走 mcp，而 k3dit 的 MCP 服务端面已退役（见下）。
 mode = "bundle"
+# 工具运行参数（k3dit 的两个旋钮，走声明面、不在腿里写死）：
+#   k3dit_mode = "full"（判读+修+复核，待修=0 才算已审）| "audit-only"（只出证据、不构成封板依据）
+#   k3dit_pins = "inplace"（钉留树）| "artifact"（钉只随包）
+k3dit_mode = "full"
+k3dit_pins = "inplace"
 
 [roles.cache]
 bind = "k3che"

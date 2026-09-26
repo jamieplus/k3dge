@@ -182,8 +182,8 @@ SUPPORTED_BUNDLE_VERSIONS = (1,)
 K3DIT_ENV = 'K3DIT_BIN'
 find_k3dit(workspace: Path) -> Optional[List[str]]
     # doc: 定位 k3dit：`K3DIT_BIN` > PATH > 兄弟仓 `.venv` > 兄弟仓 zipapp。找不到 → None。
-run_path_audit(workspace: Path, out: Path, *, mode: str='full', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict
-    # doc: 跑 k3dit 路径入口（cli 传输的实体）。返回 {ok, rc, out, payload, detail}。
+run_path_audit(workspace: Path, out: Path, *, mode: str='full', pins: str='inplace', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict
+    # doc: 跑 k3dit 路径入口（工具调用）。`mode`＝工具运行模式（full / audit-only）；
 verify_bundle(bundle: Path, *, k3dit: Optional[List[str]]=None, timeout: int=600) -> dict
     # doc: `k3dit audit --verify <bundle>`：包自证（反向重放 + 12 列 + findings↔报告）。
 bundle_facts(bundle: Path) -> dict
@@ -194,7 +194,7 @@ apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty:
     # doc: 按 `apply_order` 用**标准 `git apply`** 落补丁：先 worktree 试跑（原子化），再就地应用。
 commit_applied(workspace: Path, message: str, files: List[str]) -> str
     # doc: 提交**已落的这些文件**（不用 `add -A`：别把工作区其它改动卷进审计提交）。返回 sha 或 ""。
-consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None) -> dict
+consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None, require_closed: bool=True) -> dict
     # doc: **消费一只包**：验契约 → 输入身份 → 自证 → 落补丁。
 # audit_checklist.py
 from __future__ import annotations
