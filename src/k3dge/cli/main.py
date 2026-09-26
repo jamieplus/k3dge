@@ -794,6 +794,31 @@ def _conventional_ok(msg: str) -> bool:
     return bool(_CONV_RE.match(msg or ""))
 
 
+#: 历史仓名（正确名＝k3dge）。写错会进评审/CHANGELOG/对话，且**无法机检删除**（只在提交时提示）。
+_OLD_NAME = "k3ge"
+#: 合法上下文：引述/勘误（改名提交与"修掉旧称"提交必须写旧名，不能一刀切阻断）。
+#: 合法上下文：引述/勘误（改名提交与"修掉旧称"提交必须写旧名）＋**反引号跨度**（跨度里含旧名＝在描述
+#: 这个名字本身，不是把它当仓名用；实测：本规则的提交信息就要写 `` `k3ge 作为消费方` ``）。
+_OLD_NAME_QUOTE = ("→", "旧名", "旧称")
+_OLD_NAME_QUOTED = re.compile(r"`[^`]*k3ge[^`]*`")
+
+
+def old_name_warnings(msg: str) -> List[str]:
+    """提交信息里出现历史仓名且**不在引述/勘误上下文** ⇒ 返回可疑行（调用方只提示，不阻断）。
+
+    为什么 advisory：改名/勘误提交必须引述旧名（`k3ge → k3dge`、`旧名 \`k3ge\``）⇒ 阻断会挡合法用法；
+    而漏改的旧名会静默写进评审与变更日志（2026-09-26 实测：同一天我写了 4 次）。
+    """
+    out: List[str] = []
+    for line in (msg or "").splitlines():
+        if _OLD_NAME not in line:
+            continue
+        if any(tok in line for tok in _OLD_NAME_QUOTE) or _OLD_NAME_QUOTED.search(line):
+            continue
+        out.append(line.strip())
+    return out
+
+
 from k3dge.engine import attest as _attest
 
 _ATTEST_PREFIX = _attest.PREFIX
@@ -927,6 +952,9 @@ def cmd_check_msg(args: argparse.Namespace) -> int:
     from pathlib import Path
 
     msg = Path(args.file).read_text(encoding="utf-8").strip()
+    for _ln in old_name_warnings(msg):
+        print(f"[COMMIT] 疑似历史仓名 '{_OLD_NAME}'（正确名＝k3dge；引述历史可忽略）：{_ln}",
+              file=sys.stderr)
     if not _conventional_ok(msg):
         print(
             f"[COMMIT] message is not Conventional Commits (e.g. 'feat: ...')",
