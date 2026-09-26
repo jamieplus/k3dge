@@ -1,6 +1,6 @@
-"""k3dit 交付包**消费侧**（ADR-0028）：验契约 → 自证 → 标准 `git apply` 落补丁。
+"""k3dit 交付包**消费侧**（k3dit 仓 0028）：验契约 → 自证 → 标准 `git apply` 落补丁。
 
-这些测试用**合成包**（不依赖 k3dit 在场）：k3ge 的消费逻辑必须能独立被验——
+这些测试用**合成包**（不依赖 k3dit 在场）：k3dge 的消费逻辑必须能独立被验——
 契约面（`bundle_version`/`status`/`apply_order`）、fail-clear（异版/未闭环/脏树）、
 以及对历史**零改动**的 dry-run。
 """
@@ -126,7 +126,7 @@ def test_cli_transport_substitutes_known_placeholders_only():
 
 
 def test_bundle_audit_leg_routes_and_fails_clear(tmp_path, monkeypatch):
-    """封板审计腿 `mode="bundle"`（ADR-0028 消费方）：
+    """封板审计腿 `mode="bundle"`（k3dit 仓 0028 消费方）：
 
     - 找不到 k3dit ⇒ **拒绝**（声明面与实现面不符时不得静默换成别的形状）；
     - k3dit 未闭环 ⇒ **拒绝**（未关不得当已审）；

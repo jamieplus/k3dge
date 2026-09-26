@@ -1,6 +1,6 @@
-"""k3dit 交付包**消费侧**（ADR-0028 的消费方实现）。
+"""k3dit 交付包**消费侧**（k3dit 仓 0028 的消费方实现）。
 
-形状（与 ADR-0028 对齐）::
+形状（与 k3dit 仓 0028 对齐）::
 
     冻结提交（基线 B） → k3dit 路径入口产包（`k3dit audit --path . --out <bundle> --mode full`）
       → 验包（`k3dit audit --verify <bundle>`：反向重放逐字节 + 12 列 + findings↔报告）
@@ -8,14 +8,14 @@
       → 按 `apply_order` 用**标准 `git apply`** 把 `fix.patch` + `pins.patch` 落到工作树
       → 由调用方决定提交/封板（本模块**不**改历史）
 
-为什么 k3dge 要自己 apply 而不是让 k3dit 写：ADR-0028 §2.9「k3dit 不接管送审方的版本、封板与分发」。
+为什么 k3dge 要自己 apply 而不是让 k3dit 写：k3dit 仓 0028 §2.9「k3dit 不接管送审方的版本、封板与分发」。
 k3dit 出意图与证据，落树与落账归消费方——契约＝内容哈希，实现＝各自的 git。
 
 纪律（全部 fail-clear，不猜）：
 - 包结构版本不认 ⇒ 拒（旧/异版包不得按本版布局解释）；
 - `status != closed` ⇒ 拒（`incomplete`/`partial` 不得当"已审"）；
 - 工作树不干净 ⇒ 拒（别把别人的在途改动卷进审计产物）；
-- 只应用 `manifest.apply_order` 里**实际存在**的补丁（ADR-0028 §2.5 第 4 条）。
+- 只应用 `manifest.apply_order` 里**实际存在**的补丁（k3dit 仓 0028 §2.5 第 4 条）。
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-#: k3dit 交付包**结构**版本白名单（认不出即 fail-clear；见 ADR-0028 §2.5 第 7 条）。
+#: k3dit 交付包**结构**版本白名单（认不出即 fail-clear；见 k3dit 仓 0028 §2.5 第 7 条）。
 SUPPORTED_BUNDLE_VERSIONS = (1,)
 
 #: 环境变量：显式指定 k3dit 可执行（argv 列表中的第一段）。
@@ -170,7 +170,7 @@ def _dry_run_via_worktree(workspace: Path, bundle: Path, order: List[str]) -> di
     """
     import tempfile
 
-    tmp = Path(tempfile.mkdtemp(prefix="k3ge-apply-dry-"))
+    tmp = Path(tempfile.mkdtemp(prefix="k3dge-apply-dry-"))
     wt = tmp / "wt"
     rc, out = _git(workspace, "worktree", "add", "--detach", "-q", str(wt), "HEAD")
     if rc != 0:
@@ -239,7 +239,7 @@ def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
     """**消费一只包**：验契约 → 输入身份 → 自证 → 落补丁。
 
     `expect_input` 非空时校验 `manifest.input` 与它同指一处（realpath 比较）——包的输入身份是
-    ADR-0028 §2.10 的"同一版"判据，拿错包（为别的目录做的）多半意味着补丁要打到别的树上。
+    k3dit 仓 0028 §2.10 的"同一版"判据，拿错包（为别的目录做的）多半意味着补丁要打到别的树上。
     返回 {ok, facts, verify, apply, digest, error?}。"""
     bundle = Path(bundle)
     bundle = Path(bundle)

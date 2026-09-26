@@ -457,10 +457,10 @@ def _bundle_audit_leg(
     prompt: _Prompt,
     fresh_baseline: str,
 ) -> Tuple[Optional[Tuple[str, str]], str]:
-    """**bundle 审计腿**（ADR-0028 消费方）：冻结基线 → k3dit 路径入口产包 → 消费侧验+落补丁。
+    """**bundle 审计腿**（k3dit 仓 0028 消费方）：冻结基线 → k3dit 路径入口产包 → 消费侧验+落补丁。
 
     与 ratchet 的区别：不做"工单步进 / 写回重试"——一次性拿到**包**（`code/ report findings
-    patches manifest`），由 k3ge 自己 apply 与落账（ADR-0028 §2.9：k3dit 不接管送审方版本）。
+    patches manifest`），由 k3dge 自己 apply 与落账（k3dit 仓 0028 §2.9：k3dit 不接管送审方版本）。
     返回 `(early, step_status)`：`early` 非 None ⇒ 未闭环，交回 `[NEXT]`；None ⇒ 已闭环，走共用尾。
     """
     from k3dge.engine import audit_bundle as ab
@@ -534,7 +534,7 @@ def run_audit_flow(
 
     _mode = _audit_mode(workspace)
     if _mode == "bundle":
-        # bundle 审计腿（ADR-0028 消费方）：一次性产包 + 消费，不做棘轮步进。
+        # bundle 审计腿（k3dit 仓 0028 消费方）：一次性产包 + 消费，不做棘轮步进。
         # 闭环后**落到共用尾**（verify 步 + nextstep persist），与棘轮腿同形；未闭环则提前返回。
         early, _bmsg = _bundle_audit_leg(workspace, milestone_id, prompt, fresh_baseline)
         if early is not None:

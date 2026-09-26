@@ -588,7 +588,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
         r = audit_flow.materialize(workspace, tok or "", getattr(args, "oid", "") or "",
                                    getattr(args, "dest", "") or "")
     elif args.audit_action == "bundle":
-        # k3dit 交付包消费侧（ADR-0028）：验契约 → 自证 → 标准 `git apply` 落补丁。
+        # k3dit 交付包消费侧（k3dit 仓 0028）：验契约 → 自证 → 标准 `git apply` 落补丁。
         # 不推进版号、不封板（那些归 seal 相位）；这里只把"意图与证据"变成树上的改动事实。
         from k3dge.engine import audit_bundle as ab
 
