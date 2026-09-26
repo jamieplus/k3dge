@@ -228,11 +228,129 @@ class TestPipelineSchema(unittest.TestCase):
                      '{"mcpServers": {"dummy": {"command": "python"}}}')
             _no_audit_stages(root)   # 本例只测角色绑定，不涉审计线两步
             self.assertEqual(validate_pipeline_config(root), [])
-            # bind 指向未登记的 server ⇒ 必须红
+            # bind 指向**声明了 mcp 跳**但未登记的 peer ⇒ 必须红
+            #（规则 2026-09-26 收紧：只有声明 mcp 跳的 peer 才要求在册——纯 cli 的 peer 不必）
             self._mk(root,
                      "[roles.audit]\nbind = \"ghost\"\n"
+                     "[peers.ghost.actions.produce]\n"
+                     "transports = [ { provider = \"mcp\", tool = \"ghost_submit\" } ]\n",
+                     '{"mcpServers": {"dummy": {"command": "python"}}}')
+            errs = validate_pipeline_config(root)
+            self.assertTrue(any(c == "PIPELINE_PEER_UNWIRED" and "'audit'" in m and "ghost" in m
+                                for c, m in errs), errs)
+
+
+
+    def test_role_kind_must_be_gate_or_service(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            _write(root, ".mcp.json", '{"mcpServers": {"k3che": {"command": "python"}}}')
+            _write(root, ".agent/pipeline.toml",
+                   '[roles.cache]\nbind = "k3che"\nkind = "lucene"\n'
+                   "[peers.k3che.actions.search]\n"
+                   "transports = [ { provider = \"mcp\", tool = \"k3che_search\" } ]\n")
+            errs = validate_pipeline_config(root)
+            self.assertTrue(any("kind must be 'gate' or 'service'" in m for c, m in errs), errs)
+
+    def test_role_kind_service_with_skip_chain_is_valid(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            _write(root, ".mcp.json", '{"mcpServers": {"k3che": {"command": "python"}}}')
+            _write(root, ".agent/pipeline.toml",
+                   '[roles.cache]\nbind = "k3che"\nkind = "service"\n'
+                   "[peers.k3che.actions.search]\n"
+                   "transports = [ { provider = \"mcp\", tool = \"k3che_search\" }, { provider = \"skip\" } ]\n")
+            _no_audit_stages(root)   # 本例只测 service 角色 + skip 链
+            self.assertEqual(validate_pipeline_config(root), [])
+
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class TestLegacyConfigGuard(unittest.TestCase):
+    """已废的第二个配置文件：存在即红一次逼迁移（不静默忽略）。
+
+    前科：本仓 `.agent/gates.toml` 曾是 DEFAULTS 的冗余副本且漂移——覆盖列表漏了
+    reconcile ⇒ 功能静默死亡（2026-09-17-M10-refactor-adr_archive_to_sync）。
+    """
+
+    def test_gates_toml_present_is_flagged(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            _write(root, ".agent/pipeline.toml",
+                   '[roles.audit]\nbind = "k3dit"\n'
+                   '[peers.k3dit.actions.audit]\ntransports = [ { provider = "skip" } ]\n'
+                   '[peers.k3dit.actions.verify]\ntransports = [ { provider = "skip" } ]\n')
+            self.assertEqual(validate_pipeline_config(root), [])   # 先证明基线绿
+            _write(root, ".agent/gates.toml", "[checks.seal]\npreconditions = []\n")
+            errs = validate_pipeline_config(root)
+            self.assertTrue(any(c == "PIPELINE_SCHEMA_INVALID" and "gates.toml is retired" in m
+                                for c, m in errs), errs)
+
+    def test_repo_has_no_legacy_config(self):
+        root = pathlib.Path(__file__).resolve().parents[3]
+        self.assertFalse((root / ".agent" / "gates.toml").exists())
+        self.assertTrue((root / ".agent" / "pipeline.toml").is_file())
+
+
+    def test_cli_only_peer_need_not_be_registered_in_mcp_json(self):
+        """PIPELINE_PEER_UNWIRED 的真实危害＝"声明了 mcp 跳却没注册 server"。
+
+        反例（2026-09-26 实测）：k3dit 撤掉 MCP 服务端后只留 cli 传输，旧规则仍要求它出现在 `.mcp.json`
+        ⇒ 把合法的 cli-only peer 判红。现在规则按"是否声明 mcp 跳"判。
+        """
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            _write(root, ".agent/pipeline.toml",
+                   "[roles.audit]\nbind = \"k3dit\"\nmode = \"bundle\"\n\n"
+                     "[peers.k3dit]\nenabled = false\n\n"
+                     "[peers.k3dit.actions.verify]\n"
+                     "transports = [ { provider = \"cli\", command = \"k3dit check-report {path}\" },\n"
+                     "               { provider = \"manual\", protocol = \"docs/protocols/verify_default.md\" } ]\n",
+                     '{"mcpServers": {"k3dge": {"command": "python"}}}')
+            _no_audit_stages(root)
+            self.assertFalse([e for e in validate_pipeline_config(root)
+                              if e[0] == "PIPELINE_PEER_UNWIRED"])
+            # 一旦声明 mcp 跳而没注册 ⇒ 仍要红（规则没被削弱）
+            self._mk(root,
+                     "[roles.audit]\nbind = \"k3dit\"\nmode = \"bundle\"\n\n"
+                     "[peers.k3dit]\nenabled = false\n\n"
+                     "[peers.k3dit.actions.verify]\n"
+                     "transports = [ { provider = \"mcp\", tool = \"k3dit_check_report\" } ]\n",
+                     '{"mcpServers": {"k3dge": {"command": "python"}}}')
+            self.assertTrue([e for e in validate_pipeline_config(root)
+                             if e[0] == "PIPELINE_PEER_UNWIRED"])
+
+
+    def test_role_bind_resolves_to_wired_server(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            # 角色 audit 绑定到 dummy 服务；流程引用 audit.produce
+            self._mk(root,
+                     "[roles.audit]\nbind = \"dummy\"\n"
                      "[peers.dummy.actions.produce]\n"
                      "transports = [ { provider = \"mcp\", tool = \"dummy_submit\" } ]\n",
+                     '{"mcpServers": {"dummy": {"command": "python"}}}')
+            _no_audit_stages(root)   # 本例只测角色绑定，不涉审计线两步
+            self.assertEqual(validate_pipeline_config(root), [])
+            # bind 指向**声明了 mcp 跳**但未登记的 peer ⇒ 必须红
+            #（规则 2026-09-26 收紧：只有声明 mcp 跳的 peer 才要求在册——纯 cli 的 peer 不必）
+            self._mk(root,
+                     "[roles.audit]\nbind = \"ghost\"\n"
+                     "[peers.ghost.actions.produce]\n"
+                     "transports = [ { provider = \"mcp\", tool = \"ghost_submit\" } ]\n",
                      '{"mcpServers": {"dummy": {"command": "python"}}}')
             errs = validate_pipeline_config(root)
             self.assertTrue(any(c == "PIPELINE_PEER_UNWIRED" and "'audit'" in m and "ghost" in m

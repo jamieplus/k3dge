@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import tempfile
 from pathlib import Path
 from unittest import TestCase, mock
@@ -576,13 +577,19 @@ class TestRatchetAuditStep(TestCase):
         """
         self.assertEqual(_audit_mode(_ws()), "oneshot")
 
-    def test_repo_and_template_declare_ratchet(self):
-        """生产配置证据：本仓与脚手架模板都显式选 ratchet（oneshot 腿无人选用）。"""
+    def test_repo_and_template_declare_audit_leg_shape(self):
+        """生产配置证据：本仓与脚手架模板都**显式**声明审计腿形状。
+
+        2026-09-26 起本仓是 `bundle`（k3dit 的 MCP 服务端面退役 ⇒ 棘轮要的 verb 走不通）；
+        模板同步跟着走。断言"显式声明且取值在闭集内"，避免退回到"没写 mode ⇒ 静默 oneshot"。
+        """
         root = Path(__file__).resolve().parents[3]
         for rel in (".agent/pipeline.toml",
                     "src/k3dge/templates/assets/pipeline.toml.template"):
             text = (root / rel).read_text(encoding="utf-8")
-            self.assertIn('mode = "ratchet"', text, f"{rel} 未声明 ratchet")
+            m = re.search(r'^mode = "(ratchet|bundle|oneshot)"', text, re.MULTILINE)
+            self.assertIsNotNone(m, f"{rel} 未显式声明审计腿 mode")
+            self.assertEqual(m.group(1), "bundle", f"{rel} 应为 bundle（当前迁移态）")
 
     def test_ratchet_closed_invokes_zero_peer_actions(self):
         """E1 回归守卫：棘轮闭环后，遗留 oneshot 段不得触达任何 peer 动作。

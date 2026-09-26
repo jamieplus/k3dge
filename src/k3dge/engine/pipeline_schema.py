@@ -91,7 +91,28 @@ def _validate_legacy_keys(data) -> List[PipelineViolation]:
     return []
 
 
-def _validate_roles(roles, servers):
+def _declares_mcp(peer_cfg) -> bool:
+    """该 peer 是否声明了任何 `mcp` 跳（peer 级或 action 级）。
+
+    约束的**真实危害**是"声明了 mcp 跳却没有注册的 server"；纯 cli 传输的 peer（如 MCP 面已退役的
+    k3dit）不需要在 `.mcp.json` 里留条目——旧规则要求"角色绑定的 peer 必须在册"，会把合法的
+    cli-only peer 判红（2026-09-26 实测：k3dit 撤 MCP 服务端后 PIPELINE_PEER_UNWIRED 误报）。
+    """
+    if not isinstance(peer_cfg, dict):
+        return False
+
+    def _has_mcp(trs) -> bool:
+        return any(isinstance(x, dict) and x.get("provider") == "mcp" for x in (trs or []))
+
+    if _has_mcp(peer_cfg.get("transports")):
+        return True
+    for spec in (peer_cfg.get("actions") or {}).values():
+        if isinstance(spec, dict) and _has_mcp(spec.get("transports")):
+            return True
+    return False
+
+
+def _validate_roles(roles, servers, peers=None):
     """returns (errors, {role: bind})."""
     errors: List[PipelineViolation] = []
     role_bind: dict = {}
@@ -104,9 +125,9 @@ def _validate_roles(roles, servers):
         if not isinstance(bind, str) or not bind:
             errors.append(("PIPELINE_SCHEMA_INVALID",
                            f"role '{r_name}' must declare a non-empty string 'bind'"))
-        elif servers is not None and bind not in servers:
+        elif servers is not None and bind not in servers and _declares_mcp((peers or {}).get(bind)):
             errors.append(("PIPELINE_PEER_UNWIRED",
-                           f"role '{r_name}' binds to '{bind}' not declared in .mcp.json mcpServers"))
+                           f"role '{r_name}' binds to '{bind}'：声明了 mcp 跳但 .mcp.json 里没有该 server"))
         else:
             role_bind[r_name] = bind
     return errors, role_bind
@@ -228,7 +249,7 @@ def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
     from k3dge.engine.mcp_json import mcp_server_names
 
     servers = mcp_server_names(workspace)
-    r_errs, role_bind = _validate_roles(roles, servers)
+    r_errs, role_bind = _validate_roles(roles, servers, peers)
     errors.extend(r_errs)
     p_errs, declared = _validate_peers(workspace, peers, servers, role_bind)
     errors.extend(p_errs)

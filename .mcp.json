@@ -10,16 +10,6 @@
         "PYTHONPATH": "src"
       }
     },
-    "k3dit": {
-      "command": "/Users/jamie/Workspace/k3dit/.venv/bin/python",
-      "args": [
-        "-m",
-        "k3dit.mcp"
-      ],
-      "env": {
-        "PYTHONPATH": "../k3dit/src"
-      }
-    },
     "k3che": {
       "command": "/Users/jamie/Workspace/k3che/.venv/bin/python",
       "args": [

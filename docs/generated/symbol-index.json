@@ -1852,7 +1852,7 @@
   "validate_pipeline_config": [
     {
       "file": "src/k3dge/engine/pipeline_schema.py",
-      "line": 202
+      "line": 223
     }
   ],
   "validate_structure": [

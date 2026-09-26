@@ -21,46 +21,33 @@
 # 质量不在角色表：它是合并审计模块内的窗口（ADR-0025），无独立 peer。
 [roles.audit]
 bind = "k3dit"
-mode = "ratchet"   # 审计腿=棘轮工单步进（ADR-0025）；缺省 "oneshot" 为旧一次性形
+# 审计腿形状：`bundle`＝冻结基线 → k3dit 路径入口产包 → 消费侧验包+落补丁（ADR-0025 §2.9.6）。
+# 2026-09-26 从 `ratchet` 迁来：棘轮要的 verb 走 mcp，而 k3dit 的 MCP 服务端面已退役（见下）。
+mode = "bundle"
 
 [roles.cache]
 bind = "k3che"
 kind = "service"
 
 [peers.k3dit]
-enabled = true
+# MCP 服务端面已退役（k3dit `mcp.py` 删除）⇒ 不再注册它，也不声明任何 mcp 跳（声明不许空转）。
+# 对等接入只剩 cli 传输：命令里用 `${K3DIT_BIN:-k3dit}`，兄弟仓开发者免改配置。
+enabled = false
 
 # 判断型工单协议（契约 §1，2026-09-03）：提交登记/回收结果两态；领取与回投是席位的事（k3dit CLI/MCP）
-[peers.k3dit.actions.submit]
-transports = [
-  { provider = "mcp", tool = "k3dit_audit_submit", timeout = 15 },
-]
 
-[peers.k3dit.actions.collect]
-transports = [
-  { provider = "mcp", tool = "k3dit_audit_collect", timeout = 15 },
-]
 
-[peers.k3dit.actions.present]
-transports = [
-  { provider = "mcp", tool = "k3dit_audit_present", timeout = 10 },
-]
 
-[peers.k3dit.actions.status]
-transports = [
-  { provider = "mcp", tool = "k3dit_audit_job_status", timeout = 10 },
-]
 
 [peers.k3dit.actions.audit]
 transports = [
-  { provider = "mcp", tool = "k3dit_run_audit_flow", timeout = 60 },
+  { provider = "cli", command = "${K3DIT_BIN:-k3dit} audit --path . --out .k3dit/bundle --mode full --format json", timeout = 3600 },
   { provider = "manual", protocol = "docs/protocols/audit_default.md" },
 ]
 
 [peers.k3dit.actions.verify]
 transports = [
-  { provider = "mcp", tool = "k3dit_check_report", timeout = 15 },
-  { provider = "cli", command = "k3dit check-report", timeout = 15 },
+  { provider = "cli", command = "${K3DIT_BIN:-k3dit} check-report {path}", timeout = 15 },
   { provider = "manual", protocol = "docs/protocols/verify_default.md" },
 ]
 

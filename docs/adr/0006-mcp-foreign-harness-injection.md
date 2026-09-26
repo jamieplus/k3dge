@@ -3,6 +3,7 @@ Status: Accepted
 Supersedes: -
 Amended-by:
   - 🅰1 | Core Maintainer | 2026-09-14 | §2.3 第 2、8 条加作用域声明，删「不得外溢成参数」
+  - 🅰2 | Core Maintainer | 2026-09-26 | §2.1 cli 传输实参约定；§2.4 补"声明面不得留死 hop"与回退链实测结论
 Landed-by: src/k3dge/cli/mcp.py
 Date: 2026-08-24
 Deciders: Core Maintainer
@@ -34,6 +35,8 @@ Note: 修订痕迹见 git 历史。
 
 - **CLI**（`k3dge.cli.main`）：本仓人/脚本原生入口（shell、pre-commit、CI）。
 - **MCP**（`k3dge.cli.mcp`）：对外兼容层，只委托 `engine` / `sync` / `milestone`，零漂移；消费者是外部 harness，不是第二套交互设计。仍放在 `cli` 域（都是传输，不判定）。
+- **CLI 传输的实参**：`{key}` 按已知键**字面替换**（实参由编排传，如 `{path}`/`{bundle}`/`{milestone_id}`），
+  需要可覆盖的可执行名用 shell 默认展开写（`${K3DIT_BIN:-k3dit}`）；**不得**用 `str.format`（shell 里的 `{}` 会被炸）[^🅰2.1]。
 
 ### 2.2 并列 harness 模型
 
@@ -96,7 +99,11 @@ MCP 有两个方向，**互不借道、互不背书**：
    - `escalated` 只有一个含义：审计链整体落 `manual` 且人未确认时，`seal` 不放行。
 4. `skip` 只用于不在必做链上的 peer（cache）：记 `HARNESS_SKIP` 即算通过该 stage。
 5. `check` / `status` 可读取已落盘的降级事实并复述，但不得自行连 MCP 或跑 peer CLI（§2.3.2）。
-   - 本轮取向是把流程调通，不是验证兜底；fallback 可用性由后续里程碑专测。
+   - 回退链**已实测**（2026-09-26）：一次 verify 动作真跑出 `mcp→cli→manual` 两跳降级与各自原因；
+     对端退役 MCP 面后，`cli` 那一跳单独跑通（`provider=cli`，无降级）[^🅰2.4]。
+6. **声明面不得留死 hop**：peer 的 MCP 面退役后，其声明里不得再留 `provider = "mcp"` 的跳（跑起来必降级＝空转）；
+   该 peer 也不必留在 `.mcp.json`。判据码 `PIPELINE_PEER_UNWIRED` 的真实危害是"**声明了 mcp 跳却没注册 server**"，
+   纯 cli 的 peer 不在册不算违规[^🅰2.4]。
 
 ### 2.5 非目标 (Non-goals)
 
@@ -118,3 +125,9 @@ MCP 有两个方向，**互不借道、互不背书**：
 
 [^🅰1.1]: 修改：为第 2 条补充作用域声明，明确此约束只针对 `check` 命令，不泛化到 k3dge 其他命令。
 [^🅰1.2]: 修改：为第 8 条补充作用域声明（不约束 k3dge 自身流程编排），删除「不得外溢成 k3dge 参数」句（peer 暴露的参数即公共接口）。
+
+[^🅰2.1]: 修改：写明 cli 传输的实参约定。理由：编排需要把 `path`/`bundle` 等实参交给对端命令，而 shell 命令里
+`{}`（brace expansion、awk 脚本）很常见，`str.format` 会误炸；字面替换只认已知键，未提供的键原样保留（可见地不生效）。
+[^🅰2.4]: 修改：补"声明面不得留死 hop"与回退链实测结论。驱动缘由：对端的 MCP 服务端面退役后，旧规则
+"角色绑定的 peer 必须在 `.mcp.json` 在册"把**纯 cli 的合法 peer** 判红（实测误报），故口径收紧为
+"声明了 mcp 跳才要求在册"；同时把此前挂着"由后续里程碑专测"的 fallback 可用性用一次真跑结清。
