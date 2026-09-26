@@ -123,4 +123,4 @@ workspace_status(workspace: Path) -> Dict[str, Any]
 | TC-CLI-06 | L1 | `task list --json` / MCP `k3dge_task_list` | 顶层 tasks 索引，不含正文、不含 archive | `tests/unit/cli/test_mcp.py::test_task_list_json` |
 | TC-CLI-07 | L1 | MCP `k3dge_sync` / `k3dge_task_create` / `k3dge_task_done` | 与 CLI 同一套 engine/sync，done 优先精确 path | `tests/unit/cli/test_mcp.py::test_verify_collects_once` |
 | TC-CLI-08 | L1 | `mcp sync` 遇损坏 `.mcp.json`（非 dict/JSON 错误）或 `pipeline.toml` 损坏/缺解析器 | 损坏 `WARN` 不覆盖且 `0` 放行；`pipeline.toml` 解析失败 `1`；缺 `tomli` 跳过不假失败 | `tests/unit/cli/test_main.py::test_init_creates_harness` |
-| TC-CLI-09 | L1 | 提交信息里写历史仓名 `k3ge`（非引述上下文） | 只提示不阻断（advisory），引述/勘误上下文不提示 | `tests/unit/cli/test_old_name_warning.py` |
+| TC-CLI-09 | L1 | 提交信息里裸写 `k3ge`（正确名 k3dge；无此仓） | 只提示不阻断（advisory）；反引号跨度＝引用该错写时不提示 | `tests/unit/cli/test_old_name_warning.py` |

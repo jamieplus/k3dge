@@ -30,7 +30,7 @@ cmd_markers(args: argparse.Namespace) -> int
     # doc: 树侧 findings 一览：三锚点计数、语法违规、结项判据（只读；从不改写）。
 cmd_milestone(args: argparse.Namespace) -> int
 old_name_warnings(msg: str) -> List[str]
-    # doc: 提交信息里出现历史仓名且**不在引述/勘误上下文** ⇒ 返回可疑行（调用方只提示，不阻断）。
+    # doc: 提交信息里**裸写**了错写名 ⇒ 返回可疑行（调用方只提示，不阻断）。
 cmd_search(args: argparse.Namespace) -> int
 cmd_where(args: argparse.Namespace) -> int
 cmd_index(args: argparse.Namespace) -> int

@@ -794,26 +794,23 @@ def _conventional_ok(msg: str) -> bool:
     return bool(_CONV_RE.match(msg or ""))
 
 
-#: 历史仓名（正确名＝k3dge）。写错会进评审/CHANGELOG/对话，且**无法机检删除**（只在提交时提示）。
+#: **错写**（正确名＝k3dge；不存在叫这个名字的仓）。唯一合法出现＝**在引用这个错写本身**（反引号跨度），
+#: 因为检测器、测试与文档必须能写它。裸写（无反引号）一律提示——没有"历史名"这回事。
 _OLD_NAME = "k3ge"
-#: 合法上下文：引述/勘误（改名提交与"修掉旧称"提交必须写旧名，不能一刀切阻断）。
-#: 合法上下文：引述/勘误（改名提交与"修掉旧称"提交必须写旧名）＋**反引号跨度**（跨度里含旧名＝在描述
-#: 这个名字本身，不是把它当仓名用；实测：本规则的提交信息就要写 `` `k3ge 作为消费方` ``）。
-_OLD_NAME_QUOTE = ("→", "旧名", "旧称")
 _OLD_NAME_QUOTED = re.compile(r"`[^`]*k3ge[^`]*`")
 
 
 def old_name_warnings(msg: str) -> List[str]:
-    """提交信息里出现历史仓名且**不在引述/勘误上下文** ⇒ 返回可疑行（调用方只提示，不阻断）。
+    """提交信息里**裸写**了错写名 ⇒ 返回可疑行（调用方只提示，不阻断）。
 
-    为什么 advisory：改名/勘误提交必须引述旧名（`k3ge → k3dge`、`旧名 \`k3ge\``）⇒ 阻断会挡合法用法；
-    而漏改的旧名会静默写进评审与变更日志（2026-09-26 实测：同一天我写了 4 次）。
+    只提示不阻断的理由：检测器/测试/文档必须能提到这个字符串（用反引号标注即豁免），阻断会挡住必要引用。
+    实测危害：2026-09-26 一天内它被写进 4 条提交信息。
     """
     out: List[str] = []
     for line in (msg or "").splitlines():
         if _OLD_NAME not in line:
             continue
-        if any(tok in line for tok in _OLD_NAME_QUOTE) or _OLD_NAME_QUOTED.search(line):
+        if _OLD_NAME_QUOTED.search(line):
             continue
         out.append(line.strip())
     return out
@@ -953,7 +950,7 @@ def cmd_check_msg(args: argparse.Namespace) -> int:
 
     msg = Path(args.file).read_text(encoding="utf-8").strip()
     for _ln in old_name_warnings(msg):
-        print(f"[COMMIT] 疑似历史仓名 '{_OLD_NAME}'（正确名＝k3dge；引述历史可忽略）：{_ln}",
+        print(f"[COMMIT] 疑似错写 '{_OLD_NAME}'（正确名＝k3dge；要引用它请加反引号）：{_ln}",
               file=sys.stderr)
     if not _conventional_ok(msg):
         print(
