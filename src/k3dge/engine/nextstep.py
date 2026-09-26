@@ -47,7 +47,7 @@ from typing import Optional, TextIO
 #:   2 环未闭环，不处理无法前进（audit_open / audit_needed）
 #:   3 操作被拒（rejected）
 #:   4 决策点，可做可不做（seal_ready / audit_suggested / new_domain）
-#:   5 在办进程 / 后续步（ratchet_open）
+#:   5（空档；原 ratchet_open 已随棘轮形状退休）
 #:   9 播报，无需动作（normal / sealed / seal_declined）
 #:
 #: 播报态（无 options）：只陈述事实 + 指针，不给分支。
@@ -63,15 +63,6 @@ STATE_OPTIONS: dict = {
             "本轮不处理（钉仍在，下次照旧提示）",
         ],
         "pointers": ["peer_contract §8", "k3dge ADR-0025"],
-    },
-    "ratchet_open": {
-        "priority": 5,
-        "fact": "有在办棘轮工单（k3dge ADR-0025）：进程不等人，但账必须可见",
-        "pointers": [
-            "k3dge audit status <id>",
-            "peer_contract §1.4（Hall pin-only：判读落钉→修翻 fixnote→复核翻 fixed→Hall 拔→sign-report）",
-            "k3dge ADR-0025 §2.7",
-        ],
     },
     "audit_suggested": {
         "priority": 4,

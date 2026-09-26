@@ -370,7 +370,7 @@ def run_seal_flow(
     ok, out = nodes.run_phase(workspace, "seal", "actions", registry, ctx)
     if not ok:
         inflight = ctx.get("audit_status")
-        if inflight in ("ratchet_open", "audit_open", "escalated"):
+        if inflight in ("audit_open", "escalated"):
             # run_audit_flow 已 persist 在办态；再 persist rejected 会双 [NEXT]（M10 真跑）。
             from k3dge.engine.seal import render_checklist
 

@@ -63,12 +63,12 @@ def test_emit_upserts_and_orders_by_priority():
         ws = Path(d)
         begin_run(ws)
         emit(ws, _ns("seal_ready"))                 # priority 4
-        emit(ws, _ns("ratchet_open"))                  # priority 5
+        emit(ws, _ns("audit_suggested"))            # priority 4（原 ratchet_open 的 5 档已退休）
         emit(ws, NextStep.from_state("pending_findings", "M10", pending=2))   # priority 1
         data = _raw(ws)
-        assert [c["state"] for c in data["next"]] == ["pending_findings", "seal_ready", "ratchet_open"]
+        assert [c["state"] for c in data["next"]] == ["pending_findings", "seal_ready", "audit_suggested"]
         assert data["primary"] == "pending_findings"
-        assert [c["priority"] for c in data["next"]] == [1, 4, 5]
+        assert [c["priority"] for c in data["next"]] == [1, 4, 4]
 
 
 def test_emit_same_state_dedupes():
@@ -95,10 +95,12 @@ def test_emit_all_orders_and_writes_all():
     with tempfile.TemporaryDirectory() as d:
         ws = Path(d)
         begin_run(ws)
-        emit_all(ws, [_ns("seal_ready"), _ns("ratchet_open"),
+        emit_all(ws, [_ns("seal_ready"), _ns("audit_suggested"),
                       NextStep.from_state("audit_open", "M10", pending=3)])
         data = _raw(ws)
-        assert [c["state"] for c in data["next"]] == ["audit_open", "seal_ready", "ratchet_open"]
+        # 同 priority（4）之间的次序不属契约 ⇒ 只断言"按 priority 排 + 集合一致"，不锁平级次序
+        assert [c["priority"] for c in data["next"]] == [2, 4, 4]
+        assert {c["state"] for c in data["next"]} == {"audit_open", "seal_ready", "audit_suggested"}
         assert data["primary"] == "audit_open"
 
 

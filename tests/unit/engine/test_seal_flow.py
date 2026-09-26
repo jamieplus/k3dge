@@ -572,26 +572,6 @@ class TestSingleAuditReport(TestCase):
             status, msg = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "audited")  # 单一审计腿闭环即可，无需 quality 票
 
-    def test_push_present_audit_leg(self):
-        from k3dge.engine import audit_flow
-
-        ws = _ws()
-        import json as _j
-
-        (ws / ".agent" / "audit_jobs.json").write_text(_j.dumps({"jobs": [
-            {"job_id": "J-a", "role": "audit", "milestone_id": "M1", "state": "awaiting"}]}), encoding="utf-8")
-        calls = []
-
-        def fake(_ws, ref, *, io=None, timeout_default=60, arguments=None):
-            calls.append((ref, arguments.get("job_id")))
-            return TransportResult(True, "mcp", "ok")
-
-        with mock.patch("k3dge.engine.worktree.present", return_value=[]), \
-             mock.patch("k3dge.engine.audit_flow.run_action", side_effect=fake):
-            r = audit_flow.push_present(ws, "M1")
-        assert r["ok"] and {c[0] for c in calls} == {"audit.present"}
-
-
 class TestGateIdDispatch(TestCase):
     """拒绝携带闭集 gate_id → `nextstep.GATE_NEXT` 表驱动派发（票 gate_action_dispatch）。
 

@@ -5,6 +5,7 @@ Amended-by:
   - 🅰1 | Core Maintainer | 2026-09-14 | §2.3 第 2、8 条加作用域声明，删「不得外溢成参数」
   - 🅰2 | Core Maintainer | 2026-09-26 | §2.1 cli 传输实参约定；§2.4 补"声明面不得留死 hop"与回退链实测结论
   - 🅰3 | Core Maintainer | 2026-09-26 | §2.2 补"本地命令行工具不注册 peer/不声明 transport"；§2.4 缺省外部步为空
+  - 🅰4 | Core Maintainer | 2026-09-26 | §2.3 补"传输链只留对等 harness；本地工具的 cli 信封亦退"
 Landed-by: src/k3dge/cli/mcp.py
 Date: 2026-08-24
 Deciders: Core Maintainer
@@ -64,6 +65,10 @@ k3dge 是**一致性元门禁**；下列 peer 是独立仓，各自挂 k3dge（`
   传输链（`mcp→cli→manual`）只留给**真正的对等 harness**（跨进程/跨机/需降级语义者）[^🅰3.2]。
 - **缺省没有外部审计步**：`[checks.audit] stages_produce/stages_verify` 缺省为空——审计是本地工具调用
   （工具自带自证子命令）。需要外部步的仓**显式**声明；缺省不声明解析不到的 action（声明面不许空转）[^🅰3.2]。
+
+- **传输链只留给对等 harness**：本地命令行工具（`git` 同层）既不该注册 peer，也不该为它声明 `mcp`/`cli` 跳——
+  连"给本地上具留一条 cli 信封"也不留（无驱动者的声明面就是悬空面）。工具与编排之间只有 **argv 调用**；
+  `mcp → cli → manual` 的降级语义仅适用于跨进程/跨机、需要"降级可见"的对等 harness（如 k3che）[^🅰4.3]。
 
 ### 2.3 MCP 的方向性不变量
 
@@ -142,3 +147,7 @@ MCP 有两个方向，**互不借道、互不背书**：
 [^🅰3.2]: 修改：补"本地命令行工具不是 peer"。驱动缘由：k3dit 已退化为本地命令行工具（其 MCP 服务端面退役、
 交付物是包），继续用 peer/role/transport 那套表示它，会留下"声明了却没人解析"的空转面（实测）与
 `.mcp.json` 占位；改按 argv 调用后，声明面只剩"谁审（bind 名）＋什么形状（mode）"。
+
+[^🅰4.3]: 修改：§2.3 补"传输链只留对等 harness"。驱动缘由（PURPOSE）：棘轮形状退休后，为 k3dit 保留的
+cli 信封（`submit|collect|status|present`）失去全部调用者；对外声明一条没有驱动者的通路，与"声明面不许空转"
+直接冲突。故连这条也退，工具只按 argv 调用（k3dit 侧见其仓 0028 🅰9）。

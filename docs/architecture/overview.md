@@ -164,7 +164,6 @@ stateDiagram-v2
 | 4 | `audit_suggested` | 是 | 命中审计量化触发（账齐 / C2≥5 / 体积≥8） |
 | 4 | `new_domain` | 是 | 新建 `src/` 域未在 manifest 注册 |
 | 4 | `seal_ready` | 是 | 票已齐 + 形式闸绿（零 task 空窗不投影） |
-| 5 | `ratchet_open` | 否 | 有在办棘轮工单（进程不等人，但账可见） |
 | 9 | `normal` | 否 | 常规提交门禁通过 |
 | 9 | `seal_declined` | 否 | 已放弃封板（当普通提交结束） |
 | 9 | `sealed` | 否 | 已封板（收摊清单见 `docs/reviews/*-closure.md`） |
@@ -189,8 +188,8 @@ sequenceDiagram
     K3->>Audit: 相位 2 审计（棘轮 submit→席位→collect，或 oneshot）
     Note over K3,Audit: 唯一编排者=k3dge；交换物=审计线；sign-report 署名才算结案
     Note over K3,Audit: quality 是模块内价值窗（ADR-0025）：一份 12 列，无独立 quality peer
-    Audit-->>K3: closed / degraded-manual / ratchet_open / escalated / refused
-    K3-->>Agent: 在办 ⇒ [NEXT] ratchet_open（再 seal 幂等步进）；未闭环不封
+    Audit-->>K3: closed / degraded-manual / escalated / refused
+    K3-->>Agent: 未闭环 ⇒ 不封（棘轮形状已退休，见 ADR-0025 §2.9.6）
     K3->>K3: 相位 3：归档 → 提版 → 收摊清单 → 封版提交+tag <M>=<B>
 ```
 

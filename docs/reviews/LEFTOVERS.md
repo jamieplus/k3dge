@@ -65,7 +65,7 @@ Denial reason and reopen condition live here only.
 | value-22 | `cli/main.py` 单模块超千行（原 0003，已并入 `ADR-0018 §2.12`）：体积属实，按 A-1 分块逐程消化，本轮有意留 | [2026-09-20-M10-audit.md](archive/M10/2026-09-20-M10-audit.md) |
 
 
-## RATCHET-01 棘轮残余（形状已退休，残留件待清）
+## RATCHET-01 ✅ 已收口（2026-09-26）：棘轮残余清完
 
 - **已做**：`_ratchet_audit_leg`/`_ratchet_audit_step` 删除；`mode="ratchet"` 改为**显式拒绝**（带迁移指引）；
   `k3dge audit` 的六个对等动词（submit/status/show/advance/materialize/close）改为**拒绝并指路**；棘轮测试类删除，
@@ -79,3 +79,13 @@ Denial reason and reopen condition live here only.
 - **本次两次自伤（如实记）**：① 用 `sed 's/k3ge/k3dge/'` 式**子串**正则删"含 audit_flow 的行"时，连带删掉了
   `import audit_evidence` 与 `import persist_external_audit_report`（`run_audit_flow` 含该子串）⇒ 由测试当场抓出并修；
   ② 更早一次替换把 `_attest` 别名/`_rel_within_workspace` 一起删掉（`commit-attest` 崩）。教训：删行用**词边界**，改完立刻跑全量。
+### 收口（RATCHET-01 / ADAPTER-01）
+
+- `audit_flow.py` 的六个 verb 与其私有件（`_load_state`/`_save_state`/`_state_path`/`_find_awaiting`/`_parse_envelope`/
+  `_recent_downgrades`/`STATE_REL`）已删（模块 593 → 131 行，只留判据面：`audit_evidence`/`audit_call_result`/
+  `audit_result_of`/`SEALABLE_AUDIT_RESULTS`）；活口 `audit_evidence`/`result_of` 的导入点核对无误。
+- `open_ratchet_jobs` + `[NEXT] ratchet_open` 状态退役：`cli/status.py` 产出口删除、`nextstep.STATE_OPTIONS` 去掉该态、
+  `seal_flow` 的 inflight 元组同步、架构总览 §6 表与时序图同步、AGENTS 该行删除（资产字节锁同步）。
+- `peer_contract.md` §1.4 标"已退休（历史/对等 harness 参考）"；ADR-0006 amend 🅰4（传输链只留对等 harness）。
+- k3dit 侧 ADAPTER-01 同轮完成：`envelope.py` 删除、CLI 动词改"拒绝并指路"、5 个测试驱动器改直调
+  `jobs.create_job`/`collect_job`（副作用 `ingest_prior`/`maybe_run` 显式调）、ADR-0028 amend 🅰9、spec/指南同步。

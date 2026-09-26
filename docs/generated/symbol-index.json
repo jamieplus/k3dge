@@ -62,7 +62,7 @@
   "NextStep": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 173
+      "line": 164
     }
   ],
   "Prompt": [
@@ -143,12 +143,6 @@
       "line": 94
     }
   ],
-  "advance_line": [
-    {
-      "file": "src/k3dge/engine/audit_flow.py",
-      "line": 458
-    }
-  ],
   "all_stage_refs": [
     {
       "file": "src/k3dge/engine/gates.py",
@@ -200,7 +194,7 @@
   "audit_call_result": [
     {
       "file": "src/k3dge/engine/audit_flow.py",
-      "line": 41
+      "line": 39
     }
   ],
   "audit_closed": [
@@ -212,7 +206,7 @@
   "audit_evidence": [
     {
       "file": "src/k3dge/engine/audit_flow.py",
-      "line": 64
+      "line": 62
     }
   ],
   "audit_job_ticket_names": [
@@ -224,13 +218,13 @@
   "audit_result_of": [
     {
       "file": "src/k3dge/engine/audit_flow.py",
-      "line": 59
+      "line": 57
     }
   ],
   "begin_run": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 271
+      "line": 262
     }
   ],
   "blocking_cycles": [
@@ -659,12 +653,6 @@
       "line": 103
     }
   ],
-  "collect_audit": [
-    {
-      "file": "src/k3dge/engine/audit_flow.py",
-      "line": 262
-    }
-  ],
   "collect_domain_interface": [
     {
       "file": "src/k3dge/engine/contract.py",
@@ -750,13 +738,13 @@
     },
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 299
+      "line": 290
     }
   ],
   "emit_all": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 311
+      "line": 302
     }
   ],
   "ensure": [
@@ -1134,7 +1122,7 @@
   "load_all": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 335
+      "line": 326
     }
   ],
   "load_mcp_document": [
@@ -1152,7 +1140,7 @@
   "load_persisted": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 352
+      "line": 343
     }
   ],
   "load_pipeline_config": [
@@ -1188,10 +1176,6 @@
     }
   ],
   "materialize": [
-    {
-      "file": "src/k3dge/engine/audit_flow.py",
-      "line": 550
-    },
     {
       "file": "src/k3dge/engine/worktree.py",
       "line": 333
@@ -1230,7 +1214,7 @@
   "next_for_rejection": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 399
+      "line": 390
     }
   ],
   "normalize": [
@@ -1249,12 +1233,6 @@
     {
       "file": "src/k3dge/engine/nodes.py",
       "line": 82
-    }
-  ],
-  "open_ratchet_jobs": [
-    {
-      "file": "src/k3dge/engine/audit_flow.py",
-      "line": 522
     }
   ],
   "open_samples": [
@@ -1317,16 +1295,10 @@
       "line": 44
     }
   ],
-  "peer_status": [
-    {
-      "file": "src/k3dge/engine/audit_flow.py",
-      "line": 495
-    }
-  ],
   "persist": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 283
+      "line": 274
     }
   ],
   "persist_external_audit_report": [
@@ -1383,22 +1355,10 @@
       "line": 277
     }
   ],
-  "prune_finished": [
-    {
-      "file": "src/k3dge/engine/audit_flow.py",
-      "line": 571
-    }
-  ],
-  "push_present": [
-    {
-      "file": "src/k3dge/engine/audit_flow.py",
-      "line": 429
-    }
-  ],
   "question_text": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 424
+      "line": 415
     }
   ],
   "read_checklist": [
@@ -1674,7 +1634,7 @@
   "seal_ready_for": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 372
+      "line": 363
     }
   ],
   "seal_record": [
@@ -1711,12 +1671,6 @@
     {
       "file": "src/k3dge/engine/gate_facts.py",
       "line": 541
-    }
-  ],
-  "show_job": [
-    {
-      "file": "src/k3dge/engine/audit_flow.py",
-      "line": 528
     }
   ],
   "split_task_name": [
@@ -1759,12 +1713,6 @@
     {
       "file": "src/k3dge/engine/worktree.py",
       "line": 119
-    }
-  ],
-  "submit_audit": [
-    {
-      "file": "src/k3dge/engine/audit_flow.py",
-      "line": 172
     }
   ],
   "summary": [
@@ -1924,7 +1872,7 @@
   "workspace_status": [
     {
       "file": "src/k3dge/cli/status.py",
-      "line": 91
+      "line": 83
     }
   ],
   "worktree_path": [

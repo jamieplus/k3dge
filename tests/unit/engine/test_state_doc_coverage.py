@@ -53,7 +53,7 @@ class TestStateDocCoverage(unittest.TestCase):
         self.assertNotIn("ARCH_STATE_DOC_DRIFT", self._rules())
 
     def test_missing_next_state_is_violation(self) -> None:
-        text = _full_overview().replace("`ratchet_open`", "`something_else`")
+        text = _full_overview().replace("`audit_suggested`", "`something_else`")
         self._write(text)
         self.assertIn("ARCH_STATE_DOC_DRIFT", self._rules())
 

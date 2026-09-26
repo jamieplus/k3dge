@@ -456,7 +456,7 @@ def k3dge_milestone_control(
         )
 
     if act == "seal":
-        # Seal 三相位自己跑审计（ADR-0004 🅰1）。在办棘轮单返回 ratchet_open，不是 audit_needed。
+        # Seal 三相位自己跑审计（ADR-0004 🅰1）。在办的棘轮单已随形状退休（不会出现）。
         from k3dge.engine import nextstep
         from k3dge.engine.version import get_version
 
