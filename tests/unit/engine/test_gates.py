@@ -46,7 +46,9 @@ def test_pipeline_toml_with_peers_only_keeps_check_defaults():
         ws = _ws(d, '[roles.audit]\nbind = "k3dit"\n[peers.k3dit.actions.audit]\n'
                     'transports = [ { provider = "skip" } ]\n')
         assert gates.preconditions(ws, "seal")[0] == "tasks_all_done"
-        assert gates.stages(ws, "audit", "produce") == ["audit.actions.audit"]
+        # 缺省＝**无外部审计步**（审计是本地工具调用，2026-09-26 起）：仍有对等 harness 的仓显式声明
+        assert gates.stages(ws, "audit", "produce") == []
+        assert gates.stages(ws, "audit", "verify") == []
 
 
 def test_seal_preconditions_default_and_override():

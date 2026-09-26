@@ -153,14 +153,34 @@ def test_bundle_audit_leg_routes_and_fails_clear(tmp_path, monkeypatch):
     assert early is not None and early[0] == "refused" and "未闭环" in early[1]
 
     # ③ 闭环 + 消费成功 ⇒ 落树提交，并返回 (None, msg) 让共用尾收口
-    monkeypatch.setattr(ab, "run_path_audit",
-                        lambda w, out, **k: {"ok": True, "rc": 0, "payload": {"status": "closed", "incomplete": False}})
+    def _fake_run(w, out, **k):
+        # 真工具会产包（含 12 列报告）；这里造最小包，让"报告落地"有源可落
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "report.md").write_text(
+            "# 审计\n\n| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n",
+            encoding="utf-8")
+        return {"ok": True, "rc": 0, "payload": {"status": "closed", "incomplete": False}}
+
+    monkeypatch.setattr(ab, "run_path_audit", _fake_run)
     monkeypatch.setattr(ab, "consume",
                         lambda w, b, **k: {"ok": True, "apply": {"files": ["src/a.py"]},
                                            "facts": {"job_id": "j9"}, "digest": "d" * 64})
     (ws / "src" / "a.py").write_text("x = 1\ny = 2\nz = 3\n", encoding="utf-8")
     early, msg = ma._bundle_audit_leg(ws, "M99", ma._Prompt.default(), "b" * 40)
-    assert early is None and "bundle 审计腿闭环" in msg and "提交" in msg
+    assert early is None and "bundle 审计腿闭环" in msg and "工具 k3dit" in msg
     from k3dge.engine.seal import head_commit
+    from k3dge.engine.audit_report import _find_report
 
     assert head_commit(ws)            # 确实产生了一次提交
+    # ① 报告落地：判定面（checklist/触发）靠 `_find_report` 在 docs/reviews 里找它
+    found = _find_report(ws, "M99", "audit")
+    assert found, "包里的 12 列报告必须落到 docs/reviews（否则 checklist/judged 看不到审计产物）"
+    assert "docs/reviews" in found[0].as_posix() and "k3dit-bundle" in found[0].name
+    # ② 包在**仓外**：k3dit 的中间产物不该进被审树（旧位置 <ws>/.k3dit/... 会留未跟踪目录）
+    import subprocess
+
+    status = subprocess.run(["git", "-C", str(ws), "status", "--porcelain"],
+                            capture_output=True, text=True).stdout
+    assert ".k3dit" not in status and ".k3ge" not in status, status
+    assert not (ws / ".k3dit").exists()

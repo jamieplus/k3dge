@@ -68,7 +68,13 @@ def _ws() -> Path:
 # 审计腿形状必须显式声明：`_audit_mode` 缺省值是 "oneshot"，而本仓与模板的
 # pipeline.toml 都写 `mode = "ratchet"`。靠默认值走 oneshot 的测试不声明自己
 # 测的是哪条路——一旦默认值改变就静默改测另一条。故 oneshot 测试一律用本 helper。
-_ONESHOT = '[roles.audit]\nbind = "k3dit"\nmode = "oneshot"\n\n[peers.k3dit]\nenabled = true\n'
+# 缺省已改为"审计无外部步"（本地工具调用）⇒ oneshot 形状必须**显式**声明它的外部 produce/verify 步，
+# 否则 run_audit_flow 按"没有可跑的审计步"拒绝（那是设计，不是 bug）。
+_ONESHOT = ('[roles.audit]\nbind = "k3dit"\nmode = "oneshot"\n\n'
+            '[peers.k3dit]\nenabled = true\n\n'
+            '[checks.audit]\n'
+            'stages_produce = ["audit.actions.audit"]\n'
+            'stages_verify = ["audit.actions.verify"]\n')
 
 
 def _ws_oneshot() -> Path:
@@ -989,10 +995,11 @@ class TestStagesAreDeclaredNotHardcoded(TestCase):
     def test_executor_reads_declared_stages(self):
         from k3dge.engine import gates
 
-        self.assertEqual(gates.stages(_ws(), "audit", "produce"), ["audit.actions.audit"])
-        self.assertEqual(gates.stages(_ws(), "audit", "verify"), ["audit.actions.verify"])
-        self.assertEqual(gates.all_stage_refs(_ws()),
-                         ["audit.actions.audit", "audit.actions.verify"])
+        # 缺省＝无外部步（审计是本地工具调用，2026-09-26）：要外部步的仓**显式**声明（见下一条用例与
+        # `_ws_oneshot`）——"缺省声明一个解析不到的 action"才是要避免的。
+        self.assertEqual(gates.stages(_ws(), "audit", "produce"), [])
+        self.assertEqual(gates.stages(_ws(), "audit", "verify"), [])
+        self.assertEqual(gates.all_stage_refs(_ws()), [])
 
     def test_downstream_can_rebind_stages(self):
         """下游可配（用户裁定）：改声明面 .agent/pipeline.toml 就换实现，只有一处。"""

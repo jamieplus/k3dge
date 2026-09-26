@@ -21,7 +21,8 @@
 # 质量不在角色表：它是合并审计模块内的窗口（ADR-0025），无独立 peer。
 [roles.audit]
 bind = "k3dit"
-# 审计腿形状：`bundle`＝冻结基线 → k3dit 路径入口产包 → 消费侧验包+落补丁（ADR-0025 §2.9.6）。
+# 审计腿形状：`bundle`＝冻结基线 → **命令行工具 k3dit** 产包 → 消费侧验包+落补丁（ADR-0025 §2.9.6）。
+# `bind` 只声明"谁审"（工具名，和 `git` 同层）；本地命令行工具**不注册 peer、不声明 transport**。
 # 2026-09-26 从 `ratchet` 迁来：棘轮要的 verb 走 mcp，而 k3dit 的 MCP 服务端面已退役（见下）。
 mode = "bundle"
 
@@ -29,27 +30,8 @@ mode = "bundle"
 bind = "k3che"
 kind = "service"
 
-[peers.k3dit]
-# MCP 服务端面已退役（k3dit `mcp.py` 删除）⇒ 不再注册它，也不声明任何 mcp 跳（声明不许空转）。
-# 对等接入只剩 cli 传输：命令里用 `${K3DIT_BIN:-k3dit}`，兄弟仓开发者免改配置。
-enabled = false
-
-# 判断型工单协议（契约 §1，2026-09-03）：提交登记/回收结果两态；领取与回投是席位的事（k3dit CLI/MCP）
 
 
-
-
-[peers.k3dit.actions.audit]
-transports = [
-  { provider = "cli", command = "${K3DIT_BIN:-k3dit} audit --path . --out .k3dit/bundle --mode full --format json", timeout = 3600 },
-  { provider = "manual", protocol = "docs/protocols/audit_default.md" },
-]
-
-[peers.k3dit.actions.verify]
-transports = [
-  { provider = "cli", command = "${K3DIT_BIN:-k3dit} check-report {path}", timeout = 15 },
-  { provider = "manual", protocol = "docs/protocols/verify_default.md" },
-]
 
 # 质量是合并审计模块内的窗口（ADR-0025），不再是独立 peer：
 # 无独立 quality peer / quality report/verify 腿。一份 12 列报告即一轮。
@@ -77,17 +59,7 @@ transports = [
 #
 # 审计流的两步即在此声明（原 [pipelines.on_seal_enter] / [on_pre_seal] 已迁走——
 # 那两处只有 schema 校验、没有执行者，属"文档声称的机制不存在"）：
-#   [checks.audit] stages_produce = ["k3dit.actions.audit"]
-#                  stages_verify  = ["k3dit.actions.verify"]
-# 声明了却解析不到 peer action ⇒ PIPELINE_UNRESOLVED_STAGE（不让声明空转）。
-
-# ── 编排骨架声明（唯一声明面；下游可配）──────────────────────────────────────
-# 缺省在 engine/gates.DEFAULTS（必须完整）；本段按 key 覆盖，`checks.<op>` 逐键覆盖。
-# 文件缺失/解析失败 ⇒ 回落缺省（闸不因配置坏而失效，ADR-0026 §2.7）。
-# 未知 id 一律拒绝（不让声明空转）。两类 id 不混词表：
-#   preconditions / actions = k3dge 内部（闸 id / 注册表动作 id）
-#   stages_<phase>          = 外部 peer 的 action ref（用**角色名**，换 bind 即换实现）
-
+#   [checks.audit]
 [checks.seal]
 # 预审＝进**审计**的门槛（ADR-0004 §2.1.9 相位 1）。`align_pass` 由第一个动作
 # `full_matrix` 满足（[nodes.full_matrix].satisfies）⇒ 清单显示 ⚙️，不需预先手跑 align。
@@ -104,7 +76,13 @@ preconditions = ["tasks_all_done"]
 actions = ["full_matrix"]
 
 [checks.audit]
-stages_produce = ["audit.actions.audit"]   # 一份必做（合并审计模块，ADR-0025）
+# 审计**不是外部步**：k3dit 是本地命令行工具（和 `git` 同层）⇒ bundle 腿按 argv 调用它、读包、
+# 落树、落账；自证走工具子命令（`k3dit audit --verify`，在 `audit_bundle.consume` 内）。
+# 显式置空：既表明"没有外部 produce/verify 步"，也避免声明一个解析不到的 action（声明面不许空转）。
+stages_produce = []
+stages_verify = []
+
+["audit.actions.audit"]   # 一份必做（合并审计模块，ADR-0025）
 stages_verify = ["audit.actions.verify"]   # 待修==0 的二次核对
 
 [checks.sync]

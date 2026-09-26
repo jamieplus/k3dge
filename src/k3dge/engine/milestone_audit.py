@@ -5,6 +5,8 @@ Extracted from `engine/milestone.py` (A-1 第十二块).
 from __future__ import annotations
 
 import datetime
+import os
+import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -471,7 +473,10 @@ def _bundle_audit_leg(
             "审计腿声明为 bundle，但找不到 k3dit（设 K3DIT_BIN 或装到 PATH/兄弟仓）"
             "——声明面与实现面不符时**不得**静默降级成别的形状（ADR-0004 §2.1.11）。"), ""
 
-    out = workspace / ".k3dit" / f"bundle-{(fresh_baseline or 'head')[:12]}"
+    # 包落在**仓外**（缓存目录）：k3dit 是命令行工具，它的中间产物理应与 `git` 的对象库一样不进被审树
+    #（旧位置 `<workspace>/.k3dit/bundle-*` 会在被审仓里留未跟踪目录 ⇒ 消费方 status/gate 变脏）。
+    cache_root = Path(os.environ.get("K3GE_AUDIT_CACHE") or (Path(tempfile.gettempdir()) / "k3ge-audit"))
+    out = cache_root / f"{milestone_id}-{(fresh_baseline or 'head')[:12]}"
     ran = ab.run_path_audit(workspace, out, mode="full")
     payload = ran.get("payload") or {}
     if not ran.get("ok"):
@@ -487,16 +492,27 @@ def _bundle_audit_leg(
     if not res.get("ok"):
         return _reject_step(workspace, milestone_id, "audit_bundle_consume_failed",
                             f"消费交付包失败（{res.get('error')}）：{res.get('detail') or ''}"), ""
+    # 包里那份 12 列报告就是**审计产物**：必须落到 `docs/reviews/`，否则判定面（checklist / 触发 /
+    # judged 事实）看不到它——`_find_report` 只在 docs/reviews 里找。复用既有的落地器（统一命名/表头/覆盖规则）。
+    report_src = out / "report.md"
+    if not report_src.is_file():
+        return _reject_step(workspace, milestone_id, "audit_bundle_report_missing",
+                            f"包内缺 report.md（{out}）⇒ 没有审计产物可落，不得当已审"), ""
+    report_dst = persist_external_audit_report(workspace, milestone_id,
+                                               report_src.read_text(encoding="utf-8"),
+                                               scope="k3dit-bundle", kind="audit")
     # 落树 + 提交（**不写 Audit-* trailer**：那些由封版相位 3 一次写清，判据只认 git 事实）
     files = (res.get("apply") or {}).get("files") or []
     digest = str(res.get("digest") or "")[:12]
     jid = str((res.get("facts") or {}).get("job_id") or "")
+    rel_report = report_dst.relative_to(workspace).as_posix()
     commit = ""
-    if files:
+    if files or rel_report:
+        # 报告与补丁一起提交：审计的"产物 + 落地"落在同一次提交上（封版相位再写 trailer/边界 tag）
         commit = ab.commit_applied(workspace, f"fix(audit): k3dit 交付包落树（job {jid or '-'}，包 {digest}）",
-                                   files)
-    msg = (f"Milestone {milestone_id}: bundle 审计腿闭环（k3dit job {jid or '-'}，包 {digest}，"
-           f"落 {len(files)} 文件{('，提交 ' + commit[:12]) if commit else ''}）。")
+                                   [*files, rel_report])
+    msg = (f"Milestone {milestone_id}: bundle 审计腿闭环（工具 k3dit job {jid or '-'}，包 {digest}，"
+           f"落 {len(files)} 文件，报告 {rel_report}{('，提交 ' + commit[:12]) if commit else ''}）。")
     return None, msg
 
 

@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:bae702257ea0ce1293b0eaeb620414b0cee53270bf9133da0d02d7039214d272`
+- **Contract Hash**: `sha256:44eab82619fd954ee679dc41773b59409ca0cd6d82325299468a6fd4aacbfb1e`
 - **Last Updated**: 2026-09-26
 
 ## 1. Domain Boundary & Responsibilities
@@ -271,7 +271,7 @@ rejection(message: Any, fallback_gate_id: str) -> Rejection
 REL = '.agent/pipeline.toml'
 LEGACY_REL = '.agent/gates.toml'
 INTERNAL_GATE_IDS: tuple = ('unknown_gate_id', 'unknown_action_id', 'audit_report_missing', 'audit_open_declined', 'audit_noop', 'audit_degraded_unsigned', 'milestone_id_invalid', 'no_tasks', 'invalid_task_status', 'align_failed', 'archive_failed')
-DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed', 'adr_amend_format', 'docs_normalized'], 'actions': ['full_matrix', 'audit', 'archive', 'version_bump', 'closure_note', 'seal_record', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}, 'sync': {'actions': ['sync_extractors', 'reconcile_adrs', 'sync_domains', 'sync_manual_docs', 'sync_docs_index']}, 'audit': {'stages_produce': ['audit.actions.audit'], 'stages_verify': ['audit.actions.verify']}}}
+DEFAULTS: Dict[str, Any] = {'audit_trigger': {'c2_nesting_max': 5, 'volume_max': 8}, 'search': {'context_max': 3}, 'markers': {'max_note': 80, 'max_note_pending': 500}, 'output': {'default_lines': 10}, 'checks': {'seal': {'preconditions': ['tasks_all_done', 'align_pass', 'guides_filled', 'adrs_all_accepted', 'adr_landed', 'adr_amend_format', 'docs_normalized'], 'actions': ['full_matrix', 'audit', 'archive', 'version_bump', 'closure_note', 'seal_record', 'prune']}, 'align': {'preconditions': ['tasks_all_done'], 'actions': ['full_matrix']}, 'sync': {'actions': ['sync_extractors', 'reconcile_adrs', 'sync_domains', 'sync_manual_docs', 'sync_docs_index']}, 'audit': {'stages_produce': [], 'stages_verify': []}}}
 load(workspace: Path) -> Dict[str, Any]
 legacy_config_present(workspace: Path) -> bool
 get(workspace: Path, section: str, key: str) -> Any

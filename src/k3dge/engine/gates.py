@@ -97,12 +97,13 @@ DEFAULTS: Dict[str, Any] = {
         # sync 链：顺序＝声明序；各步性质（投影/事实源）见 nodes.NODE_DEFAULTS
         "sync": {"actions": ["sync_extractors", "reconcile_adrs", "sync_domains",
                              "sync_manual_docs", "sync_docs_index"]},
-        # 审计流的两个外部步（原 pipeline.toml 的 [pipelines.on_seal_enter]/[on_pre_seal]，
-        # 那两处只有 schema 校验、无执行者 ⇒ 迁到这里，由 run_audit_flow 真读）
-        # ref 用**角色名**（audit.*），不写死 peer 名：下游把 [roles.audit] bind 到
-        # 别的实现时，声明不用改（pipeline.toml 的既定口径：新流程一律走角色名）。
-        "audit": {"stages_produce": ["audit.actions.audit"],
-                  "stages_verify": ["audit.actions.verify"]},
+        # 审计腿默认**无外部步**：k3dit 是本地命令行工具（和 `git` 同层），由 bundle 腿按 argv 调用 +
+        # 读包 + 落树 + 落账；自证走工具子命令。仍有对等 harness 的仓**显式**声明 stages_*（用角色名
+        # audit.*，不写死 peer 名）；这里留空 = 缺省就不声明一个解析不到的 action。
+        # 审计**默认没有外部步**：k3dit 是本地命令行工具（和 `git` 同层）⇒ bundle 腿按 argv 调用它、
+        # 读包、落树、落账（ADR-0025 §2.9.6）。仍有对等 harness 的仓可自行声明 stages_*（显式覆盖）。
+        "audit": {"stages_produce": [],
+                  "stages_verify": []},
     },
 }
 

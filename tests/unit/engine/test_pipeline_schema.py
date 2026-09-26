@@ -72,7 +72,8 @@ class TestPipelineSchema(unittest.TestCase):
     def test_unresolved_stage(self):
         """声明的外部步解析不到 transports ⇒ 红（不让声明空转）。
 
-        缺省 `[checks.audit]` 要 `audit.actions.audit|verify`；这里只给了 audit 一条腿。
+        缺省 `[checks.audit]` 现在是空的（审计＝本地工具调用）⇒ 本用例**显式**声明两条外部步，
+        再只给 audit 一条腿，验证"声明了就必须能解析"。
         """
         import tempfile
 
@@ -82,6 +83,8 @@ class TestPipelineSchema(unittest.TestCase):
                 root,
                 ".agent/pipeline.toml",
                 '[roles.audit]\nbind = "k3dit"\n'
+                '[checks.audit]\nstages_produce = ["audit.actions.audit"]\n'
+                'stages_verify = ["audit.actions.verify"]\n'
                 '[peers.k3dit.actions.audit]\n'
                 "transports = [ { provider = \"skip\" } ]\n",
             )

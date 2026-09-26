@@ -122,7 +122,7 @@
   "actions": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 186
+      "line": 187
     }
   ],
   "adr_landed": [
@@ -152,7 +152,7 @@
   "all_stage_refs": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 173
+      "line": 174
     }
   ],
   "amend_format": [
@@ -870,7 +870,7 @@
   "get": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 152
+      "line": 153
     }
   ],
   "get_changed_files": [
@@ -1098,7 +1098,7 @@
   "legacy_config_present": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 147
+      "line": 148
     }
   ],
   "lifecycle_next": [
@@ -1128,7 +1128,7 @@
   "load": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 124
+      "line": 125
     }
   ],
   "load_all": [
@@ -1332,7 +1332,7 @@
   "persist_external_audit_report": [
     {
       "file": "src/k3dge/engine/milestone_audit.py",
-      "line": 35
+      "line": 37
     }
   ],
   "pin_baseline": [
@@ -1344,7 +1344,7 @@
   "preconditions": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 157
+      "line": 158
     }
   ],
   "premature_archive_hint": [
@@ -1566,7 +1566,7 @@
   "run_audit_flow": [
     {
       "file": "src/k3dge/engine/milestone_audit.py",
-      "line": 503
+      "line": 519
     }
   ],
   "run_milestone_alignment": [
@@ -1632,7 +1632,7 @@
   "scan_pending_findings": [
     {
       "file": "src/k3dge/engine/milestone_audit.py",
-      "line": 22
+      "line": 24
     }
   ],
   "scan_unfilled_guides": [
@@ -1740,7 +1740,7 @@
   "stages": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 162
+      "line": 163
     }
   ],
   "strip_code_spans": [

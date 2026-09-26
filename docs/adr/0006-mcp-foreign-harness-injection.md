@@ -4,6 +4,7 @@ Supersedes: -
 Amended-by:
   - 🅰1 | Core Maintainer | 2026-09-14 | §2.3 第 2、8 条加作用域声明，删「不得外溢成参数」
   - 🅰2 | Core Maintainer | 2026-09-26 | §2.1 cli 传输实参约定；§2.4 补"声明面不得留死 hop"与回退链实测结论
+  - 🅰3 | Core Maintainer | 2026-09-26 | §2.2 补"本地命令行工具不注册 peer/不声明 transport"；§2.4 缺省外部步为空
 Landed-by: src/k3dge/cli/mcp.py
 Date: 2026-08-24
 Deciders: Core Maintainer
@@ -57,6 +58,12 @@ k3dge 是**一致性元门禁**；下列 peer 是独立仓，各自挂 k3dge（`
 - **信任边界**：本机 stdio 信任边界＝调起该 MCP 的 OS 用户（S-13）；k3dge 作为出向客户端同样成立；网络化后再重开鉴权。
 - **入向 `workspace_path` 收敛**：MCP 服务进程启动钉**服务根**（启动 CWD）为 `K3DGE_MCP_ROOT`；`workspace_path` 默认须在服务根之内，越界即拒（显式化，不静默旁路窗/仓物理隔离，ADR-0025 §2.7）；跨仓须显式 `K3DGE_ALLOW_EXTERNAL_WORKSPACE=1`。非 MCP 直调（CLI/测试）不设服务根 ⇒ 语义不变。
 - **harness 身份不混用**：其它 harness 自定入口，禁止共用 `k3dge_*` 工具名装成一个进程；一个 peer 的传输只准命中它自己的 server / CLI（§2.3）。
+
+- **本地命令行工具不是 peer**：像 `git` 那样的本地工具（如 k3dit）由编排**按 argv 调用**，不注册 peer、
+  不声明 `actions`/`transports`、不进 `.mcp.json`；`[roles.*]` 的 `bind` 只声明"谁干这件事"的名字。
+  传输链（`mcp→cli→manual`）只留给**真正的对等 harness**（跨进程/跨机/需降级语义者）[^🅰3.2]。
+- **缺省没有外部审计步**：`[checks.audit] stages_produce/stages_verify` 缺省为空——审计是本地工具调用
+  （工具自带自证子命令）。需要外部步的仓**显式**声明；缺省不声明解析不到的 action（声明面不许空转）[^🅰3.2]。
 
 ### 2.3 MCP 的方向性不变量
 
@@ -131,3 +138,7 @@ MCP 有两个方向，**互不借道、互不背书**：
 [^🅰2.4]: 修改：补"声明面不得留死 hop"与回退链实测结论。驱动缘由：对端的 MCP 服务端面退役后，旧规则
 "角色绑定的 peer 必须在 `.mcp.json` 在册"把**纯 cli 的合法 peer** 判红（实测误报），故口径收紧为
 "声明了 mcp 跳才要求在册"；同时把此前挂着"由后续里程碑专测"的 fallback 可用性用一次真跑结清。
+
+[^🅰3.2]: 修改：补"本地命令行工具不是 peer"。驱动缘由：k3dit 已退化为本地命令行工具（其 MCP 服务端面退役、
+交付物是包），继续用 peer/role/transport 那套表示它，会留下"声明了却没人解析"的空转面（实测）与
+`.mcp.json` 占位；改按 argv 调用后，声明面只剩"谁审（bind 名）＋什么形状（mode）"。
