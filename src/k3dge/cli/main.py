@@ -599,9 +599,17 @@ def cmd_audit(args: argparse.Namespace) -> int:
                      expect_input=str(target),
                      # 纯审计包 status=partial 是设计（钉留树）⇒ 不要求闭环
                      require_closed=(getattr(args, "bundle_mode", "full") or "full") != "audit-only")
-    print(json.dumps(res, ensure_ascii=False))
+    # **入口唯一＝效果唯一**（ADR-0025 §2.9.6）：手动入口与封板腿共用 `land_report`，
+    # 否则"同一模块同一参数"只是形式——手动跑完报告不落盘、不提交（此前如此），判定面看不到产物。
+    landed = {}
+    if not getattr(args, "dry_run", False):
+        landed = ab.land_report(target, tok or "local", bundle,
+                                extra_files=list((res.get("apply") or {}).get("files") or []),
+                                why=f"手动入口 {('包 ' + str(ab.bundle_digest(bundle))[:12]) if bundle.is_dir() else ''}")
+    print(json.dumps({**res, "landed": landed}, ensure_ascii=False))
     _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] audit bundle "
-                           f"{bundle} ok={res.get('ok')} dry={bool(getattr(args, 'dry_run', False))}")
+                           f"{bundle} ok={res.get('ok')} dry={bool(getattr(args, 'dry_run', False))} "
+                           f"report={landed.get('report', '')} commit={landed.get('commit', '')}")
     return 0 if res.get("ok") else 1
 
 

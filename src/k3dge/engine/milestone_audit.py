@@ -377,38 +377,6 @@ def _oneshot_audit_leg(
     return status, msg + "\n" + _ns.render_cli()
 
 
-def _land_report_even_on_refusal(
-    workspace: Path, milestone_id: str, out: Path, *, why: str
-) -> str:
-    """**拒绝路径也要留住报告**：审计跑了、钱花了、包里有 `report.md` ⇒ 必须落 `docs/reviews/` 并提交。
-
-    真跑实测（2026-09-27）：第一轮腿（scope=src/k3dit/tools，2.29M prompt、20KB/31 行报告）产包后因
-    `DIRTY_TREE` 被拒 ⇒ 报告**只留在缓存目录**（清缓存即丢），判定面（checklist/触发/封板）看不到它，
-    而随后为了验收换窄 scope 重跑 ⇒ 落仓的那份成了"0 行结论"的空报告。**跑完没留下证据＝这一轮白跑。**
-    返回提交 sha（失败则空串；报告已落盘但提交失败时也返回空串——调用方在拒绝理由里说明）。
-    """
-    from k3dge.engine import audit_bundle as ab
-
-    report_src = Path(out) / "report.md"
-    if not report_src.is_file():
-        return ""
-    try:
-        report_dst = persist_external_audit_report(workspace, milestone_id,
-                                                   report_src.read_text(encoding="utf-8"),
-                                                   scope="k3dit-bundle", kind="audit")
-        rel = report_dst.relative_to(workspace).as_posix()
-        files = [rel]
-        from k3dge.engine.doc_catalog import INDEX_REL, write_docs_index
-
-        if write_docs_index(workspace).is_file():
-            files.append(INDEX_REL)
-        sha, err = ab.commit_applied(
-            workspace, f"docs(audit): M{milestone_id} 审计报告落盘（{why[:80]}）", files)
-        return "" if err else sha
-    except Exception:
-        return ""
-
-
 def _bundle_audit_leg(
     workspace: Path,
     milestone_id: str,
@@ -467,7 +435,8 @@ def _bundle_audit_leg(
     res = ab.consume(workspace, out, expect_input=str(workspace), require_closed=not audit_only)
     if not res.get("ok"):
         # 消费失败（脏树/补丁打不上…）**不等于这一轮没产出**：报告必须在手，否则等于白跑一轮
-        _sha = _land_report_even_on_refusal(workspace, milestone_id, out, why=f"消费被拒 {res.get('error')}")
+        _sha = (ab.land_report(workspace, milestone_id, out,
+                              why=f"消费被拒 {res.get('error')}").get("commit") or "")
         return _reject_step(
             workspace, milestone_id, "audit_bundle_consume_failed",
             f"消费交付包失败（{res.get('error')}）：{res.get('detail') or ''}"
@@ -475,38 +444,17 @@ def _bundle_audit_leg(
             f"产物包留在 {out}"), ""
     # 包里那份 12 列报告就是**审计产物**：必须落到 `docs/reviews/`，否则判定面（checklist / 触发 /
     # judged 事实）看不到它——`_find_report` 只在 docs/reviews 里找。复用既有的落地器（统一命名/表头/覆盖规则）。
-    report_src = out / "report.md"
-    if not report_src.is_file():
-        return _reject_step(workspace, milestone_id, "audit_bundle_report_missing",
-                            f"包内缺 report.md（{out}）⇒ 没有审计产物可落，不得当已审"), ""
-    report_dst = persist_external_audit_report(workspace, milestone_id,
-                                               report_src.read_text(encoding="utf-8"),
-                                               scope="k3dit-bundle", kind="audit")
-    # 落树 + 提交（**不写 Audit-* trailer**：那些由封版相位 3 一次写清，判据只认 git 事实）
+    # 落报告 + 重生投影 + **一次提交**（与拒绝路、手动入口**共用同一个函数**；此前这里另写了一份）
     files = list((res.get("apply") or {}).get("files") or [])
-    digest = str(res.get("digest") or "")[:12]
+    digest = str((res.get("digest") or "")[:12])
     jid = str((res.get("facts") or {}).get("job_id") or "")
-    rel_report = report_dst.relative_to(workspace).as_posix()
-    # 审计**自己写了文档** ⇒ 先重生**确定性投影**（docs-index），否则自带的文档新鲜度闸会把这次提交拦下：
-    # 真跑实测 2026-09-27：报告刚落、docs-index 过期 ⇒ commit 被 `DOC_INDEX_STALE` 拒（且报错被吞成空 sha）
-    # ⇒ 产物留在 staged 态，下一次跑又被 `DIRTY_TREE` 挡。**写得进、提交得上去**是同一个动作的两半。
-    try:
-        from k3dge.engine.doc_catalog import INDEX_REL, write_docs_index
-
-        if write_docs_index(workspace).is_file():
-            files = [*files, INDEX_REL]
-    except Exception as exc:
-        return _reject_step(workspace, milestone_id, "audit_bundle_projection_failed",
-                            f"落树后重生 docs 投影失败：{exc}"), ""
-    commit = ""
-    if files or rel_report:
-        # 报告与补丁一起提交：审计的"产物 + 落地"落在同一次提交上（封版相位再写 trailer/边界 tag）
-        commit, cerr = ab.commit_applied(
-            workspace, f"fix(audit): k3dit 交付包落树（job {jid or '-'}，包 {digest}）", [*files, rel_report])
-        if cerr:
-            return _reject_step(workspace, milestone_id, "audit_bundle_commit_failed",
-                                f"落树后提交失败：{cerr} ⇒ 产物已在工作区（未提交），"
-                                f"请人工提交或回退后重跑"), ""
+    landed = ab.land_report(workspace, milestone_id, out, extra_files=files,
+                            why=f"job {jid or '-'} 包 {digest}")
+    if not landed.get("ok"):
+        return _reject_step(workspace, milestone_id, f"audit_bundle_{landed.get('error', 'report').lower()}",
+                            f"落报告/投影/提交失败：{landed.get('detail') or landed.get('error')} ⇒ "
+                            f"产物已在工作区（未提交），请人工提交或回退后重跑"), ""
+    rel_report, commit = str(landed.get("report") or ""), str(landed.get("commit") or "")
     if audit_only:
         return _reject_step(
             workspace, milestone_id, "audit_evidence_only",

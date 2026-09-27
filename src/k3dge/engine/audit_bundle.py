@@ -220,6 +220,44 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
     return {"ok": True, "applied": order, "files": res.get("files") or [], "dry_run": False}
 
 
+def land_report(workspace: Path, milestone_id: str, out: Path, *,
+                extra_files: Optional[List[str]] = None, why: str = "") -> dict:
+    """**唯一的"落报告"入口**：包内 `report.md` → `docs/reviews/` + 重生 docs 投影 + **一次提交**。
+
+    为什么合并（2026-09-27 流程体检）：这条三步序列此前写在**两处**（腿的正常路 + 腿的拒绝路
+    `_land_report_even_on_refusal`），而**手动入口 `k3dge audit bundle` 两处都没有** ⇒ 同一动作三种形态，
+    其中"手动入口"那种**没有效果**（报告不落盘、不提交 ⇒ 判定面看不到）。三个入口现在共用本函数。
+    `extra_files`＝同一次提交里并入的已落文件（落补丁时用：报告与补丁同一次提交，封版相位再写 trailer）。
+    返回 {ok, report, commit, error}。**失败不抛**：调用方按 `error` 决定拒绝还是继续。
+    """
+    report_src = Path(out) / "report.md"
+    if not report_src.is_file():
+        return {"ok": False, "error": "REPORT_MISSING", "detail": f"包内缺 report.md（{out}）", "report": "", "commit": ""}
+    try:
+        from k3dge.engine.milestone_audit import persist_external_audit_report
+
+        report_dst = persist_external_audit_report(workspace, milestone_id,
+                                                   report_src.read_text(encoding="utf-8"),
+                                                   scope="k3dit-bundle", kind="audit")
+    except Exception as exc:      # pragma: no cover - 落地器异常不该吞
+        return {"ok": False, "error": "REPORT_PERSIST_FAILED", "detail": str(exc), "report": "", "commit": ""}
+    rel = report_dst.relative_to(workspace).as_posix()
+    files = [*([f for f in (extra_files or []) if f]), rel]
+    try:
+        from k3dge.engine.doc_catalog import INDEX_REL, write_docs_index
+
+        if write_docs_index(workspace).is_file():      # 落文档 ⇒ 必须先重生投影，否则自家新鲜度闸会拦提交
+            files.append(INDEX_REL)
+    except Exception as exc:
+        return {"ok": False, "error": "PROJECTION_FAILED",
+                "detail": f"重生 docs 投影失败：{exc}", "report": rel, "commit": ""}
+    msg = (f"docs(audit): M{milestone_id} 审计报告落盘（{why[:80]}）" if why
+           else f"fix(audit): k3dit 交付包落树（{why or 'k3dit-bundle'}）")
+    sha, cerr = commit_applied(workspace, msg, files)
+    return {"ok": not cerr, "error": "COMMIT_FAILED" if cerr else "", "detail": cerr,
+            "report": rel, "commit": sha, "files": files}
+
+
 def commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str, str]:
     """提交**已落的这些文件**（不用 `add -A`：别把工作区其它改动卷进审计提交）。返回 `(sha, 错误)`。
 

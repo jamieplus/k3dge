@@ -330,3 +330,33 @@ def test_leg_lands_report_even_when_consume_is_refused(tmp_path, monkeypatch):
     got = _find_report(ws, "M77", "audit")           # (path, text)
     assert got and "d-1" in got[1], "报告必须真的落盘（含内容）"
     assert doc_catalog.INDEX_REL in seen["files"], seen["files"]      # 投影一并提交
+
+
+def test_land_report_is_the_single_entry_used_by_all_three_paths(tmp_path, monkeypatch):
+    """**流程体检（2026-09-27）**：同一序列（落报告 → 重生投影 → 一次提交）此前写了两遍、手动入口一遍没有。
+
+    现在三个入口（腿正常路 / 腿拒绝路 / `k3dge audit bundle`）共用 `land_report`：
+    报告与已落补丁**同一次提交**，投影（docs-index）并入；缺报告 ⇒ fail-clear。
+    """
+    from k3dge.engine import doc_catalog
+
+    ws = _repo(tmp_path)
+    out = tmp_path / "out"
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "report.md").write_text("# 审计\n\n| ID |\n", encoding="utf-8")
+    idx = ws / doc_catalog.INDEX_REL
+    idx.parent.mkdir(parents=True, exist_ok=True)
+    idx.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(doc_catalog, "write_docs_index", lambda w: idx)
+    seen = {}
+    monkeypatch.setattr(ab, "commit_applied",
+                        lambda w, m, f: (seen.update(msg=m, files=list(f)) or ("a" * 40, "")))
+    r = ab.land_report(ws, "M1", out, extra_files=["src/a.py"], why="job j1")
+    assert r["ok"] and r["commit"] == "a" * 40 and r["report"].endswith(".md")
+    assert "src/a.py" in seen["files"], seen["files"]                       # 补丁与报告同一次提交
+    assert doc_catalog.INDEX_REL in seen["files"], seen["files"]            # 投影并入
+    assert "job j1" in seen["msg"]
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    bad = ab.land_report(ws, "M1", empty)
+    assert not bad["ok"] and bad["error"] == "REPORT_MISSING"

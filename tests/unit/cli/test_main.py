@@ -478,3 +478,35 @@ def test_status_deep_vs_summary(monkeypatch, capsys):
     assert m.cmd_status(argparse.Namespace(json=False, deep=True)) == 0
     out2 = capsys.readouterr().out
     assert "T11" in out2 and "more" not in out2
+
+
+def test_audit_bundle_manual_entry_lands_report_like_the_leg():
+    """手动入口与封板腿**效果唯一**：`k3dge audit bundle` 也必须落报告+提交（共用 `land_report`）。
+
+    流程体检出处（2026-09-27）：手动入口此前只跑 consume，报告不落盘、不提交 ⇒ "同一模块同一参数"
+    只是形式（判定面看不到产物）。
+    """
+    from k3dge.engine import audit_bundle as ab
+
+    calls = {}
+    orig_consume, orig_land = ab.consume, ab.land_report
+    ab.consume = lambda t, b, **k: {"ok": True, "apply": {"files": ["src/a.py"]}, "facts": {"job_id": "j1"}}
+    ab.land_report = lambda w, m, out, **k: (calls.update(extra=list(k.get("extra_files") or []), mid=m)
+                                             or {"ok": True, "report": "docs/reviews/x.md", "commit": "c" * 40})
+    try:
+        import contextlib
+        import io
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            (ws / ".agent").mkdir()
+            (ws / "bundle").mkdir()
+            (ws / "bundle" / "manifest.json").write_text('{"bundle_version": 1}', encoding="utf-8")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                rc = main(["audit", "bundle", str(ws / "bundle"), "--into", str(ws)])
+            assert rc == 0
+            assert calls.get("extra") == ["src/a.py"] and "landed" in out.getvalue()
+    finally:
+        ab.consume, ab.land_report = orig_consume, orig_land

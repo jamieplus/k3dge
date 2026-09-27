@@ -149,3 +149,19 @@ Denial reason and reopen condition live here only.
 
 **顺带发现（旧包不可消费）**：2026-09-27 之前产出的**全部**包，其 `baseline`（语义层）受产出方旧版**子串 strip**
 影响（把"提到钉的文档行"也去掉）⇒ 新的反向重放会**如实拒收**。要消费请用修好后的 k3dit **重新产包**。
+
+## 流程体检（2026-09-27）：绕路/无实效项清单（逐条带证据）
+
+**已修**：
+1. **同一序列写两遍、第三处没有** —— `落报告 → 重生 docs 投影 → 提交` 此前写在腿的正常路与 `_land_report_even_on_refusal`
+   两处，而**手动入口 `k3dge audit bundle` 两处都没有**（跑完报告不落盘、不提交 ⇒ 判定面看不到产物，"同一模块同一参数"
+   只是形式）。现在三处共用 `audit_bundle.land_report`（报告 + 已落补丁 **同一次提交**，投影并入）。
+2. **模板注释过时** —— `pipeline.toml.template` 写着"形状切换＝`oneshot`（缺省）/`ratchet`/`bundle`"：
+   `ratchet` **已退休**（声明即拒）、`oneshot` 也不是审计角色的缺省（缺省＝无外部步的本地工具）。已改。
+
+**记录不拆（有实效但只对另一种形状）**：
+3. **verify 预算 / `escalated` / `degraded-manual`**：`bump_verify_attempt` 的唯一调用点在 **oneshot 腿**
+   （`milestone_audit.py:263`），bundle 腿不碰 ⇒ 对常态（bundle）**无实效**。但 oneshot 是 ADR-0006 🅰3
+   明确保留的"对等 harness 扩展位"（有测试覆盖、无配置声明）⇒ 拆它属策略变更，需人拍；此处只记清"它只对 oneshot 有效"。
+4. **`k3dit audit --verify`（产出方自证）**：消费路径已不调（改本地验收）；它仍是产出方自己的 CLI 动词（产出方自测/人工用），
+   不算悬空，但**不再构成任何闸**。
