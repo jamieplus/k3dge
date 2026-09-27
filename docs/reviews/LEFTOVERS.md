@@ -174,3 +174,27 @@ Denial reason and reopen condition live here only.
 （`k3dit check-report`，无规整器）⇒ 若在 k3ge 侧实现就要**另抄一份口径**（违反单源）。
 真跑实测两次踩到（k3dit 落报告后红，手工补索引+归档两次）。**候选**：甲＝消费方加 `reviews --fix`，
 k3ge 落地后调它；乙＝消费仓把"归档"挪到 seal（改 README 与测试其一）。**待人拍**，k3ge 侧暂不动。
+
+## A 路 ✅ 已达成（2026-09-27）：审计返回的修复**并进了主干**（三路合并），不是"不落"
+
+用户指出"k3dge 消费报告、把审计返回的修复并进主干"是**既定目标** ⇒ 本轮把缺的那一环补齐并跑通：
+**k3dit `5c2c8cc`**（手动入口一条命令）：`consume ok` → `strategy=three-way-merge` → **11 个文件**并进主干
+→ 落库后校验（声明 `.venv/bin/k3dge sync && index && pytest`）**通过** → 报告+契约哈希+投影+修复**一次提交**。
+
+**为此补的四件事**（此前"打不上就整包落不下"）：
+1. **三路合并**（`engine/audit_merge.py`）：base＝包的可重放基线（`code/` 反序反向应用，抽成
+   `audit_verify.replay_to_baseline`，与哈希闸同源）、theirs＝包 `code/`、ours＝当前主干。
+   **按两层语义分手**：`fix.patch`（代码）走 `git merge-file`；`pins.patch`（钉，纯增量）正向应用、
+   打不上就按文件**并集**（两边都加钉 ⇒ 两枚都留）。冲突如实报文件（fail-clear）。
+2. **落库后校验**（声明面 `[roles.audit] post_apply_check`）：先在**工作区**跑（venv/钩子都在那），
+   不过就回滚刚写的文件 **＋ `docs/generated/*`** ⇒ 把"落进主干必须过消费仓测试"从人的习惯变成流程一步。
+3. **显式漂移接受**（`--accept-baseline-drift <理由>`）：旧包 `baseline` 受产出方旧 strip 规则影响（文档面必然
+   对不上，实测 10 个 `.md`）。两条硬条件：有理由 + 漂移文件**不被任何补丁触及**；接受事实记入
+   `accepted_drift`（写进报告/账）。
+4. **写入面收口**：落地提交的收集面＝整个 `docs/`（漏到 `docs/specs/` 的**契约哈希**会让钩子拦下，实测踩到）；
+   补丁未落 ⇒ **不落报告**（否则"24 已修"落进判定面＝误导证据，实测踩到）；无内容可提交＝no-op 不是失败。
+
+**本轮的排除项（需人工重做）**：`src/k3dit/tools/flowlint.py`（其修复与**我们后来**在同一函数里的条次归因
+改动真冲突）与 `src/k3dit/tools/cleanup.py`（其修复与**当前**测试期望冲突）——`--exclude` 显式给、写进报告说明。
+
+**仍待拍**：`FLOW-REVIEWS-01`（第三次出现）：落地会破消费仓的评审格式闸（索引/归档），今天仍是我手工补的。
