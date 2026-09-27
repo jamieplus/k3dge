@@ -403,13 +403,25 @@ def _bundle_audit_leg(
     out = cache_root / f"{milestone_id}-{(fresh_baseline or 'head')[:12]}"
     k3dit_mode = _role_opt(workspace, "audit", "k3dit_mode", "full")
     k3dit_pins = _role_opt(workspace, "audit", "k3dit_pins", "inplace")
+    k3dit_scope = _role_opt(workspace, "audit", "k3dit_scope", "")
     if k3dit_mode not in ("full", "audit-only"):
         return _reject_step(workspace, milestone_id, "audit_bad_k3dit_mode",
                             f'[roles.audit] k3dit_mode={k3dit_mode!r} 不合法（full / audit-only）'), ""
     if k3dit_pins not in ("inplace", "artifact"):
         return _reject_step(workspace, milestone_id, "audit_bad_k3dit_pins",
                             f'[roles.audit] k3dit_pins={k3dit_pins!r} 不合法（inplace / artifact）'), ""
-    ran = ab.run_path_audit(workspace, out, mode=k3dit_mode, pins=k3dit_pins)
+    # scope 是**相对仓根**的范围（逗号分隔）；绝对路径或 `..` 越界一律拒绝——送审范围是"哪一块自留地"，
+    # 不该由旋钮把审计带到仓外去（越界值只可能是写错，静默接受会让报告范围与声明不符）。
+    scope_err = ""
+    for _seg in [s for s in str(k3dit_scope).split(",") if s.strip()]:
+        _s = _seg.strip()
+        if os.path.isabs(_s) or any(part == ".." for part in Path(_s).parts):
+            scope_err = _s
+            break
+    if scope_err:
+        return _reject_step(workspace, milestone_id, "audit_bad_k3dit_scope",
+                            f'[roles.audit] k3dit_scope={scope_err!r} 不合法（相对仓根、不得含 .. 或绝对路径）'), ""
+    ran = ab.run_path_audit(workspace, out, mode=k3dit_mode, pins=k3dit_pins, scope=k3dit_scope)
     payload = ran.get("payload") or {}
     if not ran.get("ok"):
         return _reject_step(workspace, milestone_id, "audit_bundle_run_failed",

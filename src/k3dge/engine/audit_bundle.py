@@ -73,14 +73,17 @@ def _last_json(text: str) -> Optional[dict]:
 
 
 def run_path_audit(workspace: Path, out: Path, *, mode: str = "full", pins: str = "inplace",
-                   timeout: int = 3600, k3dit: Optional[List[str]] = None) -> dict:
+                   scope: str = "", timeout: int = 3600, k3dit: Optional[List[str]] = None) -> dict:
     """跑 k3dit 路径入口（工具调用）。`mode`＝工具运行模式（full / audit-only）；
-    `pins`＝钉的落地形态（inplace＝钉留树 / artifact＝钉只随包）。返回 {ok, rc, out, payload, detail}。"""
+    `pins`＝钉的落地形态（inplace＝钉留树 / artifact＝钉只随包）；
+    `scope`＝送审范围（**逗号分隔**；空串＝不传，用 k3dit 自己的缺省）。返回 {ok, rc, out, payload, detail}。"""
     argv0 = k3dit or find_k3dit(workspace)
     if not argv0:
         return {"ok": False, "rc": 127, "detail": f"找不到 k3dit（设 {K3DIT_ENV} 或装到 PATH/兄弟仓）"}
     argv = [*argv0, "audit", "--path", str(workspace), "--out", str(out),
             "--mode", mode, "--pins", pins, "--format", "json"]
+    if scope:
+        argv += ["--scope", str(scope)]
     rc, text = _run(argv, workspace, timeout)
     payload = _last_json(text)
     if rc not in (0, 3):

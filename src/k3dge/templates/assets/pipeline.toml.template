@@ -28,8 +28,10 @@ mode = "bundle"
 # 工具运行参数（k3dit 的两个旋钮，走声明面、不在腿里写死）：
 #   k3dit_mode = "full"（判读+修+复核，待修=0 才算已审）| "audit-only"（只出证据、不构成封板依据）
 #   k3dit_pins = "inplace"（钉留树）| "artifact"（钉只随包）
+#   k3dit_scope = "src/k3dit/tools"（逗号分隔、相对仓根；空＝k3dit 缺省）——控制送审面，避免整仓一次审
 k3dit_mode = "full"
 k3dit_pins = "inplace"
+k3dit_scope = ""
 
 [roles.cache]
 bind = "k3che"

@@ -182,7 +182,7 @@ SUPPORTED_BUNDLE_VERSIONS = (1,)
 K3DIT_ENV = 'K3DIT_BIN'
 find_k3dit(workspace: Path) -> Optional[List[str]]
     # doc: 定位 k3dit：`K3DIT_BIN` > PATH > 兄弟仓 `.venv` > 兄弟仓 zipapp。找不到 → None。
-run_path_audit(workspace: Path, out: Path, *, mode: str='full', pins: str='inplace', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict
+run_path_audit(workspace: Path, out: Path, *, mode: str='full', pins: str='inplace', scope: str='', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict
     # doc: 跑 k3dit 路径入口（工具调用）。`mode`＝工具运行模式（full / audit-only）；
 verify_bundle(bundle: Path, *, k3dit: Optional[List[str]]=None, timeout: int=600) -> dict
     # doc: `k3dit audit --verify <bundle>`：包自证（反向重放 + 12 列 + findings↔报告）。

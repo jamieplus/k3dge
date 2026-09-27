@@ -587,7 +587,8 @@ def cmd_audit(args: argparse.Namespace) -> int:
         out_dir = Path(getattr(args, "bundle_out", "") or bundle)
         _m = getattr(args, "bundle_mode", "full") or "full"
         ran = ab.run_path_audit(workspace, out_dir, mode=_m,
-                                pins=getattr(args, "bundle_pins", "inplace") or "inplace")
+                                pins=getattr(args, "bundle_pins", "inplace") or "inplace",
+                                scope=getattr(args, "bundle_scope", "") or "")
         print(json.dumps({"stage": "run", "out": str(out_dir), "rc": ran.get("rc"), "ok": ran.get("ok"),
                           "payload": ran.get("payload"), "detail": ran.get("detail")}, ensure_ascii=False))
         if not ran.get("ok"):
@@ -1196,6 +1197,8 @@ def build_parser() -> argparse.ArgumentParser:
                        help="bundle：先跑 k3dit 路径入口产包再消费（缺省只消费已存在的包）")
     p_aud.add_argument("--pins", dest="bundle_pins", choices=["inplace", "artifact"], default="inplace",
                        help="bundle：钉的落地形态（inplace＝钉留树 / artifact＝钉只随包）")
+    p_aud.add_argument("--scope", dest="bundle_scope", default="",
+                       help="bundle：送审范围（逗号分隔，相对仓根；空＝k3dit 缺省）")
     p_aud.add_argument("--mode", dest="bundle_mode", choices=["audit-only", "full"], default="full",
                        help="bundle --run：k3dit 模式（缺省 full＝判读+修+复核）")
     p_aud.add_argument("--bundle-out", default="", help="bundle --run：产包目录（缺省 .k3dit/bundle）")

@@ -196,10 +196,15 @@ def test_run_path_audit_passes_mode_and_pins(tmp_path, monkeypatch):
 
     monkeypatch.setattr(ab, "_run", _fake_run)
     monkeypatch.setattr(ab, "find_k3dit", lambda w: ["k3dit"])
-    ab.run_path_audit(tmp_path, tmp_path / "b", mode="audit-only", pins="artifact")
+    ab.run_path_audit(tmp_path, tmp_path / "b", mode="audit-only", pins="artifact",
+                      scope="src/k3dit/tools,docs")
     argv = seen["argv"]
     assert argv[argv.index("--mode") + 1] == "audit-only"
     assert argv[argv.index("--pins") + 1] == "artifact"
+    assert argv[argv.index("--scope") + 1] == "src/k3dit/tools,docs"
+    seen.clear()
+    ab.run_path_audit(tmp_path, tmp_path / "b")          # 空 scope ⇒ **不传**该参（用 k3dit 缺省）
+    assert "--scope" not in seen["argv"]
 
 
 def test_leg_reads_tool_knobs_from_declaration_and_audit_only_is_evidence_only(tmp_path, monkeypatch):
@@ -220,8 +225,8 @@ def test_leg_reads_tool_knobs_from_declaration_and_audit_only_is_evidence_only(t
 
     calls = {}
 
-    def _fake_run(w, out, *, mode="full", pins="inplace", **k):
-        calls["mode"], calls["pins"] = mode, pins
+    def _fake_run(w, out, *, mode="full", pins="inplace", scope="", **k):
+        calls["mode"], calls["pins"], calls["scope"] = mode, pins, scope
         out.mkdir(parents=True, exist_ok=True)
         (out / "report.md").write_text(
             "# 审计\n\n| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
@@ -238,7 +243,24 @@ def test_leg_reads_tool_knobs_from_declaration_and_audit_only_is_evidence_only(t
     monkeypatch.setattr(ab, "consume", _fake_consume)
     monkeypatch.setattr(ab, "commit_applied", lambda w, m, f: "c" * 40)
     early, _ = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
-    assert calls == {"mode": "audit-only", "pins": "artifact"}      # 声明面被读到并传下去
+    assert calls == {"mode": "audit-only", "pins": "artifact", "scope": ""}   # 声明面被读到并传下去
+
+    # scope 也走声明面（`k3dit_scope`）：**相对仓根**才合法；绝对路径 / `..` 一律拒绝——送审范围不该被
+    # 旋钮带到仓外（那只会是写错；静默接受会让报告覆盖范围与声明不符）。
+    (ws / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\nk3dit_mode = "audit-only"\n'
+        'k3dit_scope = "src/k3dit/tools,docs"\n', encoding="utf-8")
+    ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
+    assert calls.get("scope") == "src/k3dit/tools,docs", calls
+    for _bad in ("/etc", "../outside", "src/../.."):
+        (ws / ".agent" / "pipeline.toml").write_text(
+            f'[roles.audit]\nbind = "k3dit"\nmode = "bundle"\nk3dit_scope = "{_bad}"\n',
+            encoding="utf-8")
+        _early, _ = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
+        assert _early is not None and _early[0] == "refused" and "k3dit_scope" in _early[1], _bad
+    (ws / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\n'
+        'k3dit_mode = "audit-only"\nk3dit_pins = "artifact"\n', encoding="utf-8")
     assert consumed.get("require_closed") is False                  # partial 不进 NOT_CLOSED
     assert early is not None and early[0] == "refused" and "只出证据" in early[1]
     assert _find_report(ws, "M77", "audit"), "纯审计也要落报告（证据）"
