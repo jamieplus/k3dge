@@ -100,3 +100,31 @@ Denial reason and reopen condition live here only.
   **没有一条进主干** ⇒ 可能是未合并的 M10 审计产物。删线＝丢工作，须人判（合 / 弃 / 只看某几个文件）。
 - **下一步（人）**：`git diff main...k3dit/M10` 逐文件过一遍；要合就 `git merge`/挑提交；要弃就
   `git branch -D k3dit/M10`（救援 tag 仍在）。
+
+## C 验收（2026-09-27，k3dit 上走 `milestone audit M0`）：链路已通，途中修掉 3 个真缺陷
+
+**做法**（自审边界 ADR-0028 §2.11）：k3dit 侧 `[roles.audit]` 改 `k3dit_mode = "audit-only"`、
+`k3dit_pins = "artifact"`、`k3dit_scope = "src/k3dit/windows"` ⇒ 自审只出证据、不封板、不动被审树业务码。
+
+**链路证据（末次真跑）**：腿产包 → `--verify` ok → 消费（`fix.patch`/`pins.patch` 按 `apply_order`）→
+报告落 `docs/reviews/2026-09-27-M0-k3dit-bundle-audit.md` → **提交 `164f9bf`**（job `ebc3a0d6f86a`，
+包 `634c944c5465`）→ `refused(audit_evidence_only)` → `[NEXT] pending_findings pending=17`（钉留树可见）。
+更早一轮（scope=tools，2.29M prompt）因 dirty tree 被拒 ⇒ 现已能跑到提交。
+
+**途中修掉的 3 个真缺陷**（都由真跑暴露、单测没抓到）：
+1. **k3dge `milestone audit` 入口悬空**：棘轮退休（`94c8f37`/`e5ff5df`）删了 `run_audit_flow` 调用，
+   只留 `print(msg)` ⇒ `UnboundLocalError: msg`，审计腿根本没跑（修 `fde4654`，含回归测试）。
+2. **k3dge 落树后不重生投影 ⇒ 提交注定被自家闸拦**：腿往 `docs/reviews/` 写报告 ⇒ `docs-index` 过期 ⇒
+   `DOC_INDEX_STALE` 拦下；且 `commit_applied` 把 git 报错**吞成空 sha**（腿只表现为"没提提交"，树留 staged）
+   ⇒ 修 `065dd66`：提交前 `write_docs_index` 重生投影并并入同一提交；`commit_applied` 返回 `(sha, 错误)`，
+   失败即 `refused(audit_bundle_commit_failed)` 并提示人工处理。
+3. **k3dit 钉行判据是子串版**：`pack.PIN_LINE = k3dit:(pending|…)` 把窗卡里**文档举例的钉**
+   （「落成的行是：`# k3dit:pending code-1 …`」）当钉 strip ⇒ 语义层哈希与 `pins.patch` 都错 ⇒
+   消费侧 `APPLY_CHECK_FAILED:pins.patch`。修 `d82121b`：判据与 `pins.py`（契约 §8 机械手）**同形**
+   （行首 `#`/`//`/`<!--` + `k3dit:<state> <id>`），含"用本仓真卡片断言"的回归测试。
+
+**顺序教训（已写进提交信息）**：先提交声明改动，再跑审计——否则消费相位的 `DIRTY_TREE` 守卫会拒
+（守卫行为正确，错的是顺序）；`milestone audit` 前请确认工作区干净。
+
+**留**：k3dit 侧现有 17 枚 `k3dit:pending` 钉（自查产物，钉留树）⇒ 处置归人/后续轮；要封板须显式把
+`k3dit_mode` 改回 `full` 再跑（那次才落补丁+提交）。
