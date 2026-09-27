@@ -607,13 +607,20 @@ def cmd_audit(args: argparse.Namespace) -> int:
     # **补丁没落成，就不落报告**：报告里的「已修 N」是**产出方对自己场地的处置**，修复没进本仓时把它落进
     # `docs/reviews/` 会被判定面当成"本仓已修"（真跑实测：落补丁失败仍落了 26 行"24 已修"的报告并提交）。
     # 证据不丢：包留在 out，拒绝信息里给出路径。
-    _no_apply = bool(res.get("ok")) and not ((res.get("apply") or {}).get("ok", True))
+    _no_apply = not ((res.get("apply") or {}).get("ok", True))     # 补丁没落成（consume 失败也在此列）
     if not getattr(args, "dry_run", False) and not _no_apply:
         # 里程碑 id **必须**来自显式参数（缺省 `local`，与 k3dit 的约定一致）：绝不能用**包路径**当 id
         #（真跑实测：`/tmp/ctl` 被 `persist_external_audit_report` 拒 ⇒ 钉已落、报告没落、提交没做）。
+        _ap = res.get("apply") or {}
+        _note = ""
+        if _ap.get("strategy") == "three-way-merge":
+            _note = (f"> **落地方式**：`git apply` 与当前主干冲突 ⇒ **三路合并**（base＝包的可重放基线）落树；"
+                     f"落库后校验（`post_apply_check`）通过。"
+                     + (f"\n> **排除**：{', '.join(_ap.get('excluded') or [])}"
+                        f"（其修复与主干/现测试冲突，**未落**，需人工重做）。" if _ap.get("excluded") else ""))
         landed = ab.land_report(target, (getattr(args, "bundle_milestone", "") or "local"), bundle,
-                                extra_files=list((res.get("apply") or {}).get("files") or []),
-                                why=f"手动入口 包 {str(ab.bundle_digest(bundle))[:12]}")
+                                extra_files=list(_ap.get("files") or []),
+                                why=f"手动入口 包 {str(ab.bundle_digest(bundle))[:12]}", note=_note)
     if _no_apply:
         print(f"[AUDIT] 补丁未落（{(res.get('apply') or {}).get('error')}）⇒ **不落报告**："
               f"报告留在包内 {bundle}", file=sys.stderr)

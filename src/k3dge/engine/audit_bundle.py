@@ -329,7 +329,7 @@ def _post_apply_check(root: Path, workspace: Path) -> dict:
 
 
 def land_report(workspace: Path, milestone_id: str, out: Path, *,
-                extra_files: Optional[List[str]] = None, why: str = "") -> dict:
+                extra_files: Optional[List[str]] = None, why: str = "", note: str = "") -> dict:
     """**唯一的"落报告"入口**：包内 `report.md` → `docs/reviews/` + 重生 docs 投影 + **一次提交**。
 
     为什么合并（2026-09-27 流程体检）：这条三步序列此前写在**两处**（腿的正常路 + 腿的拒绝路
@@ -344,8 +344,10 @@ def land_report(workspace: Path, milestone_id: str, out: Path, *,
     try:
         from k3dge.engine.milestone_audit import persist_external_audit_report
 
-        report_dst = persist_external_audit_report(workspace, milestone_id,
-                                                   report_src.read_text(encoding="utf-8"),
+        body = report_src.read_text(encoding="utf-8")
+        if note:      # 诚实说明（例如"本批修复经三路合并落树；排除 X（其修复与主干/现测试冲突，需人工重做）"）
+            body = body.rstrip("\n") + "\n\n" + note.strip() + "\n"
+        report_dst = persist_external_audit_report(workspace, milestone_id, body,
                                                    scope="k3dit-bundle", kind="audit")
     except Exception as exc:      # pragma: no cover - 落地器异常不该吞
         return {"ok": False, "error": "REPORT_PERSIST_FAILED", "detail": str(exc), "report": "", "commit": ""}
