@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:1cecdbb89e90790b2dcde0e221cfba9ab6e06c6e00f6e2c0ea88b0e31c31a17b`
+- **Contract Hash**: `sha256:3896afc3e915a72e25aba24e78395ac66aa05787617065fd057d326300f293b1`
 - **Last Updated**: 2026-09-27
 
 ## 1. Domain Boundary & Responsibilities
@@ -120,10 +120,13 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
-REPORT_COLUMNS = ('ID', '日期', '严重度', '优先级', '类型', '问题描述', '位置', '状态', '处置', '验证', '复审', '验收')
+from k3dge.engine.report_table import REPORT_STATUSES
+from k3dge.engine.report_table import TABLE_HEADER
+from k3dge.engine.report_table import parse_rows
+REPORT_COLUMNS = tuple(TABLE_HEADER.split('|'))
+OPEN_STATES = tuple(sorted(_OPEN_KINDS))
+CLOSED_STATES = tuple((k for k in _MARKER_KINDS if k not in _OPEN_KINDS))
 ROW_STATE_ZH = {'fixed': '已修', 'leftover': '有意留', 'pending': '待修', 'fixnote': '待验证', 'disputed': '待裁'}
-OPEN_STATES = ('pending', 'fixnote', 'disputed')
-CLOSED_STATES = ('fixed', 'leftover')
 REQUIRED_CELLS = ('ID', '日期', '严重度', '优先级', '类型', '问题描述', '位置', '状态', '处置')
 has_marker_line(text: str, rel: str) -> bool
 strip_markers(text: str, rel: str) -> str

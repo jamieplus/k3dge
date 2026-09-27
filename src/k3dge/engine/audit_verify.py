@@ -21,15 +21,23 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-#: 12 列（顺序即判据；k3dge 自己声明，不 import 产出方）
-REPORT_COLUMNS = ("ID", "日期", "严重度", "优先级", "类型", "问题描述", "位置",
-                  "状态", "处置", "验证", "复审", "验收")
+#: **不另立口径**：列名/状态枚举/表格解析一律引用既有单源 `engine/report_table`
+#: （它的注释写着"唯一来源；消费方不再各自硬编码"）；未关态引用 `engine/markers.OPEN_KINDS`
+#: （契约 §8 的机械手：`closure_ok` 的 blockers 就是这三个）。
+from k3dge.engine.markers import KINDS as _MARKER_KINDS
+from k3dge.engine.markers import OPEN_KINDS as _OPEN_KINDS
+from k3dge.engine.report_table import STATUSES as REPORT_STATUSES
+from k3dge.engine.report_table import TABLE_HEADER, parse_rows
 
-#: 状态闭集 → 报告里的中文（消费侧判据；与 `rounds.TRANSITIONS` 的终态一致：`fixed`/`leftover` 无出边）
+REPORT_COLUMNS = tuple(TABLE_HEADER.split("|"))
+OPEN_STATES = tuple(sorted(_OPEN_KINDS))
+CLOSED_STATES = tuple(k for k in _MARKER_KINDS if k not in _OPEN_KINDS)
+#: 英文态（findings 字段）→ 报告里的中文状态：**桥接表**，不是判据；下面的断言保证它两侧都覆盖
+#: （任一侧加值而没更新这里 ⇒ 导入即失败，而不是悄悄放过）。
 ROW_STATE_ZH = {"fixed": "已修", "leftover": "有意留", "pending": "待修",
                 "fixnote": "待验证", "disputed": "待裁"}
-OPEN_STATES = ("pending", "fixnote", "disputed")
-CLOSED_STATES = ("fixed", "leftover")
+assert set(ROW_STATE_ZH) == set(_MARKER_KINDS), "桥接表与 markers.KINDS 不同步"
+assert set(ROW_STATE_ZH.values()) <= set(REPORT_STATUSES) | {"待验证", "待裁"}, "桥接表与 report_table.STATUSES 不同步"
 #: 每行**必须**非空的列（其余列允许空：复审/验收由席按情况填）
 REQUIRED_CELLS = ("ID", "日期", "严重度", "优先级", "类型", "问题描述", "位置", "状态", "处置")
 
@@ -41,22 +49,31 @@ def _read_json(path: Path) -> Optional[Any]:
         return None
 
 
-def _table_rows(text: str) -> Tuple[Optional[List[str]], List[List[str]]]:
-    """拆报告表格：返回 (表头, 数据行)。表头取第一行以 `| ID` 开头者。"""
-    header: Optional[List[str]] = None
-    rows: List[List[str]] = []
+def _table_rows(text: str) -> Tuple[Optional[List[str]], List[Dict[str, str]], int]:
+    """拆报告表格（**调用单源解析器** `report_table.parse_rows`）：返回 (表头, 数据行, 表格行总数)。
+
+    第三项用于检出**畸形行**（单源解析器按契约"跳过列数不符的行"，消费侧要把它**报出来**而不是忽略）。
+    """
+    header, rows = parse_rows(text)
+    if header is None:
+        return None, [], 0
+    count = 0
+    seen_header = False
     for line in (text or "").splitlines():
-        if not line.startswith("|"):
+        s = line.strip()
+        if not s.startswith("|"):
+            if seen_header:
+                break
             continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if header is None:
-            if cells and cells[0] == "ID":
-                header = cells
+        cells = [c.strip() for c in s.strip().strip("|").split("|")]
+        if not seen_header:
+            if all(h in cells for h in ("ID", "状态")):
+                seen_header = True
             continue
-        if all(set(c) <= {"-", " "} for c in cells):
-            continue                      # 分隔行
-        rows.append(cells)
-    return header, rows
+        if "".join(cells).strip() == "" or set("".join(cells)) <= set("-: "):
+            continue
+        count += 1
+    return header, [dict(zip(header, [c for c in r.values()])) for _, r in rows], count
 
 
 def _unclosed_local(findings: Dict[str, Any]) -> List[str]:
@@ -66,7 +83,7 @@ def _unclosed_local(findings: Dict[str, Any]) -> List[str]:
         if not isinstance(rec, dict):
             continue
         st = str(rec.get("state") or "")
-        if st in OPEN_STATES or (st in CLOSED_STATES and not rec.get("review_ack")) or st not in ROW_STATE_ZH:
+        if st in OPEN_STATES or st not in ROW_STATE_ZH:      # 未关＝契约的 open 集合（§8）；未知态也算未关
             out.append(str(fid))
     return sorted(out)
 
@@ -184,18 +201,19 @@ def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed:
         errors.append("findings.json 结构不可识别（期望 {items: [...]}）")
     by_id = {str(x.get("id")): x for x in findings if isinstance(x, dict) and x.get("id")}
     unclosed = _unclosed_local({i: x for i, x in by_id.items()})
+    terminal_unacked = sorted(str(i) for i, x in by_id.items()
+                              if str(x.get("state") or "") in CLOSED_STATES and not x.get("review_ack"))
     report_rows = 0
     if (bundle / "report.md").is_file():
-        header, rows = _table_rows((bundle / "report.md").read_text(encoding="utf-8"))
+        report_text = (bundle / "report.md").read_text(encoding="utf-8")
+        header, rows, table_lines = _table_rows(report_text)
         report_rows = len(rows)
         if tuple(header or ()) != REPORT_COLUMNS:
             errors.append(f"报告表头不是 12 列（或顺序不符）：{header!r}")
+        if table_lines != len(rows):
+            errors.append(f"报告有 {table_lines - len(rows)} 行**畸形行**（列数与表头不符）⇒ 不完备")
         ids: List[str] = []
-        for cells in rows:
-            if len(cells) != len(REPORT_COLUMNS):
-                errors.append(f"报告行不是 {len(REPORT_COLUMNS)} 格：{cells[:3]!r}…")
-                continue
-            row = dict(zip(REPORT_COLUMNS, cells))
+        for row in rows:
             rid = row["ID"]
             ids.append(rid)
             for col in REQUIRED_CELLS:
@@ -218,7 +236,9 @@ def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed:
     # ---- 交叉核：产出方自报的闭环状态（不一致要报出来，但**以本地为准**） ----
     claimed = str(facts.get("status") or "")
     cross = {"claimed_status": claimed, "claimed_unclosed": facts.get("unclosed"),
-             "local_unclosed": len(unclosed), "agree": (claimed == "closed") == (not unclosed)}
+             "local_unclosed": len(unclosed), "agree": (claimed == "closed") == (not unclosed),
+             # 产出方账目字段（`review_ack`）**不作判据**：只作为信息项列出来给人工看
+             "terminal_without_ack": terminal_unacked}
     if not cross["agree"]:
         errors.append(f"闭环事实不一致：包自报 status={claimed!r}/unclosed={facts.get('unclosed')!r}，"
                       f"而消费侧从 findings 算出未关 {len(unclosed)} 项（以本地为准）")

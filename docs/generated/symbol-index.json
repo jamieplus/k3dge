@@ -936,7 +936,7 @@
   "has_marker_line": [
     {
       "file": "src/k3dge/engine/audit_verify.py",
-      "line": 74
+      "line": 91
     }
   ],
   "has_milestone_token": [
@@ -1718,7 +1718,7 @@
   "strip_markers": [
     {
       "file": "src/k3dge/engine/audit_verify.py",
-      "line": 82
+      "line": 99
     }
   ],
   "strip_pins": [
@@ -1842,7 +1842,7 @@
   "verify_bundle_local": [
     {
       "file": "src/k3dge/engine/audit_verify.py",
-      "line": 148
+      "line": 165
     }
   ],
   "verify_commit": [

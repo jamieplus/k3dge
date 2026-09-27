@@ -249,10 +249,13 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
-REPORT_COLUMNS = ('ID', '日期', '严重度', '优先级', '类型', '问题描述', '位置', '状态', '处置', '验证', '复审', '验收')
+from k3dge.engine.report_table import REPORT_STATUSES
+from k3dge.engine.report_table import TABLE_HEADER
+from k3dge.engine.report_table import parse_rows
+REPORT_COLUMNS = tuple(TABLE_HEADER.split('|'))
+OPEN_STATES = tuple(sorted(_OPEN_KINDS))
+CLOSED_STATES = tuple((k for k in _MARKER_KINDS if k not in _OPEN_KINDS))
 ROW_STATE_ZH = {'fixed': '已修', 'leftover': '有意留', 'pending': '待修', 'fixnote': '待验证', 'disputed': '待裁'}
-OPEN_STATES = ('pending', 'fixnote', 'disputed')
-CLOSED_STATES = ('fixed', 'leftover')
 REQUIRED_CELLS = ('ID', '日期', '严重度', '优先级', '类型', '问题描述', '位置', '状态', '处置')
 has_marker_line(text: str, rel: str) -> bool
     # doc: 这一行是**钉**吗（行首注释 + `k3dit:<state> <id>`，契约 §8 语法单源）。
