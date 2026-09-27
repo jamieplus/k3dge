@@ -603,13 +603,18 @@ def cmd_audit(args: argparse.Namespace) -> int:
     # 否则"同一模块同一参数"只是形式——手动跑完报告不落盘、不提交（此前如此），判定面看不到产物。
     landed = {}
     if not getattr(args, "dry_run", False):
-        landed = ab.land_report(target, tok or "local", bundle,
+        # 里程碑 id **必须**来自显式参数（缺省 `local`，与 k3dit 的约定一致）：绝不能用**包路径**当 id
+        #（真跑实测：`/tmp/ctl` 被 `persist_external_audit_report` 拒 ⇒ 钉已落、报告没落、提交没做）。
+        landed = ab.land_report(target, (getattr(args, "bundle_milestone", "") or "local"), bundle,
                                 extra_files=list((res.get("apply") or {}).get("files") or []),
-                                why=f"手动入口 {('包 ' + str(ab.bundle_digest(bundle))[:12]) if bundle.is_dir() else ''}")
+                                why=f"手动入口 包 {str(ab.bundle_digest(bundle))[:12]}")
     print(json.dumps({**res, "landed": landed}, ensure_ascii=False))
     _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] audit bundle "
                            f"{bundle} ok={res.get('ok')} dry={bool(getattr(args, 'dry_run', False))} "
                            f"report={landed.get('report', '')} commit={landed.get('commit', '')}")
+    if landed and not landed.get("ok"):
+        print(f"[AUDIT] 落报告/提交失败：{landed.get('error')} {landed.get('detail') or ''}", file=sys.stderr)
+        return 1
     return 0 if res.get("ok") else 1
 
 
@@ -1212,6 +1217,8 @@ def build_parser() -> argparse.ArgumentParser:
                        help="bundle：先跑 k3dit 路径入口产包再消费（缺省只消费已存在的包）")
     p_aud.add_argument("--pins", dest="bundle_pins", choices=["inplace", "artifact"], default="inplace",
                        help="bundle：钉的落地形态（inplace＝钉留树 / artifact＝钉只随包）")
+    p_aud.add_argument("--milestone", dest="bundle_milestone", default="",
+                       help="bundle：落报告用的里程碑 id（缺省 local；**不要**用包路径）")
     p_aud.add_argument("--scope", dest="bundle_scope", default="",
                        help="bundle：送审范围（逗号分隔，相对仓根；空＝k3dit 缺省）")
     p_aud.add_argument("--mode", dest="bundle_mode", choices=["audit-only", "full"], default="full",

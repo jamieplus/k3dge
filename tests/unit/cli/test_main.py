@@ -508,5 +508,32 @@ def test_audit_bundle_manual_entry_lands_report_like_the_leg():
                 rc = main(["audit", "bundle", str(ws / "bundle"), "--into", str(ws)])
             assert rc == 0
             assert calls.get("extra") == ["src/a.py"] and "landed" in out.getvalue()
+            assert calls.get("mid") == "local", calls        # 绝不能用包路径当里程碑 id
+    finally:
+        ab.consume, ab.land_report = orig_consume, orig_land
+
+
+def test_audit_bundle_manual_entry_fails_clear_when_landing_fails():
+    """落地失败必须**退非零**（否则"看着成功、其实没落"＝正是要消灭的那类无实效）。"""
+    from k3dge.engine import audit_bundle as ab
+
+    orig_consume, orig_land = ab.consume, ab.land_report
+    ab.consume = lambda t, b, **k: {"ok": True, "apply": {"files": []}, "facts": {}}
+    ab.land_report = lambda w, m, out, **k: {"ok": False, "error": "REPORT_PERSIST_FAILED",
+                                             "detail": "bad id"}
+    try:
+        import contextlib
+        import io
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            (ws / ".agent").mkdir()
+            (ws / "bundle").mkdir()
+            (ws / "bundle" / "manifest.json").write_text('{"bundle_version": 1}', encoding="utf-8")
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                rc = main(["audit", "bundle", str(ws / "bundle"), "--into", str(ws)])
+            assert rc == 1 and "落报告/提交失败" in err.getvalue()
     finally:
         ab.consume, ab.land_report = orig_consume, orig_land
