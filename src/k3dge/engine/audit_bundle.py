@@ -287,11 +287,22 @@ def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry
             return {"ok": False, "error": "POST_APPLY_CHECK_FAILED", "conflicts": [],
                     "detail": f"落库后校验未过：{check.get('cmd')} ⇒ {check.get('detail')}",
                     "files": files}
-        if not dry_run:
-            for rel in files:      # 试跑全过 ⇒ 按 worktree 的最终内容就地写（含钉那一步的结果）
-                p = workspace / rel
-                p.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(wt / rel, p)
+        if dry_run:
+            return {"ok": True, "files": files, "excluded": res.get("excluded") or [],
+                    "conflicts": [], "post_apply_check": check}
+        # 就地写（含钉那一步的结果）⇒ 落库后校验**在工作区**跑（venv/钩子都在那；临时 worktree 里没有）
+        # ⇒ 不过就把刚写的这几个文件**回滚**（树本来是干净的：`DIRTY_TREE` 已挡）并 fail-clear。
+        for rel in files:
+            p = workspace / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(wt / rel, p)
+        check = _post_apply_check(workspace, workspace)
+        if check.get("cmd") and not check.get("ok"):
+            if files:
+                _git(workspace, "checkout", "--", *files)
+            return {"ok": False, "error": "POST_APPLY_CHECK_FAILED", "conflicts": [],
+                    "detail": f"落库后校验未过（已回滚 {len(files)} 个文件）：{check.get('cmd')} ⇒ "
+                              f"{check.get('detail')}", "files": []}
         return {"ok": True, "files": files, "excluded": res.get("excluded") or [],
                 "conflicts": [], "post_apply_check": check}
     finally:
@@ -389,6 +400,8 @@ def commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str
     rc, out = _git(workspace, "add", "--", *files)
     if rc != 0:
         return "", f"git add 失败：{out.strip()[-300:]}"
+    if _git(workspace, "diff", "--cached", "--quiet")[0] == 0:
+        return "", ""      # 没有可提交的内容（报告内容未变/投影已同步）⇒ no-op，**不是失败**
     rc, out = _git(workspace, "-c", "user.email=k3dge@local", "-c", "user.name=k3dge",
                    "commit", "-q", "-m", message)
     if rc != 0:
