@@ -375,7 +375,10 @@ def land_report(workspace: Path, milestone_id: str, out: Path, *,
                 "detail": f"重生投影失败：{exc}", "report": rel, "commit": "",
                 "projection_log": log.getvalue()[-400:]}
     proj: List[str] = []
-    rc, out = _git(workspace, "status", "--porcelain", "-uall", "--", "docs/generated")
+    # 收集面＝**整个 `docs/`**：落报告会动 `docs/reviews/`，落代码会动 `docs/generated/`（投影）
+    # 与 `docs/specs/`（契约哈希 ⇒ `k3dge sync` 回写，真跑实测漏在提交外 ⇒ 钩子按"哈希不一致"拦下）。
+    # 树在本步之前是干净的（`DIRTY_TREE` 已挡）⇒ `docs/` 下的改动必是本轮产物。
+    rc, out = _git(workspace, "status", "--porcelain", "-uall", "--", "docs")
     if rc == 0:
         proj = [line[3:].strip() for line in out.splitlines() if line.strip()]
     files = [*([f for f in (extra_files or []) if f]), rel, *proj]
