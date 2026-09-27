@@ -213,28 +213,34 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
                 "detail": "工作树不干净，先提交或 stash（审计产物不得与在途改动混在一起）",
                 "dirty": dirty.strip().splitlines()[:10]}
     pre = _dry_run_via_worktree(workspace, bundle, order)
-    if not pre.get("ok"):
-        return {"ok": False, "error": pre.get("error"), "detail": pre.get("detail", ""),
-                "phase": "dry-run", "applied": pre.get("applied") or []}
-    if dry_run:
-        return {"ok": True, "applied": order, "files": pre.get("files") or [], "dry_run": True}
-    res = _apply_sequential(workspace, bundle, order)
-    if res.get("ok"):
-        return {"ok": True, "applied": order, "files": res.get("files") or [], "dry_run": False,
-                "strategy": "git-apply"}
+    if pre.get("ok"):
+        if dry_run:
+            return {"ok": True, "applied": order, "files": pre.get("files") or [], "dry_run": True,
+                    "strategy": "git-apply"}
+        res = _apply_sequential(workspace, bundle, order)
+        if res.get("ok"):
+            return {"ok": True, "applied": order, "files": res.get("files") or [], "dry_run": False,
+                    "strategy": "git-apply"}
     # `git apply` 打不上**不等于修复不可用**：补丁是对审计当时的基线生成的，而主干可能已经往前走
     #（落钉、别的修复、重构）。两侧信息都全 ⇒ 退到**三路合并**（base＝包的可重放基线）。
-    got = _apply_sequential_merged(workspace, bundle, exclude=exclude)
+    # **结构性**失败（补丁缺/不是仓/脏树/无 worktree）不该退合并——那不是"打不上"，是输入不对。
+    if str(pre.get("error") or "").split(":")[0] in {"PATCH_MISSING", "NOT_A_REPO", "DIRTY_TREE",
+                                                     "WORKTREE_UNAVAILABLE"}:
+        return {"ok": False, "error": pre.get("error"), "detail": pre.get("detail", ""),
+                "phase": "dry-run", "applied": pre.get("applied") or []}
+    got = _apply_sequential_merged(workspace, bundle, exclude=exclude, dry_run=dry_run)
     if got.get("ok"):
-        return {"ok": True, "applied": order, "files": got.get("files") or [], "dry_run": False,
+        return {"ok": True, "applied": order, "files": got.get("files") or [], "dry_run": dry_run,
                 "strategy": "three-way-merge", "excluded": got.get("excluded") or [],
-                "detail": f"git apply 冲突（{res.get('detail', '')[:120]}）⇒ 三路合并成功"}
-    return {"ok": False, "error": got.get("error") or res.get("error"),
-            "detail": got.get("detail") or res.get("detail", ""),
+                "post_apply_check": got.get("post_apply_check") or {},
+                "detail": f"`git apply` 打不上（{(pre.get('detail') or '')[:100]}）⇒ 三路合并"
+                          f"{'（试跑，未落）' if dry_run else '成功'}"}
+    return {"ok": False, "error": got.get("error") or pre.get("error") or "MERGE_FAILED",
+            "detail": got.get("detail") or pre.get("detail", ""),
             "phase": "merge", "applied": [], "conflicts": got.get("conflicts") or []}
 
 
-def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None) -> dict:
+def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry_run: bool = False) -> dict:
     """三路合并落补丁（在**临时 worktree** 里先做一遍并跑声明的落库后校验，再就地写）。
 
     返回 {ok, files, excluded, conflicts, detail}。校验失败/有冲突 ⇒ 不写工作区（fail-clear）。
@@ -281,10 +287,11 @@ def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None) -> 
             return {"ok": False, "error": "POST_APPLY_CHECK_FAILED", "conflicts": [],
                     "detail": f"落库后校验未过：{check.get('cmd')} ⇒ {check.get('detail')}",
                     "files": files}
-        for rel in files:      # 试跑全过 ⇒ 按 worktree 的最终内容就地写（含钉那一步的结果）
-            p = workspace / rel
-            p.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(wt / rel, p)
+        if not dry_run:
+            for rel in files:      # 试跑全过 ⇒ 按 worktree 的最终内容就地写（含钉那一步的结果）
+                p = workspace / rel
+                p.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(wt / rel, p)
         return {"ok": True, "files": files, "excluded": res.get("excluded") or [],
                 "conflicts": [], "post_apply_check": check}
     finally:
