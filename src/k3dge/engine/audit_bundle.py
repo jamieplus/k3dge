@@ -294,8 +294,12 @@ def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry
             shutil.copyfile(wt / rel, p)
         check = _post_apply_check(workspace, workspace)
         if check.get("cmd") and not check.get("ok"):
+            # 回滚：合并写进去的文件 **＋ 投影**（声明的校验可能跑了 `k3dge sync/index` 之类的投影刷新；
+            # 合并被回滚后那些投影也不再成立 ⇒ 一起退，别留半套状态）
             if files:
                 _git(workspace, "checkout", "--", *files)
+            if (workspace / "docs" / "generated").is_dir():
+                _git(workspace, "checkout", "--", "docs/generated")
             return {"ok": False, "error": "POST_APPLY_CHECK_FAILED", "conflicts": [],
                     "detail": f"落库后校验未过（已回滚 {len(files)} 个文件）：{check.get('cmd')} ⇒ "
                               f"{check.get('detail')}", "files": []}

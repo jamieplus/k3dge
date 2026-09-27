@@ -604,12 +604,19 @@ def cmd_audit(args: argparse.Namespace) -> int:
     # **入口唯一＝效果唯一**（ADR-0025 §2.9.6）：手动入口与封板腿共用 `land_report`，
     # 否则"同一模块同一参数"只是形式——手动跑完报告不落盘、不提交（此前如此），判定面看不到产物。
     landed = {}
-    if not getattr(args, "dry_run", False):
+    # **补丁没落成，就不落报告**：报告里的「已修 N」是**产出方对自己场地的处置**，修复没进本仓时把它落进
+    # `docs/reviews/` 会被判定面当成"本仓已修"（真跑实测：落补丁失败仍落了 26 行"24 已修"的报告并提交）。
+    # 证据不丢：包留在 out，拒绝信息里给出路径。
+    _no_apply = bool(res.get("ok")) and not ((res.get("apply") or {}).get("ok", True))
+    if not getattr(args, "dry_run", False) and not _no_apply:
         # 里程碑 id **必须**来自显式参数（缺省 `local`，与 k3dit 的约定一致）：绝不能用**包路径**当 id
         #（真跑实测：`/tmp/ctl` 被 `persist_external_audit_report` 拒 ⇒ 钉已落、报告没落、提交没做）。
         landed = ab.land_report(target, (getattr(args, "bundle_milestone", "") or "local"), bundle,
                                 extra_files=list((res.get("apply") or {}).get("files") or []),
                                 why=f"手动入口 包 {str(ab.bundle_digest(bundle))[:12]}")
+    if _no_apply:
+        print(f"[AUDIT] 补丁未落（{(res.get('apply') or {}).get('error')}）⇒ **不落报告**："
+              f"报告留在包内 {bundle}", file=sys.stderr)
     print(json.dumps({**res, "landed": landed}, ensure_ascii=False))
     _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] audit bundle "
                            f"{bundle} ok={res.get('ok')} dry={bool(getattr(args, 'dry_run', False))} "

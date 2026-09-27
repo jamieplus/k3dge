@@ -278,7 +278,7 @@
   "build_parser": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1067
+      "line": 1074
     }
   ],
   "build_server_params": [
@@ -530,19 +530,19 @@
   "cmd_check_msg": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 952
+      "line": 959
     }
   ],
   "cmd_commit": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 890
+      "line": 897
     }
   ],
   "cmd_commit_attest": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 939
+      "line": 946
     }
   ],
   "cmd_doc": [
@@ -560,13 +560,13 @@
   "cmd_incident": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 968
+      "line": 975
     }
   ],
   "cmd_index": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 881
+      "line": 888
     }
   ],
   "cmd_init": [
@@ -578,7 +578,7 @@
   "cmd_markers": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 623
+      "line": 630
     }
   ],
   "cmd_mcp": [
@@ -602,19 +602,19 @@
   "cmd_milestone": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 657
+      "line": 664
     }
   ],
   "cmd_search": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 838
+      "line": 845
     }
   ],
   "cmd_status": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 990
+      "line": 997
     }
   ],
   "cmd_sync": [
@@ -632,7 +632,7 @@
   "cmd_verify_attest": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 945
+      "line": 952
     }
   ],
   "cmd_version": [
@@ -644,7 +644,7 @@
   "cmd_where": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 868
+      "line": 875
     }
   ],
   "code_for": [
@@ -662,7 +662,7 @@
   "commit_applied": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 385
+      "line": 389
     }
   ],
   "completeness_violations": [
@@ -686,7 +686,7 @@
   "consume": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 409
+      "line": 413
     }
   ],
   "consume_unreleased": [
@@ -1092,7 +1092,7 @@
   "land_report": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 327
+      "line": 331
     }
   ],
   "legacy_config_present": [
@@ -1168,7 +1168,7 @@
     },
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1295
+      "line": 1302
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
@@ -1244,7 +1244,7 @@
   "old_name_warnings": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 807
+      "line": 814
     }
   ],
   "on_error": [
