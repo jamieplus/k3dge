@@ -282,14 +282,10 @@ def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry
                     (wt / rel).write_text(str(u["text"]), encoding="utf-8")
                     if rel not in files:
                         files.append(rel)
-        check = _post_apply_check(wt, workspace)
-        if check.get("cmd") and not check.get("ok"):
-            return {"ok": False, "error": "POST_APPLY_CHECK_FAILED", "conflicts": [],
-                    "detail": f"落库后校验未过：{check.get('cmd')} ⇒ {check.get('detail')}",
-                    "files": files}
         if dry_run:
             return {"ok": True, "files": files, "excluded": res.get("excluded") or [],
-                    "conflicts": [], "post_apply_check": check}
+                    "conflicts": [], "post_apply_check": {"cmd": "", "ok": True,
+                                                          "detail": "dry-run：不跑落库后校验"}}
         # 就地写（含钉那一步的结果）⇒ 落库后校验**在工作区**跑（venv/钩子都在那；临时 worktree 里没有）
         # ⇒ 不过就把刚写的这几个文件**回滚**（树本来是干净的：`DIRTY_TREE` 已挡）并 fail-clear。
         for rel in files:
