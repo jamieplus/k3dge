@@ -744,8 +744,15 @@ def cmd_milestone(args: argparse.Namespace) -> int:
         return 0
 
     if action == "audit":
+        # 独立审计入口（ADR-0004 §2.1.9：审计＝封板主体，seal 相位 2 走同一函数）：只跑审计**不封板**。
+        # ⚠️ 2026-09-27 真跑发现：棘轮形状退休时删掉了这里的调用，只剩 `print(msg)` ⇒ 入口**悬空**
+        #   （`k3dge milestone audit M0` 抛 UnboundLocalError `msg`，审计腿根本没跑）。悬空入口＝声明了没人接。
+        from k3dge.engine.milestone_audit import run_audit_flow
+
+        status, msg = run_audit_flow(workspace, m_id, prompter=_Prompt.default())
         print(msg)
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone audit -> {m_id} status={status}")
+        _emit_lifecycle_next(workspace, sys.stdout)
         return 0 if status.startswith("audited") else 1
 
     if action == "seal":

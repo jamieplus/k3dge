@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import subprocess
 import tempfile
@@ -57,6 +59,37 @@ class TestCli(unittest.TestCase):
                 os.chdir(cwd)
             self.assertEqual(rc, 0)
             self.assertTrue(any((d / "docs" / "reviews").glob("*M1*audit*.md")))
+
+    def test_milestone_audit_runs_the_flow(self):
+        """回归（2026-09-27 真跑发现）：棘轮退休后 `milestone audit` 的入口**悬空**——只剩 `print(msg)`，
+        抛 `UnboundLocalError`，审计腿根本没跑。此测试钉住"入口必须真调 `run_audit_flow`"。
+
+        悬空入口正是本仓最怕的一类缺陷：**声明了没人接**（AGENTS「到达环」）——所以判据落在"调用"上，
+        而不是"有没有这段代码"。
+        """
+        from k3dge.engine import milestone_audit as ma
+
+        calls = {}
+
+        def _fake_flow(ws, mid, **kw):
+            calls["args"] = (ws, mid)
+            return "rejected", "审计被拒：理由 X"
+
+        orig = ma.run_audit_flow
+        ma.run_audit_flow = _fake_flow          # type: ignore[assignment]
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                ws = Path(d)
+                (ws / ".agent").mkdir()
+                (ws / "docs").mkdir()
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    rc = main(["milestone", "audit", "M9"])
+                self.assertEqual(rc, 1)                     # rejected ⇒ 退 1
+                self.assertIn("审计被拒：理由 X", out.getvalue())
+                self.assertEqual(calls["args"][1], "M9")    # 真把里程碑 id 传了下去
+        finally:
+            ma.run_audit_flow = orig            # type: ignore[assignment]
 
     def test_parser_has_check_sync_milestone(self):
         parser = build_parser()
