@@ -338,23 +338,28 @@ def test_land_report_is_the_single_entry_used_by_all_three_paths(tmp_path, monke
     现在三个入口（腿正常路 / 腿拒绝路 / `k3dge audit bundle`）共用 `land_report`：
     报告与已落补丁**同一次提交**，投影（docs-index）并入；缺报告 ⇒ fail-clear。
     """
-    from k3dge.engine import doc_catalog
+    from k3dge.engine import doc_catalog, search
 
     ws = _repo(tmp_path)
     out = tmp_path / "out"
     out.mkdir(parents=True, exist_ok=True)
     (out / "report.md").write_text("# 审计\n\n| ID |\n", encoding="utf-8")
-    idx = ws / doc_catalog.INDEX_REL
-    idx.parent.mkdir(parents=True, exist_ok=True)
-    idx.write_text("{}\n", encoding="utf-8")
-    monkeypatch.setattr(doc_catalog, "write_docs_index", lambda w: idx)
+    # 投影面：`sync_all`（文档/契约/索引）与 `write_symbol_index`（`k3dge where` 判据面）都要跑
+    gen = ws / "docs" / "generated"
+    gen.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(doc_catalog, "write_docs_index",
+                        lambda w: (gen / "docs-index.json").write_text("{}\n", encoding="utf-8") or
+                        (gen / "docs-index.json"))
+    monkeypatch.setattr(search, "write_symbol_index",
+                        lambda w: (gen / "symbol-index.json").write_text("{}\n", encoding="utf-8") or
+                        (gen / "symbol-index.json"))
     seen = {}
     monkeypatch.setattr(ab, "commit_applied",
                         lambda w, m, f: (seen.update(msg=m, files=list(f)) or ("a" * 40, "")))
     r = ab.land_report(ws, "M1", out, extra_files=["src/a.py"], why="job j1")
     assert r["ok"] and r["commit"] == "a" * 40 and r["report"].endswith(".md")
     assert "src/a.py" in seen["files"], seen["files"]                       # 补丁与报告同一次提交
-    assert doc_catalog.INDEX_REL in seen["files"], seen["files"]            # 投影并入
+    assert "docs/generated/symbol-index.json" in seen["files"], seen["files"]   # 投影并入（engine 自有写入器）
     assert "job j1" in seen["msg"]
     empty = tmp_path / "empty"
     empty.mkdir()

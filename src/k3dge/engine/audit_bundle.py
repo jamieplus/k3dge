@@ -242,20 +242,39 @@ def land_report(workspace: Path, milestone_id: str, out: Path, *,
     except Exception as exc:      # pragma: no cover - 落地器异常不该吞
         return {"ok": False, "error": "REPORT_PERSIST_FAILED", "detail": str(exc), "report": "", "commit": ""}
     rel = report_dst.relative_to(workspace).as_posix()
-    files = [*([f for f in (extra_files or []) if f]), rel]
-    try:
-        from k3dge.engine.doc_catalog import INDEX_REL, write_docs_index
+    # **重生全部确定性投影**（不是只修一处）：落报告与落钉都会让投影过期 —— `docs-index`（文档面）
+    # 与 `symbol-index`（`k3dge where` 的判据面）。真跑实测两次踩：先只重生 docs-index ⇒ 提交被
+    # `DOC_INDEX_STALE` 拦；补上后又撞 `SYMBOL_INDEX_STALE`。所以这里跑与 `k3dge sync` + `k3dge index`
+    # **同一对写入器**，再按 `docs/generated/` 的 git 差异把变更文件并入同一次提交（不扫全仓，避免卷进别人的改动）。
+    import contextlib
+    import io
 
-        if write_docs_index(workspace).is_file():      # 落文档 ⇒ 必须先重生投影，否则自家新鲜度闸会拦提交
-            files.append(INDEX_REL)
+    log = io.StringIO()
+    try:
+        # 两个写入器**都属于 engine 域**（`doc_catalog` / `search`）⇒ 不 import `sync`（域方向：sync→engine，
+        # 反向会被 `DOMAIN_IMPORT_VIOLATION` 拦，且那确实是耦合方向错了）。落报告/落钉会过期的投影就是这两个：
+        # `docs-index`（文档面）、`symbol-index`（`k3dge where` 判据面）；契约面（specs）不受注释级改动影响。
+        from k3dge.engine.doc_catalog import write_docs_index
+        from k3dge.engine.search import write_symbol_index
+
+        with contextlib.redirect_stdout(log):          # 投影器会打日志 ⇒ 收起来，别污染调用方的 stdout（JSON）
+            write_docs_index(workspace)
+            write_symbol_index(workspace)
     except Exception as exc:
         return {"ok": False, "error": "PROJECTION_FAILED",
-                "detail": f"重生 docs 投影失败：{exc}", "report": rel, "commit": ""}
+                "detail": f"重生投影失败：{exc}", "report": rel, "commit": "",
+                "projection_log": log.getvalue()[-400:]}
+    proj: List[str] = []
+    rc, out = _git(workspace, "status", "--porcelain", "-uall", "--", "docs/generated")
+    if rc == 0:
+        proj = [line[3:].strip() for line in out.splitlines() if line.strip()]
+    files = [*([f for f in (extra_files or []) if f]), rel, *proj]
     msg = (f"docs(audit): M{milestone_id} 审计报告落盘（{why[:80]}）" if why
            else f"fix(audit): k3dit 交付包落树（{why or 'k3dit-bundle'}）")
     sha, cerr = commit_applied(workspace, msg, files)
     return {"ok": not cerr, "error": "COMMIT_FAILED" if cerr else "", "detail": cerr,
-            "report": rel, "commit": sha, "files": files}
+            "report": rel, "commit": sha, "files": files,
+            "projection": proj, "projection_log": log.getvalue()[-400:]}
 
 
 def commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str, str]:
