@@ -241,7 +241,7 @@ def test_leg_reads_tool_knobs_from_declaration_and_audit_only_is_evidence_only(t
         return {"ok": True, "apply": {"files": []}, "facts": {"job_id": "j1"}, "digest": "e" * 64}
 
     monkeypatch.setattr(ab, "consume", _fake_consume)
-    monkeypatch.setattr(ab, "commit_applied", lambda w, m, f: "c" * 40)
+    monkeypatch.setattr(ab, "commit_applied", lambda w, m, f: ("c" * 40, ""))
     early, _ = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
     assert calls == {"mode": "audit-only", "pins": "artifact", "scope": ""}   # 声明面被读到并传下去
 
@@ -270,3 +270,34 @@ def test_leg_reads_tool_knobs_from_declaration_and_audit_only_is_evidence_only(t
         '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\nk3dit_mode = "quick"\n', encoding="utf-8")
     early2, _ = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
     assert early2 is not None and early2[0] == "refused" and "不合法" in early2[1]
+
+
+def test_leg_refuses_with_reason_when_commit_fails(tmp_path, monkeypatch):
+    """提交失败必须**带原因**回绝（不再静默留 staged 树）。
+
+    真跑出处（2026-09-27 C 验收）：报告刚落、`docs-index` 过期 ⇒ 本地钩子 `DOC_INDEX_STALE` 拦下提交，
+    而 `commit_applied` 只 `return ""` ⇒ 腿输出只表现为"没提提交"，真实原因被吞，树留在 staged 态
+    （下一次跑又被 `DIRTY_TREE` 挡）。此测试钉住：① 提交前重生投影；② 失败带 git 报错；③ 退 `refused`。
+    """
+    from k3dge.engine import doc_catalog, milestone_audit as ma
+
+    ws = _repo(tmp_path)
+    (ws / ".agent").mkdir(exist_ok=True)
+    (ws / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\nk3dit_mode = "audit-only"\n', encoding="utf-8")
+    monkeypatch.setattr(ab, "find_k3dit", lambda w: ["k3dit"])
+    monkeypatch.setattr(ab, "run_path_audit", lambda w, out, **k: (
+        (out / "report.md").write_text("# 审计\n", encoding="utf-8"),
+        out.mkdir(parents=True, exist_ok=True),
+        {"ok": True, "rc": 0, "payload": {"status": "partial", "unclosed": 1}})[-1])
+    monkeypatch.setattr(ab, "consume", lambda w, b, **k: {
+        "ok": True, "apply": {"files": ["src/a.py"]}, "facts": {"job_id": "j1"}, "digest": "e" * 64})
+    idx = ws / doc_catalog.INDEX_REL
+    idx.parent.mkdir(parents=True, exist_ok=True)
+    idx.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(doc_catalog, "write_docs_index", lambda w: idx)      # 投影重生（真函数在测试仓无 docs/）
+    monkeypatch.setattr(ab, "commit_applied",
+                        lambda w, m, f: ("", "git commit 失败：hook DOC_INDEX_STALE 拦下"))
+    early, _ = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
+    assert early is not None and early[0] == "refused", early
+    assert "提交失败" in early[1] and "DOC_INDEX_STALE" in early[1], early[1]

@@ -449,15 +449,30 @@ def _bundle_audit_leg(
                                                report_src.read_text(encoding="utf-8"),
                                                scope="k3dit-bundle", kind="audit")
     # 落树 + 提交（**不写 Audit-* trailer**：那些由封版相位 3 一次写清，判据只认 git 事实）
-    files = (res.get("apply") or {}).get("files") or []
+    files = list((res.get("apply") or {}).get("files") or [])
     digest = str(res.get("digest") or "")[:12]
     jid = str((res.get("facts") or {}).get("job_id") or "")
     rel_report = report_dst.relative_to(workspace).as_posix()
+    # 审计**自己写了文档** ⇒ 先重生**确定性投影**（docs-index），否则自带的文档新鲜度闸会把这次提交拦下：
+    # 真跑实测 2026-09-27：报告刚落、docs-index 过期 ⇒ commit 被 `DOC_INDEX_STALE` 拒（且报错被吞成空 sha）
+    # ⇒ 产物留在 staged 态，下一次跑又被 `DIRTY_TREE` 挡。**写得进、提交得上去**是同一个动作的两半。
+    try:
+        from k3dge.engine.doc_catalog import INDEX_REL, write_docs_index
+
+        if write_docs_index(workspace).is_file():
+            files = [*files, INDEX_REL]
+    except Exception as exc:
+        return _reject_step(workspace, milestone_id, "audit_bundle_projection_failed",
+                            f"落树后重生 docs 投影失败：{exc}"), ""
     commit = ""
     if files or rel_report:
         # 报告与补丁一起提交：审计的"产物 + 落地"落在同一次提交上（封版相位再写 trailer/边界 tag）
-        commit = ab.commit_applied(workspace, f"fix(audit): k3dit 交付包落树（job {jid or '-'}，包 {digest}）",
-                                   [*files, rel_report])
+        commit, cerr = ab.commit_applied(
+            workspace, f"fix(audit): k3dit 交付包落树（job {jid or '-'}，包 {digest}）", [*files, rel_report])
+        if cerr:
+            return _reject_step(workspace, milestone_id, "audit_bundle_commit_failed",
+                                f"落树后提交失败：{cerr} ⇒ 产物已在工作区（未提交），"
+                                f"请人工提交或回退后重跑"), ""
     if audit_only:
         return _reject_step(
             workspace, milestone_id, "audit_evidence_only",

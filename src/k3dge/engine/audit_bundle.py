@@ -219,23 +219,26 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
     return {"ok": True, "applied": order, "files": res.get("files") or [], "dry_run": False}
 
 
-def commit_applied(workspace: Path, message: str, files: List[str]) -> str:
-    """提交**已落的这些文件**（不用 `add -A`：别把工作区其它改动卷进审计提交）。返回 sha 或 ""。
+def commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str, str]:
+    """提交**已落的这些文件**（不用 `add -A`：别把工作区其它改动卷进审计提交）。返回 `(sha, 错误)`。
 
     不写 `Audit-*` trailer——那些由封版相位 3 一次写清（判据只认 git 事实，ADR-0004 §2.1.10）。
+
+    ⚠️ 报错**必须带出来**（2026-09-27 真跑）：此前失败只 `return ""` ⇒ 腿只表现为"没提提交"，
+    真实原因（本地钩子 `DOC_INDEX_STALE` 拦下）被吞掉，树还被留在 staged 态（下一次跑又被 `DIRTY_TREE` 挡）。
     """
     files = [f for f in (files or []) if f]
     if not files:
-        return ""
-    rc, _ = _git(workspace, "add", "--", *files)
+        return "", ""
+    rc, out = _git(workspace, "add", "--", *files)
     if rc != 0:
-        return ""
-    rc, _ = _git(workspace, "-c", "user.email=k3dge@local", "-c", "user.name=k3dge",
-                 "commit", "-q", "-m", message)
+        return "", f"git add 失败：{out.strip()[-300:]}"
+    rc, out = _git(workspace, "-c", "user.email=k3dge@local", "-c", "user.name=k3dge",
+                   "commit", "-q", "-m", message)
     if rc != 0:
-        return ""
+        return "", f"git commit 失败：{out.strip()[-400:]}"
     rc, out = _git(workspace, "rev-parse", "HEAD")
-    return out.strip() if rc == 0 else ""
+    return (out.strip() if rc == 0 else ""), ""
 
 
 def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,

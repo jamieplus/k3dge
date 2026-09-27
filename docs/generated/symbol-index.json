@@ -686,7 +686,7 @@
   "consume": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 241
+      "line": 244
     }
   ],
   "consume_unreleased": [
@@ -1526,7 +1526,7 @@
   "run_audit_flow": [
     {
       "file": "src/k3dge/engine/milestone_audit.py",
-      "line": 472
+      "line": 487
     }
   ],
   "run_milestone_alignment": [

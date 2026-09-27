@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:8ccd2a1f0e2543486b73883a7118dfb1629a93a064ba28ec1684afcf750b5cb7`
+- **Contract Hash**: `sha256:0ab9fc1da100d675598dd63b6f5d379157b2d820143fcbe6c1b99cf0014e55e0`
 - **Last Updated**: 2026-09-27
 
 ## 1. Domain Boundary & Responsibilities
@@ -77,7 +77,7 @@ verify_bundle(bundle: Path, *, k3dit: Optional[List[str]]=None, timeout: int=600
 bundle_facts(bundle: Path) -> dict
 bundle_digest(bundle: Path) -> str
 apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False) -> dict
-commit_applied(workspace: Path, message: str, files: List[str]) -> str
+commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str, str]
 consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None, require_closed: bool=True) -> dict
 from __future__ import annotations
 from pathlib import Path

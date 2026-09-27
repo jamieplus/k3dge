@@ -192,8 +192,8 @@ bundle_digest(bundle: Path) -> str
     # doc: 包的**内容摘要**（排序后的 rel:sha256）——封版提交里记它，可核"审的是哪只包"。
 apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False) -> dict
     # doc: 按 `apply_order` 用**标准 `git apply`** 落补丁：先 worktree 试跑（原子化），再就地应用。
-commit_applied(workspace: Path, message: str, files: List[str]) -> str
-    # doc: 提交**已落的这些文件**（不用 `add -A`：别把工作区其它改动卷进审计提交）。返回 sha 或 ""。
+commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str, str]
+    # doc: 提交**已落的这些文件**（不用 `add -A`：别把工作区其它改动卷进审计提交）。返回 `(sha, 错误)`。
 consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None, require_closed: bool=True) -> dict
     # doc: **消费一只包**：验契约 → 输入身份 → 自证 → 落补丁。
 # audit_checklist.py
