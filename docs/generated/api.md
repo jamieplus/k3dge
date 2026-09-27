@@ -184,8 +184,8 @@ find_k3dit(workspace: Path) -> Optional[List[str]]
     # doc: 定位 k3dit：`K3DIT_BIN` > PATH > 兄弟仓 `.venv` > 兄弟仓 zipapp。找不到 → None。
 run_path_audit(workspace: Path, out: Path, *, mode: str='full', pins: str='inplace', scope: str='', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict
     # doc: 跑 k3dit 路径入口（工具调用）。`mode`＝工具运行模式（full / audit-only）；
-verify_bundle(bundle: Path, *, k3dit: Optional[List[str]]=None, timeout: int=600) -> dict
-    # doc: `k3dit audit --verify <bundle>`：包自证（反向重放 + 12 列 + findings↔报告）。
+verify_bundle(bundle: Path, *, expect_input: str='', require_closed: bool=False) -> dict
+    # doc: **消费侧独立验收**（不调产出方）：报告完备性 + 本地闭环 + 内容哈希链。
 bundle_facts(bundle: Path) -> dict
     # doc: 读包内**机器可读契约面**（缺/坏 ⇒ 空值，由调用方 fail-clear）。
 bundle_digest(bundle: Path) -> str
@@ -241,6 +241,25 @@ compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
     # doc: Return (suggested, reasons). Only fires on a quantitative event.
 audit_closed(workspace: Path, milestone_id: str) -> bool
     # doc: True iff the single audit report exists with 待修==0（报告的**合格性**）。
+# audit_verify.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+REPORT_COLUMNS = ('ID', '日期', '严重度', '优先级', '类型', '问题描述', '位置', '状态', '处置', '验证', '复审', '验收')
+ROW_STATE_ZH = {'fixed': '已修', 'leftover': '有意留', 'pending': '待修', 'fixnote': '待验证', 'disputed': '待裁'}
+OPEN_STATES = ('pending', 'fixnote', 'disputed')
+CLOSED_STATES = ('fixed', 'leftover')
+REQUIRED_CELLS = ('ID', '日期', '严重度', '优先级', '类型', '问题描述', '位置', '状态', '处置')
+has_marker_line(text: str, rel: str) -> bool
+    # doc: 这一行是**钉**吗（行首注释 + `k3dit:<state> <id>`，契约 §8 语法单源）。
+strip_markers(text: str, rel: str) -> str
+    # doc: 去钉后的**语义层**文本（契约 §8 语法单源＝`k3dge.engine.markers`，不在消费侧另抄一份）。
+verify_bundle_local(bundle: Path, *, expect_input: str='', require_closed: bool=True) -> dict
+    # doc: k3dge 自己的验收（不调 k3dit）。返回 {ok, errors[], facts{}, report_rows, unclosed, hash{}, cross_check{}}。
 # changelog.py
 from __future__ import annotations
 from pathlib import Path

@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:0ab9fc1da100d675598dd63b6f5d379157b2d820143fcbe6c1b99cf0014e55e0`
+- **Contract Hash**: `sha256:1cecdbb89e90790b2dcde0e221cfba9ab6e06c6e00f6e2c0ea88b0e31c31a17b`
 - **Last Updated**: 2026-09-27
 
 ## 1. Domain Boundary & Responsibilities
@@ -73,7 +73,7 @@ SUPPORTED_BUNDLE_VERSIONS = (1,)
 K3DIT_ENV = 'K3DIT_BIN'
 find_k3dit(workspace: Path) -> Optional[List[str]]
 run_path_audit(workspace: Path, out: Path, *, mode: str='full', pins: str='inplace', scope: str='', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict
-verify_bundle(bundle: Path, *, k3dit: Optional[List[str]]=None, timeout: int=600) -> dict
+verify_bundle(bundle: Path, *, expect_input: str='', require_closed: bool=False) -> dict
 bundle_facts(bundle: Path) -> dict
 bundle_digest(bundle: Path) -> str
 apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False) -> dict
@@ -113,6 +113,21 @@ from k3dge.engine.milestone_pointer import get_current_milestone
 from k3dge.engine.task_index import scan_milestone_tasks
 compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]
 audit_closed(workspace: Path, milestone_id: str) -> bool
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+REPORT_COLUMNS = ('ID', '日期', '严重度', '优先级', '类型', '问题描述', '位置', '状态', '处置', '验证', '复审', '验收')
+ROW_STATE_ZH = {'fixed': '已修', 'leftover': '有意留', 'pending': '待修', 'fixnote': '待验证', 'disputed': '待裁'}
+OPEN_STATES = ('pending', 'fixnote', 'disputed')
+CLOSED_STATES = ('fixed', 'leftover')
+REQUIRED_CELLS = ('ID', '日期', '严重度', '优先级', '类型', '问题描述', '位置', '状态', '处置')
+has_marker_line(text: str, rel: str) -> bool
+strip_markers(text: str, rel: str) -> str
+verify_bundle_local(bundle: Path, *, expect_input: str='', require_closed: bool=True) -> dict
 from __future__ import annotations
 from pathlib import Path
 mechanical_commit(sha: str, subject: str, body: str) -> bool

@@ -597,7 +597,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
     target = Path(getattr(args, "into", "") or workspace).resolve()
     res = ab.consume(target, bundle, dry_run=bool(getattr(args, "dry_run", False)),
                      expect_input=str(target),
-                     # 纯审计包 status=partial 是设计（钉留树）⇒ 不进 NOT_CLOSED 分支
+                     # 纯审计包 status=partial 是设计（钉留树）⇒ 不要求闭环
                      require_closed=(getattr(args, "bundle_mode", "full") or "full") != "audit-only")
     print(json.dumps(res, ensure_ascii=False))
     _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] audit bundle "

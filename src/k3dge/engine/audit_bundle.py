@@ -93,18 +93,19 @@ def run_path_audit(workspace: Path, out: Path, *, mode: str = "full", pins: str 
             "detail": text.strip()[-400:]}
 
 
-def verify_bundle(bundle: Path, *, k3dit: Optional[List[str]] = None,
-                  timeout: int = 600) -> dict:
-    """`k3dit audit --verify <bundle>`：包自证（反向重放 + 12 列 + findings↔报告）。"""
-    argv0 = k3dit or find_k3dit(bundle)
-    if not argv0:
-        return {"ok": False, "detail": f"找不到 k3dit（设 {K3DIT_ENV}）"}
-    rc, text = _run([*argv0, "audit", "--verify", str(bundle), "--format", "json"], bundle, timeout)
-    payload = _last_json(text) or {}
-    ok = bool(payload.get("ok")) and not payload.get("errors")
-    return {"ok": ok, "rc": rc, "errors": payload.get("errors") or [],
-            "baseline_tree_hash": payload.get("baseline_tree_hash") or "",
-            "detail": "" if ok else text.strip()[-300:]}
+def verify_bundle(bundle: Path, *, expect_input: str = "", require_closed: bool = False) -> dict:
+    """**消费侧独立验收**（不调产出方）：报告完备性 + 本地闭环 + 内容哈希链。
+
+    实现见 `k3dge.engine.audit_verify`。**不由产出方自证**：`k3dit audit --verify` 是产出方的自查，
+    拿去当闸等于"自己批自己"（ADR-0012：产物 + **消费者** + 到达）。
+    """
+    from k3dge.engine import audit_verify
+
+    res = audit_verify.verify_bundle_local(bundle, expect_input=expect_input, require_closed=require_closed)
+    return {"ok": bool(res.get("ok")), "errors": list(res.get("errors") or []),
+            "baseline_tree_hash": str((res.get("facts") or {}).get("baseline") or ""),
+            "detail": "" if res.get("ok") else "; ".join(res.get("errors") or [])[:400],
+            "local": res}
 
 
 def bundle_facts(bundle: Path) -> dict:
@@ -267,17 +268,12 @@ def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
                         "detail": f"包是为 {got} 做的，而当前目标是 {want}（用 --into 指定目标目录）"}
         except OSError:      # pragma: no cover - 路径解析异常不该拦住消费
             pass
-    # `require_closed=False` 只给 **纯审计**（`--mode audit-only`）：它的 `status=partial` 是设计
-    #（钉留树＝待修队列），不是失败；消费侧照常自证 + 按 apply_order 落补丁（通常只剩 pins.patch）。
-    if require_closed and str(facts.get("status") or "") != "closed":
-        return {"ok": False, "error": "NOT_CLOSED", "facts": facts,
-                "detail": f"status={facts.get('status')!r}（unclosed={facts.get('unclosed')}）"
-                          f"——未闭环的包不得当已审"}
-    argv0 = k3dit or find_k3dit(workspace)
-    verified = verify_bundle(bundle, k3dit=argv0)
+    # **闭环由 k3dge 自己从 findings 算**（`require_closed=False` 只给纯审计：它的 `status=partial` 是设计，
+    # 钉留树＝待修队列）。产出方自报的 `status` **不作判据**，只作交叉核（不一致会被验收报出来）。
+    verified = verify_bundle(bundle, expect_input=str(expect_input or ""), require_closed=require_closed)
     if not verified.get("ok"):
         return {"ok": False, "error": "VERIFY_FAILED", "facts": facts, "verify": verified,
-                "detail": "包自证未通过：" + "; ".join(verified.get("errors") or [])[:300]}
+                "detail": "消费侧验收未通过：" + "; ".join(verified.get("errors") or [])[:400]}
     applied = apply_bundle(workspace, bundle, dry_run=dry_run)
     if not applied.get("ok"):
         return {"ok": False, "error": applied.get("error"), "facts": facts, "verify": verified,

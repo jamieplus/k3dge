@@ -182,7 +182,7 @@
   "apply_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 192
+      "line": 193
     }
   ],
   "archived_milestone_tasks": [
@@ -320,13 +320,13 @@
   "bundle_digest": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 129
+      "line": 130
     }
   ],
   "bundle_facts": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 110
+      "line": 111
     }
   ],
   "cache_observability": [
@@ -662,7 +662,7 @@
   "commit_applied": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 222
+      "line": 223
     }
   ],
   "completeness_violations": [
@@ -686,7 +686,7 @@
   "consume": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 244
+      "line": 245
     }
   ],
   "consume_unreleased": [
@@ -931,6 +931,12 @@
     {
       "file": "src/k3dge/engine/doc_catalog.py",
       "line": 273
+    }
+  ],
+  "has_marker_line": [
+    {
+      "file": "src/k3dge/engine/audit_verify.py",
+      "line": 74
     }
   ],
   "has_milestone_token": [
@@ -1526,7 +1532,7 @@
   "run_audit_flow": [
     {
       "file": "src/k3dge/engine/milestone_audit.py",
-      "line": 526
+      "line": 521
     }
   ],
   "run_milestone_alignment": [
@@ -1709,6 +1715,12 @@
       "line": 42
     }
   ],
+  "strip_markers": [
+    {
+      "file": "src/k3dge/engine/audit_verify.py",
+      "line": 82
+    }
+  ],
   "strip_pins": [
     {
       "file": "src/k3dge/engine/worktree.py",
@@ -1825,6 +1837,12 @@
     {
       "file": "src/k3dge/engine/audit_bundle.py",
       "line": 96
+    }
+  ],
+  "verify_bundle_local": [
+    {
+      "file": "src/k3dge/engine/audit_verify.py",
+      "line": 148
     }
   ],
   "verify_commit": [

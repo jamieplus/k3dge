@@ -128,3 +128,24 @@ Denial reason and reopen condition live here only.
 
 **留**：k3dit 侧现有 17 枚 `k3dit:pending` 钉（自查产物，钉留树）⇒ 处置归人/后续轮；要封板须显式把
 `k3dit_mode` 改回 `full` 再跑（那次才落补丁+提交）。
+
+## 消费侧独立验收已落地（2026-09-27）：闸从"产出方自证"移到 **k3dge 自己验**
+
+**改前**（`git show HEAD~N` 可核）：`audit_bundle.verify_bundle()` 直接调 `k3dit audit --verify`；`consume`
+的闭环闸读**产出方自报的** `manifest.status` ⇒ 等于"自己批自己"（违 ADR-0012 的"消费者"环）。
+
+**改后**：新模块 `engine/audit_verify.py::verify_bundle_local`（k3dge 自己读包的**文件**）：
+① 包完备性（`bundle_version` 白名单 / 输入身份 / `apply_order` 补丁存在非空 / 必需文件齐）；
+② **报告完备性**（12 列**精确**表头顺序、行 ↔ `findings` 一一对应、必需格非空、状态闭集、`已修`必带「验证」）；
+③ **本地闭环**（未关＝`pending`/`fixnote`/`disputed` 或终态未背书；产出方 `status` 只作交叉核，
+   不一致**报出来**且以本地为准）；
+④ **内容哈希链**（在临时副本按 `apply_order` **反序**反向应用后逐文件比 `baseline`；去钉用契约 §8 语法单源
+   `engine/markers`；**含钉文件不豁免**——先前的写法整份跳过，等于在含钉文件里任何篡改都抓不到）。
+过了闸才由 k3dge 落补丁（`apply_bundle`）。
+
+**真包控制证据**（`/tmp/ctl`＝修好后的 k3dit 产的 14 钉包）：
+正面对照 `ok=True`（findings 14＝报告 14 行、哈希链 **281 文件 0 不匹配**）；三类伪造全部**拒**：
+报告删一行（"报告漏行"）、含钉文件里追加代码（"内容哈希链不通过"）、伪造 `status=closed`（"闭环事实不一致…以本地为准"）。
+
+**顺带发现（旧包不可消费）**：2026-09-27 之前产出的**全部**包，其 `baseline`（语义层）受产出方旧版**子串 strip**
+影响（把"提到钉的文档行"也去掉）⇒ 新的反向重放会**如实拒收**。要消费请用修好后的 k3dit **重新产包**。

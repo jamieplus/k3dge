@@ -460,14 +460,9 @@ def _bundle_audit_leg(
                             f"k3dit 产包失败（rc={ran.get('rc')}）：{ran.get('detail') or ''}"), ""
     # 纯审计（audit-only）：`status=partial` 是设计（钉留树）；它**只出证据，不构成封板依据** ⇒ 落报告后
     # 以 refused 交回（带理由），不推进任何"已审"判定。full 才要求闭环。
+    # **闭环判据归 k3dge**：`consume` 里的 `audit_verify.verify_bundle_local` 从 findings 自己算未关项，
+    # 产出方自报的 `payload.status` 只作交叉核（不一致会被验收报出来）；不在此处读它当闸。
     audit_only = k3dit_mode == "audit-only"
-    if not audit_only and (str(payload.get("status") or "") != "closed" or payload.get("incomplete")):
-        _sha = _land_report_even_on_refusal(workspace, milestone_id, out, why="未闭环")
-        return _reject_step(
-            workspace, milestone_id, "audit_bundle_not_closed",
-            f"k3dit 未闭环（status={payload.get('status')!r} unclosed={payload.get('unclosed')}"
-            f"）⇒ 不得当已审；报告已落 `docs/reviews/`{('（提交 ' + _sha[:12] + '）') if _sha else ''}，"
-            f"产物包留在 {out} 供人核（ADR-0004 §2.1.9）。"), ""
 
     res = ab.consume(workspace, out, expect_input=str(workspace), require_closed=not audit_only)
     if not res.get("ok"):

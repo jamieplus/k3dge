@@ -12,21 +12,24 @@ from pathlib import Path
 
 from k3dge.engine import audit_bundle as ab
 
-_FIX = """--- a/src/a.py
-+++ b/src/a.py
-@@ -1,2 +1,3 @@
- x = 1
- y = 2
-+added_by_fix = True
-"""
-_PINS = """--- a/src/a.py
-+++ b/src/a.py
-@@ -1,3 +1,4 @@
-+x = 1  # k3dit:fixed code-1 复核通过
- x = 1
- y = 2
- added_by_fix = True
-"""
+from .test_audit_verify import make_bundle
+
+
+def _bundle(tmp: Path, *, version: int = 1, status: str = "closed", order=("fix.patch", "pins.patch"),
+            patches: bool = True) -> Path:
+    """合成包＝**结构完整**的包（`code/` + `baseline.json` + 12 列表格 + 真生成的补丁）。
+
+    走 `test_audit_verify.make_bundle`（单一夹具）：消费侧的闸现在会真读这些文件，
+    所以"只写 manifest 的假包"已不能代表真实输入。
+    `patches=False` ⇒ 造"补丁缺失"的形态（给 `apply_bundle` 的 fail-clear 用）。
+    """
+    b = make_bundle(tmp, version=version, claimed=status, order=order,
+                    finding_state=("fixed" if status == "closed" else "pending"),
+                    row_state=("已修" if status == "closed" else "待修"))
+    if not patches:
+        (b / "fix.patch").unlink(missing_ok=True)
+        (b / "pins.patch").unlink(missing_ok=True)
+    return b
 
 
 def _repo(tmp: Path) -> Path:
@@ -37,25 +40,6 @@ def _repo(tmp: Path) -> Path:
                  ["-c", "user.email=a@b", "-c", "user.name=a", "commit", "-qm", "base"]):
         subprocess.run(["git", *argv], cwd=ws, check=True, capture_output=True)
     return ws
-
-
-def _bundle(tmp: Path, *, version: int = 1, status: str = "closed", order=("fix.patch", "pins.patch"),
-            patches: bool = True) -> Path:
-    b = tmp / "bundle"
-    b.mkdir(parents=True, exist_ok=True)
-    if patches:
-        (b / "fix.patch").write_text(_FIX, encoding="utf-8")
-        (b / "pins.patch").write_text(_PINS, encoding="utf-8")
-    (b / "report.md").write_text("# 审计\n", encoding="utf-8")
-    (b / "findings.json").write_text(json.dumps({"items": []}, ensure_ascii=False), encoding="utf-8")
-    (b / "manifest.json").write_text(json.dumps({
-        "bundle_version": version, "status": status, "unclosed": 0 if status == "closed" else 3,
-        "apply_order": list(order), "patches": ["fix.patch", "pins.patch"],
-        "pins": {"count": 1, "by_state": {"fixed": 1}, "in_code": True},
-        "flow": {"windows": {"fix": 2, "review": 1}, "rework_ratio": 1.0},
-        "coverage": {"audited_files": 1}, "input": "/tmp/x", "mode": "full", "job_id": "j1",
-    }, ensure_ascii=False), encoding="utf-8")
-    return b
 
 
 def test_bundle_facts_and_digest_read_the_contract_surface(tmp_path):
@@ -73,14 +57,14 @@ def test_bundle_facts_and_digest_read_the_contract_surface(tmp_path):
 
 def test_consume_fails_clear_on_unknown_version_and_unclosed(tmp_path, monkeypatch):
     ws = _repo(tmp_path)
-    monkeypatch.setattr(ab, "verify_bundle", lambda *a, **k: {"ok": True})
     bad_ver = _bundle(tmp_path / "v", version=999)
     r = ab.consume(ws, bad_ver)
     assert r["ok"] is False and r["error"] == "BUNDLE_VERSION_UNSUPPORTED"
     open_b = _bundle(tmp_path / "o", status="partial")
     r2 = ab.consume(ws, open_b)
-    assert r2["ok"] is False and r2["error"] == "NOT_CLOSED"
-    assert "unclosed" in r2["detail"]
+    # 闭环判据归**消费侧**（不再读产出方自报的 status）⇒ 未关由本地算出来
+    assert r2["ok"] is False and r2["error"] == "VERIFY_FAILED"
+    assert "未闭环（消费侧算）" in r2["detail"] and "闭环事实不一致" not in r2["detail"]
 
 
 def test_consume_fails_clear_when_pack_self_check_fails(tmp_path, monkeypatch):
@@ -145,12 +129,21 @@ def test_bundle_audit_leg_routes_and_fails_clear(tmp_path, monkeypatch):
     early, _ = ma._bundle_audit_leg(ws, "M99", ma._Prompt.default(), "b" * 40)
     assert early is not None and early[0] == "refused" and "找不到 k3dit" in early[1]
 
-    # ② 产包未闭环 ⇒ 拒绝
+    # ② 产包未闭环 ⇒ 拒绝。**闭环由消费侧自己算**（不再读产出方自报的 status）⇒ 得让 consume 拿到真包
     monkeypatch.setattr(ab, "find_k3dit", lambda w: ["k3dit"])
-    monkeypatch.setattr(ab, "run_path_audit",
-                        lambda w, out, **k: {"ok": True, "rc": 3, "payload": {"status": "incomplete", "unclosed": 2}})
+
+    def _run_open(w, out, **k):
+        import shutil
+
+        src = make_bundle(tmp_path / "opensrc", claimed="partial", finding_state="pending",
+                          row_state="待修", input_path=str(ws))
+        shutil.rmtree(out, ignore_errors=True)      # 同一测试里腿会被调多次 ⇒ 目标目录先清
+        shutil.copytree(src, out)
+        return {"ok": True, "rc": 3, "payload": {"status": "partial", "unclosed": 2}}
+
+    monkeypatch.setattr(ab, "run_path_audit", _run_open)
     early, _ = ma._bundle_audit_leg(ws, "M99", ma._Prompt.default(), "b" * 40)
-    assert early is not None and early[0] == "refused" and "未闭环" in early[1]
+    assert early is not None and early[0] == "refused" and "未闭环（消费侧算）" in early[1], early
 
     # ③ 闭环 + 消费成功 ⇒ 落树提交，并返回 (None, msg) 让共用尾收口
     def _fake_run(w, out, **k):
