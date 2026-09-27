@@ -662,7 +662,7 @@
   "commit_applied": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 280
+      "line": 281
     }
   ],
   "completeness_violations": [
@@ -686,7 +686,7 @@
   "consume": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 302
+      "line": 303
     }
   ],
   "consume_unreleased": [

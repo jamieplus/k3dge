@@ -361,6 +361,7 @@ def test_land_report_is_the_single_entry_used_by_all_three_paths(tmp_path, monke
     assert "src/a.py" in seen["files"], seen["files"]                       # 补丁与报告同一次提交
     assert "docs/generated/symbol-index.json" in seen["files"], seen["files"]   # 投影并入（engine 自有写入器）
     assert "job j1" in seen["msg"]
+    assert "MM1" not in seen["msg"] and seen["msg"].count("M1") == 1, seen["msg"]   # id 原样用（别再前置 M）
     empty = tmp_path / "empty"
     empty.mkdir()
     bad = ab.land_report(ws, "M1", empty)

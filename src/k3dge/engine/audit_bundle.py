@@ -269,7 +269,8 @@ def land_report(workspace: Path, milestone_id: str, out: Path, *,
     if rc == 0:
         proj = [line[3:].strip() for line in out.splitlines() if line.strip()]
     files = [*([f for f in (extra_files or []) if f]), rel, *proj]
-    msg = (f"docs(audit): M{milestone_id} 审计报告落盘（{why[:80]}）" if why
+    # 里程碑 id **原样用**（`M0` 就写 `M0`）：别再前置 `M`——真跑实测把 `M0` 写成了 `MM0`。
+    msg = (f"docs(audit): {milestone_id} 审计报告落盘（{why[:80]}）" if why
            else f"fix(audit): k3dit 交付包落树（{why or 'k3dit-bundle'}）")
     sha, cerr = commit_applied(workspace, msg, files)
     return {"ok": not cerr, "error": "COMMIT_FAILED" if cerr else "", "detail": cerr,
