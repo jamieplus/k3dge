@@ -165,3 +165,12 @@ Denial reason and reopen condition live here only.
    明确保留的"对等 harness 扩展位"（有测试覆盖、无配置声明）⇒ 拆它属策略变更，需人拍；此处只记清"它只对 oneshot 有效"。
 4. **`k3dit audit --verify`（产出方自证）**：消费路径已不调（改本地验收）；它仍是产出方自己的 CLI 动词（产出方自测/人工用），
    不算悬空，但**不再构成任何闸**。
+
+## FLOW-REVIEWS-01（跨仓，2026-09-27）：k3ge 落报告后**消费仓必红**（索引/归档口径）
+
+`audit_bundle.land_report` 把报告写进消费仓 `docs/reviews/` 后，消费仓自己的 reviews 格式闸要求：
+① 报告登记在 `docs/reviews/README.md` 索引（含机器状态 + 待修计数）；② 机器判定"已结"的报告须在
+`archive/<M>/`。而消费仓 `README` 又写"**封板时**由 seal 归档" ⇒ **文与闸不一致**；消费方只给校验器
+（`k3dit check-report`，无规整器）⇒ 若在 k3ge 侧实现就要**另抄一份口径**（违反单源）。
+真跑实测两次踩到（k3dit 落报告后红，手工补索引+归档两次）。**候选**：甲＝消费方加 `reviews --fix`，
+k3ge 落地后调它；乙＝消费仓把"归档"挪到 seal（改 README 与测试其一）。**待人拍**，k3ge 侧暂不动。
