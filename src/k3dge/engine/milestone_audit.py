@@ -377,6 +377,38 @@ def _oneshot_audit_leg(
     return status, msg + "\n" + _ns.render_cli()
 
 
+def _land_report_even_on_refusal(
+    workspace: Path, milestone_id: str, out: Path, *, why: str
+) -> str:
+    """**拒绝路径也要留住报告**：审计跑了、钱花了、包里有 `report.md` ⇒ 必须落 `docs/reviews/` 并提交。
+
+    真跑实测（2026-09-27）：第一轮腿（scope=src/k3dit/tools，2.29M prompt、20KB/31 行报告）产包后因
+    `DIRTY_TREE` 被拒 ⇒ 报告**只留在缓存目录**（清缓存即丢），判定面（checklist/触发/封板）看不到它，
+    而随后为了验收换窄 scope 重跑 ⇒ 落仓的那份成了"0 行结论"的空报告。**跑完没留下证据＝这一轮白跑。**
+    返回提交 sha（失败则空串；报告已落盘但提交失败时也返回空串——调用方在拒绝理由里说明）。
+    """
+    from k3dge.engine import audit_bundle as ab
+
+    report_src = Path(out) / "report.md"
+    if not report_src.is_file():
+        return ""
+    try:
+        report_dst = persist_external_audit_report(workspace, milestone_id,
+                                                   report_src.read_text(encoding="utf-8"),
+                                                   scope="k3dit-bundle", kind="audit")
+        rel = report_dst.relative_to(workspace).as_posix()
+        files = [rel]
+        from k3dge.engine.doc_catalog import INDEX_REL, write_docs_index
+
+        if write_docs_index(workspace).is_file():
+            files.append(INDEX_REL)
+        sha, err = ab.commit_applied(
+            workspace, f"docs(audit): M{milestone_id} 审计报告落盘（{why[:80]}）", files)
+        return "" if err else sha
+    except Exception:
+        return ""
+
+
 def _bundle_audit_leg(
     workspace: Path,
     milestone_id: str,
@@ -430,15 +462,22 @@ def _bundle_audit_leg(
     # 以 refused 交回（带理由），不推进任何"已审"判定。full 才要求闭环。
     audit_only = k3dit_mode == "audit-only"
     if not audit_only and (str(payload.get("status") or "") != "closed" or payload.get("incomplete")):
+        _sha = _land_report_even_on_refusal(workspace, milestone_id, out, why="未闭环")
         return _reject_step(
             workspace, milestone_id, "audit_bundle_not_closed",
             f"k3dit 未闭环（status={payload.get('status')!r} unclosed={payload.get('unclosed')}"
-            f"）⇒ 不得当已审；产物留在 {out} 供人核（ADR-0004 §2.1.9）。"), ""
+            f"）⇒ 不得当已审；报告已落 `docs/reviews/`{('（提交 ' + _sha[:12] + '）') if _sha else ''}，"
+            f"产物包留在 {out} 供人核（ADR-0004 §2.1.9）。"), ""
 
     res = ab.consume(workspace, out, expect_input=str(workspace), require_closed=not audit_only)
     if not res.get("ok"):
-        return _reject_step(workspace, milestone_id, "audit_bundle_consume_failed",
-                            f"消费交付包失败（{res.get('error')}）：{res.get('detail') or ''}"), ""
+        # 消费失败（脏树/补丁打不上…）**不等于这一轮没产出**：报告必须在手，否则等于白跑一轮
+        _sha = _land_report_even_on_refusal(workspace, milestone_id, out, why=f"消费被拒 {res.get('error')}")
+        return _reject_step(
+            workspace, milestone_id, "audit_bundle_consume_failed",
+            f"消费交付包失败（{res.get('error')}）：{res.get('detail') or ''}"
+            f"；报告已落 `docs/reviews/`{('（提交 ' + _sha[:12] + '）') if _sha else '（未提交）'}，"
+            f"产物包留在 {out}"), ""
     # 包里那份 12 列报告就是**审计产物**：必须落到 `docs/reviews/`，否则判定面（checklist / 触发 /
     # judged 事实）看不到它——`_find_report` 只在 docs/reviews 里找。复用既有的落地器（统一命名/表头/覆盖规则）。
     report_src = out / "report.md"

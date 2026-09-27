@@ -301,3 +301,39 @@ def test_leg_refuses_with_reason_when_commit_fails(tmp_path, monkeypatch):
     early, _ = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
     assert early is not None and early[0] == "refused", early
     assert "提交失败" in early[1] and "DOC_INDEX_STALE" in early[1], early[1]
+
+
+def test_leg_lands_report_even_when_consume_is_refused(tmp_path, monkeypatch):
+    """消费被拒（脏树 / 补丁打不上）**也必须把报告落到 `docs/reviews/` 并提交**。
+
+    真跑出处（2026-09-27）：第一轮腿产包后因 `DIRTY_TREE` 被拒 ⇒ 20KB/31 行报告**只留在缓存目录**，
+    随后为了验收换窄 scope 重跑 ⇒ 落仓的成了"0 行结论"的空报告。跑完没留下证据＝这一轮（2.29M prompt）白跑。
+    """
+    from k3dge.engine import doc_catalog, milestone_audit as ma
+    from k3dge.engine.audit_report import _find_report
+
+    ws = _repo(tmp_path)
+    (ws / ".agent").mkdir(exist_ok=True)
+    (ws / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\nk3dit_mode = "audit-only"\n', encoding="utf-8")
+    monkeypatch.setattr(ab, "find_k3dit", lambda w: ["k3dit"])
+    monkeypatch.setattr(ab, "run_path_audit", lambda w, out, **k: (
+        out.mkdir(parents=True, exist_ok=True),
+        (out / "report.md").write_text(
+            "# 审计\n\n| ID | 日期 |\n| --- | --- |\n| d-1 | 2026-09-27 |\n", encoding="utf-8"),
+        {"ok": True, "rc": 0, "payload": {"status": "partial", "unclosed": 3}})[-1])
+    monkeypatch.setattr(ab, "consume", lambda w, b, **k: {"ok": False, "error": "DIRTY_TREE",
+                                                          "detail": "工作树不干净"})
+    idx = ws / doc_catalog.INDEX_REL
+    idx.parent.mkdir(parents=True, exist_ok=True)
+    idx.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(doc_catalog, "write_docs_index", lambda w: idx)
+    seen = {}
+    monkeypatch.setattr(ab, "commit_applied",
+                        lambda w, m, f: (seen.update(msg=m, files=list(f)) or ("d" * 40, "")))
+    early, _ = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
+    assert early is not None and early[0] == "refused" and "DIRTY_TREE" in early[1], early
+    assert "报告已落" in early[1], early[1]
+    got = _find_report(ws, "M77", "audit")           # (path, text)
+    assert got and "d-1" in got[1], "报告必须真的落盘（含内容）"
+    assert doc_catalog.INDEX_REL in seen["files"], seen["files"]      # 投影一并提交
