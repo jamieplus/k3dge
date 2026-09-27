@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:6b5ab3965ac14cc88646fedbce90744c1e6ff94b08797be0bc58441b4a72d302`
+- **Contract Hash**: `sha256:f9c472992db8d86a81577c10982e6c6264e9263cf24ec67c7fc9262e630fc251`
 - **Last Updated**: 2026-09-27
 
 ## 1. Domain Boundary & Responsibilities
@@ -73,13 +73,13 @@ SUPPORTED_BUNDLE_VERSIONS = (1,)
 K3DIT_ENV = 'K3DIT_BIN'
 find_k3dit(workspace: Path) -> Optional[List[str]]
 run_path_audit(workspace: Path, out: Path, *, mode: str='full', pins: str='inplace', scope: str='', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict
-verify_bundle(bundle: Path, *, expect_input: str='', require_closed: bool=False) -> dict
+verify_bundle(bundle: Path, *, expect_input: str='', require_closed: bool=False, accept_baseline_drift: str='') -> dict
 bundle_facts(bundle: Path) -> dict
 bundle_digest(bundle: Path) -> str
-apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False) -> dict
+apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False, exclude: Optional[List[str]]=None) -> dict
 land_report(workspace: Path, milestone_id: str, out: Path, *, extra_files: Optional[List[str]]=None, why: str='') -> dict
 commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str, str]
-consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None, require_closed: bool=True) -> dict
+consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None, require_closed: bool=True, accept_baseline_drift: str='', exclude: Optional[List[str]]=None) -> dict
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
@@ -102,6 +102,18 @@ SEALABLE_AUDIT_RESULTS = ('closed', 'degraded-manual')
 audit_call_result(produced) -> str
 audit_result_of(status: str) -> Optional[str]
 audit_evidence(workspace: Path, milestone_id: str) -> dict
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Dict
+from typing import Iterable
+from typing import List
+from typing import Optional
+from typing import Set
+from k3dge.engine.audit_verify import replay_to_baseline
+touched_files(bundle: Path) -> Set[str]
+merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str]=()) -> Dict[str, Any]
+union_pins(workspace: Path, bundle: Path, rel: str) -> Dict[str, Any]
 from __future__ import annotations
 from pathlib import Path
 from k3dge.engine import report_table
@@ -131,7 +143,8 @@ ROW_STATE_ZH = {'fixed': '已修', 'leftover': '有意留', 'pending': '待修',
 REQUIRED_CELLS = ('ID', '日期', '严重度', '优先级', '类型', '问题描述', '位置', '状态', '处置')
 has_marker_line(text: str, rel: str) -> bool
 strip_markers(text: str, rel: str) -> str
-verify_bundle_local(bundle: Path, *, expect_input: str='', require_closed: bool=True) -> dict
+replay_to_baseline(bundle: Path, dest: Optional[Path]=None, only: Optional[List[str]]=None) -> Dict[str, Any]
+verify_bundle_local(bundle: Path, *, expect_input: str='', require_closed: bool=True, accept_baseline_drift: str='') -> dict
 from __future__ import annotations
 from pathlib import Path
 mechanical_commit(sha: str, subject: str, body: str) -> bool

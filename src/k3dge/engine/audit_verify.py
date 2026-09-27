@@ -108,39 +108,61 @@ def strip_markers(text: str, rel: str) -> str:
     return "".join(line + "\n" for line in keep)
 
 
-def _replay_hashes(bundle: Path, order: List[str], pins_in_code: bool) -> Dict[str, Any]:
-    """反向重放（`apply_order` 反序）后逐文件比 `baseline.json`。返回 {ok, mismatched, skipped_pin_files, checked}。"""
-    import hashlib
+def replay_to_baseline(bundle: Path, dest: Optional[Path] = None,
+                       only: Optional[List[str]] = None) -> Dict[str, Any]:
+    """把包的 `code/` **反向重放**回基线（审前语义层）——消费侧据此拿到**三路合并的 base**。
 
-    baseline = _read_json(bundle / "baseline.json") or {}
-    want = baseline.get("files") or {}
-    code = bundle / "code"
-    if not want or not code.is_dir():
-        return {"ok": False, "checked": 0, "mismatched": [], "skipped_pin_files": [],
-                "detail": f"baseline/code 缺失（baseline.files={len(want)}，code={'有' if code.is_dir() else '无'}）"}
-    tmp = Path(tempfile.mkdtemp(prefix="k3dge-verify-"))
-    try:
-        work = tmp / "code"
-        shutil.copytree(code, work)
-        env = {"GIT_AUTHOR_NAME": "k3dge", "GIT_AUTHOR_EMAIL": "k3dge@local",
-               "GIT_COMMITTER_NAME": "k3dge", "GIT_COMMITTER_EMAIL": "k3dge@local",
-               "PATH": "/usr/bin:/bin"}
-        for cmd in (["git", "init", "-q"], ["git", "add", "-A"],
-                    ["git", "-c", "user.email=k3dge@local", "-c", "user.name=k3dge", "commit", "-qm", "code"]):
-            subprocess.run(cmd, cwd=work, capture_output=True, env=env, check=False)
-        # 重放方向取决于**钉在不在 `code/` 里**（`pins.in_code`）：
-        #   in_code=True（inplace）⇒ `code/` 带钉 ⇒ 反序**反向**应用（pins.patch → fix.patch）回到语义层；
-        #   in_code=False（artifact）⇒ `code/` 本身已是语义层（钉被剥离，只有 pins.patch 拎着）⇒ **不反向**
-        #     pins.patch，只把 fix.patch 反向应用回去（真跑实测：对 artifact 包反向应用 pins.patch 必然打不上）。
-        replay: List[str] = [p for p in order if p == "fix.patch"]
+    方向取决于 `pins.in_code`（与判据同一口径）：
+      - `True`（inplace）：`code/` 带钉 ⇒ 反序反向应用（`pins.patch` → `fix.patch`）；
+      - `False`（artifact）：`code/` 已是语义层 ⇒ **不反向** `pins.patch`，只反向 `fix.patch`。
+    返回 {ok, root, detail}；失败时 `root` 为空。
+    """
+    facts = _read_json(Path(bundle) / "manifest.json") or {}
+    order = [str(x) for x in (facts.get("apply_order") or [])]
+    pins_in_code = bool((facts.get("pins") or {}).get("in_code"))
+    code = Path(bundle) / "code"
+    if not code.is_dir():
+        return {"ok": False, "root": "", "detail": "包内无 code/（无法重放基线）"}
+    work = Path(dest) if dest else Path(tempfile.mkdtemp(prefix="k3dge-base-"))
+    if work.exists():
+        shutil.rmtree(work, ignore_errors=True)
+    shutil.copytree(code, work)
+    env = {"GIT_AUTHOR_NAME": "k3dge", "GIT_AUTHOR_EMAIL": "k3dge@local",
+           "GIT_COMMITTER_NAME": "k3dge", "GIT_COMMITTER_EMAIL": "k3dge@local",
+           "PATH": "/usr/bin:/bin"}
+    for cmd in (["git", "init", "-q"], ["git", "add", "-A"],
+                ["git", "-c", "user.email=k3dge@local", "-c", "user.name=k3dge", "commit", "-qm", "code"]):
+        subprocess.run(cmd, cwd=work, capture_output=True, env=env, check=False)
+    if only is not None:      # `only`＝只反向这些补丁（合并器用它拿"语义层修复后"的中间树）
+        replay = [p for p in order if p in set(only)]
+    else:
+        replay = [p for p in order if p == "fix.patch"]
         if pins_in_code:
             replay = list(reversed([p for p in order if p in ("fix.patch", "pins.patch")]))
-        for name in replay:
-            rc = subprocess.run(["git", "apply", "-R", "-p1", str(bundle / name)],
-                                cwd=work, capture_output=True, env=env)
-            if rc.returncode != 0:
-                return {"ok": False, "checked": 0, "mismatched": [], "skipped_pin_files": [],
-                        "detail": f"反向应用 {name} 失败：{(rc.stderr or b'').decode('utf-8', 'replace')[:200]}"}
+    for name in replay:
+        rc = subprocess.run(["git", "apply", "-R", "-p1", str(Path(bundle) / name)],
+                            cwd=work, capture_output=True, env=env)
+        if rc.returncode != 0:
+            return {"ok": False, "root": "", "replay": replay,
+                    "detail": f"反向应用 {name} 失败：{(rc.stderr or b'').decode('utf-8', 'replace')[:200]}"}
+    return {"ok": True, "root": str(work), "replay": replay, "detail": ""}
+
+
+def _replay_hashes(bundle: Path) -> Dict[str, Any]:
+    """反向重放后逐文件比 `baseline.json`（重放本身走 `replay_to_baseline`，与合并器同源）。"""
+    import hashlib
+
+    baseline = _read_json(Path(bundle) / "baseline.json") or {}
+    want = baseline.get("files") or {}
+    if not want:
+        return {"ok": False, "checked": 0, "mismatched": [], "files_with_markers": [], "skipped_pin_files": [],
+                "detail": "baseline.json 缺 files"}
+    rep = replay_to_baseline(bundle)
+    if not rep.get("ok"):
+        return {"ok": False, "checked": 0, "mismatched": [], "files_with_markers": [],
+                "skipped_pin_files": [], "detail": rep.get("detail") or "重放失败"}
+    work = Path(rep["root"])
+    try:
         mismatched, with_pins, checked = [], [], 0
         for rel, digest in sorted(want.items()):
             f = work / rel
@@ -159,10 +181,11 @@ def _replay_hashes(bundle: Path, order: List[str], pins_in_code: bool) -> Dict[s
         return {"ok": not mismatched, "checked": checked, "mismatched": mismatched[:10],
                 "files_with_markers": with_pins[:10], "skipped_pin_files": [], "detail": ""}
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        shutil.rmtree(work, ignore_errors=True)
 
 
-def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed: bool = True) -> dict:
+def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed: bool = True,
+                        accept_baseline_drift: str = "") -> dict:
     """k3dge 自己的验收（不调 k3dit）。返回 {ok, errors[], facts{}, report_rows, unclosed, hash{}, cross_check{}}。"""
     bundle = Path(bundle)
     errors: List[str] = []
@@ -247,12 +270,27 @@ def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed:
 
     # ---- 内容哈希链（反向重放） ----
     pins_in_code = bool((facts.get("pins") or {}).get("in_code"))
-    hash_res = _replay_hashes(bundle, order, pins_in_code) if (bundle / "code").is_dir() else {
+    hash_res = _replay_hashes(bundle) if (bundle / "code").is_dir() else {
         "ok": True, "checked": 0, "mismatched": [], "skipped_pin_files": [], "detail": "包内无 code/（跳过）"}
+    accepted: List[str] = []
     if not hash_res.get("ok"):
-        errors.append("内容哈希链不通过：" + (hash_res.get("detail") or
-                                             f"不匹配 {hash_res.get('mismatched')}"))
+        # `baseline` 的语义层口径随产出方版本变过（旧版把"提到钉的文档行"也 strip）⇒ 旧包在**文档**上必然
+        # 对不上。这时允许调用方**显式、带理由**地接受——但有两个硬条件：① 给了理由；② 漂移文件**不被任何
+        # 补丁触及**（补丁要落的地方必须逐字节自洽）。接受的事实进 `accepted_drift`，由调用方写进提交信息/账。
+        from k3dge.engine.audit_merge import touched_files
+
+        drifted = set(hash_res.get("mismatched") or [])
+        touched = touched_files(bundle)
+        if accept_baseline_drift and drifted and not (drifted & touched):
+            accepted = sorted(drifted)
+            hash_res = {**hash_res, "ok": True, "accepted_drift": accepted,
+                        "reason": accept_baseline_drift}
+        else:
+            why = "" if not accept_baseline_drift else "（漂移文件与补丁触及面相交，不接受）"
+            errors.append("内容哈希链不通过" + why + "：" +
+                          (hash_res.get("detail") or f"不匹配 {hash_res.get('mismatched')}"))
 
     return {"ok": not errors, "errors": errors, "facts": facts, "report_rows": report_rows,
             "unclosed": unclosed, "hash": hash_res, "cross_check": cross,
+            "accepted_drift": accepted,
             "counts": {"findings": len(by_id), "report_rows": report_rows, "unclosed": len(unclosed)}}

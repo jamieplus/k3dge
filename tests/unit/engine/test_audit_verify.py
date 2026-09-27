@@ -148,3 +148,27 @@ def test_missing_files_and_empty_patch_fail_clear(tmp_path):
     (b2 / "pins.patch").write_text("", encoding="utf-8")
     res2 = av.verify_bundle_local(b2)
     assert not res2["ok"] and "缺失或为空" in _errors(res2), _errors(res2)
+
+
+def test_baseline_drift_is_accepted_only_explicitly_and_off_patch_surface(tmp_path):
+    """旧包的 `baseline` 语义层口径漂移（产出方旧 strip 规则）：**显式带理由**可接受，但硬条件两条——
+
+    ① 给了理由；② 漂移文件**不被任何补丁触及**（补丁要落的地方必须逐字节自洽）。
+    """
+    b = make_bundle(tmp_path / "drift")
+    (b / "code" / "src" / "a.py").write_text(
+        (b / "code" / "src" / "a.py").read_text(encoding="utf-8") + "drifted = True\n", encoding="utf-8")
+    assert not av.verify_bundle_local(b)["ok"]                       # 默认拒
+    # 漂移文件恰是**补丁触及**的（src/a.py）⇒ 给了理由也不接受
+    r = av.verify_bundle_local(b, accept_baseline_drift="旧 strip 规则")
+    assert not r["ok"] and "不接受" in " ".join(r["errors"]), r
+    # 漂移落在**没被补丁触及**的文件上 ⇒ 显式理由可接受，且事实被记录
+    b2 = make_bundle(tmp_path / "drift2")
+    (b2 / "code" / "docs").mkdir(parents=True, exist_ok=True)
+    (b2 / "code" / "docs" / "x.md").write_text("x\n", encoding="utf-8")
+    (b2 / "baseline.json").write_text(json.dumps({
+        "files": {**json.loads((b2 / "baseline.json").read_text(encoding="utf-8"))["files"],
+                  "docs/x.md": hashlib.sha1(b"old\n").hexdigest()}, "tree_hash": "x", "count": 2},
+        ensure_ascii=False), encoding="utf-8")
+    ok = av.verify_bundle_local(b2, accept_baseline_drift="产出方旧 strip 规则 ⇒ 文档面语义层漂移")
+    assert ok["ok"] and ok["accepted_drift"] == ["docs/x.md"], ok

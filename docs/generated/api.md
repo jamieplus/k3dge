@@ -184,19 +184,19 @@ find_k3dit(workspace: Path) -> Optional[List[str]]
     # doc: 定位 k3dit：`K3DIT_BIN` > PATH > 兄弟仓 `.venv` > 兄弟仓 zipapp。找不到 → None。
 run_path_audit(workspace: Path, out: Path, *, mode: str='full', pins: str='inplace', scope: str='', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict
     # doc: 跑 k3dit 路径入口（工具调用）。`mode`＝工具运行模式（full / audit-only）；
-verify_bundle(bundle: Path, *, expect_input: str='', require_closed: bool=False) -> dict
+verify_bundle(bundle: Path, *, expect_input: str='', require_closed: bool=False, accept_baseline_drift: str='') -> dict
     # doc: **消费侧独立验收**（不调产出方）：报告完备性 + 本地闭环 + 内容哈希链。
 bundle_facts(bundle: Path) -> dict
     # doc: 读包内**机器可读契约面**（缺/坏 ⇒ 空值，由调用方 fail-clear）。
 bundle_digest(bundle: Path) -> str
     # doc: 包的**内容摘要**（排序后的 rel:sha256）——封版提交里记它，可核"审的是哪只包"。
-apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False) -> dict
-    # doc: 按 `apply_order` 用**标准 `git apply`** 落补丁：先 worktree 试跑（原子化），再就地应用。
+apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False, exclude: Optional[List[str]]=None) -> dict
+    # doc: 落补丁：先 `git apply`（精确）；打不上则**三路合并**（主干已前进时的正道）。
 land_report(workspace: Path, milestone_id: str, out: Path, *, extra_files: Optional[List[str]]=None, why: str='') -> dict
     # doc: **唯一的"落报告"入口**：包内 `report.md` → `docs/reviews/` + 重生 docs 投影 + **一次提交**。
 commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str, str]
     # doc: 提交**已落的这些文件**（不用 `add -A`：别把工作区其它改动卷进审计提交）。返回 `(sha, 错误)`。
-consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None, require_closed: bool=True) -> dict
+consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None, require_closed: bool=True, accept_baseline_drift: str='', exclude: Optional[List[str]]=None) -> dict
     # doc: **消费一只包**：验契约 → 输入身份 → 自证 → 落补丁。
 # audit_checklist.py
 from __future__ import annotations
@@ -227,6 +227,22 @@ audit_result_of(status: str) -> Optional[str]
     # doc: 审计流程状态 → 闭集值；in-flight（尚未正常返回）⇒ None。
 audit_evidence(workspace: Path, milestone_id: str) -> dict
     # doc: 审计的 **durable 证据**（判据只认这些）：边界 tag + 封版提交 trailer。
+# audit_merge.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Any
+from typing import Dict
+from typing import Iterable
+from typing import List
+from typing import Optional
+from typing import Set
+from k3dge.engine.audit_verify import replay_to_baseline
+touched_files(bundle: Path) -> Set[str]
+    # doc: 包内补丁触及的文件（`+++ b/<rel>`）。
+merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str]=()) -> Dict[str, Any]
+    # doc: 把包合进 `workspace`（**只算不写**）：返回 {ok, merged{rel: text}, conflicts[], excluded[], pins_rels[], detail}。
+union_pins(workspace: Path, bundle: Path, rel: str) -> Dict[str, Any]
+    # doc: 钉的并集合并（两边都加了钉 ⇒ 两枚都留）：`merge-file --union`，不产生冲突标记。
 # audit_report.py
 from __future__ import annotations
 from pathlib import Path
@@ -263,7 +279,9 @@ has_marker_line(text: str, rel: str) -> bool
     # doc: 这一行是**钉**吗（行首注释 + `k3dit:<state> <id>`，契约 §8 语法单源）。
 strip_markers(text: str, rel: str) -> str
     # doc: 去钉后的**语义层**文本（契约 §8 语法单源＝`k3dge.engine.markers`，不在消费侧另抄一份）。
-verify_bundle_local(bundle: Path, *, expect_input: str='', require_closed: bool=True) -> dict
+replay_to_baseline(bundle: Path, dest: Optional[Path]=None, only: Optional[List[str]]=None) -> Dict[str, Any]
+    # doc: 把包的 `code/` **反向重放**回基线（审前语义层）——消费侧据此拿到**三路合并的 base**。
+verify_bundle_local(bundle: Path, *, expect_input: str='', require_closed: bool=True, accept_baseline_drift: str='') -> dict
     # doc: k3dge 自己的验收（不调 k3dit）。返回 {ok, errors[], facts{}, report_rows, unclosed, hash{}, cross_check{}}。
 # changelog.py
 from __future__ import annotations

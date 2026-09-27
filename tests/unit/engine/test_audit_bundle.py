@@ -366,3 +366,24 @@ def test_land_report_is_the_single_entry_used_by_all_three_paths(tmp_path, monke
     empty.mkdir()
     bad = ab.land_report(ws, "M1", empty)
     assert not bad["ok"] and bad["error"] == "REPORT_MISSING"
+
+
+def test_post_apply_check_is_read_from_declaration_and_run(tmp_path, monkeypatch):
+    """落库后校验走**声明面**（`[roles.audit] post_apply_check`）：修复并进主干必须过消费仓自己的测试。
+
+    真跑出处（2026-09-27）：补丁过了 `git apply` 但让测试红 ⇒ 只有"落完记得跑测试"这条**人的习惯**在挡。
+    """
+    ws = _repo(tmp_path)
+    (ws / ".agent").mkdir(exist_ok=True)
+    (ws / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\npost_apply_check = "true"\n', encoding="utf-8")
+    ok = ab._post_apply_check(ws, ws)
+    assert ok["cmd"] == "true" and ok["ok"] is True, ok
+    (ws / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\npost_apply_check = "exit 3"\n', encoding="utf-8")
+    bad = ab._post_apply_check(ws, ws)
+    assert bad["ok"] is False and bad["rc"] == 3, bad
+    (ws / ".agent" / "pipeline.toml").write_text('[roles.audit]\nbind = "k3dit"\nmode = "bundle"\n',
+                                                 encoding="utf-8")
+    skipped = ab._post_apply_check(ws, ws)
+    assert skipped["cmd"] == "" and skipped["ok"] is True       # 未声明 ⇒ 跳过（如实报 cmd=''）

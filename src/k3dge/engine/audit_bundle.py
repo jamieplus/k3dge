@@ -93,7 +93,8 @@ def run_path_audit(workspace: Path, out: Path, *, mode: str = "full", pins: str 
             "detail": text.strip()[-400:]}
 
 
-def verify_bundle(bundle: Path, *, expect_input: str = "", require_closed: bool = False) -> dict:
+def verify_bundle(bundle: Path, *, expect_input: str = "", require_closed: bool = False,
+                  accept_baseline_drift: str = "") -> dict:
     """**消费侧独立验收**（不调产出方）：报告完备性 + 本地闭环 + 内容哈希链。
 
     实现见 `k3dge.engine.audit_verify`。**不由产出方自证**：`k3dit audit --verify` 是产出方的自查，
@@ -101,7 +102,8 @@ def verify_bundle(bundle: Path, *, expect_input: str = "", require_closed: bool 
     """
     from k3dge.engine import audit_verify
 
-    res = audit_verify.verify_bundle_local(bundle, expect_input=expect_input, require_closed=require_closed)
+    res = audit_verify.verify_bundle_local(bundle, expect_input=expect_input, require_closed=require_closed,
+                                           accept_baseline_drift=accept_baseline_drift)
     return {"ok": bool(res.get("ok")), "errors": list(res.get("errors") or []),
             "baseline_tree_hash": str((res.get("facts") or {}).get("baseline") or ""),
             "detail": "" if res.get("ok") else "; ".join(res.get("errors") or [])[:400],
@@ -191,8 +193,12 @@ def _dry_run_via_worktree(workspace: Path, bundle: Path, order: List[str]) -> di
 
 
 def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
-                 allow_dirty: bool = False) -> dict:
-    """按 `apply_order` 用**标准 `git apply`** 落补丁：先 worktree 试跑（原子化），再就地应用。"""
+                 allow_dirty: bool = False, exclude: Optional[List[str]] = None) -> dict:
+    """落补丁：先 `git apply`（精确）；打不上则**三路合并**（主干已前进时的正道）。
+
+    两条策略的差别只在"怎么把补丁贴到当前树上"：结果都要过同一道消费侧验收与同一套提交。
+    `exclude`＝显式排除某些文件（例如"这条修复与当前测试期望冲突，需人工重做"）——不做猜测。
+    """
     facts = bundle_facts(bundle)
     order = facts.get("apply_order") or []
     if not order:
@@ -213,11 +219,95 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
     if dry_run:
         return {"ok": True, "applied": order, "files": pre.get("files") or [], "dry_run": True}
     res = _apply_sequential(workspace, bundle, order)
-    if not res.get("ok"):
-        # worktree 试跑已过 ⇒ 走到这里多为外部并发改动；如实报错并给出**已落清单**，不静默半途状态
-        return {"ok": False, "error": res.get("error"), "detail": res.get("detail", ""),
-                "phase": "apply", "applied": res.get("applied") or []}
-    return {"ok": True, "applied": order, "files": res.get("files") or [], "dry_run": False}
+    if res.get("ok"):
+        return {"ok": True, "applied": order, "files": res.get("files") or [], "dry_run": False,
+                "strategy": "git-apply"}
+    # `git apply` 打不上**不等于修复不可用**：补丁是对审计当时的基线生成的，而主干可能已经往前走
+    #（落钉、别的修复、重构）。两侧信息都全 ⇒ 退到**三路合并**（base＝包的可重放基线）。
+    got = _apply_sequential_merged(workspace, bundle, exclude=exclude)
+    if got.get("ok"):
+        return {"ok": True, "applied": order, "files": got.get("files") or [], "dry_run": False,
+                "strategy": "three-way-merge", "excluded": got.get("excluded") or [],
+                "detail": f"git apply 冲突（{res.get('detail', '')[:120]}）⇒ 三路合并成功"}
+    return {"ok": False, "error": got.get("error") or res.get("error"),
+            "detail": got.get("detail") or res.get("detail", ""),
+            "phase": "merge", "applied": [], "conflicts": got.get("conflicts") or []}
+
+
+def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None) -> dict:
+    """三路合并落补丁（在**临时 worktree** 里先做一遍并跑声明的落库后校验，再就地写）。
+
+    返回 {ok, files, excluded, conflicts, detail}。校验失败/有冲突 ⇒ 不写工作区（fail-clear）。
+    """
+    import tempfile
+
+    from k3dge.engine import audit_merge
+
+    tmp = Path(tempfile.mkdtemp(prefix="k3dge-merge-dry-"))
+    wt = tmp / "wt"
+    rc, out = _git(workspace, "worktree", "add", "--detach", "-q", str(wt), "HEAD")
+    if rc != 0:
+        return {"ok": False, "error": "WORKTREE_UNAVAILABLE", "detail": out.strip()[-200:]}
+    try:
+        res = audit_merge.merge_into(wt, bundle, exclude=exclude or ())
+        if not res.get("ok"):
+            label = "合并冲突" if res.get("conflicts") else "合并失败"
+            return {"ok": False, "error": "MERGE_FAILED", "conflicts": res.get("conflicts") or [],
+                    "detail": f"{label}：{', '.join((res.get('conflicts') or [])[:6])} {res.get('detail', '')}".strip()}
+        files = []
+        for rel, text in (res.get("merged") or {}).items():
+            p = wt / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text, encoding="utf-8")
+            files.append(rel)
+        # 钉（标注层，纯增量）：正向应用；打不上就对**该文件**并集合并（"两边都加钉"的正解＝两枚都留）
+        pins = str(res.get("pins_patch") or "")
+        if pins:
+            rc, out = _git(wt, "apply", "-p1", str(Path(bundle) / pins))
+            if rc != 0:
+                from k3dge.engine import audit_merge
+
+                for rel in sorted(audit_merge._rels_of_patch(Path(bundle), pins)):
+                    u = audit_merge.union_pins(wt, Path(bundle), rel)
+                    if not u.get("ok"):
+                        return {"ok": False, "error": "PINS_MERGE_FAILED", "conflicts": [rel],
+                                "detail": f"{rel}: 钉并集失败 {u.get('detail', '')}"}
+                    (wt / rel).parent.mkdir(parents=True, exist_ok=True)
+                    (wt / rel).write_text(str(u["text"]), encoding="utf-8")
+                    if rel not in files:
+                        files.append(rel)
+        check = _post_apply_check(wt, workspace)
+        if check.get("cmd") and not check.get("ok"):
+            return {"ok": False, "error": "POST_APPLY_CHECK_FAILED", "conflicts": [],
+                    "detail": f"落库后校验未过：{check.get('cmd')} ⇒ {check.get('detail')}",
+                    "files": files}
+        for rel in files:      # 试跑全过 ⇒ 按 worktree 的最终内容就地写（含钉那一步的结果）
+            p = workspace / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(wt / rel, p)
+        return {"ok": True, "files": files, "excluded": res.get("excluded") or [],
+                "conflicts": [], "post_apply_check": check}
+    finally:
+        _git(workspace, "worktree", "remove", "--force", str(wt))
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _post_apply_check(root: Path, workspace: Path) -> dict:
+    """跑**声明面**的落库后校验（`[roles.audit] post_apply_check`）：把"修复落进主干必须过消费仓自己的
+    测试"从"靠人记得跑"变成流程的一步。未声明 ⇒ 跳过（如实报 `cmd=''`）。"""
+    cmd = ""
+    try:
+        import tomllib
+
+        data = tomllib.loads((Path(workspace) / ".agent" / "pipeline.toml").read_text(encoding="utf-8"))
+        cmd = str(((data.get("roles") or {}).get("audit") or {}).get("post_apply_check") or "")
+    except Exception:
+        cmd = ""
+    if not cmd:
+        return {"cmd": "", "ok": True, "detail": "未声明 post_apply_check（跳过）"}
+    rc = subprocess.run(["/bin/sh", "-c", cmd], cwd=root, capture_output=True)
+    tail = ((rc.stdout or b"") + (rc.stderr or b"")).decode("utf-8", "replace").strip()[-400:]
+    return {"cmd": cmd, "ok": rc.returncode == 0, "rc": rc.returncode, "detail": tail}
 
 
 def land_report(workspace: Path, milestone_id: str, out: Path, *,
@@ -302,7 +392,8 @@ def commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str
 
 def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
             k3dit: Optional[List[str]] = None, expect_input: Optional[str] = None,
-            require_closed: bool = True) -> dict:
+            require_closed: bool = True, accept_baseline_drift: str = "",
+            exclude: Optional[List[str]] = None) -> dict:
     """**消费一只包**：验契约 → 输入身份 → 自证 → 落补丁。
 
     `expect_input` 非空时校验 `manifest.input` 与它同指一处（realpath 比较）——包的输入身份是
@@ -328,11 +419,12 @@ def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
             pass
     # **闭环由 k3dge 自己从 findings 算**（`require_closed=False` 只给纯审计：它的 `status=partial` 是设计，
     # 钉留树＝待修队列）。产出方自报的 `status` **不作判据**，只作交叉核（不一致会被验收报出来）。
-    verified = verify_bundle(bundle, expect_input=str(expect_input or ""), require_closed=require_closed)
+    verified = verify_bundle(bundle, expect_input=str(expect_input or ""), require_closed=require_closed,
+                             accept_baseline_drift=accept_baseline_drift)
     if not verified.get("ok"):
         return {"ok": False, "error": "VERIFY_FAILED", "facts": facts, "verify": verified,
                 "detail": "消费侧验收未通过：" + "; ".join(verified.get("errors") or [])[:400]}
-    applied = apply_bundle(workspace, bundle, dry_run=dry_run)
+    applied = apply_bundle(workspace, bundle, dry_run=dry_run, exclude=exclude)
     if not applied.get("ok"):
         return {"ok": False, "error": applied.get("error"), "facts": facts, "verify": verified,
                 "apply": applied, "detail": applied.get("detail", "")}
