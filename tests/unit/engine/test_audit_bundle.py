@@ -63,9 +63,11 @@ def test_consume_fails_clear_on_unknown_version_and_unclosed(tmp_path, monkeypat
     assert r["ok"] is False and r["error"] == "BUNDLE_VERSION_UNSUPPORTED"
     open_b = _bundle(tmp_path / "o", status="partial")
     r2 = ab.consume(ws, open_b)
-    # 闭环判据归**消费侧**（不再读产出方自报的 status）⇒ 未关由本地算出来
-    assert r2["ok"] is False and r2["error"] == "VERIFY_FAILED"
-    assert "未闭环（消费侧算）" in r2["detail"] and "闭环事实不一致" not in r2["detail"]
+    # **未闭环 ⇒ 部分落地**（用户裁定 乙）：不整包拒；未关项所在文件被排除、升级记在结果里
+    assert r2["ok"] is True and r2["partial"] is True, r2
+    assert "code-1" in (r2["escalated"] or []), r2
+    assert "src/a.py" in (r2["unclosed_files"] or []), r2
+    assert "src/a.py" in (r2["apply"].get("excluded") or []), r2["apply"]
 
 
 def test_consume_fails_clear_when_pack_self_check_fails(tmp_path, monkeypatch):
@@ -137,14 +139,26 @@ def test_bundle_audit_leg_routes_and_fails_clear(tmp_path, monkeypatch):
         import shutil
 
         src = make_bundle(tmp_path / "opensrc", claimed="partial", finding_state="pending",
-                          row_state="待修", input_path=str(ws))
+                          row_state="待修", input_path=str(w))       # 目标是**当前**工作区（w）
         shutil.rmtree(out, ignore_errors=True)      # 同一测试里腿会被调多次 ⇒ 目标目录先清
         shutil.copytree(src, out)
         return {"ok": True, "rc": 3, "payload": {"status": "partial", "unclosed": 2}}
 
     monkeypatch.setattr(ab, "run_path_audit", _run_open)
-    early, _ = ma._bundle_audit_leg(ws, "M99", ma._Prompt.default(), "b" * 40)
-    assert early is not None and early[0] == "refused" and "未闭环（消费侧算）" in early[1], early
+    ws2 = _repo(tmp_path / "ws_open")          # 干净工作区（上一 case 的落地会留脏树 ⇒ DIRTY_TREE）
+    (ws2 / ".agent").mkdir(exist_ok=True)
+    (ws2 / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\nk3dit_mode = "audit-only"\n', encoding="utf-8")
+    import subprocess as _sp
+
+    _sp.run(["git", "-C", str(ws2), "add", "-A"], check=True, capture_output=True)   # 声明必须**已提交**
+    _sp.run(["git", "-C", str(ws2), "-c", "user.email=t@t", "-c", "user.name=t",
+             "commit", "-qm", "decl"], check=True, capture_output=True)
+    early, msg = ma._bundle_audit_leg(ws2, "M99", ma._Prompt.default(), "b" * 40)
+    # 未关 ⇒ **部分落地**（落已修、排除未关项所在文件）；声明是 audit-only ⇒ 仍以 refused 交回，
+    # 但**升级信息必须由 k3dge 的这条闸报出来**（k3dit 里没人看得到升级）。
+    assert early is not None and early[0] == "refused" and "只出证据" in early[1], early
+    assert "升级" in early[1] and "code-1" in early[1], early
 
     # ③ 闭环 + 消费成功 ⇒ 落树提交，并返回 (None, msg) 让共用尾收口
     def _fake_run(w, out, **k):
@@ -401,18 +415,20 @@ def test_report_rows_are_reconciled_with_what_actually_landed(tmp_path):
             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
             "| a-1 | 2026-09-27 | 中 | P1 | 正确性 | x | src/x/landed.py:10 | 已修 | 改了 | 验了 | | |\n"
             "| a-2 | 2026-09-27 | 中 | P1 | 正确性 | y | src/x/excluded.py:20 | 已修 | 改了 | 验了 | | |\n"
-            "| a-3 | 2026-09-27 | 低 | P3 | 规范 | z | src/x/excluded.py:5 | 有意留 | 有意留：理由 | | | |\n")
-    r = ab.reconcile_report_rows(body, ["src/x/excluded.py"])
-    assert r["changed"] == 1 and r["ids"] == ["a-2"], r
+            "| a-3 | 2026-09-27 | 低 | P3 | 规范 | z | src/x/excluded.py:5 | 有意留 | 有意留：理由 | | | |\n"
+            "| a-4 | 2026-09-27 | 低 | P3 | 规范 | w | src/x/notlanded.py:7 | 已修 | 改了 | 验了 | | |\n")
+    r = ab.reconcile_report_rows(body, ["src/x/excluded.py", "src/x/notlanded.py"], ["a-2"])
+    assert r["changed"] == 2 and sorted(r["ids"]) == ["a-2", "a-4"], r
     out = str(r["body"])
-    assert "| 待修 |" in out and "本次**未落**" in out
-    assert out.count("| 已修 |") == 1                      # 落到主干的那行不动
-    assert "| 有意留 |" in out                             # 有意留不是"未落"，不改
+    assert out.count("| 已修 |") == 3, out                   # **状态列不动**（用户裁定：改在验证列）
+    assert "待验：未闭环（转人工）" in out, out               # 未关项
+    assert "升级：本次未落" in out, out                       # 已修但没落
+    assert "| 有意留 |" in out and out.count("升级：本次未落") == 1, out   # 有意留不标
     # 无排除项 ⇒ 原样（不动报告）
-    same = ab.reconcile_report_rows(body, [])
+    same = ab.reconcile_report_rows(body, [], [])
     assert same["changed"] == 0 and same["body"] == body
     # 表头不合规 ⇒ 原样返回（不冒险改坏报告）
-    bad = ab.reconcile_report_rows("# 审计\n\n没有表\n", ["src/x/excluded.py"])
+    bad = ab.reconcile_report_rows("# 审计\n\n没有表\n", ["src/x/excluded.py"], ["a-2"])
     assert bad["changed"] == 0 and bad["body"] == "# 审计\n\n没有表\n"
 
 
@@ -467,3 +483,17 @@ def test_tool_timeout_is_a_knob_with_mode_defaults(tmp_path, monkeypatch):
         '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\nk3dit_timeout = "abc"\n', encoding="utf-8")
     early, _ = ma._bundle_audit_leg(ws, "M1", ma._Prompt.default(), "b" * 40)
     assert early is not None and early[0] == "refused" and "k3dit_timeout" in early[1], early
+
+
+def test_partial_landing_fails_closed_when_unclosed_files_are_unresolvable(tmp_path, monkeypatch):
+    """未关项解不出 `location` ⇒ **不许部分落地**（否则会连未关项的修复一起落＝虚报）。"""
+    ws = _repo(tmp_path)
+    b = _bundle(tmp_path / "noloc", status="partial")
+    items = json.loads((b / "findings.json").read_text(encoding="utf-8"))
+    for it in items["items"]:
+        it.pop("location", None)
+    (b / "findings.json").write_text(json.dumps(items, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(ab, "verify_bundle", lambda *a, **k: {
+        "ok": True, "errors": [], "local": {"unclosed": ["code-1"], "facts": {}, "counts": {}}})
+    r = ab.consume(ws, b)
+    assert r["ok"] is False and r["error"] == "UNRESOLVED_UNCLOSED", r

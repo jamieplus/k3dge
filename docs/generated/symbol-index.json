@@ -662,7 +662,7 @@
   "commit_applied": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 475
+      "line": 483
     }
   ],
   "completeness_violations": [
@@ -686,7 +686,7 @@
   "consume": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 499
+      "line": 507
     }
   ],
   "consume_unreleased": [
@@ -1092,7 +1092,7 @@
   "land_report": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 404
+      "line": 411
     }
   ],
   "legacy_config_present": [
@@ -1556,7 +1556,7 @@
   "run_audit_flow": [
     {
       "file": "src/k3dge/engine/milestone_audit.py",
-      "line": 502
+      "line": 515
     }
   ],
   "run_milestone_alignment": [

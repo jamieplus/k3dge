@@ -246,11 +246,11 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
     if pre.get("ok"):
         if dry_run:
             return {"ok": True, "applied": order, "files": pre.get("files") or [], "dry_run": True,
-                    "strategy": "git-apply"}
+                    "strategy": "git-apply", "excluded": sorted({str(x) for x in (exclude or [])})}
         res = _apply_sequential(workspace, bundle, order)
         if res.get("ok"):
             return {"ok": True, "applied": order, "files": res.get("files") or [], "dry_run": False,
-                    "strategy": "git-apply"}
+                    "strategy": "git-apply", "excluded": sorted({str(x) for x in (exclude or [])})}
     # `git apply` 打不上**不等于修复不可用**：补丁是对审计当时的基线生成的，而主干可能已经往前走
     #（落钉、别的修复、重构）。两侧信息都全 ⇒ 退到**三路合并**（base＝包的可重放基线）。
     # **结构性**失败（补丁缺/不是仓/脏树/无 worktree）不该退合并——那不是"打不上"，是输入不对。
@@ -358,52 +358,60 @@ def _post_apply_check(root: Path, workspace: Path) -> dict:
     return {"cmd": cmd, "ok": rc.returncode == 0, "rc": rc.returncode, "detail": tail}
 
 
-def reconcile_report_rows(body: str, excluded: Optional[List[str]] = None) -> Dict[str, object]:
-    """报告行 ↔ **实际落了什么**的机械对账（不是靠尾注说明）。
+def reconcile_report_rows(body: str, excluded: Optional[List[str]] = None,
+                          escalated: Optional[List[str]] = None) -> Dict[str, object]:
+    """报告行 ↔ **实际落了什么/未关什么**的机械对账（写在**验证**列，**不动状态列**）。
 
-    为什么必须做（2026-09-27 承重缺口）：k3dge 自己的封板判据把**报告 `待修` 行数**当 `pending`
-    （`audit_checklist._snapshot` → `audit_report._parse_audit_stats`）。而 `--exclude` 掉的文件，其条目在
-    产出方的报告里仍写"已修" ⇒ 不校正就会**虚报已审**（`pending=0` 放行封板）。
-    规则：**位置列指向被排除文件**的行，状态由 `已修` 改标 `待修`，并在处置列标注原因（可核）。
-    返回 {body, changed, ids}。表头顺序/格数异常 ⇒ 原样返回（不冒险改坏报告）。
+    用户裁定（2026-09-27）：未关项**不要**改成"待修"，而是在**验证**列分配状态；升级由 **k3dge 的审后闸**
+    报出来（k3dit 里没人看得到升级）。所以：
+      - 位置列指向**被排除文件**的行（`--exclude`／未关项所在文件 ⇒ 本次没落）⇒ 验证列加
+        `升级：本次未落（--exclude）待人工`；
+      - 未关 finding（`escalated`）⇒ 验证列加 `待验：未闭环（转人工）`。
+    状态列保持产出方原样（判定面要的是"它在报告里怎么说的"＋我们的升级注记）。
+    返回 {body, changed, ids}。表头异常 ⇒ 原样返回（不冒险改坏报告）。
     """
     excluded = [str(x) for x in (excluded or []) if str(x).strip()]
-    if not excluded or not (body or "").strip():
+    esc = {str(x) for x in (escalated or []) if str(x).strip()}
+    if (not excluded and not esc) or not (body or "").strip():
         return {"body": body, "changed": 0, "ids": []}
     from k3dge.engine.report_table import parse_rows
 
     lines = body.splitlines()
     header, rows = parse_rows(body)
-    if not header or "状态" not in header or "位置" not in header:
+    if not header or "验证" not in header or "位置" not in header:
         return {"body": body, "changed": 0, "ids": []}
     try:
-        i_state = header.index("状态") + 1          # split("|") 后：cells[0] 为空串 ⇒ 列 k 在 k+1
-        i_disp = header.index("处置") + 1
+        i_ver = header.index("验证") + 1
         i_id = header.index("ID") + 1
         i_pos = header.index("位置") + 1
     except ValueError:
         return {"body": body, "changed": 0, "ids": []}
     changed: List[str] = []
     for idx, row in rows:
-        pos = str(row.get("位置") or "")
-        f = pos.split(":")[0].strip()
-        if f not in excluded or str(row.get("状态") or "").strip() != "已修":
+        rid = str(row.get("ID") or "").strip()
+        f = str(row.get("位置") or "").split(":")[0].strip()
+        mark = ""
+        if rid and rid in esc:
+            mark = "待验：未闭环（转人工）"
+        elif f and f in excluded and str(row.get("状态") or "").strip() == "已修":
+            # 只标"声称已修却没落"的行（"有意留"本无东西可落 ⇒ 标它等于误导）
+            mark = "升级：本次未落（`--exclude`）待人工"
+        if not mark:
             continue
         parts = lines[idx].split("|")
-        if len(parts) <= max(i_state, i_disp, i_id, i_pos):
+        if len(parts) <= max(i_ver, i_id, i_pos):
             continue
-        parts[i_state] = " 待修 "
-        mark = "（本次**未落**：`--exclude`；待人工重做）"
-        if mark not in parts[i_disp]:
-            parts[i_disp] = parts[i_disp].rstrip() + " " + mark + " "
+        if mark not in parts[i_ver]:
+            parts[i_ver] = (parts[i_ver].rstrip() + ("；" if parts[i_ver].strip() else " ") + mark + " ")
         lines[idx] = "|".join(parts)
-        changed.append(str(row.get("ID") or parts[i_id]).strip())
+        changed.append(rid or str(row.get("ID") or ""))
     return {"body": "\n".join(lines) + "\n", "changed": len(changed), "ids": changed}
 
 
 def land_report(workspace: Path, milestone_id: str, out: Path, *,
                 extra_files: Optional[List[str]] = None, why: str = "", note: str = "",
-                excluded: Optional[List[str]] = None) -> dict:
+                excluded: Optional[List[str]] = None,
+                escalated: Optional[List[str]] = None) -> dict:
     """**唯一的"落报告"入口**：包内 `report.md` → `docs/reviews/` + 重生 docs 投影 + **一次提交**。
 
     为什么合并（2026-09-27 流程体检）：这条三步序列此前写在**两处**（腿的正常路 + 腿的拒绝路
@@ -420,10 +428,10 @@ def land_report(workspace: Path, milestone_id: str, out: Path, *,
 
         body = report_src.read_text(encoding="utf-8")
         # **先对账再落盘**：被排除文件的 `已修` 行改 `待修` ⇒ 判定面（封板判据读报告 `待修`）不会被虚报糊弄。
-        rec = reconcile_report_rows(body, excluded)
+        rec = reconcile_report_rows(body, excluded, escalated)
         body, _rec_changed = str(rec["body"]), int(rec["changed"])
         if _rec_changed:
-            note = (f"| 对账 | 报告有 {_rec_changed} 行因**本次未落**（`--exclude`）已改标 `待修`："
+            note = (f"| 对账 | 报告有 {_rec_changed} 行在**验证**列被标升级/未验（未关或未落）："
                     f"{', '.join(rec['ids'][:8])} |\n| --- | --- |\n" + (note or ""))
         if note:      # 诚实说明（例如"本批修复经三路合并落树；排除 X（其修复与主干/现测试冲突，需人工重做）"）
             body = body.rstrip("\n") + "\n\n" + note.strip() + "\n"
@@ -525,14 +533,37 @@ def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
             pass
     # **闭环由 k3dge 自己从 findings 算**（`require_closed=False` 只给纯审计：它的 `status=partial` 是设计，
     # 钉留树＝待修队列）。产出方自报的 `status` **不作判据**，只作交叉核（不一致会被验收报出来）。
-    verified = verify_bundle(bundle, expect_input=str(expect_input or ""), require_closed=require_closed,
+    # 未闭环**不再整包拒**（用户裁定 乙：部分落地）⇒ 验收先按"不要求闭环"跑，未关项改成"排除其所在文件"
+    # 并在结果里**记升级**（由 k3dge 的审后闸报出，k3dit 里没人看得到升级）。
+    verified = verify_bundle(bundle, expect_input=str(expect_input or ""), require_closed=False,
                              accept_baseline_drift=accept_baseline_drift)
     if not verified.get("ok"):
         return {"ok": False, "error": "VERIFY_FAILED", "facts": facts, "verify": verified,
                 "detail": "消费侧验收未通过：" + "; ".join(verified.get("errors") or [])[:400]}
-    applied = apply_bundle(workspace, bundle, dry_run=dry_run, exclude=exclude)
+    local = (verified.get("local") or {})
+    unclosed = [str(x) for x in (local.get("unclosed") or [])]
+    unclosed_files: List[str] = []
+    if unclosed:
+        try:
+            items = json.loads((Path(bundle) / "findings.json").read_text(encoding="utf-8"))
+            rows = items.get("items") if isinstance(items, dict) else items
+            for it in (rows or []):
+                if str((it or {}).get("id") or "") in unclosed:
+                    f = str((it or {}).get("location") or "").split(":")[0].strip()
+                    if f:
+                        unclosed_files.append(f)
+        except Exception:      # pragma: no cover - 读不出就不排除（宁可不落也不乱落）
+            unclosed_files = []
+    if unclosed and not unclosed_files:
+        # **解不出未关项所在文件 ⇒ 不许部分落地**（否则会把未关项的修复一起落进去＝虚报）。fail-close。
+        return {"ok": False, "error": "UNRESOLVED_UNCLOSED", "facts": facts, "verify": verified,
+                "detail": f"未关 {len(unclosed)} 项但 findings 里取不到 `location` ⇒ 无法安全排除其文件，"
+                          f"不做部分落地（{', '.join(unclosed[:5])}）"}
+    ex_all = sorted({str(x) for x in (exclude or [])} | set(unclosed_files))
+    applied = apply_bundle(workspace, bundle, dry_run=dry_run, exclude=ex_all)
     if not applied.get("ok"):
         return {"ok": False, "error": applied.get("error"), "facts": facts, "verify": verified,
                 "apply": applied, "detail": applied.get("detail", "")}
     return {"ok": True, "facts": facts, "verify": verified, "apply": applied,
-            "digest": bundle_digest(bundle), "dry_run": dry_run}
+            "digest": bundle_digest(bundle), "dry_run": dry_run,
+            "partial": bool(unclosed), "escalated": unclosed, "unclosed_files": unclosed_files}

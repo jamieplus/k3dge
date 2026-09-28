@@ -480,22 +480,35 @@ def _bundle_audit_leg(
     files = list((res.get("apply") or {}).get("files") or [])
     digest = str((res.get("digest") or "")[:12])
     jid = str((res.get("facts") or {}).get("job_id") or "")
+    _esc = [str(x) for x in (res.get("escalated") or [])]
+    _excl = sorted({str(x) for x in (res.get("apply") or {}).get("excluded") or []} |
+                   {str(x) for x in (res.get("unclosed_files") or [])})
     landed = ab.land_report(workspace, milestone_id, out, extra_files=files,
                             why=f"job {jid or '-'} 包 {digest}",
-                            excluded=list((res.get("apply") or {}).get("excluded") or []))
+                            excluded=_excl, escalated=_esc)
     if not landed.get("ok"):
         return _reject_step(workspace, milestone_id, f"audit_bundle_{landed.get('error', 'report').lower()}",
                             f"落报告/投影/提交失败：{landed.get('detail') or landed.get('error')} ⇒ "
                             f"产物已在工作区（未提交），请人工提交或回退后重跑"), ""
     rel_report, commit = str(landed.get("report") or ""), str(landed.get("commit") or "")
     if audit_only:
+        _esc_msg = (f"\n[升级·转人工] 未关 {len(_esc)} 项：{', '.join(_esc[:8]) or '-'}"
+                    f"；排除文件 {len(_excl)} 个（其修复未落）。报告「验证」列已标。") if _esc else ""
         return _reject_step(
             workspace, milestone_id, "audit_evidence_only",
             f"纯审计（`k3dit_mode = \"audit-only\"`）只出证据，不构成封板依据：报告落盘 {rel_report}，"
             f"落 {len(files)} 文件{('，提交 ' + commit[:12]) if commit else ''}。要封板请把 "
-            f'`[roles.audit] k3dit_mode` 改为 "full"（判读+修+复核，待修=0）再跑。'), ""
-    msg = (f"Milestone {milestone_id}: bundle 审计腿闭环（工具 k3dit job {jid or '-'}，包 {digest}，"
-           f"落 {len(files)} 文件，报告 {rel_report}{('，提交 ' + commit[:12]) if commit else ''}）。")
+            f'`[roles.audit] k3dit_mode` 改为 "full"（判读+修+复核，待修=0）再跑。{_esc_msg}'), ""
+    # **部分落地**（用户裁定 乙）：未关项不再整包拒 ⇒ 落已修、把未关项所在文件排除，并**由 k3dge 的审后闸
+    # 报出升级**（k3dit 里没人看得到升级；报告行只在「验证」列加注，状态列保持产出方原样）。
+    _part = bool(res.get("partial"))
+    msg = (f"Milestone {milestone_id}: bundle 审计腿"
+           f"{'**部分落地**（未闭环）' if _part else '闭环'}"
+           f"（工具 k3dit job {jid or '-'}，包 {digest}，落 {len(files)} 文件，报告 {rel_report}"
+           f"{('，提交 ' + commit[:12]) if commit else ''}）。")
+    if _part:
+        msg += (f"\n[升级·转人工] 未关 {len(_esc)} 项：{', '.join(_esc[:8]) or '-'}"
+                f"；排除文件 {len(_excl)} 个（其修复未落）。报告「验证」列已标，**封板判据须为空**。")
     return None, msg
 
 

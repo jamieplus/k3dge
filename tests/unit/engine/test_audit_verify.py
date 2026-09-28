@@ -52,6 +52,7 @@ def make_bundle(root: Path, *, version: int = 1, claimed: str = "closed", row_st
         "tree_hash": "x", "count": 1}, ensure_ascii=False), encoding="utf-8")
     (b / "findings.json").write_text(json.dumps({"items": [
         {"id": "code-1", "state": finding_state, "review_ack": review_ack,
+         "location": "src/a.py:1",          # 真包含 location（部分落地要靠它把未关项所在文件排除）
          "disposition": "已改：加了 added_by_fix", "verification": "跑通 tests/unit/x.py"}]},
         ensure_ascii=False), encoding="utf-8")
     hdr = _HEADER
