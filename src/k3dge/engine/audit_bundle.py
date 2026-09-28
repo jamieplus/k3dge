@@ -328,8 +328,52 @@ def _post_apply_check(root: Path, workspace: Path) -> dict:
     return {"cmd": cmd, "ok": rc.returncode == 0, "rc": rc.returncode, "detail": tail}
 
 
+def reconcile_report_rows(body: str, excluded: Optional[List[str]] = None) -> Dict[str, object]:
+    """报告行 ↔ **实际落了什么**的机械对账（不是靠尾注说明）。
+
+    为什么必须做（2026-09-27 承重缺口）：k3dge 自己的封板判据把**报告 `待修` 行数**当 `pending`
+    （`audit_checklist._snapshot` → `audit_report._parse_audit_stats`）。而 `--exclude` 掉的文件，其条目在
+    产出方的报告里仍写"已修" ⇒ 不校正就会**虚报已审**（`pending=0` 放行封板）。
+    规则：**位置列指向被排除文件**的行，状态由 `已修` 改标 `待修`，并在处置列标注原因（可核）。
+    返回 {body, changed, ids}。表头顺序/格数异常 ⇒ 原样返回（不冒险改坏报告）。
+    """
+    excluded = [str(x) for x in (excluded or []) if str(x).strip()]
+    if not excluded or not (body or "").strip():
+        return {"body": body, "changed": 0, "ids": []}
+    from k3dge.engine.report_table import parse_rows
+
+    lines = body.splitlines()
+    header, rows = parse_rows(body)
+    if not header or "状态" not in header or "位置" not in header:
+        return {"body": body, "changed": 0, "ids": []}
+    try:
+        i_state = header.index("状态") + 1          # split("|") 后：cells[0] 为空串 ⇒ 列 k 在 k+1
+        i_disp = header.index("处置") + 1
+        i_id = header.index("ID") + 1
+        i_pos = header.index("位置") + 1
+    except ValueError:
+        return {"body": body, "changed": 0, "ids": []}
+    changed: List[str] = []
+    for idx, row in rows:
+        pos = str(row.get("位置") or "")
+        f = pos.split(":")[0].strip()
+        if f not in excluded or str(row.get("状态") or "").strip() != "已修":
+            continue
+        parts = lines[idx].split("|")
+        if len(parts) <= max(i_state, i_disp, i_id, i_pos):
+            continue
+        parts[i_state] = " 待修 "
+        mark = "（本次**未落**：`--exclude`；待人工重做）"
+        if mark not in parts[i_disp]:
+            parts[i_disp] = parts[i_disp].rstrip() + " " + mark + " "
+        lines[idx] = "|".join(parts)
+        changed.append(str(row.get("ID") or parts[i_id]).strip())
+    return {"body": "\n".join(lines) + "\n", "changed": len(changed), "ids": changed}
+
+
 def land_report(workspace: Path, milestone_id: str, out: Path, *,
-                extra_files: Optional[List[str]] = None, why: str = "", note: str = "") -> dict:
+                extra_files: Optional[List[str]] = None, why: str = "", note: str = "",
+                excluded: Optional[List[str]] = None) -> dict:
     """**唯一的"落报告"入口**：包内 `report.md` → `docs/reviews/` + 重生 docs 投影 + **一次提交**。
 
     为什么合并（2026-09-27 流程体检）：这条三步序列此前写在**两处**（腿的正常路 + 腿的拒绝路
@@ -345,6 +389,12 @@ def land_report(workspace: Path, milestone_id: str, out: Path, *,
         from k3dge.engine.milestone_audit import persist_external_audit_report
 
         body = report_src.read_text(encoding="utf-8")
+        # **先对账再落盘**：被排除文件的 `已修` 行改 `待修` ⇒ 判定面（封板判据读报告 `待修`）不会被虚报糊弄。
+        rec = reconcile_report_rows(body, excluded)
+        body, _rec_changed = str(rec["body"]), int(rec["changed"])
+        if _rec_changed:
+            note = (f"| 对账 | 报告有 {_rec_changed} 行因**本次未落**（`--exclude`）已改标 `待修`："
+                    f"{', '.join(rec['ids'][:8])} |\n| --- | --- |\n" + (note or ""))
         if note:      # 诚实说明（例如"本批修复经三路合并落树；排除 X（其修复与主干/现测试冲突，需人工重做）"）
             body = body.rstrip("\n") + "\n\n" + note.strip() + "\n"
         report_dst = persist_external_audit_report(workspace, milestone_id, body,
@@ -388,6 +438,7 @@ def land_report(workspace: Path, milestone_id: str, out: Path, *,
     sha, cerr = commit_applied(workspace, msg, files)
     return {"ok": not cerr, "error": "COMMIT_FAILED" if cerr else "", "detail": cerr,
             "report": rel, "commit": sha, "files": files,
+            "reconciled_rows": _rec_changed,
             "projection": proj, "projection_log": log.getvalue()[-400:]}
 
 

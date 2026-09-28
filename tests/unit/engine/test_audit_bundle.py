@@ -387,3 +387,29 @@ def test_post_apply_check_is_read_from_declaration_and_run(tmp_path, monkeypatch
                                                  encoding="utf-8")
     skipped = ab._post_apply_check(ws, ws)
     assert skipped["cmd"] == "" and skipped["ok"] is True       # 未声明 ⇒ 跳过（如实报 cmd=''）
+
+
+def test_report_rows_are_reconciled_with_what_actually_landed(tmp_path):
+    """**承重缺口**（2026-09-27）：报告行 ↔ 实际落地必须机械对账，否则虚报已审。
+
+    证据链：`audit_checklist._snapshot` 的 `pending` ＝报告 `待修` 行数；`--exclude` 掉的文件其条目仍写
+    "已修" ⇒ `pending=0` ⇒ 封板判据被糊弄。规则：位置列指向被排除文件的行 ⇒ 状态改 `待修` + 处置标注原因。
+    """
+    body = ("# 审计\n\n"
+            "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+            "| a-1 | 2026-09-27 | 中 | P1 | 正确性 | x | src/x/landed.py:10 | 已修 | 改了 | 验了 | | |\n"
+            "| a-2 | 2026-09-27 | 中 | P1 | 正确性 | y | src/x/excluded.py:20 | 已修 | 改了 | 验了 | | |\n"
+            "| a-3 | 2026-09-27 | 低 | P3 | 规范 | z | src/x/excluded.py:5 | 有意留 | 有意留：理由 | | | |\n")
+    r = ab.reconcile_report_rows(body, ["src/x/excluded.py"])
+    assert r["changed"] == 1 and r["ids"] == ["a-2"], r
+    out = str(r["body"])
+    assert "| 待修 |" in out and "本次**未落**" in out
+    assert out.count("| 已修 |") == 1                      # 落到主干的那行不动
+    assert "| 有意留 |" in out                             # 有意留不是"未落"，不改
+    # 无排除项 ⇒ 原样（不动报告）
+    same = ab.reconcile_report_rows(body, [])
+    assert same["changed"] == 0 and same["body"] == body
+    # 表头不合规 ⇒ 原样返回（不冒险改坏报告）
+    bad = ab.reconcile_report_rows("# 审计\n\n没有表\n", ["src/x/excluded.py"])
+    assert bad["changed"] == 0 and bad["body"] == "# 审计\n\n没有表\n"

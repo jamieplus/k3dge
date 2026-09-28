@@ -449,7 +449,8 @@ def _bundle_audit_leg(
     digest = str((res.get("digest") or "")[:12])
     jid = str((res.get("facts") or {}).get("job_id") or "")
     landed = ab.land_report(workspace, milestone_id, out, extra_files=files,
-                            why=f"job {jid or '-'} 包 {digest}")
+                            why=f"job {jid or '-'} 包 {digest}",
+                            excluded=list((res.get("apply") or {}).get("excluded") or []))
     if not landed.get("ok"):
         return _reject_step(workspace, milestone_id, f"audit_bundle_{landed.get('error', 'report').lower()}",
                             f"落报告/投影/提交失败：{landed.get('detail') or landed.get('error')} ⇒ "

@@ -620,7 +620,8 @@ def cmd_audit(args: argparse.Namespace) -> int:
                         f"（其修复与主干/现测试冲突，**未落**，需人工重做）。" if _ap.get("excluded") else ""))
         landed = ab.land_report(target, (getattr(args, "bundle_milestone", "") or "local"), bundle,
                                 extra_files=list(_ap.get("files") or []),
-                                why=f"手动入口 包 {str(ab.bundle_digest(bundle))[:12]}", note=_note)
+                                why=f"手动入口 包 {str(ab.bundle_digest(bundle))[:12]}", note=_note,
+                                excluded=list(_ap.get("excluded") or []))
     if _no_apply:
         print(f"[AUDIT] 补丁未落（{(res.get('apply') or {}).get('error')}）⇒ **不落报告**："
               f"报告留在包内 {bundle}", file=sys.stderr)
