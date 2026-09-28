@@ -829,6 +829,7 @@ stateDiagram-v2
 | TC-ENG-30 | L1 | `.agent/docs.toml` 有脚本不认识的 `= true` 键，或目标文件不存在 | 违反 `DOCS_TOML_KEY_UNKNOWN`（warn）；读不到 `gen` 行则跳过 | `tests/unit/engine/test_projection_drift_gates.py::test_unknown_key_is_violation` |
 | TC-ENG-31 | L1 | 文档状态表的 priority 数字与 `STATE_OPTIONS` 不符 | 违反 `ARCH_STATE_DOC_DRIFT`（同码，detail 给 got/want） | `tests/unit/engine/test_state_doc_coverage.py::test_full_state_set_passes` |
 | TC-ENG-32 | L1 | k3dit 交付包消费：异版/未闭环/自证失败/脏树/输入身份不符 | 各自 fail-clear 拒绝；标准 `git apply` 按序落补丁、dry-run 零改动 | `tests/unit/engine/test_audit_bundle.py` |
+| TC-ENG-33 | L1 | `scripts/pre-commit` 薄壳把 staged 文档接进 `engine/doc_gate.run_schema_gate`（三层闸接线） | 干净 doc 通过；坏文件名/坏 frontmatter/号空洞/复写 frontmatter 各按闭集码 block；warn 与 errs 分流 | `tests/unit/scripts/test_precommit.py` |
 
 ## 5. Fact-Source Gate Matrix (三元门禁矩阵)
 

@@ -78,3 +78,4 @@ main(argv: Optional[Sequence[str]]=None) -> int
 | TC-TPL-06 | L0 | 对空目录 scaffold | `scripts/pre-commit` 与 `scripts/commit-msg` 落地且**可执行**（否则 git 静默跳过 hook） | `tests/unit/templates/test_hooks_reach_downstream.py::test_hook_scripts_are_shipped_and_executable` |
 | TC-TPL-07 | L0 | 对空目录 scaffold | `docs/{specs,guides,protocols,architecture,generated}` 各带 README + AUTHORING（否则下游第一次提交被 doc-gate 拦） | `tests/unit/templates/test_hooks_reach_downstream.py::test_governance_files_exist_for_every_docs_type` |
 | TC-TPL-08 | L1 | init 仓按 AGENTS.md 激活 `core.hooksPath scripts` 后提交 | hook 真跑三层闸（doc-gate PASS）；缺 AUTHORING 时 commit 被拦 | `tests/unit/templates/test_hooks_reach_downstream.py::test_missing_authoring_blocks_the_commit` |
+| TC-TPL-09 | L1 | scaffold 写协议文本（AGENTS.md/.agent/rules/README）进下游仓 | 裸 ADR 引用自限定为 `k3dge ADR-NNNN`（防指错靶）；`where ADR-NNNN` 与本仓 adr/README 示例不限定、幂等不重复限定 | `tests/unit/templates/test_reference_portability.py` |
