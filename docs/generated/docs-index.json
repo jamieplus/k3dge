@@ -377,6 +377,22 @@
       "tokens": "封板收摊清单（上下文压缩）: M10"
     },
     {
+      "path": "docs/reviews/2026-09-28-M11-align.md",
+      "type": "reviews",
+      "id": "2026-09-28-M11-align",
+      "title": "里程碑对齐与验收报告: M11",
+      "status": "",
+      "tokens": "里程碑对齐与验收报告: M11"
+    },
+    {
+      "path": "docs/reviews/2026-09-28-M11-k3dit-bundle-audit.md",
+      "type": "reviews",
+      "id": "2026-09-28-M11-k3dit-bundle-audit",
+      "title": "审计：.（milestone local）",
+      "status": "",
+      "tokens": "审计：.（milestone local）"
+    },
+    {
       "path": "docs/specs/_template/spec.md",
       "type": "specs",
       "id": "spec",
