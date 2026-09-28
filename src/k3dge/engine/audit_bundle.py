@@ -260,7 +260,8 @@ def _dry_run_via_worktree(workspace: Path, bundle: Path, order: List[str]) -> di
 
 
 def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
-                 allow_dirty: bool = False, exclude: Optional[List[str]] = None) -> dict:
+                 allow_dirty: bool = False, exclude: Optional[List[str]] = None,
+                 exclude_hunks: Optional[Dict[str, List[int]]] = None) -> dict:
     """落补丁：先 `git apply`（精确）；打不上则**三路合并**（主干已前进时的正道）。
 
     两条策略的差别只在"怎么把补丁贴到当前树上"：结果都要过同一道消费侧验收与同一套提交。
@@ -279,7 +280,10 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
         return {"ok": False, "error": "DIRTY_TREE",
                 "detail": "工作树不干净，先提交或 stash（审计产物不得与在途改动混在一起）",
                 "dirty": dirty.strip().splitlines()[:10]}
-    pre = _dry_run_via_worktree(workspace, bundle, order)
+    # **有 hunk 级剔除要求时不许走"精确 git apply"快路**：那条路会把未关项所在 hunk 一起落进去
+    #（真跑/测试实测：`git apply` 成功 ⇒ 过滤从未发生 ⇒ 未验证的改动进了主干）。一律走合并路径。
+    pre = {"ok": False, "detail": "（有 hunk 级剔除要求 ⇒ 强制走合并路径）"} if exclude_hunks else \
+        _dry_run_via_worktree(workspace, bundle, order)
     if pre.get("ok"):
         if dry_run:
             return {"ok": True, "applied": order, "files": pre.get("files") or [], "dry_run": True,
@@ -295,10 +299,12 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
                                                      "WORKTREE_UNAVAILABLE"}:
         return {"ok": False, "error": pre.get("error"), "detail": pre.get("detail", ""),
                 "phase": "dry-run", "applied": pre.get("applied") or []}
-    got = _apply_sequential_merged(workspace, bundle, exclude=exclude, dry_run=dry_run)
+    got = _apply_sequential_merged(workspace, bundle, exclude=exclude, dry_run=dry_run,
+                                   exclude_hunks=exclude_hunks)
     if got.get("ok"):
         return {"ok": True, "applied": order, "files": got.get("files") or [], "dry_run": dry_run,
                 "strategy": "three-way-merge", "excluded": got.get("excluded") or [],
+                "dropped_hunks": got.get("dropped_hunks") or {},
                 "post_apply_check": got.get("post_apply_check") or {},
                 "detail": f"`git apply` 打不上（{(pre.get('detail') or '')[:100]}）⇒ 三路合并"
                           f"{'（试跑，未落）' if dry_run else '成功'}"}
@@ -307,7 +313,8 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
             "phase": "merge", "applied": [], "conflicts": got.get("conflicts") or []}
 
 
-def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry_run: bool = False) -> dict:
+def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry_run: bool = False,
+                             exclude_hunks: Optional[Dict[str, List[int]]] = None) -> dict:
     """三路合并落补丁（在**临时 worktree** 里先做一遍并跑声明的落库后校验，再就地写）。
 
     返回 {ok, files, excluded, conflicts, detail}。校验失败/有冲突 ⇒ 不写工作区（fail-clear）。
@@ -333,6 +340,29 @@ def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(text, encoding="utf-8")
             files.append(rel)
+        # **hunk 级剔除未关项那几段**（用户裁定："已修的为什么不能落，不是 git 管理吗？"）：git 本是按 hunk 的
+        # ⇒ 只把与未关项位置重叠的 hunk 反向应用掉，同文件里的其它修复**照落**（文件级排除会把它们一起挡掉）。
+        dropped: Dict[str, list] = {}
+        if exclude_hunks:
+            from k3dge.engine.audit_merge import hunks_overlapping
+
+            for rel, lines in sorted(exclude_hunks.items()):
+                if rel not in files:
+                    continue
+                src = Path(bundle) / "fix.patch"
+                if not src.is_file():
+                    continue
+                sel = hunks_overlapping(src.read_text(encoding="utf-8"), rel, list(lines))
+                if not sel.get("patch"):
+                    continue
+                tmpf = wt / ".k3dge-drop.patch"
+                tmpf.write_text(str(sel["patch"]), encoding="utf-8")
+                rc, out = _git(wt, "apply", "-R", "-p1", str(tmpf))
+                tmpf.unlink(missing_ok=True)
+                if rc != 0:
+                    return {"ok": False, "error": "HUNK_EXCLUDE_FAILED", "conflicts": [rel],
+                            "detail": f"{rel}: 未关项所在 hunk 剔不出去（{out.strip()[:160]}）⇒ 不落地（fail-close）"}
+                dropped[rel] = sel.get("dropped") or []
         # 钉（标注层，纯增量）：正向应用；打不上就对**该文件**并集合并（"两边都加钉"的正解＝两枚都留）
         pins = str(res.get("pins_patch") or "")
         if pins:
@@ -371,7 +401,7 @@ def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry
                     "detail": f"落库后校验未过（已回滚 {len(files)} 个文件）：{check.get('cmd')} ⇒ "
                               f"{check.get('detail')}", "files": []}
         return {"ok": True, "files": files, "excluded": res.get("excluded") or [],
-                "conflicts": [], "post_apply_check": check}
+                "conflicts": [], "post_apply_check": check, "dropped_hunks": dropped}
     finally:
         _git(workspace, "worktree", "remove", "--force", str(wt))
         shutil.rmtree(tmp, ignore_errors=True)
@@ -551,7 +581,7 @@ def commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str
 def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
             k3dit: Optional[List[str]] = None, expect_input: Optional[str] = None,
             require_closed: bool = True, accept_baseline_drift: str = "",
-            exclude: Optional[List[str]] = None) -> dict:
+            exclude: Optional[List[str]] = None, landing: str = "partial") -> dict:
     """**消费一只包**：验契约 → 输入身份 → 自证 → 落补丁。
 
     `expect_input` 非空时校验 `manifest.input` 与它同指一处（realpath 比较）——包的输入身份是
@@ -587,27 +617,44 @@ def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
     local = (verified.get("local") or {})
     unclosed = [str(x) for x in (local.get("unclosed") or [])]
     unclosed_files: List[str] = []
+    unclosed_hunks: Dict[str, List[int]] = {}
     if unclosed:
         try:
             items = json.loads((Path(bundle) / "findings.json").read_text(encoding="utf-8"))
             rows = items.get("items") if isinstance(items, dict) else items
             for it in (rows or []):
                 if str((it or {}).get("id") or "") in unclosed:
-                    f = str((it or {}).get("location") or "").split(":")[0].strip()
+                    loc = str((it or {}).get("location") or "")
+                    f, _sep, ln = loc.partition(":")
+                    f = f.strip()
                     if f:
                         unclosed_files.append(f)
-        except Exception:      # pragma: no cover - 读不出就不排除（宁可不落也不乱落）
-            unclosed_files = []
-    if unclosed and not unclosed_files:
+                        if ln.strip().isdigit():
+                            unclosed_hunks.setdefault(f, []).append(int(ln.strip()))
+        except Exception:      # pragma: no cover - 读不出就 fail-close（宁可不落也不乱落）
+            unclosed_files, unclosed_hunks = [], {}
+    _landing = str(landing or "partial")
+    if _landing not in ("closed-only", "partial", "all"):
+        return {"ok": False, "error": "BAD_LANDING", "facts": facts,
+                "detail": f"landing={landing!r} 不合法（closed-only / partial / all）"}
+    if unclosed and _landing == "closed-only":
+        # **调用方选了最严策略**：未关项 ⇒ 不落（这等价于旧行为；策略归声明面/CLI，k3ge 只执行）
+        return {"ok": False, "error": "VERIFY_FAILED", "facts": facts, "verify": verified,
+                "detail": f"未闭环（消费侧算）：{unclosed[:5]}（`landing=closed-only` ⇒ 不落）"}
+    if unclosed and _landing == "all":
+        unclosed_hunks = {}      # 全落：连未关项那几段也落（但下面仍按行标升级 ⇒ 封板被挡）
+    if unclosed and not unclosed_hunks and _landing == "partial":
         # **解不出未关项所在文件 ⇒ 不许部分落地**（否则会把未关项的修复一起落进去＝虚报）。fail-close。
         return {"ok": False, "error": "UNRESOLVED_UNCLOSED", "facts": facts, "verify": verified,
                 "detail": f"未关 {len(unclosed)} 项但 findings 里取不到 `location` ⇒ 无法安全排除其文件，"
                           f"不做部分落地（{', '.join(unclosed[:5])}）"}
-    ex_all = sorted({str(x) for x in (exclude or [])} | set(unclosed_files))
-    applied = apply_bundle(workspace, bundle, dry_run=dry_run, exclude=ex_all)
+    ex_all = sorted({str(x) for x in (exclude or [])})      # 未关项走 **hunk 级**（不再整文件排除）
+    applied = apply_bundle(workspace, bundle, dry_run=dry_run, exclude=ex_all,
+                           exclude_hunks=unclosed_hunks or None)
     if not applied.get("ok"):
         return {"ok": False, "error": applied.get("error"), "facts": facts, "verify": verified,
                 "apply": applied, "detail": applied.get("detail", "")}
     return {"ok": True, "facts": facts, "verify": verified, "apply": applied,
             "digest": bundle_digest(bundle), "dry_run": dry_run,
-            "partial": bool(unclosed), "escalated": unclosed, "unclosed_files": unclosed_files}
+            "partial": bool(unclosed), "escalated": unclosed, "unclosed_files": sorted(set(unclosed_files)),
+            "unclosed_hunks": unclosed_hunks, "landing": _landing}

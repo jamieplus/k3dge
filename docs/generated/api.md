@@ -194,7 +194,7 @@ bundle_facts(bundle: Path) -> dict
     # doc: 读包内**机器可读契约面**（缺/坏 ⇒ 空值，由调用方 fail-clear）。
 bundle_digest(bundle: Path) -> str
     # doc: 包的**内容摘要**（排序后的 rel:sha256）——封版提交里记它，可核"审的是哪只包"。
-apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False, exclude: Optional[List[str]]=None) -> dict
+apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False, exclude: Optional[List[str]]=None, exclude_hunks: Optional[Dict[str, List[int]]]=None) -> dict
     # doc: 落补丁：先 `git apply`（精确）；打不上则**三路合并**（主干已前进时的正道）。
 ESCALATION_UNCLOSED = '待验：未闭环（转人工）'
 ESCALATION_NOTLANDED = '升级：本次未落'
@@ -205,7 +205,7 @@ land_report(workspace: Path, milestone_id: str, out: Path, *, extra_files: Optio
     # doc: **唯一的"落报告"入口**：包内 `report.md` → `docs/reviews/` + 重生 docs 投影 + **一次提交**。
 commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str, str]
     # doc: 提交**已落的这些文件**（不用 `add -A`：别把工作区其它改动卷进审计提交）。返回 `(sha, 错误)`。
-consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None, require_closed: bool=True, accept_baseline_drift: str='', exclude: Optional[List[str]]=None) -> dict
+consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None, require_closed: bool=True, accept_baseline_drift: str='', exclude: Optional[List[str]]=None, landing: str='partial') -> dict
     # doc: **消费一只包**：验契约 → 输入身份 → 自证 → 落补丁。
 # audit_checklist.py
 from __future__ import annotations
@@ -248,6 +248,8 @@ from typing import Set
 from k3dge.engine.audit_verify import replay_to_baseline
 touched_files(bundle: Path) -> Set[str]
     # doc: 包内补丁触及的文件（`+++ b/<rel>`）。
+hunks_overlapping(patch_text: str, rel: str, lines: List[int], *, slack: int=2) -> Dict[str, Any]
+    # doc: **只取与给定行重叠的 hunk**（用于把"未关项那几段"从落地里剔出去，其余修复照落）。
 merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str]=()) -> Dict[str, Any]
     # doc: 把包合进 `workspace`（**只算不写**）：返回 {ok, merged{rel: text}, conflicts[], excluded[], pins_rels[], detail}。
 union_pins(workspace: Path, bundle: Path, rel: str) -> Dict[str, Any]

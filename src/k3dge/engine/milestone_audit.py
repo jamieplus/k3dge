@@ -450,6 +450,12 @@ def _bundle_audit_leg(
     _salv: dict = {}      # 抢救结果（仅失败路径填）
     _salv_ok = False      # 抢救成功标记（`ran` 会被改写 ⇒ 不能靠它反推）
     _dig = ""             # 运行摘要路径
+    # 落地策略（**调用方定**，用户裁定）：`closed-only`（未关项不落）/`partial`（只剔未关项那些 hunk）/
+    # `all`（全落，但行上标升级 ⇒ 封板仍被挡）。声明面旋钮，非法值显式拒绝。
+    landing = _role_opt(workspace, "audit", "k3dit_landing", "partial")
+    if landing not in ("closed-only", "partial", "all"):
+        return _reject_step(workspace, milestone_id, "audit_bad_k3dit_landing",
+                            f'[roles.audit] k3dit_landing={landing!r} 不合法（closed-only / partial / all）'), ""
     ran = ab.run_path_audit(workspace, out, mode=k3dit_mode, pins=k3dit_pins, scope=k3dit_scope,
                             timeout=_tmo)
     payload = ran.get("payload") or {}
@@ -489,7 +495,8 @@ def _bundle_audit_leg(
     salvaged = bool(_salv_ok and _salv.get("ok"))
     _salv_note = f"（工具被掐断 ⇒ 由 `hall export` **抢救**出包；摘要 {_dig}）" if salvaged else ""
 
-    res = ab.consume(workspace, out, expect_input=str(workspace), require_closed=not audit_only)
+    res = ab.consume(workspace, out, expect_input=str(workspace), require_closed=not audit_only,
+                     landing=landing)
     if not res.get("ok"):
         # 消费失败（脏树/补丁打不上…）**不等于这一轮没产出**：报告必须在手，否则等于白跑一轮
         _sha = (ab.land_report(workspace, milestone_id, out,

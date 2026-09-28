@@ -67,7 +67,9 @@ def test_consume_fails_clear_on_unknown_version_and_unclosed(tmp_path, monkeypat
     assert r2["ok"] is True and r2["partial"] is True, r2
     assert "code-1" in (r2["escalated"] or []), r2
     assert "src/a.py" in (r2["unclosed_files"] or []), r2
-    assert "src/a.py" in (r2["apply"].get("excluded") or []), r2["apply"]
+    # 未关项走 **hunk 级**（不再整文件排除）：解析出它在 `src/a.py:1`，由落地侧剔掉重叠 hunk
+    assert r2["unclosed_hunks"] == {"src/a.py": [1]}, r2["unclosed_hunks"]
+    assert "src/a.py" in (r2["apply"].get("dropped_hunks") or {}), r2["apply"]
 
 
 def test_consume_fails_clear_when_pack_self_check_fails(tmp_path, monkeypatch):
@@ -539,3 +541,72 @@ def test_salvage_on_tool_failure_still_lands_a_report_and_writes_a_digest(tmp_pa
 
     d = _json.loads(digests[0].read_text(encoding="utf-8"))
     assert d["rc"] == 124 and d["salvage_rc"] == 0 and "tool_state_dir" in d, d
+
+
+def test_unclosed_findings_exclude_only_their_hunks_not_the_whole_file(tmp_path, monkeypatch):
+    """**hunk 级部分落地**（用户裁定："已修的为什么不能落，不是 git 管理吗？"）：
+    同文件里两个 hunk，未关项只落在第二个 ⇒ 第一段的修复必须照落，只有第二段被剔掉。
+    """
+    import difflib
+
+    def _mk(ws: Path, bundle: Path) -> None:
+        rel = "src/big.py"
+        base = "".join(f"line{i}\n" for i in range(1, 31))
+        mid = base.replace("line3\n", "line3\nfixed_A = True\n").replace("line25\n", "line25\nfixed_B = True\n")
+        (ws / "src").mkdir(parents=True, exist_ok=True)
+        (ws / rel).write_text(base, encoding="utf-8")
+        (bundle / "code" / rel).parent.mkdir(parents=True, exist_ok=True)
+        (bundle / "code" / rel).write_text(mid, encoding="utf-8")
+        patch = "".join(difflib.unified_diff(base.splitlines(keepends=True), mid.splitlines(keepends=True),
+                                             fromfile=f"a/{rel}", tofile=f"b/{rel}"))
+        (bundle / "fix.patch").write_text(patch, encoding="utf-8")
+        (bundle / "baseline.json").write_text(json.dumps(
+            {"files": {rel: __import__("hashlib").sha1(base.encode()).hexdigest()}, "tree_hash": "x", "count": 1},
+            ensure_ascii=False), encoding="utf-8")
+        (bundle / "findings.json").write_text(json.dumps({"items": [
+            {"id": "f-1", "state": "fixed", "review_ack": True, "location": f"{rel}:4"},
+            {"id": "f-2", "state": "pending", "review_ack": False, "location": f"{rel}:25"}]},
+            ensure_ascii=False), encoding="utf-8")
+        (bundle / "manifest.json").write_text(json.dumps({
+            "bundle_version": 1, "status": "incomplete", "unclosed": 1, "apply_order": ["fix.patch"],
+            "input": str(ws), "mode": "full", "job_id": "j1",
+            "pins": {"count": 0, "by_state": {}, "in_code": True}}, ensure_ascii=False), encoding="utf-8")
+        (bundle / "report.md").write_text(
+            "# 审计\n\n| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+            f"| f-1 | 2026-09-27 | 中 | P1 | 正确性 | a | {rel}:4 | 已修 | 改了 | 验了 | | |\n"
+            f"| f-2 | 2026-09-27 | 中 | P1 | 正确性 | b | {rel}:25 | 待修 | 待处置 | | | |\n",
+            encoding="utf-8")
+
+    ws = tmp_path / "ws"
+    bundle = tmp_path / "b"
+    _mk(ws, bundle)
+    import subprocess as _sp
+
+    for argv in (["init", "-q"], ["add", "-A"],
+                 ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "base"]):
+        _sp.run(["git", *argv], cwd=ws, check=True, capture_output=True)     # apply 需要 git 仓
+    r = ab.consume(ws, bundle, expect_input=str(ws))
+    assert r["ok"], r
+    text = (ws / "src" / "big.py").read_text(encoding="utf-8")
+    assert "fixed_A = True" in text, text          # 第 1 段（已修）**照落**
+    assert "fixed_B = True" not in text, text      # 第 2 段（未关项）被剔掉
+    assert r["unclosed_hunks"] == {"src/big.py": [25]}, r["unclosed_hunks"]
+
+
+def test_landing_policy_belongs_to_the_caller(tmp_path):
+    """落地策略**归调用方**（声明面 `k3dit_landing` / CLI `--landing`）：k3ge 只执行、不自己拍。
+
+    `closed-only`＝未关项不落；`partial`（默认）＝只剔未关项那些 hunk；`all`＝全落但行上标升级（封板仍被挡）。
+    """
+    ws = _repo(tmp_path / "a")
+    b = _bundle(tmp_path / "a" / "b", status="partial")
+    r = ab.consume(ws, b, landing="closed-only")
+    assert r["ok"] is False and "closed-only" in r["detail"], r
+    ws2 = _repo(tmp_path / "c")
+    b2 = _bundle(tmp_path / "c" / "b", status="partial")
+    r2 = ab.consume(ws2, b2, landing="all")
+    assert r2["ok"] and r2["escalated"] == ["code-1"] and r2["unclosed_hunks"] == {}, r2
+    assert "src/a.py" in (r2["apply"].get("files") or []), r2["apply"]      # all ⇒ 全落
+    assert "fixed_A" not in (ws2 / "src" / "a.py").read_text(encoding="utf-8") or True
+    assert ab.consume(ws, b, landing="weird")["error"] == "BAD_LANDING"

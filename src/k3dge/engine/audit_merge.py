@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -59,6 +60,50 @@ def _merge_file(ours: Path, base: Path, theirs: Path) -> Dict[str, Any]:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _hunks(patch_text: str) -> Dict[str, List[Dict[str, Any]]]:
+    """拆 unified diff：`{rel: [{src_start, src_len, lines}]}`（只认我们生成的形状：`+++ b/<rel>` + `@@ -a,b +c,d @@`）。"""
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    rel = ""
+    cur: Optional[Dict[str, Any]] = None
+    for line in (patch_text or "").splitlines(keepends=True):
+        if line.startswith("+++ b/"):
+            rel = line[6:].strip()
+            out.setdefault(rel, [])
+            cur = None
+        elif line.startswith("@@") and rel:
+            m = re.match(r"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", line)
+            if not m:
+                cur = None
+                continue
+            cur = {"src_start": int(m.group(1)), "src_len": int(m.group(2) or 1), "lines": [line]}
+            out[rel].append(cur)
+        elif cur is not None and (line.startswith((" ", "+", "-", "\\")) or line.strip() == ""):
+            cur["lines"].append(line)
+    return out
+
+
+def hunks_overlapping(patch_text: str, rel: str, lines: List[int], *, slack: int = 2) -> Dict[str, Any]:
+    """**只取与给定行重叠的 hunk**（用于把"未关项那几段"从落地里剔出去，其余修复照落）。
+
+    用户裁定（2026-09-27）："已修的为什么不能落，不是 git 管理吗？" —— git 本就是按 hunk 的；
+    文件级排除会把同文件里的已修一起挡掉（真跑实测：11 条修复与 3 条未关项同在两个文件里 ⇒ 一条也落不进）。
+    返回 {patch, dropped: [(start, len)], detail}；无重叠 ⇒ patch 为空。
+    """
+    hs = _hunks(patch_text).get(rel, [])
+    if not hs or not lines:
+        return {"patch": "", "dropped": [], "detail": ""}
+    hit = []
+    for h in hs:
+        lo, hi = h["src_start"] - slack, h["src_start"] + max(h["src_len"], 1) + slack
+        if any(lo <= int(ln) <= hi for ln in lines):
+            hit.append(h)
+    if not hit:
+        return {"patch": "", "dropped": [], "detail": ""}
+    header = f"--- a/{rel}\n+++ b/{rel}\n"
+    return {"patch": header + "".join("".join(h["lines"]) for h in hit),
+            "dropped": [(h["src_start"], h["src_len"]) for h in hit], "detail": ""}
+
+
 def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) -> Dict[str, Any]:
     """把包合进 `workspace`（**只算不写**）：返回 {ok, merged{rel: text}, conflicts[], excluded[], pins_rels[], detail}。
 
@@ -78,11 +123,19 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
     facts = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
     order = [str(x) for x in (facts.get("apply_order") or [])]
     pins_in_code = bool((facts.get("pins") or {}).get("in_code"))
-    mid = replay_to_baseline(bundle, only=["pins.patch"]) if (pins_in_code and
-                                                              (bundle / "pins.patch").is_file()) else rep
+    # "修复后树"（fix 合并的 theirs）怎么取：
+    #   inplace + 有 pins.patch ⇒ `code/` 是"基线+修复+**钉**" ⇒ 先把钉反向掉 ⇒ 得"基线+修复"；
+    #   否则（artifact，或无 pins.patch）⇒ `code/` 本身就是"基线+修复" ⇒ **直接用它**。
+    # （此前无 pins.patch 时错取 base ⇒ theirs==base ⇒ 修复根本没进合并 ⇒ 后面对它剔 hunk 必然失败。）
+    need_pins_replay = bool(pins_in_code and (bundle / "pins.patch").is_file())
+    mid = replay_to_baseline(bundle, only=["pins.patch"]) if need_pins_replay else {"ok": False}
     base_root = Path(rep["root"])
-    mid_root = Path(mid["root"]) if mid.get("ok") else base_root
-    theirs_root = bundle / "code"
+    theirs_root = Path(bundle) / "code"
+    if need_pins_replay and mid.get("ok"):
+        mid_root = Path(str(mid["root"]))
+        tmp_mid = str(mid_root)
+    else:
+        mid_root, tmp_mid = theirs_root, ""      # 复用包的 `code/`（**别 rmtree 它**）
     try:
         fix_rels = sorted(t for t in touched_files(bundle) - excluded
                           if t in set(_rels_of_patch(bundle, "fix.patch")) or True)
@@ -109,8 +162,8 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
                 "detail": ""}
     finally:
         shutil.rmtree(base_root, ignore_errors=True)
-        if mid_root != base_root:
-            shutil.rmtree(mid_root, ignore_errors=True)
+        if tmp_mid:
+            shutil.rmtree(tmp_mid, ignore_errors=True)
 
 
 def _rels_of_patch(bundle: Path, name: str) -> Set[str]:

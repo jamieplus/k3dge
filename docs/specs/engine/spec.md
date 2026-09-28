@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:2d4ef5f44251fa36df03716fce8090033e9325bc3487204b617bf0e29fae309f`
+- **Contract Hash**: `sha256:196805f4c34495c5e5209f1506c920b7f8073bcb8d9a590940ba1b3457f5f232`
 - **Last Updated**: 2026-09-28
 
 ## 1. Domain Boundary & Responsibilities
@@ -78,14 +78,14 @@ write_run_digest(out: Path, **facts: object) -> str
 verify_bundle(bundle: Path, *, expect_input: str='', require_closed: bool=False, accept_baseline_drift: str='') -> dict
 bundle_facts(bundle: Path) -> dict
 bundle_digest(bundle: Path) -> str
-apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False, exclude: Optional[List[str]]=None) -> dict
+apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False, exclude: Optional[List[str]]=None, exclude_hunks: Optional[Dict[str, List[int]]]=None) -> dict
 ESCALATION_UNCLOSED = '待验：未闭环（转人工）'
 ESCALATION_NOTLANDED = '升级：本次未落'
 ESCALATION_MARKERS = (ESCALATION_UNCLOSED, ESCALATION_NOTLANDED)
 reconcile_report_rows(body: str, excluded: Optional[List[str]]=None, escalated: Optional[List[str]]=None) -> Dict[str, object]
 land_report(workspace: Path, milestone_id: str, out: Path, *, extra_files: Optional[List[str]]=None, why: str='', note: str='', excluded: Optional[List[str]]=None, escalated: Optional[List[str]]=None) -> dict
 commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str, str]
-consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None, require_closed: bool=True, accept_baseline_drift: str='', exclude: Optional[List[str]]=None) -> dict
+consume(workspace: Path, bundle: Path, *, dry_run: bool=False, k3dit: Optional[List[str]]=None, expect_input: Optional[str]=None, require_closed: bool=True, accept_baseline_drift: str='', exclude: Optional[List[str]]=None, landing: str='partial') -> dict
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
@@ -118,6 +118,7 @@ from typing import Optional
 from typing import Set
 from k3dge.engine.audit_verify import replay_to_baseline
 touched_files(bundle: Path) -> Set[str]
+hunks_overlapping(patch_text: str, rel: str, lines: List[int], *, slack: int=2) -> Dict[str, Any]
 merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str]=()) -> Dict[str, Any]
 union_pins(workspace: Path, bundle: Path, rel: str) -> Dict[str, Any]
 from __future__ import annotations

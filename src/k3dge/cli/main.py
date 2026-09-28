@@ -610,7 +610,8 @@ def cmd_audit(args: argparse.Namespace) -> int:
                      # 纯审计包 status=partial 是设计（钉留树）⇒ 不要求闭环
                      require_closed=(getattr(args, "bundle_mode", "full") or "full") != "audit-only",
                      accept_baseline_drift=getattr(args, "bundle_drift", "") or "",
-                     exclude=getattr(args, "bundle_exclude", None) or [])
+                     exclude=getattr(args, "bundle_exclude", None) or [],
+                     landing=getattr(args, "bundle_landing", "partial") or "partial")
     # **入口唯一＝效果唯一**（ADR-0025 §2.9.6）：手动入口与封板腿共用 `land_report`，
     # 否则"同一模块同一参数"只是形式——手动跑完报告不落盘、不提交（此前如此），判定面看不到产物。
     landed = {}
@@ -1246,6 +1247,9 @@ def build_parser() -> argparse.ArgumentParser:
                        help="bundle：先跑 k3dit 路径入口产包再消费（缺省只消费已存在的包）")
     p_aud.add_argument("--pins", dest="bundle_pins", choices=["inplace", "artifact"], default="inplace",
                        help="bundle：钉的落地形态（inplace＝钉留树 / artifact＝钉只随包）")
+    p_aud.add_argument("--landing", dest="bundle_landing", choices=["closed-only", "partial", "all"],
+                       default="partial",
+                       help="bundle：未关项怎么落（closed-only 不落 / partial 只剔其 hunk / all 全落并标升级）")
     p_aud.add_argument("--timeout", dest="bundle_timeout", type=int, default=0,
                        help="bundle：工具调用的墙钟预算（秒；0＝按模式缺省：full 2h / audit-only 1h）")
     p_aud.add_argument("--accept-baseline-drift", dest="bundle_drift", default="",
