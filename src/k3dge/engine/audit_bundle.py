@@ -50,9 +50,9 @@ def find_k3dit(workspace: Path) -> Optional[List[str]]:
     return None
 
 
-def _run(argv: List[str], cwd: Path, timeout: int) -> Tuple[int, str]:
+def _run(argv: List[str], cwd: Path, timeout: int, env: Optional[Dict[str, str]] = None) -> Tuple[int, str]:
     try:
-        proc = subprocess.run(argv, cwd=str(cwd), capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(argv, cwd=str(cwd), capture_output=True, text=True, timeout=timeout, env=env)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 124, f"{exc}"
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
@@ -84,13 +84,43 @@ def run_path_audit(workspace: Path, out: Path, *, mode: str = "full", pins: str 
             "--mode", mode, "--pins", pins, "--format", "json"]
     if scope:
         argv += ["--scope", str(scope)]
-    rc, text = _run(argv, workspace, timeout)
+    rc, text = _run(argv, workspace, timeout, env=_tool_env(workspace, argv0))
     payload = _last_json(text)
     if rc not in (0, 3):
         return {"ok": False, "rc": rc, "out": str(out), "detail": text.strip()[-400:],
                 "payload": payload or {}}
     return {"ok": bool(payload), "rc": rc, "out": str(out), "payload": payload or {},
             "detail": text.strip()[-400:]}
+
+
+def _tool_env(workspace: Path, argv0: List[str]) -> Dict[str, str]:
+    """工具子进程的环境：**工具状态（hall root / ledger）不得落到外部被审仓**。
+
+    真跑实测（2026-09-27）：在 k3dge 仓里跑 k3dge 自己的审计时，k3dit 把 `.k3dit/`（工作目录/席日志）与
+    `ledger/jobs.json` 建到了**被审仓**里 ⇒ 工作区变脏 ⇒ 消费相位被自家 `DIRTY_TREE` 拒（而且这些是工具
+    状态，不是审计产物）。规则：**外部被审仓 ⇒ 状态落缓存**（确定性路径 ⇒ 跨轮续用，`prior.json` 的旧债
+    抑制仍然有效）；**工具自己家**（被审仓＝工具所在仓）⇒ 不动，保持仓库内状态的连续性。
+    """
+    import hashlib
+    import tempfile
+
+    env = {**os.environ}
+    try:
+        repo = Path(argv0[0]).resolve()
+        for _ in range(3):      # <repo>/.venv/bin/k3dit → <repo>
+            if (repo / "pyproject.toml").is_file() or (repo / ".git").exists():
+                break
+            repo = repo.parent
+        if repo.resolve() == Path(workspace).resolve():
+            return env          # 工具审自己：保持仓库内状态（连续性优先）
+    except OSError:             # pragma: no cover
+        pass
+    cache = Path(os.environ.get("K3GE_AUDIT_CACHE") or (Path(tempfile.gettempdir()) / "k3ge-audit"))
+    key = hashlib.sha1(str(Path(workspace).resolve()).encode("utf-8")).hexdigest()[:12]
+    root = cache / f"k3dit-state-{key}"
+    env["K3DIT_HALL_ROOT"] = str(root / "hall")
+    env["K3DIT_LEDGER"] = str(root / "ledger" / "jobs.json")
+    return env
 
 
 def verify_bundle(bundle: Path, *, expect_input: str = "", require_closed: bool = False,

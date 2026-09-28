@@ -182,7 +182,7 @@
   "apply_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 195
+      "line": 225
     }
   ],
   "archived_milestone_tasks": [
@@ -320,13 +320,13 @@
   "bundle_digest": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 132
+      "line": 162
     }
   ],
   "bundle_facts": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 113
+      "line": 143
     }
   ],
   "cache_observability": [
@@ -662,7 +662,7 @@
   "commit_applied": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 445
+      "line": 475
     }
   ],
   "completeness_violations": [
@@ -686,7 +686,7 @@
   "consume": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 469
+      "line": 499
     }
   ],
   "consume_unreleased": [
@@ -1092,7 +1092,7 @@
   "land_report": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 374
+      "line": 404
     }
   ],
   "legacy_config_present": [
@@ -1406,7 +1406,7 @@
   "reconcile_report_rows": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 331
+      "line": 361
     }
   ],
   "reconcile_supersedes": [
@@ -1872,7 +1872,7 @@
   "verify_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 96
+      "line": 126
     }
   ],
   "verify_bundle_local": [

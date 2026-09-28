@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -183,7 +184,7 @@ def test_run_path_audit_passes_mode_and_pins(tmp_path, monkeypatch):
     """工具参数必须**传到位**：`--mode` 与 `--pins` 是 k3dit 的两个运行旋钮（纯审计/钉只随包）。"""
     seen = {}
 
-    def _fake_run(argv, cwd, timeout):
+    def _fake_run(argv, cwd, timeout, env=None):
         seen["argv"] = argv
         return 0, '{"ok": true, "status": "closed"}'
 
@@ -413,3 +414,26 @@ def test_report_rows_are_reconciled_with_what_actually_landed(tmp_path):
     # 表头不合规 ⇒ 原样返回（不冒险改坏报告）
     bad = ab.reconcile_report_rows("# 审计\n\n没有表\n", ["src/x/excluded.py"])
     assert bad["changed"] == 0 and bad["body"] == "# 审计\n\n没有表\n"
+
+
+def test_tool_state_never_lands_in_a_foreign_subject(tmp_path, monkeypatch):
+    """工具状态（hall root / ledger）**不得落到外部被审仓**（真跑实测：k3dit 把 `.k3dit/` 与 `ledger/` 建进
+    被审仓 k3dge ⇒ 工作区变脏 ⇒ 消费相位被自家 `DIRTY_TREE` 拒，而且那些是工具状态不是审计产物）。
+    外部被审仓 ⇒ 落缓存（确定性路径，跨轮续用）；工具审自己 ⇒ 不动（保持仓库内状态连续性）。
+    """
+    subj = tmp_path / "subject"
+    subj.mkdir()
+    fake_tool = tmp_path / "k3dit" / ".venv" / "bin" / "k3dit"
+    fake_tool.parent.mkdir(parents=True)
+    fake_tool.write_text("#!/bin/sh\n", encoding="utf-8")
+    (tmp_path / "k3dit" / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
+    monkeypatch.setenv("K3GE_AUDIT_CACHE", str(tmp_path / "cache"))
+    env = ab._tool_env(subj, [str(fake_tool)])
+    assert env["K3DIT_HALL_ROOT"].startswith(str(tmp_path / "cache"))
+    assert env["K3DIT_LEDGER"].startswith(str(tmp_path / "cache"))
+    assert str(subj) not in env["K3DIT_HALL_ROOT"] and "K3DIT_HALL_ROOT" not in {
+        k: v for k, v in os.environ.items() if k == "K3DIT_HALL_ROOT"}
+    # 工具审自己：不覆盖（沿用仓库内状态）
+    monkeypatch.setenv("K3DIT_HALL_ROOT", "/tmp/keep-me")
+    env2 = ab._tool_env(tmp_path / "k3dit", [str(fake_tool)])
+    assert env2["K3DIT_HALL_ROOT"] == "/tmp/keep-me"
