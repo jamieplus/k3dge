@@ -966,7 +966,7 @@
   "hunks_overlapping": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 85
+      "line": 87
     }
   ],
   "index_path": [
@@ -1220,7 +1220,7 @@
   "merge_into": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 107
+      "line": 109
     }
   ],
   "milestone_tags": [
@@ -1830,7 +1830,7 @@
   "union_pins": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 177
+      "line": 179
     }
   ],
   "unmet_seal_preconditions": [

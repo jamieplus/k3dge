@@ -52,8 +52,10 @@ def _merge_file(ours: Path, base: Path, theirs: Path) -> Dict[str, Any]:
         text = rc.stdout.decode("utf-8", "replace")
         if rc.returncode == 0:
             return {"ok": True, "text": text, "conflict": False}
-        if rc.returncode == 1:
-            return {"ok": False, "text": text, "conflict": True}
+        if 1 <= rc.returncode <= 127:
+            # `git merge-file` 的返回码＝**冲突个数**（不是错误码！）⇒ rc=2 是"2 处冲突"。
+            # 真跑实测：把 `>1` 当错误 ⇒ 只要文件里 ≥2 处冲突就误报"合并失败"（detail 空）。
+            return {"ok": False, "text": text, "conflict": True, "conflicts": rc.returncode}
         return {"ok": False, "text": "", "conflict": False,
                 "detail": (rc.stderr or b"").decode("utf-8", "replace")[:200]}
     finally:

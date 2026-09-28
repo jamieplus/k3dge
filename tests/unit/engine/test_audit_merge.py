@@ -56,3 +56,33 @@ def test_merge_excludes_files_explicitly(tmp_path):
 def test_touched_files_reads_both_patches(tmp_path):
     b = make_bundle(tmp_path)
     assert am.touched_files(b) == {"src/a.py"}
+
+
+def test_merge_file_rc_is_conflict_count_not_error(tmp_path):
+    """`git merge-file` 返回码＝**冲突个数**：一处文件里有两处冲突时 rc=2，**不是**"合并失败"。
+
+    真跑实测：把 `>1` 当错误 ⇒ 真包的 `audit_bundle.py`（2 处冲突）被判"合并失败"（detail 空），
+    排查方向跑偏。用例：两个改动区都冲突 ⇒ 仍必须报 `conflicts=[rel]`。
+    """
+    ws = tmp_path / "ws"
+    b = tmp_path / "b"
+    rel = "src/c.py"
+    base = "".join(f"l{i}\n" for i in range(1, 21))
+    # **两侧改同一行**（两处）才会真冲突：相邻插入是能干净合上的（夹具第一版就造错了）
+    ours = base.replace("l3\n", "ours_A\n").replace("l15\n", "ours_B\n")
+    theirs = base.replace("l3\n", "theirs_A\n").replace("l15\n", "theirs_B\n")
+    for root, text in ((ws, ours), (b / "code", theirs)):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text, encoding="utf-8")
+    (b / "baseline.json").write_text(__import__("json").dumps(
+        {"files": {rel: __import__("hashlib").sha1(base.encode()).hexdigest()}, "tree_hash": "x", "count": 1}),
+        encoding="utf-8")
+    (b / "manifest.json").write_text(__import__("json").dumps(
+        {"bundle_version": 1, "apply_order": ["fix.patch"], "pins": {"in_code": True}}), encoding="utf-8")
+    import difflib
+
+    (b / "fix.patch").write_text("".join(difflib.unified_diff(
+        base.splitlines(keepends=True), theirs.splitlines(keepends=True),
+        fromfile=f"a/{rel}", tofile=f"b/{rel}")), encoding="utf-8")
+    r = am.merge_into(ws, b)
+    assert r["ok"] is False and r["conflicts"] == [rel], r        # 冲突（不是 MERGE_FAILED 那一类）
