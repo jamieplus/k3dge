@@ -42,7 +42,9 @@ files of that language are skipped until installed.
 
 ## 2. Hand-written
 
-Drop a `.py` file here that calls `register_extractor()` at import —
+Drop a `.py` file here that calls `register_extractor()` at import:
+
+```
 # .agent/extractors/go.py
 from pathlib import Path
 from k3dge.engine.contract import ContractExtractor, register_extractor
@@ -62,5 +64,5 @@ Rules:
 - Files are loaded alphabetically on every `k3dge check`; first `can_handle` match wins.
 - `register_extractor(ext, override=True)` inserts at front (overrides a built-in for the same suffix).
 - Files starting with `_` are skipped (put shared helpers there).
-- One bad file warns (`[WARN][EXTRACTOR]`) and the rest still load — a broken plugin never reds the gate.
+- One bad file warns (`[WARN][EXTRACTOR]`) and the rest still load — a broken plugin never reds the gate. A generated plugin with a **missing grammar** raises `ImportError` from `extract()`; that is *not* the "broken plugin" path — `engine/contract.py` catches `ImportError` as a skip signal for the whole language. Precedence: the skip-catch is the rule, the `raise` is only its trigger (never fatal).
 - Alternatively, declare out-of-repo modules in manifest `extractors: ["mod" / "mod:attr"]`.

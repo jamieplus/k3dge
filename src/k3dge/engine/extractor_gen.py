@@ -6,6 +6,25 @@ per language — never guessed). Unknown languages are declared by hand in the
 toml; misconfigured rows are hard errors, never silent.
 
 stdlib-only. No k3dge imports (this module must stay importable anywhere).
+
+Known limitations of the brace-language heuristic (intentional, not yet fixed —
+each requires grammar + real samples to change safely, per "never guessed" above;
+this repo currently tracks zero TS/JS files, so there is no active surface):
+
+  - body stripping cuts at the first `{`/`(`, so a *type* that embeds an object
+    or function type (e.g. `Record<string, {a: number}>`, `cb: () => void`) is
+    truncated; the lexical branch also decides to strip by substring sniffing
+    (`"=>"` / `"function"`) instead of by node type, so `const name = "functional"`
+    is mis-detected (interface text is not fully node-type driven).
+  - only `tree.root_node.children` (one level) is walked: declarations wrapped in
+    `declare module` / `namespace` are dropped silently (re-exports like
+    `export { A, B }` are kept as their whole slice).
+  - `_container_signature` filters member nodes by type but does not warn on
+    `ERROR`/`MISSING` children, so a half-parsed class yields a plausible-but-short
+    interface instead of a loud failure.
+
+Adjudicated as leftover in `docs/reviews/LEFTOVERS.md` (M11); a proper fix belongs
+to a milestone that installs `tree-sitter` grammars and adds golden TS samples.
 """
 from __future__ import annotations
 
@@ -203,13 +222,15 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
     cls = "".join(p[:1].upper() + p[1:] for p in slug.split("_") if p) + "Extractor"
     lines: List[str] = [
         MARKER + " — do not edit.",
-        f"# Source: .agent/extractors.toml + builtin table (`engine/extractor_gen.py`).",
+        f"# Source: .agent/extractors.toml + builtin table (`src/k3dge/engine/extractor_gen.py`).",
         "# To customize: copy this file to a new name, remove this header",
         "# (markerless files are never pruned or overwritten), and edit freely.",
         f'"""{{}} interface extractor plugin (generated).'.format(name),
         "",
         "Requires the grammar package (see pip hint from `k3dge extractor sync`).",
-        "Without it, matching files are silently skipped by the gate.",
+        "Without it, matching files are silently skipped by the gate: `extract()`",
+        "raises `ImportError`, which `engine/contract.py` treats as a skip signal",
+        "(never fatal) — see `extract_python_interface` caller's `except ImportError`.",
         '"""',
         "",
         "from __future__ import annotations",
@@ -219,11 +240,21 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
         "",
         "from k3dge.engine.contract import ContractExtractor, register_extractor",
         "",
-        '_IGNORED_DIRS = {".git", "__pycache__", "build", "dist", ".venv", "venv", ".pytest_cache", ".mypy_cache"}',
+        '_IGNORED_DIRS = {".git", ".mypy_cache", ".next", ".pytest_cache", ".venv", '
+        '"__pycache__", "build", "coverage", "dist", "node_modules", "out", "vendor", "venv"}',
+        '_GENERATED_MARKERS = (".generated.", ".min.")',
+        '_GENERATED_SUFFIXES = (".d.ts",)',
+        "_PARSER = None",
+        "",
+        "",
+        "def _is_generated(path: Path) -> bool:",
+        "    name = path.name",
+        "    return any(m in name for m in _GENERATED_MARKERS) or name.endswith(_GENERATED_SUFFIXES)",
         "",
         "",
         "def _slice(source: bytes, node) -> str:",
-        '    return source[node.start_byte : node.end_byte].decode("utf-8", "replace").strip()',
+        '    text = source[node.start_byte : node.end_byte].decode("utf-8", "replace")',
+        '    return "".join(ch for ch in text if ch in "\\n\\t" or ch.isprintable()).strip()',
         "",
         "",
         "def _strip_impl_body(text: str) -> str:",
@@ -307,21 +338,25 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
     lines += decl
     lines += [
         f"def extract_{slug}_interface(path: Path) -> str:",
+        "    global _PARSER",
         "    try:",
         "        from tree_sitter import Language, Parser",
         "        import importlib",
         f"        _grammar = importlib.import_module(\"{row['grammar']}\")",
         "    except ImportError as exc:",
         f"        raise ImportError(\"{row['package']} not installed; pip install {row['package']}\") from exc",
-        "    try:",
-        f"        language = Language(_grammar.{row['lang_func']}())",
-        "    except Exception:",
-        f"        language = Language(_grammar.{row['lang_func']}(), \"{row['lang_name']}\")  # type: ignore[call-arg]",
-        "    try:",
-        "        parser = Parser(language)  # 0.21+",
-        "    except TypeError:",
-        "        parser = Parser()",
-        "        parser.language = language  # type: ignore[attr-defined]",
+        "    if _PARSER is None:",
+        "        try:",
+        f"            language = Language(_grammar.{row['lang_func']}())",
+        "        except TypeError:",
+        f"            language = Language(_grammar.{row['lang_func']}(), \"{row['lang_name']}\")  # type: ignore[call-arg]",
+        "        try:",
+        "            parser = Parser(language)  # 0.21+",
+        "        except TypeError:",
+        "            parser = Parser()",
+        "            parser.language = language  # type: ignore[attr-defined]",
+        "        _PARSER = parser",
+        "    parser = _PARSER",
         "    source = path.read_bytes()",
         "    tree = parser.parse(source)",
         "    lines = []",
@@ -334,7 +369,8 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
         "",
         f"class {cls}(ContractExtractor):",
         "    def can_handle(self, path: Path) -> bool:",
-        f"        return path.suffix in {_tup(row['suffixes'])} and not _IGNORED_DIRS.intersection(path.parts)",
+        f"        return (path.suffix in {_tup(row['suffixes'])} and not _IGNORED_DIRS.intersection(path.parts)"
+        " and not _is_generated(path))",
         "",
         "    def extract(self, path: Path, include_doc: bool = False) -> str:",
         f"        return extract_{slug}_interface(path)",

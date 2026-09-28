@@ -194,18 +194,22 @@ def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed:
         return {"ok": False, "errors": ["manifest.json 缺失或不可解析"], "facts": {},
                 "report_rows": 0, "unclosed": [], "hash": {}, "cross_check": {}}
     try:
-        from k3dge.engine.audit_bundle import SUPPORTED_BUNDLE_VERSIONS
+        from k3dge.engine.audit_bundle import SUPPORTED_BUNDLE_VERSIONS, bundle_input_matches
     except Exception:      # pragma: no cover - 防御
         SUPPORTED_BUNDLE_VERSIONS = (1,)
+        bundle_input_matches = None
     ver = facts.get("bundle_version")
     if ver not in SUPPORTED_BUNDLE_VERSIONS:
         errors.append(f"bundle_version={ver!r} 不在白名单 {SUPPORTED_BUNDLE_VERSIONS}")
     if expect_input:
-        try:
-            if Path(str(facts.get("input") or "")).resolve() != Path(str(expect_input)).resolve():
-                errors.append(f"输入身份不符：包为 {facts.get('input')!r}，目标是 {expect_input!r}")
-        except OSError:      # pragma: no cover
-            pass
+        if bundle_input_matches is None:      # pragma: no cover - 回退旧 realpath 判据
+            try:
+                if Path(str(facts.get("input") or "")).resolve() != Path(str(expect_input)).resolve():
+                    errors.append(f"输入身份不符：包为 {facts.get('input')!r}，目标是 {expect_input!r}")
+            except OSError:
+                pass
+        elif not bundle_input_matches(facts.get("input"), expect_input):
+            errors.append(f"输入身份不符：包为 {facts.get('input')!r}，目标是 {expect_input!r}")
     order = [str(x) for x in (facts.get("apply_order") or [])]
     for name in order:
         if name not in ("fix.patch", "pins.patch"):

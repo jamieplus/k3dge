@@ -184,14 +184,6 @@ Note: 修订痕迹见 git 历史。
 
 [^🅰1.9]: 修改（🅰1）：版本在**审计正常返回后**前进（不再等"seal 成功"）；CHANGELOG 改由**提交区间**生成（§2.1.12），闸只验不漏项，语义润色归人。
 
-[^🅰2.1]: 修改（🅰2）：`degraded-manual` 原表述是"降级到 manual 协议"，容易被读成"只有**降级**才算"
-    ——于是"把 manual 排在 transports 首位"就成了绕开署名要求的路（`downgrades` 为空 ⇒ 判 `closed`）。
-    裁定：判据是**事实**（有没有独立透镜），不是**相对位置**（链里排在哪儿）。故 `provider == "manual"`
-    一律 `degraded-manual`、一律须署名；本仓 `[mcp, manual]` 不受影响（本就落在降级位）。
+[^🅰2.1]: 修改（🅰2）：`degraded-manual` 原表述是"降级到 manual 协议"，容易被读成"只有**降级**才算" ——于是"把 manual 排在 transports 首位"就成了绕开署名要求的路（`downgrades` 为空 ⇒ 判 `closed`）。 裁定：判据是**事实**（有没有独立透镜），不是**相对位置**（链里排在哪儿）。故 `provider == "manual"` 一律 `degraded-manual`、一律须署名；本仓 `[mcp, manual]` 不受影响（本就落在降级位）。
 
-[^🅰3.1]: 修改（🅰3）：新增"相位 3 先刷纯投影"。为什么不是整条 `sync`：`sync` 链里 `sync_domains`
-    （spec 接口块 + `Contract Hash`）与 `reconcile_adrs`（ADR frontmatter + 移文件）是**事实源写**，
-    审计之后执行等于让"审的那一版"与封版内容脱钩（§2.1.9「审哪版封哪版」）。纯投影刷新与新鲜度闸
-    是同一件事的两半：**闸管发现**（重算比对，红了给重生命令）、**刷管及时**（封版那一刻与 `k3dge where` 自愈）。
-    落地：`src/k3dge/engine/seal_flow.py::_refresh_projections`、`engine/evaluator.py`（三闸）、
-    `engine/search.py::_is_stale_cheaply`；见 `docs/tasks/2026-09-21-M11-feat-projection_refresh.done.md`。
+[^🅰3.1]: 修改（🅰3）：新增"相位 3 先刷纯投影"。为什么不是整条 `sync`：`sync` 链里 `sync_domains` （spec 接口块 + `Contract Hash`）与 `reconcile_adrs`（ADR frontmatter + 移文件）是**事实源写**， 审计之后执行等于让"审的那一版"与封版内容脱钩（§2.1.9「审哪版封哪版」）。纯投影刷新与新鲜度闸 是同一件事的两半：**闸管发现**（重算比对，红了给重生命令）、**刷管及时**（封版那一刻与 `k3dge where` 自愈）。 落地：`src/k3dge/engine/seal_flow.py::_refresh_projections`、`engine/evaluator.py`（三闸）、 `engine/search.py::_is_stale_cheaply`；见 `docs/tasks/2026-09-21-M11-feat-projection_refresh.done.md`。

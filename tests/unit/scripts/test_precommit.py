@@ -55,6 +55,28 @@ class TestSchemaGateWiring(unittest.TestCase):
         )
         self.assertTrue(any("Status=" in e for e in errs), errs)
 
+    def test_number_hole_blocks_the_commit(self):
+        """提交硬闸：号池有空洞时，staged 的 ADR 过不了 schema gate。"""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            ws = Path(td)
+            adr = ws / "docs" / "adr"
+            adr.mkdir(parents=True)
+            (adr / "0001-a.md").write_text("# ADR-0001: a\n", encoding="utf-8")
+            (adr / "0003-c.md").write_text("# ADR-0003: c\n", encoding="utf-8")
+            orig = hook.WS
+            hook.WS = ws
+            try:
+                errs, _warns = self._run(
+                    ["docs/adr/0003-c.md"],
+                    {"docs/adr/0003-c.md": b"# ADR-0003: c\n"},
+                )
+            finally:
+                hook.WS = orig
+        self.assertTrue(any("ADR_NUMBER_HOLE" in e for e in errs), errs)
+        self.assertTrue(any("0002" in e for e in errs), errs)
+
     def test_dangling_adr_blocks(self):
         errs, _warns = self._run(
             ["docs/tasks/2026-09-16-fix-x.md"],

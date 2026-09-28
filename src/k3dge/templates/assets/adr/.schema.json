@@ -30,7 +30,11 @@
     "footnote_tail": "ADR_FOOTNOTE_TAIL",
     "amend_marker_text": "ADR_AMEND_MARKER_TEXT",
     "amend_ref": "ADR_AMEND_REF",
-    "footnote_orphan": "ADR_FOOTNOTE_ORPHAN"
+    "footnote_orphan": "ADR_FOOTNOTE_ORPHAN",
+    "footnote_line": "ADR_FOOTNOTE_LINE",
+    "footnote_seq": "ADR_FOOTNOTE_SEQ",
+    "amend_draft": "ADR_AMEND_DRAFT",
+    "amend_split": "ADR_AMEND_SPLIT"
   },
   "amend": {
     "enabled": true

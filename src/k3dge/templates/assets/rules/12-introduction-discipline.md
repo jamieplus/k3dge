@@ -68,9 +68,9 @@ or abstraction layer. Counterpart of Rule 02 (which removes); this one gates wha
 
 1. `.agent/pipeline.toml`（声明面：`[checks.*].actions` / `stages_produce` / `stages_verify`）；
 2. `src/k3dge/engine/nextstep.py` 的 `GATE_NEXT`（每个码的**引导面**：事实 + 成对 option + 命令）；
-3. 相关模块的 docstring（例：`engine/doc_fix.py` 开头就写了"规约化由 `[NEXT]` 引导的主动动作完成，
+3. 相关模块的 docstring（例：`src/k3dge/engine/doc_fix.py` 开头就写了"规约化由 `[NEXT]` 引导的主动动作完成，
    seal 只验做没做"）。
 
 **实测教训**：问"要不要让 pre-commit 自动修"之前，那段 docstring 就在我当时正在编辑的文件里——
 外问一次＝多一轮用户往返，而答案只需一条命令。判断链：能确定修的 → `FIXABLE_RULES`/`BY_COMMAND`；
-不能确定修的 → `fix: judgment` 交人/席；两条都已被反向机检覆盖（见 `test_doc_fix.py`）。
+不能确定修的 → `fix: judgment` 交人/席；两条都已被反向机检覆盖（见 `tests/unit/engine/test_doc_fix.py`）。

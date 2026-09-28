@@ -14,14 +14,17 @@ Note: -
 Frontmatter is DATA ONLY (no prose comments — a `#` line inside it is read as an
 H1 by naive parsers and corrupts `k3dge doc list` / docs-index titles).
 
-- Append-only after Accepted: revise via the `Amended-by` list
-  (`- 🅰<n> | <授权席位> | <日期> | <简述>`) + an inline footnote `[^🅰n.m]` at each
-  edited spot. Never rewrite this decision's prose in place.
+- Append-only after Accepted: one `Amended-by` number per decision theme
+  (`- 🅰<n> | <授权席位> | <日期> | <简述>`). Touch-points are `[^🅰n.1]`,
+  `[^🅰n.2]`, … contiguous from 1 in reading order — not a new number per
+  sentence, and not a clause number as the minor. Each definition is one line.
+- Draft/Proposed: `Amended-by: -` and no amend footnotes. Do not rewrite an
+  Accepted decision's prose in place.
 - Supersede via `Supersedes:` (new ADR only); the gate flips the old one to
   `Status: Superseded` and moves it to `obsolete/` (`adr_gate.reconcile_supersedes`).
 - `Landed-by:` is required before Accepted — the seal gate `adr_landed` resolves it.
 - `Note:` = non-revision metadata only; default `-`. Revision traces never go here.
-- Numbers are never reused. See AUTHORING.md (the single delivery point for these rules).
+- Numbers are never reused, and each repo has its own pool. See AUTHORING.md.
 -->
 <!--
 Section-number rule (hard-gated by `k3dge check`, code ADR_SECTION_ORDER):

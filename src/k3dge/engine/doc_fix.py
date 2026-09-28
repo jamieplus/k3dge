@@ -38,6 +38,8 @@ FIXABLE_RULES: Tuple[str, ...] = (
     # ADR amend/footnote 形态（2026-09-24）：这些都是**固定规则**，不需要 agent 参与
     "ADR_AMEND_ORDER",            # 条目前缀补齐 + 按 append 序（升序）重排
     "ADR_FOOTNOTE_TAIL",          # 脚注定义移到文末
+    "ADR_FOOTNOTE_LINE",          # 脚注定义的续行并回同一行（换行会截断脚注）
+    "ADR_FOOTNOTE_SEQ",           # 小标号按正文出现序重排为 1..k
     "ADR_AMEND_MARKER_TEXT",      # 正文里的"（🅰N，…）"→ 对应脚注引用
     "INCIDENT_ID_REDUNDANT",      # 删 frontmatter 里与文件名重复的 `id:` 行（fix_hint 早就这么写，缺实现）
 )
@@ -109,6 +111,12 @@ def _fix(rel: str, text: str, codes: List[str]) -> Tuple[str, List[str]]:
     if "ADR_FOOTNOTE_TAIL" in codes:
         out = _fix_footnote_tail(out)
         applied.append("ADR_FOOTNOTE_TAIL")
+    if "ADR_FOOTNOTE_LINE" in codes:
+        out = _fix_footnote_line(out)
+        applied.append("ADR_FOOTNOTE_LINE")
+    if "ADR_FOOTNOTE_SEQ" in codes:
+        out = _fix_footnote_seq(out)
+        applied.append("ADR_FOOTNOTE_SEQ")
     if "ADR_AMEND_MARKER_TEXT" in codes:
         out = _fix_marker_text(out)
         applied.append("ADR_AMEND_MARKER_TEXT")
@@ -165,6 +173,53 @@ def _fix_footnote_tail(text: str) -> str:
     for blk in blocks:
         keep += [""] + blk
     return "\n".join(keep).rstrip("\n") + "\n"
+
+
+def _footnote_continuation(line: str) -> bool:
+    s = line.strip()
+    return bool(s) and not s.startswith("[^") and not s.startswith("#") and s != "---"
+
+
+def _fix_footnote_line(text: str) -> str:
+    """把脚注定义的续行并回定义行。Markdown 在未缩进的换行处结束脚注，后文掉进正文。"""
+    lines = text.splitlines()
+    out: List[str] = []
+    i = 0
+    while i < len(lines):
+        if re.match(r"^\[\^🅰\d+\.\d+\]:", lines[i]):
+            parts = [lines[i].rstrip()]
+            i += 1
+            while i < len(lines) and _footnote_continuation(lines[i]):
+                parts.append(lines[i].strip())
+                i += 1
+            out.append(" ".join(parts))
+            continue
+        out.append(lines[i])
+        i += 1
+    return "\n".join(out) + ("\n" if text.endswith("\n") else "")
+
+
+def _fix_footnote_seq(text: str) -> str:
+    """同一修订号的小标号按正文第一次出现序改成 1..k。定义随引用一起改，单遍替换不连环。"""
+    lines = text.splitlines()
+    order: Dict[int, List[int]] = {}
+    for line in lines:
+        if line.startswith("[^🅰"):
+            continue
+        for m in re.finditer(r"\[\^🅰(\d+)\.(\d+)\]", line):
+            n, minor = int(m.group(1)), int(m.group(2))
+            got = order.setdefault(n, [])
+            if minor not in got:
+                got.append(minor)
+    mapping = {(n, old): i for n, minors in order.items() for i, old in enumerate(minors, 1)}
+    if not mapping or all(new == old for (_n, old), new in mapping.items()):
+        return text
+
+    def repl(m: "re.Match[str]") -> str:
+        n, old = int(m.group(1)), int(m.group(2))
+        return f"[^🅰{n}.{mapping.get((n, old), old)}]{m.group(3) or ''}"
+
+    return re.sub(r"\[\^🅰(\d+)\.(\d+)\](:?)", repl, text)
 
 
 def _fix_marker_text(text: str) -> str:

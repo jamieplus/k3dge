@@ -1,6 +1,6 @@
-"""k3dit 交付包**消费侧**（k3dit 仓 0028 的消费方实现）。
+"""k3dit 交付包**消费侧**（k3dit 仓 0008 的消费方实现）。
 
-形状（与 k3dit 仓 0028 对齐）::
+形状（与 k3dit 仓 0008 对齐）::
 
     冻结提交（基线 B） → k3dit 路径入口产包（`k3dit audit --path . --out <bundle> --mode full`）
       → 验包（**本地**：`engine/audit_verify.verify_bundle_local`——反向重放逐字节 + 12 列 + findings↔报告
@@ -9,14 +9,14 @@
       → 按 `apply_order` 用**标准 `git apply`** 把 `fix.patch` + `pins.patch` 落到工作树
       → 由调用方决定提交/封板（本模块**不**改历史）
 
-为什么 k3dge 要自己 apply 而不是让 k3dit 写：k3dit 仓 0028 §2.9「k3dit 不接管送审方的版本、封板与分发」。
+为什么 k3dge 要自己 apply 而不是让 k3dit 写：k3dit 仓 0008 §2.9「k3dit 不接管送审方的版本、封板与分发」。
 k3dit 出意图与证据，落树与落账归消费方——契约＝内容哈希，实现＝各自的 git。
 
 纪律（全部 fail-clear，不猜）：
 - 包结构版本不认 ⇒ 拒（旧/异版包不得按本版布局解释）；
 - `status != closed` ⇒ 拒（`incomplete`/`partial` 不得当"已审"）；
 - 工作树不干净 ⇒ 拒（别把别人的在途改动卷进审计产物）；
-- 只应用 `manifest.apply_order` 里**实际存在**的补丁（k3dit 仓 0028 §2.5 第 4 条）。
+- 只应用 `manifest.apply_order` 里**实际存在**的补丁（k3dit 仓 0008 §2.5 第 4 条）。
 """
 from __future__ import annotations
 
@@ -29,11 +29,50 @@ import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-#: k3dit 交付包**结构**版本白名单（认不出即 fail-clear；见 k3dit 仓 0028 §2.5 第 7 条）。
+#: k3dit 交付包**结构**版本白名单（认不出即 fail-clear；见 k3dit 仓 0008 §2.5 第 7 条）。
 SUPPORTED_BUNDLE_VERSIONS = (1,)
 
 #: 环境变量：显式指定 k3dit 可执行（argv 列表中的第一段）。
 K3DIT_ENV = "K3DIT_BIN"
+
+
+def audit_cache_root() -> Path:
+    """审计缓存根：工具状态（hall/ledger）与交付包 `--out` 都落这里。
+    `K3GE_AUDIT_CACHE` 可改位；缺省系统临时目录下的 `k3ge-audit`。
+    `_tool_env` / `milestone_audit._tool_state_dir` / 交付包落点**共用这一处**——同一规则别各算各的。"""
+    import tempfile
+
+    return Path(os.environ.get("K3GE_AUDIT_CACHE") or (Path(tempfile.gettempdir()) / "k3ge-audit"))
+
+
+def tool_state_dir(workspace: Path) -> Path:
+    """被审仓 `workspace` 的**确定性工具状态目录**：`<cache>/k3dit-state-<sha1(realpath)[:12]>`。
+    与 `_tool_env` 里 `K3DIT_HALL_ROOT` 同源（hall 根＝本目录下的 `hall`）。"""
+    key = hashlib.sha1(str(Path(workspace).resolve()).encode("utf-8")).hexdigest()[:12]
+    return audit_cache_root() / f"k3dit-state-{key}"
+
+
+def bundle_input_matches(bundle_input: object, expect_input: object) -> bool:
+    """交付包的**输入身份**判定（`consume` 与 `audit_verify.verify_bundle_local` **共用这一处**）。
+    满足任一即视为"这包就是为 `expect_input` 做的"：
+      (a) realpath 同指一处；或
+      (b) `full` 模式下 k3dit 把被审仓 stage 成临时副本再审——它把 `manifest.input` 记成
+          `<tool_state_dir(expect_input)>/hall/run/<job>/stage`。该副本与 `expect_input`
+          **同一身份**（state 目录按 realpath 确定性生成）；补丁是仓根相对，可干净落回 `expect_input`。
+    路径解析失败 ⇒ **放行**（解析异常不该拦住消费）。"""
+    try:
+        got = Path(str(bundle_input or "")).resolve()
+        want = Path(str(expect_input or "")).resolve()
+    except OSError:      # pragma: no cover - 路径解析异常不拦消费
+        return True
+    if got == want:
+        return True
+    try:
+        rel = got.relative_to(tool_state_dir(want).resolve())
+    except (ValueError, OSError):      # pragma: no cover
+        return False
+    parts = rel.parts
+    return len(parts) >= 4 and parts[0] == "hall" and parts[1] == "run" and parts[-1] == "stage"
 
 
 def find_k3dit(workspace: Path) -> Optional[List[str]]:
@@ -143,9 +182,6 @@ def _tool_env(workspace: Path, argv0: List[str]) -> Dict[str, str]:
     状态，不是审计产物）。规则：**外部被审仓 ⇒ 状态落缓存**（确定性路径 ⇒ 跨轮续用，`prior.json` 的旧债
     抑制仍然有效）；**工具自己家**（被审仓＝工具所在仓）⇒ 不动，保持仓库内状态的连续性。
     """
-    import hashlib
-    import tempfile
-
     env = {**os.environ}
     try:
         repo = Path(argv0[0]).resolve()
@@ -157,9 +193,8 @@ def _tool_env(workspace: Path, argv0: List[str]) -> Dict[str, str]:
             return env          # 工具审自己：保持仓库内状态（连续性优先）
     except OSError:             # pragma: no cover
         pass
-    cache = Path(os.environ.get("K3GE_AUDIT_CACHE") or (Path(tempfile.gettempdir()) / "k3ge-audit"))
-    key = hashlib.sha1(str(Path(workspace).resolve()).encode("utf-8")).hexdigest()[:12]
-    root = cache / f"k3dit-state-{key}"
+    root = tool_state_dir(workspace)
+    root = tool_state_dir(workspace)
     bad = _harden_state_root(root)          # code-9：拿不到干净的状态目录 ⇒ **别把子进程放出去**
     if bad:
         env["K3GE_STATE_UNSAFE"] = bad
@@ -694,8 +729,9 @@ def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
             exclude: Optional[List[str]] = None, landing: str = "partial") -> dict:
     """**消费一只包**：验契约 → 输入身份 → 自证 → 落补丁。
 
-    `expect_input` 非空时校验 `manifest.input` 与它同指一处（realpath 比较）——包的输入身份是
-    k3dit 仓 0028 §2.10 的"同一版"判据，拿错包（为别的目录做的）多半意味着补丁要打到别的树上。
+    `expect_input` 非空时用 `bundle_input_matches` 校验 `manifest.input` 与它同一身份——realpath 相等，
+    **或** `full` 模式下 k3dit 把被审仓 stage 成的 `<state>/hall/run/<job>/stage` 副本（同一仓、仓根相对
+    补丁可干净落回）。拿错包（为别的目录做的）多半意味着补丁要打到别的树上，仍拒。
     返回 {ok, facts, verify, apply, digest, error?}。"""
     bundle = Path(bundle)
     bundle = Path(bundle)
@@ -706,15 +742,10 @@ def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
     if ver not in SUPPORTED_BUNDLE_VERSIONS:
         return {"ok": False, "error": "BUNDLE_VERSION_UNSUPPORTED", "facts": facts,
                 "detail": f"bundle_version={ver!r} 不在白名单 {SUPPORTED_BUNDLE_VERSIONS}"}
-    if expect_input:
-        try:
-            got = Path(str(facts.get("input") or "")).resolve()
-            want = Path(str(expect_input)).resolve()
-            if got != want:
-                return {"ok": False, "error": "INPUT_MISMATCH", "facts": facts,
-                        "detail": f"包是为 {got} 做的，而当前目标是 {want}（用 --into 指定目标目录）"}
-        except OSError:      # pragma: no cover - 路径解析异常不该拦住消费
-            pass
+    if expect_input and not bundle_input_matches(facts.get("input"), expect_input):
+        return {"ok": False, "error": "INPUT_MISMATCH", "facts": facts,
+                "detail": f"包是为 {facts.get('input')!r} 做的，而当前目标是 {expect_input!r}"
+                          f"（既非同一目录、也非该仓的 stage 副本；用 --into 指定目标目录）"}
     # **闭环由 k3dge 自己从 findings 算**（`require_closed=False` 只给纯审计：它的 `status=partial` 是设计，
     # 钉留树＝待修队列）。产出方自报的 `status` **不作判据**，只作交叉核（不一致会被验收报出来）。
     # 未闭环**不再整包拒**（用户裁定 乙：部分落地）⇒ 验收先按"不要求闭环"跑，未关项改成"排除其所在文件"

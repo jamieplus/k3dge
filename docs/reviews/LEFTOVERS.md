@@ -88,7 +88,7 @@ Denial reason and reopen condition live here only.
   `seal_flow` 的 inflight 元组同步、架构总览 §6 表与时序图同步、AGENTS 该行删除（资产字节锁同步）。
 - `peer_contract.md` §1.4 标"已退休（历史/对等 harness 参考）"；ADR-0006 amend 🅰4（传输链只留对等 harness）。
 - k3dit 侧 ADAPTER-01 同轮完成：`envelope.py` 删除、CLI 动词改"拒绝并指路"、5 个测试驱动器改直调
-  `jobs.create_job`/`collect_job`（副作用 `ingest_prior`/`maybe_run` 显式调）、ADR-0028 amend 🅰9、spec/指南同步。
+  `jobs.create_job`/`collect_job`（副作用 `ingest_prior`/`maybe_run` 显式调）、k3dit 仓 0008 §2.8、spec/指南同步。
 
 ## LINE-M10-01 残留 worktree 已清，但线内 5 个提交**没进主干**（待人工判）
 
@@ -103,7 +103,7 @@ Denial reason and reopen condition live here only.
 
 ## C 验收（2026-09-27，k3dit 上走 `milestone audit M0`）：链路已通，途中修掉 3 个真缺陷
 
-**做法**（自审边界 ADR-0028 §2.11）：k3dit 侧 `[roles.audit]` 改 `k3dit_mode = "audit-only"`、
+**做法**（自审边界见 k3dit 仓 0008 §2.11）：k3dit 侧 `[roles.audit]` 改 `k3dit_mode = "audit-only"`、
 `k3dit_pins = "artifact"`、`k3dit_scope = "src/k3dit/windows"` ⇒ 自审只出证据、不封板、不动被审树业务码。
 
 **链路证据（末次真跑）**：腿产包 → `--verify` ok → 消费（`fix.patch`/`pins.patch` 按 `apply_order`）→
@@ -284,3 +284,36 @@ value-2（with-worktree 上下文管理器，两处脚手架合并）、value-3�
 
 **注意**：那轮 M11 的**包本身仍不可落**（其 `fix.patch` 只触及的两个文件此后又改过 ⇒ 真冲突）；上面是
 **以报告为规格的人工重做**，与"落包"是两条路。报告原文与包留档在 `/tmp/k3ge_m11c`。
+
+## M11 k3dit bundle 审计轮（2026-09-28）：抢救包（超时 `hall export`）判 28 条 pending
+
+本轮审计腿跑到墙钟被掐 ⇒ `entry=export` 抢救包，`待修=28`（全 pending，fix/review 窗未裁到闭环）。
+干活侧逐条处置如下（ID 是 `2026-09-28-M11-k3dit-bundle-audit.md` 的行号，与 09-27 老批次同号不同事）。
+
+**已修（有测试或既有覆盖）**：
+
+| ID | 处置 | 消费者 / 证据 |
+|---|---|---|
+| code-1 / code-11 | 前提有误：缺 grammar 时 `extract()` `raise ImportError` **被 `engine/contract.py` 的 `except ImportError: pass` 当整语言 skip 信号**（never fatal）——docstring/README 的"silently skipped / broken plugin never reds the gate"与行为一致，只是两条规则缺先后声明。补 precedence 一句，不改行为。 | `.agent/extractors/README.md` L67；生成插件 docstring；`test_extractor_gen.py::test_skip_is_documented_as_gate_caught` |
+| code-4 | 构造 `Language(ptr)` vs `Language(ptr,name)` 的 arity 差异只该 `TypeError` 兜；真实故障（ABI/import）不得被吞成降级分支（fail-silent→fail-closed）。 | `extractor_gen.py` 模板 `except TypeError:`；`test_language_arity_fallback_narrows_except` |
+| code-6 | 忽略集补 `node_modules`/`vendor`/`coverage`/`out`/`.next`；`can_handle` 排除生成物 `.d.ts`/`*.generated.*`/`*.min.js`；`_PARSER` 模块级缓存，去掉每文件重复构造语法库。 | `test_generated_filtering::test_can_handle_skips_deps_and_generated` |
+| code-9 | `_slice` 净化：丢 `\r`/控制字符、仅留 `\n\t`+可打印，消除 `decode(replace)` 的 U+FFFD/换行造成的 hash 漂移与被反向按行读入的注入面。 | `test_generated_filtering::test_slice_strips_control_and_cr` |
+| code-7 | 声明面 `seal_record` `on_rerun=append` 担心的"两套基线"已被 git 事实幂等兜住：`tag_audit_baseline` 同指→绿/异指→拒、`_commit_all` 干净树不造空提交、judged 只读 tag+trailer（本地账＝投影）。补一条重入幂等证据测试，把"声明的失败分支"转成可复算凭据。 | `test_seal_record.py::test_reentrant_seal_record_is_idempotent` |
+| code-3 | `rules/12` 裸名 `engine/doc_fix.py` / `test_doc_fix.py` → 全路径（与同段 `src/k3dge/engine/nextstep.py` 精度一致）。copy + template 同改。 | `.agent/rules/12-introduction-discipline.md` L71/L76 |
+| code-12/13/14 | `.ua/.trash-1789420608/tmp/*.py` 是 understand skill 的一次性垃圾（`.ua` 已 gitignore、不入库、不属版本化契约）。审计 stage 复制整树才会扫到。删除该 trash 目录，三随消。 | 工作树删除（gitignore，零契约影响） |
+| doc-1 | `extractors/README.md`「## 2. Hand-written」示例缺开栏围栏 ⇒ 补。 | `.agent/extractors/README.md` L47 |
+| doc-4 | `rules/01` item2 短名 `AUTHORING.md`/`_template.md` → `docs/<type>/…`（与同行 `.schema.json` 一致）。copy+template。 | `.agent/rules/01-docs-structure.md` L2 |
+| doc-6 | `extractors.toml` 头注释与生成头 `engine/extractor_gen.py` → `src/k3dge/engine/extractor_gen.py`。 | `.agent/extractors.toml` L1；`extractor_gen.py` 渲染行 |
+| doc-7 / doc-8 | `rules/04` 同文件内指针风格不一：`LEFTOVERS.md`/`audit_jobs.json`/`audit_checklist.json`/`pipeline.toml`/`nextstep`/`audit_trigger` 裸名 → 全路径；`peer_contract` → `docs/protocols/peer_contract.md`。`SUMMARY.md` 不动（ADR-0018 反指它不该存在）。copy+template 同步。 | `.agent/rules/04-milestone.md` L12/L15/L21/L39 |
+| doc-10 | `AGENTS.md` 路由句 `AUTHORING.md` → `docs/<type>/AUTHORING.md`。 | `AGENTS.md` §路由 |
+| doc-13 | `docs/README.md` 把 AGENTS §Docs 的 write/find/schema 四条**逐条重写**＝双写漂移源（doc-7/8/9 的悬空裸名正出在这份副本）。收敛为"目录角色表＋一行指向 `AGENTS.md`"（规则 10：下沉单一源，别复写散文）。 | `docs/README.md` |
+| doc-14 | `AGENTS.md` 审计建议触发行只写"账齐/C2≥5/体积≥8"无口径。补**指针**（不复写定义）：口径见 `src/k3dge/engine/audit_trigger.py` 模块 docstring，阈值取 `[gates.audit_trigger] c2_nesting_max/volume_max`——改数改这一处。 | `AGENTS.md` §12 表；`src/k3dge/engine/audit_trigger.py` |
+
+**仍留（有意保留，附判据）**：
+
+- **code-2 / code-5 / code-8 / code-10（TS 抽取精度）**：brace-language 启发式的已知失效面（第一个 `{` 一刀切会截 `Record<string,{a:number}>`、lexical 分支靠 `"function"` 子串嗅探、只走顶层一层、`_container_signature` 不对 `ERROR/MISSING` 告警）。**不臆改**：生成器纪律明写"node types 必须实测、绝不猜"，本环境无 `tree-sitter` 且仓库 **0 个 `.ts/.tsx/.js`** ⇒ 零实际面、改了也无法证伪。已在 `src/k3dge/engine/extractor_gen.py` 模块 docstring 逐条写明失效面＝把限制沉到事实源。正解归一个装了 grammar + golden TS 样本的独立批次。
+- **doc-2 / doc-3（`.agent/README.md` 相对名 "Rule 02"/"docs.toml"）**：该 README 通篇在 `.agent/` 目录语境下列本目录成员（`manifest.json`/`rules/*.md` 同样相对名），且文件自声明「不要把这里当 Agent 入口 / 由 AGENTS.md 给出具体路径」（ADR-0010）。补 `.agent/` 前缀反而与全表不一致，属设计。
+- **doc-5（`rules/00` `src/<domain>/` vs `package_root`）**：`src/<domain>/` 是模板对**下游任意 package_root** 的示意写法（`templates/assets/rules/00` 与本仓 copy 同源）；把 `src/k3dge/` 焊进模板会破坏 scaffold 可移植性。本仓真实包根由 `manifest.json` `package_root` 定义、不变量由 `k3dge check` 强制。示意≠缺陷。
+- **doc-9（rules 04-11 缺"Protocol slice…AGENTS.md wins"头）**：该 precedence 已在 `AGENTS.md` 全局声明（"`.agent/rules/*` are slices; this file wins"）。往 8 份文件各贴一遍＝把全局规则复制成散文，正是规则 10（结构优先于散文）要避的。00-03 上的头是历史遗留，非须补齐的不变量。
+- **doc-11（`AUDIT-QWEN-STATUS.md` 引用外部 `models.json`）**：根级一次性排障笔记，非 `docs/<type>/` 受管面；删/移入库文件归仓主裁定，不由审计轮动。
+- **doc-12（`CHANGELOG.md` 引用已删 `scripts/lib/schema_check.py`）**：CHANGELOG 条目是**历史事实**（当时存在），裸名是当时的写法；改历史条目不如让下一版封版由提交区间重生。

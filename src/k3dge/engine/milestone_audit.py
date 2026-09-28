@@ -379,14 +379,10 @@ def _oneshot_audit_leg(
 
 
 def _tool_state_dir(workspace: Path) -> str:
-    """工具状态目录（外部被审仓 ⇒ 缓存的确定性路径；见 `audit_bundle._tool_env`）。给超时提示用。"""
-    import hashlib
-    import os
-    import tempfile
+    """工具状态目录（外部被审仓 ⇒ 缓存的确定性路径）。单一源在 `audit_bundle.tool_state_dir`。"""
+    from k3dge.engine.audit_bundle import tool_state_dir
 
-    cache = Path(os.environ.get("K3GE_AUDIT_CACHE") or (Path(tempfile.gettempdir()) / "k3ge-audit"))
-    key = hashlib.sha1(str(Path(workspace).resolve()).encode("utf-8")).hexdigest()[:12]
-    return str(cache / f"k3dit-state-{key}")
+    return str(tool_state_dir(workspace))
 
 
 def _bundle_audit_leg(
@@ -395,10 +391,10 @@ def _bundle_audit_leg(
     prompt: _Prompt,
     fresh_baseline: str,
 ) -> Tuple[Optional[Tuple[str, str]], str]:
-    """**bundle 审计腿**（k3dit 仓 0028 消费方）：冻结基线 → k3dit 路径入口产包 → 消费侧验+落补丁。
+    """**bundle 审计腿**（k3dit 仓 0008 消费方）：冻结基线 → k3dit 路径入口产包 → 消费侧验+落补丁。
 
     与 ratchet 的区别：不做"工单步进 / 写回重试"——一次性拿到**包**（`code/ report findings
-    patches manifest`），由 k3dge 自己 apply 与落账（k3dit 仓 0028 §2.9：k3dit 不接管送审方版本）。
+    patches manifest`），由 k3dge 自己 apply 与落账（k3dit 仓 0008 §2.9：k3dit 不接管送审方版本）。
     返回 `(early, step_status)`：`early` 非 None ⇒ 未闭环，交回 `[NEXT]`；None ⇒ 已闭环，走共用尾。
     """
     from k3dge.engine import audit_bundle as ab
@@ -411,7 +407,7 @@ def _bundle_audit_leg(
 
     # 包落在**仓外**（缓存目录）：k3dit 是命令行工具，它的中间产物理应与 `git` 的对象库一样不进被审树
     #（旧位置 `<workspace>/.k3dit/bundle-*` 会在被审仓里留未跟踪目录 ⇒ 消费方 status/gate 变脏）。
-    cache_root = Path(os.environ.get("K3GE_AUDIT_CACHE") or (Path(tempfile.gettempdir()) / "k3ge-audit"))
+    cache_root = ab.audit_cache_root()
     out = cache_root / f"{milestone_id}-{(fresh_baseline or 'head')[:12]}"
     k3dit_mode = _role_opt(workspace, "audit", "k3dit_mode", "full")
     k3dit_pins = _role_opt(workspace, "audit", "k3dit_pins", "inplace")

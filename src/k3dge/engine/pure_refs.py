@@ -494,6 +494,47 @@ def _live_adr_numbers(workspace: Path) -> set:
     return {m.group(1) for p in d.glob("*.md") if (m := _ADR_NUM_RE.match(p.name))}
 
 
+def _obsolete_adr_numbers(workspace: Path) -> set:
+    d = Path(workspace) / "docs" / "adr" / "obsolete"
+    if not d.is_dir():
+        return set()
+    return {m.group(1) for p in d.glob("*.md") if (m := _ADR_NUM_RE.match(p.name))}
+
+
+def accounted_adr_numbers(workspace: Path) -> set:
+    """本仓已经解释过的号：现役文件 ∪ obsolete 墓碑 ∪ 退役账本。"""
+    return _live_adr_numbers(workspace) | _obsolete_adr_numbers(workspace) | set(retired_adr_numbers(workspace))
+
+
+def check_adr_number_holes(workspace: Path) -> List[Ref]:
+    """1..最大号之间不得有空洞。
+
+    空洞＝既没有现役文件，也没有退役墓碑。k3dit 在只有 0001–0007 时直接新建 0028
+    就是这种跳号（去占了别的仓的下一个号）。下一号只能是 max+1。
+    """
+    nums = accounted_adr_numbers(workspace)
+    if not nums:
+        return []
+    ints = sorted(int(n) for n in nums)
+    holes = [i for i in range(1, ints[-1] + 1) if f"{i:04d}" not in nums]
+    if not holes:
+        return []
+    first = holes[0]
+    adr = Path(workspace) / "docs" / "adr"
+    above = sorted(
+        (int(m.group(1)), p.name)
+        for p in adr.glob("*.md")
+        if (m := _ADR_NUM_RE.match(p.name)) and int(m.group(1)) > first
+    )
+    rel = f"docs/adr/{above[0][1]}" if above else "docs/adr"
+    shown = ", ".join(f"{n:04d}" for n in holes[:8])
+    if len(holes) > 8:
+        shown += f" …共 {len(holes)} 个"
+    return [("ADR_NUMBER_HOLE",
+             f"{rel}: 号池有空洞 {shown}（最大号 {ints[-1]:04d}）。"
+             f"每个号必须是现役文件、obsolete 墓碑或退役账本；下一号只能是 max+1，不能跳去别的仓的号")]
+
+
 def check_adr_number_reuse(workspace: Path, rel: str) -> List[Ref]:
     """新 ADR 不得占用退役号（`Numbers are never reused` 的机检半边）。
 

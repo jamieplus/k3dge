@@ -84,6 +84,23 @@ class TestSealRecord(TestCase):
         seal_record(ws, "M11", baseline=baseline, result="closed")
         self.assertEqual(_git(ws, "rev-list", "--count", "HEAD"), "1")  # 只有 init
 
+    def test_reentrant_seal_record_is_idempotent(self) -> None:
+        """code-7 正面回应：seal 是幂等重入入口。基线不变时重跑 `seal_record`
+        ⇒ 不追加第二份提交、边界 tag 不移动 ⇒ git 事实唯一，本地账只是投影
+        （声明面 `on_rerun=append` 落的是可重建投影，judged 只读 tag+trailer）。"""
+        ws = _repo()
+        baseline = _git(ws, "rev-parse", "HEAD")
+        (ws / "f.md").write_text("x\n", encoding="utf-8")                 # 第一次制造改动 ⇒ 有封版提交
+        ok1, m1 = seal_record(ws, "M12", baseline=baseline, result="closed")
+        self.assertTrue(ok1, m1)
+        commits_after_first = int(_git(ws, "rev-list", "--count", "HEAD"))
+        self.assertEqual(commits_after_first, 2)                          # init + 封版提交
+        ok2, m2 = seal_record(ws, "M12", baseline=baseline, result="closed")
+        self.assertTrue(ok2, m2)
+        self.assertIn("已在", m2)                                          # tag 幂等
+        self.assertEqual(int(_git(ws, "rev-list", "--count", "HEAD")), commits_after_first)  # 无第二提交
+        self.assertEqual(_git(ws, "rev-parse", "M12^{commit}"), baseline)  # 边界未动
+
 
 class TestTagBoundary(TestCase):
     def test_idempotent_same_target_and_refuses_move(self) -> None:

@@ -14,7 +14,7 @@
   "ExtractorConfigError": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 107
+      "line": 126
     }
   ],
   "GateReport": [
@@ -188,13 +188,19 @@
   "apply_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 354
+      "line": 389
     }
   ],
   "archived_milestone_tasks": [
     {
       "file": "src/k3dge/engine/task_index.py",
       "line": 108
+    }
+  ],
+  "audit_cache_root": [
+    {
+      "file": "src/k3dge/engine/audit_bundle.py",
+      "line": 39
     }
   ],
   "audit_call_result": [
@@ -326,13 +332,19 @@
   "bundle_digest": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 249
+      "line": 284
     }
   ],
   "bundle_facts": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 230
+      "line": 265
+    }
+  ],
+  "bundle_input_matches": [
+    {
+      "file": "src/k3dge/engine/audit_bundle.py",
+      "line": 55
     }
   ],
   "cache_observability": [
@@ -674,7 +686,7 @@
   "commit_applied": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 667
+      "line": 702
     }
   ],
   "completeness_violations": [
@@ -698,7 +710,7 @@
   "consume": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 691
+      "line": 726
     }
   ],
   "consume_unreleased": [
@@ -740,7 +752,7 @@
   "describe_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 391
+      "line": 427
     }
   ],
   "emit": [
@@ -810,7 +822,7 @@
   "find_k3dit": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 39
+      "line": 78
     }
   ],
   "find_orphan_adrs": [
@@ -1110,7 +1122,7 @@
   "land_report": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 590
+      "line": 625
     }
   ],
   "legacy_config_present": [
@@ -1430,7 +1442,7 @@
   "reconcile_report_rows": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 540
+      "line": 575
     }
   ],
   "reconcile_supersedes": [
@@ -1496,7 +1508,7 @@
   "render_plugin": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 200
+      "line": 219
     }
   ],
   "render_readme_layout": [
@@ -1550,7 +1562,7 @@
   "resolve_languages": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 156
+      "line": 175
     }
   ],
   "resolve_role": [
@@ -1580,7 +1592,7 @@
   "run_audit_flow": [
     {
       "file": "src/k3dge/engine/milestone_audit.py",
-      "line": 547
+      "line": 543
     }
   ],
   "run_milestone_alignment": [
@@ -1592,7 +1604,7 @@
   "run_path_audit": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 96
+      "line": 135
     }
   ],
   "run_phase": [
@@ -1622,7 +1634,7 @@
   "salvage_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 172
+      "line": 207
     }
   ],
   "satisfied_ids": [
@@ -1812,7 +1824,7 @@
   "sync_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 349
+      "line": 385
     }
   ],
   "tag_audit_baseline": [
@@ -1831,6 +1843,12 @@
     {
       "file": "src/k3dge/engine/attest.py",
       "line": 66
+    }
+  ],
+  "tool_state_dir": [
+    {
+      "file": "src/k3dge/engine/audit_bundle.py",
+      "line": 48
     }
   ],
   "touched_files": [
@@ -1902,7 +1920,7 @@
   "verify_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 213
+      "line": 248
     }
   ],
   "verify_bundle_local": [
@@ -1980,7 +1998,7 @@
   "write_run_digest": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 194
+      "line": 229
     }
   ],
   "write_symbol_index": [

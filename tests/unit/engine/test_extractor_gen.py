@@ -38,6 +38,71 @@ class TestRender(unittest.TestCase):
         src_ts = g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"])
         self.assertIn("_container_signature", src_ts)
 
+    def test_language_arity_fallback_narrows_except(self):
+        """code-4: `Language(ptr)` vs `Language(ptr, name)` 的差异只该被 `TypeError` 兜住，
+        真实故障（ABI/import 错）不得被吞成降级分支（fail-closed 而非 fail-silent）。"""
+        src = g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"])
+        self.assertIn("except TypeError:", src)
+        self.assertNotIn("except Exception:", src)
+
+    def test_skip_is_documented_as_gate_caught(self):
+        """code-1/code-11: 缺 grammar 时 `raise ImportError` 是**被门禁吞的 skip 信号**，
+        docstring 必须写明调用方 `except ImportError`（消「会红」与「never fatal」的表观矛盾）。"""
+        src = g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"])
+        self.assertIn("except ImportError", src)
+        self.assertIn("never fatal", src)
+
+
+class TestGeneratedFiltering(unittest.TestCase):
+    """code-6/code-9: 生成的插件在**没有 grammar 时也能测**的路径逻辑——加载模块、直接调
+    `can_handle` / `_slice`（两者都不触发 tree_sitter import）。"""
+
+    def _load(self):
+        import importlib.util
+        import sys
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "gen_ts.py"
+            p.write_text(g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"]), encoding="utf-8")
+            spec = importlib.util.spec_from_file_location("gen_ts_filter_probe", p)
+            assert spec is not None and spec.loader is not None
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules["gen_ts_filter_probe"] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+    def tearDown(self):
+        import sys
+        sys.modules.pop("gen_ts_filter_probe", None)
+        from k3dge.engine import contract as c
+        c._EXTRACTORS[:] = [e for e in c._EXTRACTORS if type(e).__module__ != "gen_ts_filter_probe"]
+
+    def test_can_handle_skips_deps_and_generated(self):
+        mod = self._load()
+        ext = mod.TypescriptExtractor()
+        self.assertTrue(ext.can_handle(Path("src/app.ts")))
+        self.assertFalse(ext.can_handle(Path("node_modules/x/index.ts")), "third-party dep")
+        self.assertFalse(ext.can_handle(Path("dist/bundle.js")), "ignored dir")
+        self.assertFalse(ext.can_handle(Path("src/types/api.d.ts")), "type-only declaration file")
+        self.assertFalse(ext.can_handle(Path("src/gen.proto.generated.ts")), "generated marker")
+        self.assertFalse(ext.can_handle(Path("src/vendor/app.min.js")), "minified bundle")
+
+    def test_slice_strips_control_and_cr(self):
+        """code-9: 不可信字节/换行控制符不得原样进契约文本（U+FFFD/`\r` 造成 hash 漂移）。"""
+        mod = self._load()
+
+        class Node:
+            start_byte, end_byte = 0, 0
+
+        raw = b"line1\r\nline2\x00\x07 end"
+        n = Node()
+        n.start_byte, n.end_byte = 0, len(raw)
+        out = mod._slice(raw, n)
+        self.assertNotIn("\r", out)
+        self.assertNotIn("\x00", out)
+        self.assertNotIn("\x07", out)
+        self.assertIn("line1", out)
+        self.assertIn("line2", out)
+
 
 class TestResolve(unittest.TestCase):
     def test_no_toml_defaults_typescript(self):

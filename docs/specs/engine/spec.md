@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:e7dce52ef35d7b3890b0199ba72845a54ceda9d0b193dd7d406c80fa198719f5`
+- **Contract Hash**: `sha256:0451809d274e6de4fc661347a46beefd7f2bad80cc3360a87dd87762cdba13e9`
 - **Last Updated**: 2026-09-28
 
 ## 1. Domain Boundary & Responsibilities
@@ -71,6 +71,9 @@ from typing import Optional
 from typing import Tuple
 SUPPORTED_BUNDLE_VERSIONS = (1,)
 K3DIT_ENV = 'K3DIT_BIN'
+audit_cache_root() -> Path
+tool_state_dir(workspace: Path) -> Path
+bundle_input_matches(bundle_input: object, expect_input: object) -> bool
 find_k3dit(workspace: Path) -> Optional[List[str]]
 run_path_audit(workspace: Path, out: Path, *, mode: str='full', pins: str='inplace', scope: str='', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict
 salvage_bundle(workspace: Path, out: Path, *, k3dit: Optional[List[str]]=None, timeout: int=300) -> dict

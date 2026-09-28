@@ -1,4 +1,4 @@
-"""k3dit 交付包**消费侧**（k3dit 仓 0028）：验契约 → 自证 → 标准 `git apply` 落补丁。
+"""k3dit 交付包**消费侧**（k3dit 仓 0008）：验契约 → 自证 → 标准 `git apply` 落补丁。
 
 这些测试用**合成包**（不依赖 k3dit 在场）：k3dge 的消费逻辑必须能独立被验——
 契约面（`bundle_version`/`status`/`apply_order`）、fail-clear（异版/未闭环/脏树）、
@@ -115,7 +115,7 @@ def test_cli_transport_substitutes_known_placeholders_only():
 
 
 def test_bundle_audit_leg_routes_and_fails_clear(tmp_path, monkeypatch):
-    """封板审计腿 `mode="bundle"`（k3dit 仓 0028 消费方）：
+    """封板审计腿 `mode="bundle"`（k3dit 仓 0008 消费方）：
 
     - 找不到 k3dit ⇒ **拒绝**（声明面与实现面不符时不得静默换成别的形状）；
     - k3dit 未闭环 ⇒ **拒绝**（未关不得当已审）；
@@ -715,3 +715,34 @@ def test_land_report_collects_only_its_own_projection_roots(tmp_path, monkeypatc
     assert r["ok"], r
     assert "docs/generated/api.md" in seen["files"], seen["files"]
     assert not any(f.startswith("docs/stray") for f in seen["files"]), seen["files"]
+
+
+def test_bundle_input_matches_accepts_full_mode_stage(tmp_path, monkeypatch):
+    """`INPUT_MISMATCH` 修复：`full` 模式 k3dit 把被审仓 stage 成 `<state>/hall/run/<job>/stage`，
+    它与 workspace **同一身份**（state 根按 realpath 确定性生成）⇒ 该认；别处的 stage 仍拒。"""
+    monkeypatch.setenv("K3GE_AUDIT_CACHE", str(tmp_path / "cache"))
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    stage = ab.tool_state_dir(ws) / "hall" / "run" / "job1" / "stage"
+    assert ab.bundle_input_matches(str(ws), str(ws)) is True                 # (a) realpath 相等
+    assert ab.bundle_input_matches(str(stage), str(ws)) is True             # (b) 本仓 stage 副本
+    foreign = tmp_path / "cache" / "k3dit-state-DEADBEEF0000" / "hall" / "run" / "j" / "stage"
+    assert ab.bundle_input_matches(str(foreign), str(ws)) is False          # 错 key（别的仓）的 stage
+    assert ab.bundle_input_matches("/tmp/elsewhere/stage", str(ws)) is False  # 仓外
+    # 本 state 根下但**不是** hall/run/<job>/stage 的也算别的身份（只认 stage 这一形）
+    assert ab.bundle_input_matches(str(ab.tool_state_dir(ws) / "ledger"), str(ws)) is False
+
+
+def test_consume_accepts_bundle_recorded_against_stage(tmp_path, monkeypatch):
+    """回归：包 `manifest.input` 记成 stage 副本时，consume 不该再以 `INPUT_MISMATCH` 拒
+    （此前 full 模式自产包**永远**过不了这道守卫 ⇒ 封版停在消费步）。"""
+    monkeypatch.setenv("K3GE_AUDIT_CACHE", str(tmp_path / "cache"))
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    bundle = _bundle(tmp_path)                                              # 结构完整的合成闭包
+    man = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    stage = ab.tool_state_dir(ws) / "hall" / "run" / "j1" / "stage"
+    man["input"] = str(stage)
+    (bundle / "manifest.json").write_text(json.dumps(man, ensure_ascii=False), encoding="utf-8")
+    r = ab.consume(ws, bundle, expect_input=str(ws))
+    assert r.get("error") != "INPUT_MISMATCH", r

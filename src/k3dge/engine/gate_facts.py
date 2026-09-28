@@ -189,6 +189,14 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "pointers": ["docs/incidents/AUTHORING.md", "docs/incidents/README.md"],
     },
     # --- ADR 编号退役账本（obsolete/README.md 的表是唯一源）---
+    "ADR_NUMBER_HOLE": {
+        "fix": "judgment", "severity": "block",
+        "fact": "`{path}` 所在号池有空洞——1 到最大号之间有的号既不是现役 ADR，也没有退役墓碑。"
+                "下一号只能是 max(本仓 adr ∪ obsolete ∪ 账本)+1，不能跳去别的仓的号",
+        "options": ["把跳号文件改成下一个空号（本仓 max+1），并改 H1 与全部引用",
+                    "空洞是删掉的旧 ADR → 补 obsolete 墓碑或退役账本行，不要留一个没解释的号"],
+        "pointers": ["docs/adr/AUTHORING.md「编号分配」", "docs/adr/obsolete/README.md"],
+    },
     "ADR_NUMBER_REUSE": {
         "fix": "judgment", "severity": "block",
         "fact": "`{path}` 占了一个**已永久退役**的 ADR 号——`Numbers are never reused`："
@@ -248,6 +256,35 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "fact": "`{path}` 的脚注引用与定义不闭合（双向）",
         "options": ["补齐闭合（人/席）", "确属历史残留 → 删除该定义"],
         "pointers": ["docs/adr/AUTHORING.md"],
+    },
+    "ADR_FOOTNOTE_LINE": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "`k3dge doc fix`：把脚注定义的续行并回同一行",
+        "fact": "`{path}` 的修订脚注定义折了行——Markdown 在换行处结束脚注，后文掉进正文",
+        "options": ["`k3dge doc fix` 自动修（幂等）", "这行不是脚注续文 → 改到定义之外并空行隔开"],
+        "pointers": ["docs/adr/AUTHORING.md「内联修订标记」", "k3dge doc fix"],
+    },
+    "ADR_FOOTNOTE_SEQ": {
+        "severity": "block", "fix": "deterministic",
+        "fix_hint": "`k3dge doc fix`：小标号按正文出现序改成 1..k",
+        "fact": "`{path}` 的修订脚注小标号不从 1 连续（跳号，或用了条款号当小标号）",
+        "options": ["`k3dge doc fix` 自动修（幂等；只改本文件的引用与定义）", "小标号有意指向别的编号体系 → 改 AUTHORING（改声明，不改闸）"],
+        "pointers": ["docs/adr/AUTHORING.md「内联修订标记」", "k3dge doc fix"],
+    },
+    "ADR_AMEND_SPLIT": {
+        "severity": "block", "fix": "judgment",
+        "fix_hint": "同一个节被多条 Amended-by 各写一遍时，并成一个修订号，落点用 🅰N.1、🅰N.2",
+        "fact": "`{path}` 把同一个节拆成了多条修订——一条修订是一个主题，不是一次补写",
+        "options": ["并成一个 Amended-by 号；各处落点用从 1 连续的小标号，定义各占一行",
+                    "后一次是另一个不变量 → 另开号，但不要再让好几条都只写同一个节"],
+        "pointers": ["docs/adr/AUTHORING.md「内联修订标记」"],
+    },
+    "ADR_AMEND_DRAFT": {
+        "severity": "block", "fix": "judgment",
+        "fix_hint": "Draft/Proposed 把决定写进正文，`Amended-by: -`，删掉修订脚注；规范只在脚注里的，先收进正文",
+        "fact": "`{path}` 还没 Accepted 就记了修订留痕——起草过程不是修订，一个主题不该拆成多个号",
+        "options": ["规范收进正文后删 `Amended-by` 列表和脚注", "决策已经 Accepted → 把 Status 改为 Accepted（须先有 Landed-by）"],
+        "pointers": ["docs/adr/AUTHORING.md「内联修订标记」"],
     },
     # --- markdown 完整性（pure_refs B3）---
     "MD_TRAILING_WS": {

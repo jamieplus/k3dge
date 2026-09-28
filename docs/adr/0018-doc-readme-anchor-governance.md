@@ -67,10 +67,4 @@ Note: 修订痕迹见 git 历史。
 - **Reopen when**: a harness can inject Authoring at the IO boundary without owning the agent runtime; or catalog tokens are proven too thin for recall.
 - **判据/投影**：职责分明，同类混淆有 ADR 可查；代价＝两处域表手工同步（接受，换取判据文件不被生成逻辑覆盖）；升级条件＝第 3 对语义相近产物出现或第 2 次同类事故 → 再考虑 `manifest` 的 docs_registry 创建期拦截。
 
-[^🅰1.1]: 修改（🅰1，2026-09-21，授权：Core Maintainer）：本项的"硬底"直到本条才**实测成立**——此前
-    `scripts/pre-commit` / `commit-msg` 不在 `templates/assets` 里，`k3dge init` 后照下发的 `AGENTS.md`
-    激活 `core.hooksPath scripts` 时，git 对**不存在的 hook 静默跳过**（实测 `git commit` rc=0，doc-gate /
-    引用闸 / 排查闸一句没跑）；同时 5 个 docs 类型缺 README/AUTHORING ⇒ 钩子即使在，下游第一次提交也红。
-    本条的四处口径（对账闸 / 到达环 / 引用自限定 / 排查豁免）+ 落地票见
-    `docs/tasks/2026-09-21-M11-fix-hooks_reach_downstream.done.md`、`…-feat-arch_table_gate.done.md`、
-    `…-docs-arch_flow_coverage.done.md`；机检在 `tests/unit/templates/test_hooks_reach_downstream.py`。
+[^🅰1.1]: 修改（🅰1，2026-09-21，授权：Core Maintainer）：本项的"硬底"直到本条才**实测成立**——此前 `scripts/pre-commit` / `commit-msg` 不在 `templates/assets` 里，`k3dge init` 后照下发的 `AGENTS.md` 激活 `core.hooksPath scripts` 时，git 对**不存在的 hook 静默跳过**（实测 `git commit` rc=0，doc-gate / 引用闸 / 排查闸一句没跑）；同时 5 个 docs 类型缺 README/AUTHORING ⇒ 钩子即使在，下游第一次提交也红。 本条的四处口径（对账闸 / 到达环 / 引用自限定 / 排查豁免）+ 落地票见 `docs/tasks/2026-09-21-M11-fix-hooks_reach_downstream.done.md`、`…-feat-arch_table_gate.done.md`、 `…-docs-arch_flow_coverage.done.md`；机检在 `tests/unit/templates/test_hooks_reach_downstream.py`。

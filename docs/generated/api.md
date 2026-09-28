@@ -180,6 +180,12 @@ from typing import Optional
 from typing import Tuple
 SUPPORTED_BUNDLE_VERSIONS = (1,)
 K3DIT_ENV = 'K3DIT_BIN'
+audit_cache_root() -> Path
+    # doc: 审计缓存根：工具状态（hall/ledger）与交付包 `--out` 都落这里。
+tool_state_dir(workspace: Path) -> Path
+    # doc: 被审仓 `workspace` 的**确定性工具状态目录**：`<cache>/k3dit-state-<sha1(realpath)[:12]>`。
+bundle_input_matches(bundle_input: object, expect_input: object) -> bool
+    # doc: 交付包的**输入身份**判定（`consume` 与 `audit_verify.verify_bundle_local` **共用这一处**）。
 find_k3dit(workspace: Path) -> Optional[List[str]]
     # doc: 定位 k3dit：`K3DIT_BIN` > PATH > 兄弟仓 `.venv` > 兄弟仓 zipapp。找不到 → None。
 run_path_audit(workspace: Path, out: Path, *, mode: str='full', pins: str='inplace', scope: str='', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict

@@ -12,9 +12,7 @@ Every `docs/<type>/` is one document kind. Type rules live **in that directory**
 `README.md` and `AUTHORING.md` are required (missing `AUTHORING.md` fails the doc-gate hook). `_template.md` and `.schema.json` are optional; no schema file means no structure gate for that type.
 
 - Only this file may sit directly under `docs/` (`DOCS_ROOT_DISALLOWED`).
-- **Write** a managed file: open `docs/<type>/AUTHORING.md`; copy `_template.md` if present. Formula is in `AGENTS.md`.
-- **Find** a file: default `k3dge doc list` / `k3dge doc where <id>`. Body scan: `k3dge doc grep` (path only). Do not raw-grep `docs/`.
-- k3dge checks `docs/<type>/.schema.json` (structure). Text quality is k3dit. Whether an agreement is a good idea is k3lity (soft).
+- Write/find/schema rules are **not duplicated here** — the single source is `AGENTS.md` (§Docs) and `docs/<type>/AUTHORING.md`. This file only carries the directory table below.
 - `specs/` and `generated/` are k3dge-managed; their README is orientation only.
 
 ## Subdirectory Index

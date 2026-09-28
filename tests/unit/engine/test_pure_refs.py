@@ -479,6 +479,37 @@ class TestAdrNumberRetirement(unittest.TestCase):
             self.assertEqual(
                 pure_refs.check_adr_number_reuse(REPO, f"docs/adr/{name.name}"), [], name.name)
 
+    def test_this_repo_has_no_number_hole(self):
+        """1..最大号每个号都有现役文件或退役墓碑。跳号（0028 那种）在这里会红。"""
+        self.assertEqual(pure_refs.check_adr_number_holes(REPO), [])
+
+    def test_skipped_number_is_a_hole(self):
+        with tempfile.TemporaryDirectory() as td:
+            ws = Path(td)
+            adr = ws / "docs" / "adr"
+            adr.mkdir(parents=True)
+            (adr / "0001-a.md").write_text("# ADR-0001\n", encoding="utf-8")
+            (adr / "0003-c.md").write_text("# ADR-0003\n", encoding="utf-8")
+            out = pure_refs.check_adr_number_holes(ws)
+            self.assertEqual([c for c, _ in out], ["ADR_NUMBER_HOLE"])
+            self.assertIn("0002", out[0][1])
+            self.assertIn("0003-c.md", out[0][1])
+
+    def test_ledger_fills_the_hole(self):
+        with tempfile.TemporaryDirectory() as td:
+            ws = Path(td)
+            adr = ws / "docs" / "adr"
+            (adr / "obsolete").mkdir(parents=True)
+            (adr / "0001-a.md").write_text("# ADR-0001\n", encoding="utf-8")
+            (adr / "0003-c.md").write_text("# ADR-0003\n", encoding="utf-8")
+            (adr / "obsolete" / "README.md").write_text(
+                "## 永久退役号（账本）\n\n"
+                "| 号 | 曾是 | 退役方式 | 去向 | 删除 commit |\n| --- | --- | --- | --- | --- |\n"
+                "| 0002 | old | 合并 | ADR-0001 | `abc` |\n\n"
+                "### 曾被复用的号（存量不追，仅记账）\n",
+                encoding="utf-8")
+            self.assertEqual(pure_refs.check_adr_number_holes(ws), [])
+
 
 class TestTaskClosureRecord(unittest.TestCase):
     """done 票必须留结案记录（防"票里说待办、实际已做"的漂移）。

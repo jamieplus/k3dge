@@ -287,7 +287,9 @@ def check_amend(block: Any, codes: Dict[str, Any], filename: str, text: str) -> 
     权威形态＝k3dge 自家 ADR（`- 🅰N | 席位 | 日期 | 简述`，降序；定义集中在文末）。
 
     判据：① 条目前缀 `- 🅰N |`；② 号唯一且单调；③ 引用/定义双向闭合（引用只从非定义行取）；
-    ④ 定义行全在最后一个 `## ` 之后。
+    ④ 定义行全在最后一个 `## ` 之后；⑤ 每条定义独占一行（续行会把脚注截断）；
+    ⑥ 同一修订号的小标号按正文出现序从 1 连续；⑦ `Draft`/`Proposed` 不带修订留痕；
+    ⑧ 多条修订都只写同一个节（同一天两条，或先后三条及以上）＝拆主题。
     """
     if not block:
         return []
@@ -296,6 +298,10 @@ def check_amend(block: Any, codes: Dict[str, Any], filename: str, text: str) -> 
     c_marker = code_for((codes or {}), "amend_marker_text", "ADR_AMEND_MARKER_TEXT")
     c_ref = code_for((codes or {}), "amend_ref", "ADR_AMEND_REF")
     c_orphan = code_for((codes or {}), "footnote_orphan", "ADR_FOOTNOTE_ORPHAN")
+    c_line = code_for((codes or {}), "footnote_line", "ADR_FOOTNOTE_LINE")
+    c_seq = code_for((codes or {}), "footnote_seq", "ADR_FOOTNOTE_SEQ")
+    c_draft = code_for((codes or {}), "amend_draft", "ADR_AMEND_DRAFT")
+    c_split = code_for((codes or {}), "amend_split", "ADR_AMEND_SPLIT")
     out: List[Check] = []
     lines = text.splitlines()
     nums: List[int] = []
@@ -333,7 +339,84 @@ def check_amend(block: Any, codes: Dict[str, Any], filename: str, text: str) -> 
     deflines = [i for i, l in enumerate(lines) if l.startswith("[^🅰")]
     if deflines and not all(i > last_sec for i in deflines):
         out.append((c_tail, "脚注定义未集中在文末（穿插正文）", "file"))
+    i = 0
+    while i < len(lines):
+        if re.match(r"^\[\^🅰\d+\.\d+\]:", lines[i]):
+            start, end = _footnote_run(lines, i)
+            if end > start:
+                out.append((c_line, f"脚注定义必须独占一行（换行会截断脚注）：{lines[i][:48]}", "file"))
+            i = end
+            continue
+        i += 1
+    for n, minors in _footnote_minor_order(lines).items():
+        if minors != list(range(1, len(minors) + 1)):
+            out.append((c_seq, f"🅰{n} 的脚注小标号须按正文出现序从 1 连续，现为 {minors}", "file"))
+    status = re.search(r"^Status:\s*(\S+)", text, re.M)
+    if status and status.group(1) in ("Draft", "Proposed") and (nums or refs or defs):
+        out.append((c_draft, "Draft/Proposed 不记 Amended-by 与修订脚注；Accepted 之后才修订", "file"))
+    for sec, group in _amend_sole_sections(text).items():
+        dates = {d for _, d in group}
+        if len(group) >= 3 or (len(group) >= 2 and len(dates) == 1):
+            ids = "、".join(f"🅰{n}" for n, _ in group)
+            out.append((c_split,
+                        f"Amended-by 的 {ids} 都只写 §{sec}，同一主题拆成了多个号；"
+                        f"并成一个号，落点用连续小标号",
+                        "file"))
     return out
+
+
+_AMEND_ROW_RE = re.compile(r"^\s*-\s*🅰(\d+)\s*\|[^|]*\|([^|]*)\|(.*)$")
+_SECTION_REF_RE = re.compile(r"§(\d+(?:\.\d+)*)")
+
+
+def _most_specific_sections(sections: List[str]) -> List[str]:
+    """丢掉被更长节号盖住的前缀：同时写了 §2.9 和 §2.9.6 时，主题是 §2.9.6。"""
+    return [s for s in sections if not any(o != s and o.startswith(s + ".") for o in sections)]
+
+
+def _amend_sole_sections(text: str) -> Dict[str, List[tuple]]:
+    """每条修订若只谈论一个节，记到那个节名下。返回节号 → [(修订号, 日期)]。"""
+    m = re.search(r"^Amended-by:\s*\n((?:\s+-.*\n)+)", text, re.M)
+    if not m:
+        return {}
+    by: Dict[str, List[tuple]] = {}
+    for ln in m.group(1).splitlines():
+        mm = _AMEND_ROW_RE.match(ln)
+        if not mm:
+            continue
+        specific = _most_specific_sections(_SECTION_REF_RE.findall(mm.group(3)))
+        if len(specific) != 1:
+            continue
+        by.setdefault(specific[0], []).append((int(mm.group(1)), mm.group(2).strip()))
+    return by
+
+
+def _footnote_continuation(line: str) -> bool:
+    """定义行的下一行若仍是这段说明，Markdown 会把它当成正文，脚注在此截断。"""
+    s = line.strip()
+    return bool(s) and not s.startswith("[^") and not s.startswith("#") and s != "---"
+
+
+def _footnote_run(lines: List[str], start: int) -> Tuple[int, int]:
+    """从定义行起，连续说明行的半开区间（不含定义行本身的后一段）。"""
+    j = start + 1
+    while j < len(lines) and _footnote_continuation(lines[j]):
+        j += 1
+    return start + 1, j
+
+
+def _footnote_minor_order(lines: List[str]) -> Dict[int, List[int]]:
+    """每个修订号的小标号，按正文（非定义行）第一次出现的顺序。"""
+    order: Dict[int, List[int]] = {}
+    for line in lines:
+        if line.startswith("[^🅰"):
+            continue
+        for m in re.finditer(r"\[\^🅰(\d+)\.(\d+)\]", line):
+            n, minor = int(m.group(1)), int(m.group(2))
+            got = order.setdefault(n, [])
+            if minor not in got:
+                got.append(minor)
+    return order
 
 
 def check_content(

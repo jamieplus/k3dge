@@ -246,6 +246,13 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -
         # B3 text markdown
         for code, msg in pure_refs.check_markdown_text(text, rel):
             _add(code, msg, where=rel)
+    # 号池空洞看的是本仓目录，不是单文件正文；本轮有 ADR 才查
+    if any(f.startswith("docs/adr/") and "obsolete" not in Path(f).parts
+           and len(Path(f).name) > 5 and Path(f).name[:4].isdigit() and Path(f).name[4] == "-"
+           for f in doc_files):
+        for code, msg in pure_refs.check_adr_number_holes(WS):
+            where = msg.split(":", 1)[0]
+            _add(code, msg, where=where, facts={"path": where})
     # B4 orphans：档位查表（声明为 warn），不在这里写死"WARN-only"
     if any(f.startswith(("docs/", "tests/")) or f == ".agent/manifest.json" for f in files):
         for code, msg, facts in _orphan_warnings(pure_refs):
