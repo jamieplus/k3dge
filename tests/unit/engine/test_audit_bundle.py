@@ -437,3 +437,33 @@ def test_tool_state_never_lands_in_a_foreign_subject(tmp_path, monkeypatch):
     monkeypatch.setenv("K3DIT_HALL_ROOT", "/tmp/keep-me")
     env2 = ab._tool_env(tmp_path / "k3dit", [str(fake_tool)])
     assert env2["K3DIT_HALL_ROOT"] == "/tmp/keep-me"
+
+
+def test_tool_timeout_is_a_knob_with_mode_defaults(tmp_path, monkeypatch):
+    """墙钟预算必须是**声明面旋钮**（真跑实测：8 文件 full 跑超 1h 被 `_run` 掐断 ⇒ 整轮白烧）。"""
+    from k3dge.engine import milestone_audit as ma
+
+    ws = _repo(tmp_path)
+    (ws / ".agent").mkdir(exist_ok=True)
+    monkeypatch.setattr(ab, "find_k3dit", lambda w: ["k3dit"])
+    seen = {}
+
+    def _fake_run(w, out, **k):
+        seen.update(k)
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "report.md").write_text("# 审计\n", encoding="utf-8")
+        return {"ok": False, "rc": 9, "payload": {}, "detail": "stub"}
+
+    monkeypatch.setattr(ab, "run_path_audit", _fake_run)
+    (ws / ".agent" / "pipeline.toml").write_text('[roles.audit]\nbind = "k3dit"\nmode = "bundle"\n',
+                                                 encoding="utf-8")
+    ma._bundle_audit_leg(ws, "M1", ma._Prompt.default(), "b" * 40)
+    assert seen["timeout"] == 7200                      # full（缺省）⇒ 2h
+    (ws / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\nk3dit_mode = "audit-only"\n', encoding="utf-8")
+    ma._bundle_audit_leg(ws, "M1", ma._Prompt.default(), "b" * 40)
+    assert seen["timeout"] == 3600                      # 纯审计 ⇒ 1h
+    (ws / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\nk3dit_timeout = "abc"\n', encoding="utf-8")
+    early, _ = ma._bundle_audit_leg(ws, "M1", ma._Prompt.default(), "b" * 40)
+    assert early is not None and early[0] == "refused" and "k3dit_timeout" in early[1], early

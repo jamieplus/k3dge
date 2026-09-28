@@ -586,9 +586,10 @@ def cmd_audit(args: argparse.Namespace) -> int:
     if getattr(args, "run", False) or not (bundle / "manifest.json").is_file():
         out_dir = Path(getattr(args, "bundle_out", "") or bundle)
         _m = getattr(args, "bundle_mode", "full") or "full"
+        _tmo = int(getattr(args, "bundle_timeout", 0) or 0) or (7200 if _m == "full" else 3600)
         ran = ab.run_path_audit(workspace, out_dir, mode=_m,
                                 pins=getattr(args, "bundle_pins", "inplace") or "inplace",
-                                scope=getattr(args, "bundle_scope", "") or "")
+                                scope=getattr(args, "bundle_scope", "") or "", timeout=_tmo)
         print(json.dumps({"stage": "run", "out": str(out_dir), "rc": ran.get("rc"), "ok": ran.get("ok"),
                           "payload": ran.get("payload"), "detail": ran.get("detail")}, ensure_ascii=False))
         if not ran.get("ok"):
@@ -1234,6 +1235,8 @@ def build_parser() -> argparse.ArgumentParser:
                        help="bundle：先跑 k3dit 路径入口产包再消费（缺省只消费已存在的包）")
     p_aud.add_argument("--pins", dest="bundle_pins", choices=["inplace", "artifact"], default="inplace",
                        help="bundle：钉的落地形态（inplace＝钉留树 / artifact＝钉只随包）")
+    p_aud.add_argument("--timeout", dest="bundle_timeout", type=int, default=0,
+                       help="bundle：工具调用的墙钟预算（秒；0＝按模式缺省：full 2h / audit-only 1h）")
     p_aud.add_argument("--accept-baseline-drift", dest="bundle_drift", default="",
                        help="bundle：显式接受基线漂移（给理由；仅当漂移文件不被补丁触及）")
     p_aud.add_argument("--exclude", dest="bundle_exclude", action="append", default=[],
