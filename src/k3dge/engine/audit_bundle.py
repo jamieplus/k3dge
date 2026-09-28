@@ -358,6 +358,13 @@ def _post_apply_check(root: Path, workspace: Path) -> dict:
     return {"cmd": cmd, "ok": rc.returncode == 0, "rc": rc.returncode, "detail": tail}
 
 
+#: 升级标记（写在报告**验证**列；k3ge 自己写、自己读 ⇒ 单源）：
+#:   `UNCLOSED`＝未闭环（转人工，封板判据须为空）；`NOTLANDED`＝声称已修但本次没落（--exclude）。
+ESCALATION_UNCLOSED = "待验：未闭环（转人工）"
+ESCALATION_NOTLANDED = "升级：本次未落"
+ESCALATION_MARKERS = (ESCALATION_UNCLOSED, ESCALATION_NOTLANDED)
+
+
 def reconcile_report_rows(body: str, excluded: Optional[List[str]] = None,
                           escalated: Optional[List[str]] = None) -> Dict[str, object]:
     """报告行 ↔ **实际落了什么/未关什么**的机械对账（写在**验证**列，**不动状态列**）。
@@ -392,10 +399,10 @@ def reconcile_report_rows(body: str, excluded: Optional[List[str]] = None,
         f = str(row.get("位置") or "").split(":")[0].strip()
         mark = ""
         if rid and rid in esc:
-            mark = "待验：未闭环（转人工）"
+            mark = ESCALATION_UNCLOSED
         elif f and f in excluded and str(row.get("状态") or "").strip() == "已修":
             # 只标"声称已修却没落"的行（"有意留"本无东西可落 ⇒ 标它等于误导）
-            mark = "升级：本次未落（`--exclude`）待人工"
+            mark = ESCALATION_NOTLANDED + "（`--exclude`）待人工"
         if not mark:
             continue
         parts = lines[idx].split("|")

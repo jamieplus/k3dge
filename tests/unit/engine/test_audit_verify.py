@@ -173,3 +173,26 @@ def test_baseline_drift_is_accepted_only_explicitly_and_off_patch_surface(tmp_pa
         ensure_ascii=False), encoding="utf-8")
     ok = av.verify_bundle_local(b2, accept_baseline_drift="产出方旧 strip 规则 ⇒ 文档面语义层漂移")
     assert ok["ok"] and ok["accepted_drift"] == ["docs/x.md"], ok
+
+
+def test_checklist_counts_escalations_as_pending(tmp_path):
+    """升级标记（报告**验证**列）必须计入 `pending`：否则封板前置闸会**虚报已审**。
+
+    用户裁定：未关项不改"状态"列（保持产出方原样），升级由 k3dge 的审后闸报出 ⇒ 所以 k3dge 必须自己数。
+    """
+    from k3dge.engine import audit_checklist
+    from k3dge.engine.audit_bundle import ESCALATION_NOTLANDED, ESCALATION_UNCLOSED
+
+    ws = tmp_path
+    (ws / ".agent").mkdir(parents=True, exist_ok=True)
+    (ws / "docs" / "reviews").mkdir(parents=True, exist_ok=True)
+    (ws / "docs" / "reviews" / "2026-09-27-M1-external-audit.md").write_text(
+        "# 审计\n\n| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+        f"| a-1 | 2026-09-27 | 中 | P1 | 正确性 | x | src/a.py:1 | 已修 | 改了 | {ESCALATION_UNCLOSED} | | |\n"
+        f"| a-2 | 2026-09-27 | 中 | P1 | 正确性 | y | src/b.py:2 | 已修 | 改了 | {ESCALATION_NOTLANDED}（`--exclude`）待人工 | | |\n"
+        "| a-3 | 2026-09-27 | 低 | P3 | 规范 | z | src/c.py:3 | 已修 | 改了 | 验了 | | |\n",
+        encoding="utf-8")
+    data = audit_checklist.build_checklist(ws, "M1")
+    assert data["closure"]["audit"]["escalated"] == 2, data["closure"]
+    assert data["closure"]["audit"]["pending"] == 2, data["closure"]

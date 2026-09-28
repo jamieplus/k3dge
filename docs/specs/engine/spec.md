@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:8b5f67e1f309dc8e71d152fb6a47d23e8e2164c820a3fd03686bae292a9e575c`
+- **Contract Hash**: `sha256:a7d71f31572e4111521dd7eea65e2ca47d8917222b13938e4af48a20577c09cd`
 - **Last Updated**: 2026-09-28
 
 ## 1. Domain Boundary & Responsibilities
@@ -77,6 +77,9 @@ verify_bundle(bundle: Path, *, expect_input: str='', require_closed: bool=False,
 bundle_facts(bundle: Path) -> dict
 bundle_digest(bundle: Path) -> str
 apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False, exclude: Optional[List[str]]=None) -> dict
+ESCALATION_UNCLOSED = '待验：未闭环（转人工）'
+ESCALATION_NOTLANDED = '升级：本次未落'
+ESCALATION_MARKERS = (ESCALATION_UNCLOSED, ESCALATION_NOTLANDED)
 reconcile_report_rows(body: str, excluded: Optional[List[str]]=None, escalated: Optional[List[str]]=None) -> Dict[str, object]
 land_report(workspace: Path, milestone_id: str, out: Path, *, extra_files: Optional[List[str]]=None, why: str='', note: str='', excluded: Optional[List[str]]=None, escalated: Optional[List[str]]=None) -> dict
 commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str, str]

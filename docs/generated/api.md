@@ -192,6 +192,9 @@ bundle_digest(bundle: Path) -> str
     # doc: 包的**内容摘要**（排序后的 rel:sha256）——封版提交里记它，可核"审的是哪只包"。
 apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool=False, allow_dirty: bool=False, exclude: Optional[List[str]]=None) -> dict
     # doc: 落补丁：先 `git apply`（精确）；打不上则**三路合并**（主干已前进时的正道）。
+ESCALATION_UNCLOSED = '待验：未闭环（转人工）'
+ESCALATION_NOTLANDED = '升级：本次未落'
+ESCALATION_MARKERS = (ESCALATION_UNCLOSED, ESCALATION_NOTLANDED)
 reconcile_report_rows(body: str, excluded: Optional[List[str]]=None, escalated: Optional[List[str]]=None) -> Dict[str, object]
     # doc: 报告行 ↔ **实际落了什么/未关什么**的机械对账（写在**验证**列，**不动状态列**）。
 land_report(workspace: Path, milestone_id: str, out: Path, *, extra_files: Optional[List[str]]=None, why: str='', note: str='', excluded: Optional[List[str]]=None, escalated: Optional[List[str]]=None) -> dict

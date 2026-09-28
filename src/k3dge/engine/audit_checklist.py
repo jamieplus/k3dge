@@ -48,10 +48,22 @@ def _snapshot(workspace: Path, milestone_id: str) -> dict:
 
     suggested, reasons = compute_audit_suggestion(workspace)
     found = _find_report(workspace, milestone_id, "audit")
+    # **升级计入 pending**：k3dge 自己写的升级标记在报告**验证**列（`待验：未闭环` / `升级：本次未落`）——
+    # 判定面（封板前置闸 / `[NEXT]`）读的是本清单的 `pending` ⇒ 不计它就会**虚报已审**（用户裁定：
+    # 升级由 k3dge 的审后闸报出；报告"状态"列保持产出方原样，所以这里必须自己数）。
+    escalated = 0
+    if found is not None:
+        from k3dge.engine.audit_bundle import ESCALATION_MARKERS
+        from k3dge.engine.report_table import parse_rows
+
+        _, rows = parse_rows(found[1])
+        escalated = sum(1 for _i, r in rows
+                        if any(m in str(r.get("验证") or "") for m in ESCALATION_MARKERS))
     closure = {
         "audit": {
             "present": found is not None,
-            "pending": (_parse_audit_stats(found[1])["待修"] if found else None),
+            "pending": ((_parse_audit_stats(found[1])["待修"] + escalated) if found else None),
+            "escalated": escalated,
         },
     }
     return {
