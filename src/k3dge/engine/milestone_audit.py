@@ -377,6 +377,17 @@ def _oneshot_audit_leg(
     return status, msg + "\n" + _ns.render_cli()
 
 
+def _tool_state_dir(workspace: Path) -> str:
+    """工具状态目录（外部被审仓 ⇒ 缓存的确定性路径；见 `audit_bundle._tool_env`）。给超时提示用。"""
+    import hashlib
+    import os
+    import tempfile
+
+    cache = Path(os.environ.get("K3GE_AUDIT_CACHE") or (Path(tempfile.gettempdir()) / "k3ge-audit"))
+    key = hashlib.sha1(str(Path(workspace).resolve()).encode("utf-8")).hexdigest()[:12]
+    return str(cache / f"k3dit-state-{key}")
+
+
 def _bundle_audit_leg(
     workspace: Path,
     milestone_id: str,
@@ -439,8 +450,14 @@ def _bundle_audit_leg(
                             timeout=_tmo)
     payload = ran.get("payload") or {}
     if not ran.get("ok"):
+        _hint = ""
+        if int(ran.get("rc") or 0) == 124:      # 墙钟掐断：孤儿单会占住窗 ⇒ 重跑前要清工具状态或释放该单
+            _st = _tool_state_dir(workspace)
+            _hint = (f"\n[提示] 工具调用被墙钟掐断（timeout）。工具状态在 {_st}：其中『在办单』会占住窗"
+                     f"（重跑会被『站点占位』拒）⇒ 先 `k3dit hall prune --force <job>` 释放，"
+                     f"或删除该状态目录后重跑。")
         return _reject_step(workspace, milestone_id, "audit_bundle_run_failed",
-                            f"k3dit 产包失败（rc={ran.get('rc')}）：{ran.get('detail') or ''}"), ""
+                            f"k3dit 产包失败（rc={ran.get('rc')}）：{ran.get('detail') or ''}{_hint}"), ""
     # 纯审计（audit-only）：`status=partial` 是设计（钉留树）；它**只出证据，不构成封板依据** ⇒ 落报告后
     # 以 refused 交回（带理由），不推进任何"已审"判定。full 才要求闭环。
     # **闭环判据归 k3dge**：`consume` 里的 `audit_verify.verify_bundle_local` 从 findings 自己算未关项，

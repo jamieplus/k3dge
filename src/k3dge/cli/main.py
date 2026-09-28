@@ -608,7 +608,9 @@ def cmd_audit(args: argparse.Namespace) -> int:
     # **补丁没落成，就不落报告**：报告里的「已修 N」是**产出方对自己场地的处置**，修复没进本仓时把它落进
     # `docs/reviews/` 会被判定面当成"本仓已修"（真跑实测：落补丁失败仍落了 26 行"24 已修"的报告并提交）。
     # 证据不丢：包留在 out，拒绝信息里给出路径。
-    _no_apply = not ((res.get("apply") or {}).get("ok", True))     # 补丁没落成（consume 失败也在此列）
+    # 只在"**验包通过 + 补丁落成**"时落报告：验包失败或空转轮（未产出判定）⇒ 报告留在包内，
+    # `docs/reviews/` 只放**审计结果**，不放"这轮什么都没产出"的运行痕迹。
+    _no_apply = not (bool(res.get("ok")) and bool((res.get("apply") or {}).get("ok")))
     if not getattr(args, "dry_run", False) and not _no_apply:
         # 里程碑 id **必须**来自显式参数（缺省 `local`，与 k3dit 的约定一致）：绝不能用**包路径**当 id
         #（真跑实测：`/tmp/ctl` 被 `persist_external_audit_report` 拒 ⇒ 钉已落、报告没落、提交没做）。

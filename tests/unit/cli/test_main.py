@@ -490,7 +490,8 @@ def test_audit_bundle_manual_entry_lands_report_like_the_leg():
 
     calls = {}
     orig_consume, orig_land = ab.consume, ab.land_report
-    ab.consume = lambda t, b, **k: {"ok": True, "apply": {"files": ["src/a.py"]}, "facts": {"job_id": "j1"}}
+    ab.consume = lambda t, b, **k: {"ok": True, "apply": {"ok": True, "files": ["src/a.py"]},
+                                    "facts": {"job_id": "j1"}}
     ab.land_report = lambda w, m, out, **k: (calls.update(extra=list(k.get("extra_files") or []), mid=m)
                                              or {"ok": True, "report": "docs/reviews/x.md", "commit": "c" * 40})
     try:
@@ -518,7 +519,7 @@ def test_audit_bundle_manual_entry_fails_clear_when_landing_fails():
     from k3dge.engine import audit_bundle as ab
 
     orig_consume, orig_land = ab.consume, ab.land_report
-    ab.consume = lambda t, b, **k: {"ok": True, "apply": {"files": []}, "facts": {}}
+    ab.consume = lambda t, b, **k: {"ok": True, "apply": {"ok": True, "files": []}, "facts": {}}
     ab.land_report = lambda w, m, out, **k: {"ok": False, "error": "REPORT_PERSIST_FAILED",
                                              "detail": "bad id"}
     try:
