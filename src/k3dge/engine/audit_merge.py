@@ -24,16 +24,21 @@ from typing import Any, Dict, Iterable, List, Optional, Set
 from k3dge.engine.audit_verify import replay_to_baseline
 
 
+def _owned_replay(bundle: Path, *, only: Optional[List[str]] = None) -> Dict[str, Any]:
+    """`replay_to_baseline` 的**唯一内部入口**（value-8 报告）：把"谁拥有这棵重放树"写成契约——
+    返回的 `root` 由**本模块自建**，所有权归**调用方**（用完自己 `rmtree`）。`owner` 字段显式标出。
+    """
+    res = replay_to_baseline(bundle, only=only)
+    if res.get("ok"):
+        res["owner"] = "caller"
+    return res
+
+
 def touched_files(bundle: Path) -> Set[str]:
-    """包内补丁触及的文件（`+++ b/<rel>`）。"""
+    """包内补丁触及的文件＝两份补丁声明集的**并集**（value-4：规则只在 `patch_rels` 里写一遍）。"""
     out: Set[str] = set()
     for name in ("fix.patch", "pins.patch"):
-        p = Path(bundle) / name
-        if not p.is_file():
-            continue
-        for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
-            if line.startswith("+++ b/"):
-                out.add(line[6:].strip())
+        out |= patch_rels(bundle, name)
     return out
 
 
@@ -112,13 +117,16 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
     按包的**两层语义**分开处理（这是它能自动合的关键）：
       1. `fix.patch`＝语义层（代码）：base＝包的可重放基线，mid＝"只反向 pins 后"的中间树（＝基线+修复）
          ⇒ 对每个文件做**三路合并** `merge-file(ours, base, mid)`（两边都在顶部加行时也能各自保留）；
-      2. `pins.patch`＝标注层（钉，纯增量）：由调用方在合并后的树上**正向**应用（失败则按文件并集合并，
-         因为"两边都加了钉"的正确结果就是**两枚钉都在**）。
+      2. `pins.patch`＝标注层（钉，纯增量）：**本函数只报出 `pins_rels`**（`patch_rels` 单源），实际应用
+         由落盘方 `audit_bundle._apply_sequential_merged` 做：先正向 `git apply pins.patch`，打不上再对该
+         文件**并集**合并（`union_pins`：两边都加钉 ⇒ 两枚都留）。
+    （code-8 报告原意是在本函数内做并集；但落盘方已在做同一件事 ⇒ 照做会成**两份实现**，故改为兑现契约的
+    另一半：把 `pins_rels` 作为单源暴露出来、文档写清谁在应用。」
     `exclude`＝显式排除（不做猜测）。
     """
     workspace, bundle = Path(workspace), Path(bundle)
     excluded = {str(x) for x in exclude}
-    rep = replay_to_baseline(bundle)
+    rep = _owned_replay(bundle)
     if not rep.get("ok"):
         return {"ok": False, "merged": {}, "conflicts": [], "excluded": sorted(excluded),
                 "detail": rep.get("detail") or "无法重放基线"}
@@ -139,15 +147,22 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
     else:
         mid_root, tmp_mid = theirs_root, ""      # 复用包的 `code/`（**别 rmtree 它**）
     try:
-        fix_rels = sorted(t for t in touched_files(bundle) - excluded
-                          if t in set(_rels_of_patch(bundle, "fix.patch")) or True)
-        fix_only = sorted(set(_rels_of_patch(bundle, "fix.patch")) - excluded)
+        # code-4（报告）：原 `... or True` 是**恒真谓词** ⇒ 过滤完全失效。改成显式语义：
+        # `fix_only`＝fix.patch 声明的文件（有则只合它）；`fix_rels`＝无 fix.patch 时的回落集合。
+        fix_rels = sorted(touched_files(bundle) - excluded)
+        fix_only = sorted(set(patch_rels(bundle, "fix.patch")) - excluded)
         merged: Dict[str, str] = {}
         conflicts: List[str] = []
         missing: List[str] = []
         for rel in fix_only or fix_rels:
             theirs = mid_root / rel if (mid_root / rel).is_file() else theirs_root / rel
             if not theirs.is_file():
+                missing.append(rel)
+                continue
+            # code-6（报告）：**base 存在而 ours 缺失** ⇒ 记 `missing` 并跳过（原实现把缺失侧写成空文件，
+            # 三方皆空会合出 rc=0/text="" ⇒ 调用方以为"合并成功但内容为空"）。base 缺失而 ours 在（fix 新增
+            # 文件）是正常情形，继续合。
+            if (base_root / rel).is_file() and not (workspace / rel).is_file():
                 missing.append(rel)
                 continue
             res = _merge_file(workspace / rel, base_root / rel, theirs)
@@ -158,8 +173,9 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
             else:
                 return {"ok": False, "merged": merged, "conflicts": conflicts,
                         "excluded": sorted(excluded), "detail": f"{rel}: {res.get('detail', '')}"}
+        pins_rels = sorted(patch_rels(bundle, "pins.patch") - excluded)
         return {"ok": not conflicts and not missing, "merged": merged, "conflicts": conflicts,
-                "missing": missing, "excluded": sorted(excluded),
+                "missing": missing, "pins_rels": pins_rels, "excluded": sorted(excluded),
                 "pins_patch": "pins.patch" if (bundle / "pins.patch").is_file() and "pins.patch" in order else "",
                 "detail": ""}
     finally:
@@ -168,7 +184,8 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
             shutil.rmtree(tmp_mid, ignore_errors=True)
 
 
-def _rels_of_patch(bundle: Path, name: str) -> Set[str]:
+def patch_rels(bundle: Path, name: str) -> Set[str]:
+    """补丁声明的文件集合（`+++ b/<rel>`）——**公开单源**（value-4：送检面内曾有三份同规则实现）。"""
     p = Path(bundle) / name
     if not p.is_file():
         return set()
@@ -176,11 +193,18 @@ def _rels_of_patch(bundle: Path, name: str) -> Set[str]:
             if line.startswith("+++ b/")}
 
 
+#: 旧名（内部调用点过渡用）
+_rels_of_patch = patch_rels
+
+
 def union_pins(workspace: Path, bundle: Path, rel: str) -> Dict[str, Any]:
     """钉的并集合并（两边都加了钉 ⇒ 两枚都留）：`merge-file --union`，不产生冲突标记。"""
     import subprocess as _sp
 
-    base = replay_to_baseline(bundle, only=(["pins.patch"] if True else []))
+    # code-5（报告）：base 必须是**纯基线**（`code/` 是"基线+fix+钉"，只反向钉会得"基线+fix"",
+    # 与 ours（干线）/theirs（基线+fix+钉）不同基 ⇒ 并集会把 fix 当成钉侧的改动重复带入）。原实现还有
+    # 一个恒真 `if True`（同 code-4 的味道）。
+    base = _owned_replay(bundle)
     if not base.get("ok"):
         return {"ok": False, "text": "", "detail": base.get("detail") or "重放失败"}
     tmp = Path(tempfile.mkdtemp(prefix="k3dge-union-"))

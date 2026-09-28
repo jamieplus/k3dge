@@ -610,3 +610,108 @@ def test_landing_policy_belongs_to_the_caller(tmp_path):
     assert "src/a.py" in (r2["apply"].get("files") or []), r2["apply"]      # all ⇒ 全落
     assert "fixed_A" not in (ws2 / "src" / "a.py").read_text(encoding="utf-8") or True
     assert ab.consume(ws, b, landing="weird")["error"] == "BAD_LANDING"
+
+
+def test_patch_with_escaping_path_is_refused_before_apply(tmp_path, monkeypatch):
+    """code-2（报告）：补丁目标路径越出 target（绝对 / `..` / 盘符）⇒ **先拒**（`APPLY_PATH_ESCAPE`），
+    不再让 `git apply` 的 APPLY_* 错误码替我们说话。"""
+    ws = _repo(tmp_path)
+    b = _bundle(tmp_path / "esc")
+    (b / "fix.patch").write_text("--- a/../evil.py\n+++ b/../evil.py\n@@ -1 +1 @@\n-x\n+y\n", encoding="utf-8")
+    r = ab.apply_bundle(ws, b)
+    assert r["ok"] is False and r["error"].startswith("APPLY_PATH_ESCAPE"), r
+    assert "evil.py" in r["detail"], r
+
+
+def test_files_come_from_the_patch_not_from_the_whole_worktree(tmp_path):
+    """code-3（报告）：`files`＝**补丁声明的 rel**；工作树上的其它改动（在途文件/构建产物）不得
+    被当成审计产物交给 `commit_applied`。"""
+    ws = _repo(tmp_path)
+    (ws / "stray.txt").write_text("x\n", encoding="utf-8")          # 在途改动（未跟踪）
+    b = _bundle(tmp_path)
+    r = ab.apply_bundle(ws, b, allow_dirty=True)
+    assert r["ok"], r
+    assert r["files"] == ["src/a.py"], r["files"]                   # 只报补丁声明的文件
+
+
+def test_tree_moved_between_dry_run_and_apply_is_refused(tmp_path, monkeypatch):
+    """code-1（报告）：dry-run 与真打之间 HEAD/工作树被挪动 ⇒ `TREE_MOVED`（不真打）。"""
+    ws = _repo(tmp_path)
+    b = _bundle(tmp_path)
+
+    def _dry(w, bundle, order):
+        (w / "src" / "a.py").write_text("x = 1\ny = 2\nconcurrent = True\n", encoding="utf-8")   # 模拟并发改动
+        return {"ok": True, "files": ["src/a.py"], "applied": order}
+
+    monkeypatch.setattr(ab, "_dry_run_via_worktree", _dry)
+    r = ab.apply_bundle(ws, b)
+    assert r["ok"] is False and r["error"] == "TREE_MOVED", r
+    assert "concurrent = True" in (ws / "src" / "a.py").read_text(encoding="utf-8")   # 没被真打
+
+
+def test_half_applied_patches_are_rolled_back_before_merge_fallback(tmp_path, monkeypatch):
+    """code-7/10（报告）：真打时第 1 条已落、第 2 条失败 ⇒ **先逆序回滚**再降级合并；
+    失败面必须带真实 `applied`/`rolled_back`（不许硬编码空列表）。
+    （失败若发生在 dry-run，树上什么都没落 ⇒ 这条要走"dry-run 过、真打半落"的路径来验。）
+    """
+    import subprocess as _sp
+
+    ws = _repo(tmp_path)
+    b = _bundle(tmp_path)
+
+    def _dry(w, bundle, order):
+        return {"ok": True, "files": ["src/a.py"], "applied": order}
+
+    def _half(ws_, bundle, order):
+        _sp.run(["git", "-C", str(ws_), "apply", str(bundle / "fix.patch")], check=True, capture_output=True)
+        return {"ok": False, "error": "APPLY_FAILED:pins.patch", "applied": ["fix.patch"], "detail": "boom"}
+
+    monkeypatch.setattr(ab, "_dry_run_via_worktree", _dry)
+    monkeypatch.setattr(ab, "_apply_sequential", _half)
+    # 让**合并兜底也失败**（否则它会干净合上、ok=True ⇒ 看不到回滚的效果）⇒ 走失败面看真实账
+    monkeypatch.setattr(ab, "_apply_sequential_merged",
+                        lambda *a, **k: {"ok": False, "error": "MERGE_FAILED", "detail": "stub", "conflicts": []})
+    r = ab.apply_bundle(ws, b)
+    assert r["ok"] is False, r
+    assert r["applied"] == ["fix.patch"] and r["rolled_back"] == ["fix.patch"], r
+    assert "added_by_fix" not in (ws / "src" / "a.py").read_text(encoding="utf-8"), "半落必须回滚干净"
+
+
+def test_tool_state_root_is_hardened_and_refuses_symlink(tmp_path, monkeypatch):
+    """code-9（报告）：工具状态目录可被环境劫持 ⇒ `mkdir 0700`、拒符号链接、拒非目录；不安全就**别放子进程**。"""
+    ok = tmp_path / "state"
+    assert ab._harden_state_root(ok) == "" and (ok.stat().st_mode & 0o777) == 0o700
+    (tmp_path / "real").mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(tmp_path / "real")
+    assert "符号链接" in ab._harden_state_root(link), ab._harden_state_root(link)
+    monkeypatch.setenv("K3GE_AUDIT_CACHE", str(tmp_path / "cache"))
+    monkeypatch.setattr(ab, "_harden_state_root", lambda root: "stub: 不安全")
+    env = ab._tool_env(tmp_path, [str(tmp_path / "k3dit")])
+    assert "K3GE_STATE_UNSAFE" in env and "K3DIT_HALL_ROOT" not in env, env
+    r = ab.run_path_audit(tmp_path, tmp_path / "out", k3dit=["k3dit"])
+    assert r["ok"] is False and "状态目录不安全" in r["detail"], r
+
+
+def test_land_report_collects_only_its_own_projection_roots(tmp_path, monkeypatch):
+    """value-10（报告）：落报告提交的"本轮产物"**显式化**——只认 `docs/generated` 与 `docs/specs`，
+    不盲扫整个 `docs/`（否则会把别人的在途文档改动卷进审计提交）。"""
+    from k3dge.engine import doc_catalog
+
+    ws = _repo(tmp_path)
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "report.md").write_text("# 审计\n", encoding="utf-8")
+    (ws / "docs" / "generated").mkdir(parents=True, exist_ok=True)
+    (ws / "docs" / "generated" / "api.md").write_text("api\n", encoding="utf-8")
+    (ws / "docs" / "stray.md").write_text("stray\n", encoding="utf-8")      # 别人的在途文档（未跟踪）
+    monkeypatch.setattr(doc_catalog, "write_docs_index", lambda w: (ws / "docs" / "generated" / "docs-index.json"))
+    (ws / "docs" / "generated" / "docs-index.json").write_text("{}\n", encoding="utf-8")
+    seen = {}
+    monkeypatch.setattr(ab, "commit_applied",
+                        lambda w, m, f: (seen.update(files=list(f)) or ("a" * 40, "")))
+    monkeypatch.setattr(ab, "write_run_digest", lambda *a, **k: "")
+    r = ab.land_report(ws, "M1", out)
+    assert r["ok"], r
+    assert "docs/generated/api.md" in seen["files"], seen["files"]
+    assert not any(f.startswith("docs/stray") for f in seen["files"]), seen["files"]

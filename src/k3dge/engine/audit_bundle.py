@@ -3,7 +3,8 @@
 形状（与 k3dit 仓 0028 对齐）::
 
     冻结提交（基线 B） → k3dit 路径入口产包（`k3dit audit --path . --out <bundle> --mode full`）
-      → 验包（`k3dit audit --verify <bundle>`：反向重放逐字节 + 12 列 + findings↔报告）
+      → 验包（**本地**：`engine/audit_verify.verify_bundle_local`——反向重放逐字节 + 12 列 + findings↔报告
+        + 本地闭环；**权威实现只有一处**，`verify_bundle` 只是稳定门面，value-6 报告）
       → 读包内**机器可读判定**（`bundle_version` / `status` / `unclosed` / `apply_order`）
       → 按 `apply_order` 用**标准 `git apply`** 把 `fix.patch` + `pins.patch` 落到工作树
       → 由调用方决定提交/封板（本模块**不**改历史）
@@ -22,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -51,11 +53,30 @@ def find_k3dit(workspace: Path) -> Optional[List[str]]:
 
 
 def _run(argv: List[str], cwd: Path, timeout: int, env: Optional[Dict[str, str]] = None) -> Tuple[int, str]:
+    """跑子进程。**超时杀整个进程组**（code-11 报告）：k3dit 会再起席位子进程 ⇒ 只杀父进程会留孤儿，
+    它们继续写 `code/`/hall 状态，下一轮就撞"站点占位"。另外"超时"与"命令不存在/权限错"是两回事：
+    前者 124、后者 127（原先都折叠成 124 ⇒ 排查被带偏）。
+    """
+    import signal
+
     try:
-        proc = subprocess.run(argv, cwd=str(cwd), capture_output=True, text=True, timeout=timeout, env=env)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return 124, f"{exc}"
-    return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+        proc = subprocess.Popen(argv, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                text=True, env=env, start_new_session=True)
+    except OSError as exc:
+        return 127, f"{exc}"
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except OSError:      # pragma: no cover - 进程已退出
+            proc.kill()
+        try:
+            out, err = proc.communicate(timeout=30)
+        except Exception:      # pragma: no cover
+            out, err = "", ""
+        return 124, f"timeout {timeout}s（已杀进程组）{(out or '')}{(err or '')}"
+    return proc.returncode, (out or "") + (err or "")
 
 
 def _last_json(text: str) -> Optional[dict]:
@@ -84,13 +105,34 @@ def run_path_audit(workspace: Path, out: Path, *, mode: str = "full", pins: str 
             "--mode", mode, "--pins", pins, "--format", "json"]
     if scope:
         argv += ["--scope", str(scope)]
-    rc, text = _run(argv, workspace, timeout, env=_tool_env(workspace, argv0))
+    _env = _tool_env(workspace, argv0)
+    if _env.get("K3GE_STATE_UNSAFE"):
+        return {"ok": False, "rc": 126, "out": str(out),
+                "detail": f"工具状态目录不安全，拒绝启动（{_env['K3GE_STATE_UNSAFE']}）"}
+    rc, text = _run(argv, workspace, timeout, env=_env)
     payload = _last_json(text)
     if rc not in (0, 3):
         return {"ok": False, "rc": rc, "out": str(out), "detail": text.strip()[-400:],
                 "payload": payload or {}}
     return {"ok": bool(payload), "rc": rc, "out": str(out), "payload": payload or {},
             "detail": text.strip()[-400:]}
+
+
+def _harden_state_root(root: Path) -> str:
+    """**工具状态目录加固**（code-9 报告）：cache/tmp 路径可被环境劫持 ⇒ 不校验就交给子进程读写工具状态，
+    后果是"共库"（两仓共写一份 jobs.json/席日志）或"任意人可读席日志"。规则：`mkdir 0700`（不跟随符号链接）、
+    必须是真目录、属主可写。返回 ""＝OK；否则返回拒绝原因（**fail-clear**，调用方据此不跑）。
+    """
+    try:
+        if root.is_symlink():
+            return f"状态目录是符号链接：{root}"
+        root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if not root.is_dir():
+            return f"状态目录不是目录：{root}"
+        os.chmod(root, 0o700)
+    except OSError as exc:
+        return f"状态目录不可用：{root}（{exc}）"
+    return ""
 
 
 def _tool_env(workspace: Path, argv0: List[str]) -> Dict[str, str]:
@@ -118,6 +160,10 @@ def _tool_env(workspace: Path, argv0: List[str]) -> Dict[str, str]:
     cache = Path(os.environ.get("K3GE_AUDIT_CACHE") or (Path(tempfile.gettempdir()) / "k3ge-audit"))
     key = hashlib.sha1(str(Path(workspace).resolve()).encode("utf-8")).hexdigest()[:12]
     root = cache / f"k3dit-state-{key}"
+    bad = _harden_state_root(root)          # code-9：拿不到干净的状态目录 ⇒ **别把子进程放出去**
+    if bad:
+        env["K3GE_STATE_UNSAFE"] = bad
+        return env
     env["K3DIT_HALL_ROOT"] = str(root / "hall")
     env["K3DIT_LEDGER"] = str(root / "ledger" / "jobs.json")
     return env
@@ -134,8 +180,12 @@ def salvage_bundle(workspace: Path, out: Path, *, k3dit: Optional[List[str]] = N
     argv0 = k3dit or find_k3dit(workspace)
     if not argv0:
         return {"ok": False, "rc": 127, "out": str(out), "detail": "找不到 k3dit（抢救不了）"}
+    _env = _tool_env(Path(workspace), argv0)
+    if _env.get("K3GE_STATE_UNSAFE"):
+        return {"ok": False, "rc": 126, "out": str(out),
+                "detail": f"工具状态目录不安全，拒绝抢救（{_env['K3GE_STATE_UNSAFE']}）"}
     rc, text = _run([*argv0, "hall", "export", "--latest", "--out", str(out)],
-                    Path(workspace), timeout, env=_tool_env(Path(workspace), argv0))
+                    Path(workspace), timeout, env=_env)
     ok = rc == 0 and (Path(out) / "manifest.json").is_file()
     return {"ok": ok, "rc": rc, "out": str(out),
             "detail": "" if ok else (text or "").strip()[-300:]}
@@ -210,6 +260,41 @@ def _git(workspace: Path, *argv: str) -> Tuple[int, str]:
     return _run(["git", "-C", str(workspace), *argv], workspace, 120)
 
 
+def _snapshot(workspace: Path) -> Tuple[str, str]:
+    """(HEAD, `status --porcelain`) 快照——code-1 报告：dry-run 与真打之间要比对，防"窗口内被挪动"。"""
+    _, head = _git(workspace, "rev-parse", "HEAD")
+    rc, st = _git(workspace, "status", "--porcelain")
+    return (head.strip(), st if rc == 0 else "")
+
+
+def _rollback_applied(workspace: Path, bundle: Path, applied: List[str]) -> List[str]:
+    """**逆序反向应用"半落"的补丁**（code-7 报告）：降级到三路合并前必须把树恢复干净，
+    否则合并的 `ours` 被半条补丁污染 ⇒ 合出来的东西谁都不敢用。返回成功撤回的补丁名。"""
+    back: List[str] = []
+    for name in reversed([x for x in (applied or []) if x]):
+        rc, _ = _git(workspace, "apply", "-R", str(Path(bundle) / name))
+        if rc == 0:
+            back.append(name)
+    return back
+
+
+def _escaping_rels(patch: Path) -> List[str]:
+    """补丁里**越出 target** 的目标路径（绝对 / `..` / 盘符）——code-2 报告：不能静默交给 `git apply`
+    （它对越界默认拒绝，但 rc!=0 只报 APPLY_* ⇒ 调用方看不出是"包有问题"还是"树不匹配"）。"""
+    out: List[str] = []
+    try:
+        lines = patch.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:      # pragma: no cover
+        return out
+    for line in lines:
+        if not line.startswith("+++ b/"):
+            continue
+        rel = line[6:].strip()
+        if rel.startswith("/") or any(part == ".." for part in Path(rel).parts) or re.match(r"^[A-Za-z]:", rel):
+            out.append(rel)
+    return sorted(set(out))
+
+
 def _apply_sequential(target: Path, bundle: Path, order: List[str]) -> dict:
     """在 `target` 上按序 `git apply`（每条先 `--check`）。
 
@@ -222,6 +307,10 @@ def _apply_sequential(target: Path, bundle: Path, order: List[str]) -> dict:
         patch = Path(bundle) / name
         if not patch.is_file():
             return {"ok": False, "error": f"PATCH_MISSING:{name}", "applied": done}
+        esc = _escaping_rels(patch)          # code-2：**越界路径先拒**（别让 git 的错误码替我们说话）
+        if esc:
+            return {"ok": False, "error": f"APPLY_PATH_ESCAPE:{name}", "detail": ", ".join(esc[:5]),
+                    "applied": done}
         rc, out = _git(target, "apply", "--check", str(patch))
         if rc != 0:
             return {"ok": False, "error": f"APPLY_CHECK_FAILED:{name}", "detail": out.strip()[-300:],
@@ -231,8 +320,11 @@ def _apply_sequential(target: Path, bundle: Path, order: List[str]) -> dict:
             return {"ok": False, "error": f"APPLY_FAILED:{name}", "detail": out.strip()[-300:],
                     "applied": done}
         done.append(name)
-    rc, names = _git(target, "status", "--porcelain")
-    files = sorted(ln[3:].strip() for ln in names.splitlines() if ln.strip()) if rc == 0 else []
+    # code-3（报告）：`files`＝**补丁声明的 rel**（单源 `patch_rels`），不是 `git status --porcelain` 的全量
+    # 改动——后者会把在途改动/构建产物/上一轮半落残留都当审计产物交给 commit_applied。
+    from k3dge.engine.audit_merge import patch_rels
+
+    files = sorted({rel for nm in order for rel in patch_rels(bundle, nm)})
     return {"ok": True, "files": files, "applied": done}
 
 
@@ -282,23 +374,34 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
                 "dirty": dirty.strip().splitlines()[:10]}
     # **有 hunk 级剔除要求时不许走"精确 git apply"快路**：那条路会把未关项所在 hunk 一起落进去
     #（真跑/测试实测：`git apply` 成功 ⇒ 过滤从未发生 ⇒ 未验证的改动进了主干）。一律走合并路径。
+    snap0 = _snapshot(workspace)          # code-1：dry-run 之前
     pre = {"ok": False, "detail": "（有 hunk 级剔除要求 ⇒ 强制走合并路径）"} if exclude_hunks else \
         _dry_run_via_worktree(workspace, bundle, order)
+    rolled: List[str] = []
+    res: dict = {}
     if pre.get("ok"):
         if dry_run:
             return {"ok": True, "applied": order, "files": pre.get("files") or [], "dry_run": True,
                     "strategy": "git-apply", "excluded": sorted({str(x) for x in (exclude or [])})}
+        # code-1：真打前**复核快照**——窗口内 HEAD/工作树被并发改动 ⇒ `TREE_MOVED`，不真打
+        if _snapshot(workspace) != snap0:
+            return {"ok": False, "error": "TREE_MOVED", "applied": [], "files": [],
+                    "detail": "dry-run 与真打之间工作树/HEAD 变了（并发改动）⇒ 不真打；请重跑"}
         res = _apply_sequential(workspace, bundle, order)
         if res.get("ok"):
             return {"ok": True, "applied": order, "files": res.get("files") or [], "dry_run": False,
                     "strategy": "git-apply", "excluded": sorted({str(x) for x in (exclude or [])})}
+        # code-7：半落 ⇒ **先逆序回滚**再考虑降级合并（否则合并的 ours 被污染）
+        rolled = _rollback_applied(workspace, bundle, res.get("applied") or [])
     # `git apply` 打不上**不等于修复不可用**：补丁是对审计当时的基线生成的，而主干可能已经往前走
     #（落钉、别的修复、重构）。两侧信息都全 ⇒ 退到**三路合并**（base＝包的可重放基线）。
     # **结构性**失败（补丁缺/不是仓/脏树/无 worktree）不该退合并——那不是"打不上"，是输入不对。
+    # 结构性失败（补丁缺/越界路径/不是仓/脏树/无 worktree）不该退合并——那不是"打不上"，是输入不对。
+    #  `APPLY_PATH_ESCAPE` 是 code-2 的闸：**包有问题**，退合并只会得到更绕的错误（真跑实测过一次）。
     if str(pre.get("error") or "").split(":")[0] in {"PATCH_MISSING", "NOT_A_REPO", "DIRTY_TREE",
-                                                     "WORKTREE_UNAVAILABLE"}:
+                                                     "WORKTREE_UNAVAILABLE", "APPLY_PATH_ESCAPE"}:
         return {"ok": False, "error": pre.get("error"), "detail": pre.get("detail", ""),
-                "phase": "dry-run", "applied": pre.get("applied") or []}
+                "phase": "dry-run", "applied": pre.get("applied") or [], "rolled_back": rolled}
     got = _apply_sequential_merged(workspace, bundle, exclude=exclude, dry_run=dry_run,
                                    exclude_hunks=exclude_hunks)
     if got.get("ok"):
@@ -308,9 +411,11 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
                 "post_apply_check": got.get("post_apply_check") or {},
                 "detail": f"`git apply` 打不上（{(pre.get('detail') or '')[:100]}）⇒ 三路合并"
                           f"{'（试跑，未落）' if dry_run else '成功'}"}
+    # code-10（报告）：失败面**不许硬编码 `applied: []`**——调用方要据此判断"是否需人工收拾现场"。
     return {"ok": False, "error": got.get("error") or pre.get("error") or "MERGE_FAILED",
             "detail": got.get("detail") or pre.get("detail", ""),
-            "phase": "merge", "applied": [], "conflicts": got.get("conflicts") or []}
+            "phase": "merge", "applied": res.get("applied") or [], "rolled_back": rolled,
+            "files": res.get("files") or [], "conflicts": got.get("conflicts") or []}
 
 
 def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry_run: bool = False,
@@ -366,11 +471,11 @@ def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry
         # 钉（标注层，纯增量）：正向应用；打不上就对**该文件**并集合并（"两边都加钉"的正解＝两枚都留）
         pins = str(res.get("pins_patch") or "")
         if pins:
+            from k3dge.engine import audit_merge      # 单源：补丁→文件集合只认 `patch_rels`
+
             rc, out = _git(wt, "apply", "-p1", str(Path(bundle) / pins))
             if rc != 0:
-                from k3dge.engine import audit_merge
-
-                for rel in sorted(audit_merge._rels_of_patch(Path(bundle), pins)):
+                for rel in sorted(res.get("pins_rels") or audit_merge.patch_rels(Path(bundle), pins)):
                     u = audit_merge.union_pins(wt, Path(bundle), rel)
                     if not u.get("ok"):
                         return {"ok": False, "error": "PINS_MERGE_FAILED", "conflicts": [rel],
@@ -540,9 +645,14 @@ def land_report(workspace: Path, milestone_id: str, out: Path, *,
     # 收集面＝**整个 `docs/`**：落报告会动 `docs/reviews/`，落代码会动 `docs/generated/`（投影）
     # 与 `docs/specs/`（契约哈希 ⇒ `k3dge sync` 回写，真跑实测漏在提交外 ⇒ 钩子按"哈希不一致"拦下）。
     # 树在本步之前是干净的（`DIRTY_TREE` 已挡）⇒ `docs/` 下的改动必是本轮产物。
-    rc, out = _git(workspace, "status", "--porcelain", "-uall", "--", "docs")
-    if rc == 0:
-        proj = [line[3:].strip() for line in out.splitlines() if line.strip()]
+    # value-10（报告）：产物清单**显式化**——只认我们自己会写的两处投影根（generated / specs），
+    # 不再对**整个 `docs/`** 盲扫（那会把别人的在途文档改动卷进审计提交）。
+    proj: List[str] = []
+    for _root in ("docs/generated", "docs/specs"):
+        rc, out = _git(workspace, "status", "--porcelain", "-uall", "--", _root)
+        if rc == 0:
+            proj += [line[3:].strip() for line in out.splitlines() if line.strip()]
+    proj = sorted(set(proj))
     files = [*([f for f in (extra_files or []) if f]), rel, *proj]
     # 里程碑 id **原样用**（`M0` 就写 `M0`）：别再前置 `M`——真跑实测把 `M0` 写成了 `MM0`。
     msg = (f"docs(audit): {milestone_id} 审计报告落盘（{why[:80]}）" if why

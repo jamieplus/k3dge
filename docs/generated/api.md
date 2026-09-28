@@ -247,11 +247,13 @@ from typing import Optional
 from typing import Set
 from k3dge.engine.audit_verify import replay_to_baseline
 touched_files(bundle: Path) -> Set[str]
-    # doc: 包内补丁触及的文件（`+++ b/<rel>`）。
+    # doc: 包内补丁触及的文件＝两份补丁声明集的**并集**（value-4：规则只在 `patch_rels` 里写一遍）。
 hunks_overlapping(patch_text: str, rel: str, lines: List[int], *, slack: int=2) -> Dict[str, Any]
     # doc: **只取与给定行重叠的 hunk**（用于把"未关项那几段"从落地里剔出去，其余修复照落）。
 merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str]=()) -> Dict[str, Any]
     # doc: 把包合进 `workspace`（**只算不写**）：返回 {ok, merged{rel: text}, conflicts[], excluded[], pins_rels[], detail}。
+patch_rels(bundle: Path, name: str) -> Set[str]
+    # doc: 补丁声明的文件集合（`+++ b/<rel>`）——**公开单源**（value-4：送检面内曾有三份同规则实现）。
 union_pins(workspace: Path, bundle: Path, rel: str) -> Dict[str, Any]
     # doc: 钉的并集合并（两边都加了钉 ⇒ 两枚都留）：`merge-file --union`，不产生冲突标记。
 # audit_report.py

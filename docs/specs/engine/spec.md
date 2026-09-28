@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:196805f4c34495c5e5209f1506c920b7f8073bcb8d9a590940ba1b3457f5f232`
+- **Contract Hash**: `sha256:4cdc871810ca0db66196847755ae9d9132fca65da8c2cacf6c2bab44b9ee6c3d`
 - **Last Updated**: 2026-09-28
 
 ## 1. Domain Boundary & Responsibilities
@@ -120,6 +120,7 @@ from k3dge.engine.audit_verify import replay_to_baseline
 touched_files(bundle: Path) -> Set[str]
 hunks_overlapping(patch_text: str, rel: str, lines: List[int], *, slack: int=2) -> Dict[str, Any]
 merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str]=()) -> Dict[str, Any]
+patch_rels(bundle: Path, name: str) -> Set[str]
 union_pins(workspace: Path, bundle: Path, rel: str) -> Dict[str, Any]
 from __future__ import annotations
 from pathlib import Path

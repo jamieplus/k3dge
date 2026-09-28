@@ -182,7 +182,7 @@
   "apply_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 262
+      "line": 354
     }
   ],
   "archived_milestone_tasks": [
@@ -320,13 +320,13 @@
   "bundle_digest": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 199
+      "line": 249
     }
   ],
   "bundle_facts": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 180
+      "line": 230
     }
   ],
   "cache_observability": [
@@ -662,7 +662,7 @@
   "commit_applied": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 557
+      "line": 667
     }
   ],
   "completeness_violations": [
@@ -686,7 +686,7 @@
   "consume": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 581
+      "line": 691
     }
   ],
   "consume_unreleased": [
@@ -798,7 +798,7 @@
   "find_k3dit": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 37
+      "line": 39
     }
   ],
   "find_orphan_adrs": [
@@ -966,7 +966,7 @@
   "hunks_overlapping": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 87
+      "line": 92
     }
   ],
   "index_path": [
@@ -1098,7 +1098,7 @@
   "land_report": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 485
+      "line": 590
     }
   ],
   "legacy_config_present": [
@@ -1220,7 +1220,7 @@
   "merge_into": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 109
+      "line": 114
     }
   ],
   "milestone_tags": [
@@ -1319,6 +1319,12 @@
       "line": 44
     }
   ],
+  "patch_rels": [
+    {
+      "file": "src/k3dge/engine/audit_merge.py",
+      "line": 187
+    }
+  ],
   "persist": [
     {
       "file": "src/k3dge/engine/nextstep.py",
@@ -1412,7 +1418,7 @@
   "reconcile_report_rows": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 435
+      "line": 540
     }
   ],
   "reconcile_supersedes": [
@@ -1574,7 +1580,7 @@
   "run_path_audit": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 75
+      "line": 96
     }
   ],
   "run_phase": [
@@ -1604,7 +1610,7 @@
   "salvage_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 126
+      "line": 172
     }
   ],
   "satisfied_ids": [
@@ -1818,7 +1824,7 @@
   "touched_files": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 27
+      "line": 37
     }
   ],
   "tree_hash": [
@@ -1830,7 +1836,7 @@
   "union_pins": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 179
+      "line": 200
     }
   ],
   "unmet_seal_preconditions": [
@@ -1884,7 +1890,7 @@
   "verify_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 163
+      "line": 213
     }
   ],
   "verify_bundle_local": [
@@ -1962,7 +1968,7 @@
   "write_run_digest": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 144
+      "line": 194
     }
   ],
   "write_symbol_index": [

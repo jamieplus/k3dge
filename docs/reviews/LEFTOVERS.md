@@ -255,3 +255,32 @@ Denial reason and reopen condition live here only.
   以报告（`验证`列/升级标记）为准由人重做，或（需要时）重跑一轮——**重跑不是默认动作**（用户已明确"不重跑"）。
 - **证据留存**：`/tmp/k3ge_m11c`（report/findings/pins/fix.patch 完整）+ 本文件 + 工具状态目录
   `<cache>/k3dit-state-<subj12>/`（席日志/账本；运行摘要机制见 `audit_bundle.write_run_digest`）。
+
+## M11 报告**人工重做**（2026-09-27）：按报告逐条修进今天的代码（不靠落包）
+
+用户裁定："既然落不了，你根据 review 报告来修"。**已修**（每条都有测试或既有测试覆盖）：
+
+| 报告 ID | 动作 |
+|---|---|
+| code-1 | `apply_bundle` dry-run **前后取 (HEAD, status) 快照比对**，不一致 ⇒ `TREE_MOVED` 不真打 |
+| code-2 | `_escaping_rels` 越界路径闸 ⇒ `APPLY_PATH_ESCAPE:<patch>`（并进"结构性失败"白名单，不退合并） |
+| code-3 | `files` 由**补丁声明**推出（`patch_rels` 单源），不再拿 `git status --porcelain` 全量当审计产物 |
+| code-4 | 删掉恒真谓词 `... or True`（过滤曾完全失效） |
+| code-5 | `union_pins` 的 base 改**纯基线**（原为"基线+fix"⇒ 与 ours/theirs 不同基；顺带删 `if True`） |
+| code-6 | base 在而 ours 缺 ⇒ 记 `missing`（fail-clear），不再以空文件三合出"成功但内容为空" |
+| code-7 | 半落 ⇒ 降级合并前**逆序反向应用回滚**（`_rollback_applied`） |
+| code-8 | 兑现契约另一半：暴露 `pins_rels` 单源 + 文档写清"钉由落盘方应用"（照原意再做一遍＝两份实现） |
+| code-9 | （原"转 tasks"）**状态目录加固**：`mkdir 0700`、拒符号链接/非目录；不安全 ⇒ `K3GE_STATE_UNSAFE` + 拒绝启动 |
+| code-10 | 失败面**不再硬编码 `applied: []`**：带真实 `applied/rolled_back/files` |
+| code-11 | `_run` 改 `Popen(start_new_session=True)` + 超时 **`killpg` 进程组**；`OSError`＝127 与超时＝124 分开 |
+| value-4 | `touched_files` 走 `patch_rels` 单源（送检面内曾三份同规则实现） |
+| value-6 | 权威口径写清：`audit_verify.verify_bundle_local` 是**唯一实现**，`verify_bundle` 是稳定门面 |
+| value-8 | `_owned_replay`：重放树**所有权显式**（本模块自建、调用方清理），`owner` 字段标出 |
+| value-10 | 产物清单**显式化**：只认 `docs/generated` 与 `docs/specs`，不再盲扫整个 `docs/` |
+
+**仍留（审计原判"有意留"，属结构性重构，需带测试面的独立批次）**：value-1（`apply_bundle` 相位拆分）、
+value-2（with-worktree 上下文管理器，两处脚手架合并）、value-3（落盘重复单点化）、value-5（replay 结果缓存，
+避免 O(补丁×钉文件) 次全量重放）、value-7（`audit_bundle` 四层拆文件）、value-9（`merge-file` 脚手架重复，原"待复验"）。
+
+**注意**：那轮 M11 的**包本身仍不可落**（其 `fix.patch` 只触及的两个文件此后又改过 ⇒ 真冲突）；上面是
+**以报告为规格的人工重做**，与"落包"是两条路。报告原文与包留档在 `/tmp/k3ge_m11c`。
