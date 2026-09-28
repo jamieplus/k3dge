@@ -593,7 +593,16 @@ def cmd_audit(args: argparse.Namespace) -> int:
         print(json.dumps({"stage": "run", "out": str(out_dir), "rc": ran.get("rc"), "ok": ran.get("ok"),
                           "payload": ran.get("payload"), "detail": ran.get("detail")}, ensure_ascii=False))
         if not ran.get("ok"):
-            return 1
+            # **抢救**（用户裁定：超时也要出报告）：工具被掐断 ⇒ `k3dit hall export --latest` 出"未完成导出"包
+            _salv = ab.salvage_bundle(workspace, out_dir)
+            _dig = ab.write_run_digest(out_dir, stage=("salvage-ok" if _salv.get("ok") else "run-failed"),
+                                       rc=ran.get("rc"), detail=(ran.get("detail") or "")[:400],
+                                       salvage_rc=_salv.get("rc"), salvage_detail=_salv.get("detail", ""))
+            print(json.dumps({"stage": "salvage", "ok": _salv.get("ok"), "rc": _salv.get("rc"),
+                              "digest": _dig, "detail": _salv.get("detail", "")}, ensure_ascii=False),
+                  file=sys.stderr)
+            if not _salv.get("ok"):
+                return 1
         bundle = out_dir
     target = Path(getattr(args, "into", "") or workspace).resolve()
     res = ab.consume(target, bundle, dry_run=bool(getattr(args, "dry_run", False)),

@@ -184,6 +184,10 @@ find_k3dit(workspace: Path) -> Optional[List[str]]
     # doc: 定位 k3dit：`K3DIT_BIN` > PATH > 兄弟仓 `.venv` > 兄弟仓 zipapp。找不到 → None。
 run_path_audit(workspace: Path, out: Path, *, mode: str='full', pins: str='inplace', scope: str='', timeout: int=3600, k3dit: Optional[List[str]]=None) -> dict
     # doc: 跑 k3dit 路径入口（工具调用）。`mode`＝工具运行模式（full / audit-only）；
+salvage_bundle(workspace: Path, out: Path, *, k3dit: Optional[List[str]]=None, timeout: int=300) -> dict
+    # doc: 工具失败/被墙钟掐断后**抢救**：`k3dit hall export --latest --out <out>`。
+write_run_digest(out: Path, **facts: object) -> str
+    # doc: **运行摘要**（用户裁定 ok）：`<out>/run-digest.json` —— "这轮怎么跑的 / 为什么停"。
 verify_bundle(bundle: Path, *, expect_input: str='', require_closed: bool=False, accept_baseline_drift: str='') -> dict
     # doc: **消费侧独立验收**（不调产出方）：报告完备性 + 本地闭环 + 内容哈希链。
 bundle_facts(bundle: Path) -> dict

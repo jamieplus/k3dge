@@ -5,6 +5,7 @@ Extracted from `engine/milestone.py` (A-1 第十二块).
 from __future__ import annotations
 
 import datetime
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -446,23 +447,47 @@ def _bundle_audit_leg(
                                 f'[roles.audit] k3dit_timeout={_tmo_raw!r} 不合法（正整数秒）'), ""
     elif k3dit_mode == "full":
         _tmo = 7200
+    _salv: dict = {}      # 抢救结果（仅失败路径填）
+    _salv_ok = False      # 抢救成功标记（`ran` 会被改写 ⇒ 不能靠它反推）
+    _dig = ""             # 运行摘要路径
     ran = ab.run_path_audit(workspace, out, mode=k3dit_mode, pins=k3dit_pins, scope=k3dit_scope,
                             timeout=_tmo)
     payload = ran.get("payload") or {}
     if not ran.get("ok"):
-        _hint = ""
-        if int(ran.get("rc") or 0) == 124:      # 墙钟掐断：孤儿单会占住窗 ⇒ 重跑前要清工具状态或释放该单
-            _st = _tool_state_dir(workspace)
-            _hint = (f"\n[提示] 工具调用被墙钟掐断（timeout）。工具状态在 {_st}：其中『在办单』会占住窗"
-                     f"（重跑会被『站点占位』拒）⇒ 先 `k3dit hall prune --force <job>` 释放，"
-                     f"或删除该状态目录后重跑。")
-        return _reject_step(workspace, milestone_id, "audit_bundle_run_failed",
-                            f"k3dit 产包失败（rc={ran.get('rc')}）：{ran.get('detail') or ''}{_hint}"), ""
-    # 纯审计（audit-only）：`status=partial` 是设计（钉留树）；它**只出证据，不构成封板依据** ⇒ 落报告后
+        # **抢救**（用户裁定：超时也要出报告，不能让流程停在中间）：工具被杀时不会 write_bundle，
+        # 但它账本里状态是全的 ⇒ `k3dit hall export --latest` 抢救出"未完成导出"包，再照常验收/部分落地。
+        _salv = ab.salvage_bundle(workspace, out)
+        _dig = ab.write_run_digest(out, stage=("salvage-ok" if _salv.get("ok") else "run-failed"),
+                                   rc=ran.get("rc"), detail=(ran.get("detail") or "")[:400],
+                                   salvage_rc=_salv.get("rc"), salvage_detail=_salv.get("detail", ""),
+                                   tool_state_dir=_tool_state_dir(workspace))
+        if not _salv.get("ok"):
+            # 抢救也失败 ⇒ 拒绝，但把**可操作提示 + 运行摘要路径**给出来（摘要随包留，事后可查）
+            _hint = ""
+            if int(ran.get("rc") or 0) == 124:
+                _st = _tool_state_dir(workspace)
+                _hint = (f"\n[提示] 工具调用被墙钟掐断（timeout）。工具状态在 {_st}：其中『在办单』会占住窗"
+                         f"（重跑会被『站点占位』拒）⇒ 先 `k3dit hall prune --force <job>` 释放，"
+                         f"或删除该状态目录后重跑。")
+            return _reject_step(workspace, milestone_id, "audit_bundle_run_failed",
+                                f"k3dit 产包失败（rc={ran.get('rc')}）：{ran.get('detail') or ''}{_hint}"
+                                f"\n[运行摘要] {_dig or '（未写出）'}"), ""
+        # 抢救成功 ⇒ **继续**走验收/部分落地（包自带「未完成导出」横幅 + `salvage:true`）
+        _salv_ok = True
+        _lm = out / "manifest.json"
+        try:
+            ran = {"ok": True, "payload": json.loads(_lm.read_text(encoding="utf-8")),
+                   "detail": "salvaged"}
+        except Exception:
+            return _reject_step(workspace, milestone_id, "audit_bundle_run_failed",
+                                f"抢救出的包不可读（{_lm}）\n[运行摘要] {_dig or '（未写出）'}"), ""
+    # 纯审计（audit-only）：    # 纯审计（audit-only）：`status=partial` 是设计（钉留树）；它**只出证据，不构成封板依据** ⇒ 落报告后
     # 以 refused 交回（带理由），不推进任何"已审"判定。full 才要求闭环。
     # **闭环判据归 k3dge**：`consume` 里的 `audit_verify.verify_bundle_local` 从 findings 自己算未关项，
     # 产出方自报的 `payload.status` 只作交叉核（不一致会被验收报出来）；不在此处读它当闸。
     audit_only = k3dit_mode == "audit-only"
+    salvaged = bool(_salv_ok and _salv.get("ok"))
+    _salv_note = f"（工具被掐断 ⇒ 由 `hall export` **抢救**出包；摘要 {_dig}）" if salvaged else ""
 
     res = ab.consume(workspace, out, expect_input=str(workspace), require_closed=not audit_only)
     if not res.get("ok"):
@@ -498,14 +523,14 @@ def _bundle_audit_leg(
             workspace, milestone_id, "audit_evidence_only",
             f"纯审计（`k3dit_mode = \"audit-only\"`）只出证据，不构成封板依据：报告落盘 {rel_report}，"
             f"落 {len(files)} 文件{('，提交 ' + commit[:12]) if commit else ''}。要封板请把 "
-            f'`[roles.audit] k3dit_mode` 改为 "full"（判读+修+复核，待修=0）再跑。{_esc_msg}'), ""
+            f'`[roles.audit] k3dit_mode` 改为 "full"（判读+修+复核，待修=0）再跑。{_esc_msg}{_salv_note}'), ""
     # **部分落地**（用户裁定 乙）：未关项不再整包拒 ⇒ 落已修、把未关项所在文件排除，并**由 k3dge 的审后闸
     # 报出升级**（k3dit 里没人看得到升级；报告行只在「验证」列加注，状态列保持产出方原样）。
     _part = bool(res.get("partial"))
     msg = (f"Milestone {milestone_id}: bundle 审计腿"
            f"{'**部分落地**（未闭环）' if _part else '闭环'}"
            f"（工具 k3dit job {jid or '-'}，包 {digest}，落 {len(files)} 文件，报告 {rel_report}"
-           f"{('，提交 ' + commit[:12]) if commit else ''}）。")
+           f"{('，提交 ' + commit[:12]) if commit else ''}）。{_salv_note}")
     if _part:
         msg += (f"\n[升级·转人工] 未关 {len(_esc)} 项：{', '.join(_esc[:8]) or '-'}"
                 f"；排除文件 {len(_excl)} 个（其修复未落）。报告「验证」列已标，**封板判据须为空**。")

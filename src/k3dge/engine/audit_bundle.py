@@ -123,6 +123,43 @@ def _tool_env(workspace: Path, argv0: List[str]) -> Dict[str, str]:
     return env
 
 
+def salvage_bundle(workspace: Path, out: Path, *, k3dit: Optional[List[str]] = None,
+                   timeout: int = 300) -> dict:
+    """工具失败/被墙钟掐断后**抢救**：`k3dit hall export --latest --out <out>`。
+
+    用户裁定："超时也要出报告，不能让流程停在中间"。工具被杀时不会自己 `write_bundle`，但它账本里状态
+    是全的（`report_markdown` 每步都写）⇒ 抢救出一只**自带「未完成导出」横幅 + `salvage:true`** 的包，
+    消费侧据此走"部分落地 + 升级"。返回 {ok, rc, out, detail}。
+    """
+    argv0 = k3dit or find_k3dit(workspace)
+    if not argv0:
+        return {"ok": False, "rc": 127, "out": str(out), "detail": "找不到 k3dit（抢救不了）"}
+    rc, text = _run([*argv0, "hall", "export", "--latest", "--out", str(out)],
+                    Path(workspace), timeout, env=_tool_env(Path(workspace), argv0))
+    ok = rc == 0 and (Path(out) / "manifest.json").is_file()
+    return {"ok": ok, "rc": rc, "out": str(out),
+            "detail": "" if ok else (text or "").strip()[-300:]}
+
+
+def write_run_digest(out: Path, **facts: object) -> str:
+    """**运行摘要**（用户裁定 ok）：`<out>/run-digest.json` —— "这轮怎么跑的 / 为什么停"。
+
+    为什么随产物留：席日志与账本在**工具状态目录**里（可能被清理/换机），摘要随包留存 ⇒ 事后仍能看出
+    问题出在哪（轮次/打回/封顶/未关/用量/抢救是否发生/工具状态目录）。
+    """
+    import datetime
+    import json as _json
+
+    data = {"written_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), **facts}
+    try:
+        Path(out).mkdir(parents=True, exist_ok=True)
+        dst = Path(out) / "run-digest.json"
+        dst.write_text(_json.dumps(data, ensure_ascii=False, indent=2, default=str) + "\n", encoding="utf-8")
+        return str(dst)
+    except OSError:      # pragma: no cover - 摘要写不出不该挡住主流程
+        return ""
+
+
 def verify_bundle(bundle: Path, *, expect_input: str = "", require_closed: bool = False,
                   accept_baseline_drift: str = "") -> dict:
     """**消费侧独立验收**（不调产出方）：报告完备性 + 本地闭环 + 内容哈希链。

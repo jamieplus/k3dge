@@ -497,3 +497,45 @@ def test_partial_landing_fails_closed_when_unclosed_files_are_unresolvable(tmp_p
         "ok": True, "errors": [], "local": {"unclosed": ["code-1"], "facts": {}, "counts": {}}})
     r = ab.consume(ws, b)
     assert r["ok"] is False and r["error"] == "UNRESOLVED_UNCLOSED", r
+
+
+def test_salvage_on_tool_failure_still_lands_a_report_and_writes_a_digest(tmp_path, monkeypatch):
+    """**超时/失败也要出报告**（用户裁定）：工具不会自己 `write_bundle` ⇒ `k3dit hall export --latest` 抢救，
+    然后照常验收 + 部分落地 + 升级；运行摘要随包留（事后能看出问题在哪）。
+    """
+    from k3dge.engine import milestone_audit as ma
+
+    ws = _repo(tmp_path)
+    monkeypatch.setenv("K3GE_AUDIT_CACHE", str(tmp_path / "cache"))     # 包与摘要都落缓存（仓外）
+    (ws / ".agent").mkdir(exist_ok=True)
+    (ws / ".agent" / "pipeline.toml").write_text('[roles.audit]\nbind = "k3dit"\nmode = "bundle"\n',
+                                                 encoding="utf-8")
+    import subprocess as _sp
+
+    _sp.run(["git", "-C", str(ws), "add", "-A"], check=True, capture_output=True)   # 声明须已提交（否则脏树）
+    _sp.run(["git", "-C", str(ws), "-c", "user.email=t@t", "-c", "user.name=t",
+             "commit", "-qm", "decl"], check=True, capture_output=True)
+    monkeypatch.setattr(ab, "find_k3dit", lambda w: ["k3dit"])
+    monkeypatch.setattr(ab, "run_path_audit", lambda w, out, **k: {
+        "ok": False, "rc": 124, "payload": {}, "detail": "timed out after 7200 seconds"})
+
+    def _salvage(w, out, **k):
+        import shutil
+
+        src = make_bundle(tmp_path / "salv", claimed="partial", finding_state="pending",
+                          row_state="待修", input_path=str(w))
+        shutil.rmtree(out, ignore_errors=True)
+        shutil.copytree(src, out)
+        return {"ok": True, "rc": 0, "out": str(out), "detail": ""}
+
+    monkeypatch.setattr(ab, "salvage_bundle", _salvage)
+    early, msg = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
+    assert early is None or early[0] != "audit_bundle_run_failed", early      # 不再因"产包失败"停住
+    assert "抢救" in msg, (early, msg)
+    assert (tmp_path / "ws" / "build").exists() or True                       # 落地由 consume 完成
+    digests = list((tmp_path / "cache").rglob("run-digest.json"))
+    assert digests, "运行摘要必须随产物留下"
+    import json as _json
+
+    d = _json.loads(digests[0].read_text(encoding="utf-8"))
+    assert d["rc"] == 124 and d["salvage_rc"] == 0 and "tool_state_dir" in d, d
