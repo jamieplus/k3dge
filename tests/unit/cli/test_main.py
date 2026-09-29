@@ -14,7 +14,12 @@ class TestCli(unittest.TestCase):
     def test_parser_has_audit(self):
         actions = build_parser()._subparsers._group_actions[0].choices  # type: ignore[attr-defined]
         self.assertIn("audit", actions)
-        self.assertNotIn("bundle", actions)   # 审计线模型：bundle 交付面已废
+        # bundle 交付面已**下沉为 audit 子动词**：顶层不再有 bundle，但 audit 仍有它。
+        self.assertNotIn("bundle", actions)
+        audit_action_choices = next(
+            a.choices for a in actions["audit"]._actions if getattr(a, "dest", "") == "audit_action"
+        )  # type: ignore[attr-defined]
+        self.assertIn("bundle", audit_action_choices)
 
     def test_audit_submit_no_peer(self):
         import os

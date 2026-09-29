@@ -49,8 +49,9 @@ def test_bundle_facts_and_digest_read_the_contract_surface(tmp_path):
     assert f["bundle_version"] == 1 and f["status"] == "closed"
     assert f["apply_order"] == ["fix.patch", "pins.patch"] and f["flow"]["windows"]["fix"] == 2
     assert ab.bundle_digest(b) == ab.bundle_digest(b)          # 确定性
+    d0 = ab.bundle_digest(b)
     (b / "report.md").write_text("# 审计 changed\n", encoding="utf-8")
-    assert ab.bundle_digest(b) != ab.bundle_digest(b) if False else True  # 摘要随内容变（下一行实证）
+    assert ab.bundle_digest(b) != d0                            # 摘要随内容变
     d1 = ab.bundle_digest(b)
     (b / "report.md").write_text("# 审计\n", encoding="utf-8")
     assert ab.bundle_digest(b) != d1
@@ -534,7 +535,6 @@ def test_salvage_on_tool_failure_still_lands_a_report_and_writes_a_digest(tmp_pa
     early, msg = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
     assert early is None or early[0] != "audit_bundle_run_failed", early      # 不再因"产包失败"停住
     assert "抢救" in msg, (early, msg)
-    assert (tmp_path / "ws" / "build").exists() or True                       # 落地由 consume 完成
     digests = list((tmp_path / "cache").rglob("run-digest.json"))
     assert digests, "运行摘要必须随产物留下"
     import json as _json
@@ -608,7 +608,7 @@ def test_landing_policy_belongs_to_the_caller(tmp_path):
     r2 = ab.consume(ws2, b2, landing="all")
     assert r2["ok"] and r2["escalated"] == ["code-1"] and r2["unclosed_hunks"] == {}, r2
     assert "src/a.py" in (r2["apply"].get("files") or []), r2["apply"]      # all ⇒ 全落
-    assert "fixed_A" not in (ws2 / "src" / "a.py").read_text(encoding="utf-8") or True
+    assert "added_by_fix = True" in (ws2 / "src" / "a.py").read_text(encoding="utf-8")  # all ⇒ 未关项也照落
     assert ab.consume(ws, b, landing="weird")["error"] == "BAD_LANDING"
 
 

@@ -238,7 +238,7 @@ def _seal_gate_registry(workspace: Path, milestone_id: str) -> dict:
 
 
 def seal_checklist(workspace: Path, milestone_id: str) -> list:
-    """**全量**封板前置清单：`[(gate_id, ok, message)]`，顺序＝声明序。
+    """**全量**封板前置清单：`[(gate_id, ok, message, auto)]`，顺序＝声明序。
 
     为什么需要全量：`seal_preconditions_error` 只报**首个**失败（闸的语义是"停"），
     于是操作者实际体验是"跑 seal → 修一个 → 再跑 → 又发现一个"的试错。清单让

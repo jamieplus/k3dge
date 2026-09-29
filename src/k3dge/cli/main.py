@@ -8,7 +8,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import List, Optional, Sequence
 
 from k3dge.engine import gate_facts
 from k3dge.engine.evaluator import ConsistencyEngine

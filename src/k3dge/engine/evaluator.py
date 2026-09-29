@@ -232,7 +232,7 @@ def _run_batch_tests(
     print("=" * 60, flush=True)
     print(output, flush=True)
     tail = "\n".join(output.splitlines()[-40:])
-    failed = {ref for ref in refs if ref in output and ("FAILED" in output or "failed" in output.lower())}
+    failed = {ref for ref in refs if ref in output and "failed" in output.lower()}
     if not failed:
         failed = set(refs)
     for ref in sorted(failed):

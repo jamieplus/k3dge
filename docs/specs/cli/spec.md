@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/cli`
-- **Contract Hash**: `sha256:4d2b160d3c3566d986a1bdbee3bbcaf4304cc2573fba5e7a800c95268880a8c3`
-- **Last Updated**: 2026-09-26
+- **Contract Hash**: `sha256:9f3a3e6a746bff9f1fbbccaa2f40eeab1a77eafc5f7881c91ee56270c6c7de05`
+- **Last Updated**: 2026-09-29
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -24,6 +24,7 @@
 ```python
 from __future__ import annotations
 from pathlib import Path
+from typing import List
 from typing import Optional
 from typing import Sequence
 from k3dge.engine import gate_facts
@@ -98,6 +99,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 from typing import Dict
+from typing import Optional
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.manifest import Manifest
 from k3dge.engine.manifest import ManifestError

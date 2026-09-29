@@ -58,13 +58,12 @@ def ensure(workspace: Path, job: str, base: Optional[str] = None) -> Path:
         m = _git(workspace, "worktree", "add", str(wt), br)
     if m.returncode != 0 and "already registered" in (m.stderr or ""):
         _git(workspace, "worktree", "prune")            # 陈旧登记自愈（目录被外部清过）
-        if base or True:
-            re = _git(workspace, "worktree", "add", "-f", str(wt), branch_name(job)) \
-                if _git(workspace, "rev-parse", "--verify", "-q", f"refs/heads/{branch_name(job)}").returncode == 0 \
-                else _git(workspace, "worktree", "add", "-f", "-b", branch_name(job), str(wt), base or "HEAD")
-            if re.returncode != 0:
-                raise RuntimeError(f"worktree add failed after prune: {(re.stderr or re.stdout).strip()[:200]}")
-            return wt
+        re = _git(workspace, "worktree", "add", "-f", str(wt), branch_name(job)) \
+            if _git(workspace, "rev-parse", "--verify", "-q", f"refs/heads/{branch_name(job)}").returncode == 0 \
+            else _git(workspace, "worktree", "add", "-f", "-b", branch_name(job), str(wt), base or "HEAD")
+        if re.returncode != 0:
+            raise RuntimeError(f"worktree add failed after prune: {(re.stderr or re.stdout).strip()[:200]}")
+        return wt
     if m.returncode != 0:
         raise RuntimeError(f"worktree add failed: {(m.stderr or m.stdout).strip()[:200]}")
     return wt

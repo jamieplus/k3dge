@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.manifest import Manifest, ManifestError
@@ -51,8 +51,6 @@ def lifecycle_next(workspace: Path) -> Any:
     自己的门槛同源（`seal.unmet_seal_preconditions`）；**审计状态不参与**——审计是 seal 相位 2
     自己跑的，不是"先审好才谈封"的前置闸。
     """
-    from typing import Optional
-
     from k3dge.engine import nextstep
     from k3dge.engine.audit_trigger import compute_audit_suggestion
     from k3dge.engine.milestone_audit import scan_pending_findings

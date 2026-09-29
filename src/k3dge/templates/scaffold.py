@@ -159,7 +159,8 @@ def ensure_mcp_config(target: Path) -> bool:
             return False
     if "mcpServers" not in data or not isinstance(data["mcpServers"], dict):
         data["mcpServers"] = {}
-    # k3dge is always present (framework)
+    # k3dge is always present (framework); peers from pipeline.toml are merged
+    # on demand via `k3dge mcp sync` (not scaffold time).
     if "k3dge" not in data["mcpServers"]:
         if (target / "src" / "k3dge").is_dir():
             data["mcpServers"]["k3dge"] = {
@@ -176,9 +177,7 @@ def ensure_mcp_config(target: Path) -> bool:
         tmp = mcp_path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
         tmp.replace(mcp_path)
-        return True
     return True
-    # Peers from pipeline.toml are merged on demand via `k3dge mcp sync` (not scaffold time)
 
 
 def _pipeline_servers(target: Path) -> set:
@@ -292,7 +291,7 @@ def scaffold(target: Path, name: str | None = None) -> None:
         _write_if_missing(_d / "AUTHORING.md", _asset(f"{_type}/AUTHORING.md"))
     _write_if_missing(
         target / "docs" / "specs" / "_template" / "spec.md",
-        _qualify_adr_refs(SPEC_TEMPLATE.format(domain="<domain>", date=today)),
+        SPEC_TEMPLATE,
     )
     _write_if_missing(target / ".pre-commit-config.yaml", PRE_COMMIT_TEMPLATE)
     _write_if_missing(target / "scripts" / "gate.sh", GATE_SH_TEMPLATE, executable=True)

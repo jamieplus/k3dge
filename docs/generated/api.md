@@ -8,6 +8,7 @@
 # main.py
 from __future__ import annotations
 from pathlib import Path
+from typing import List
 from typing import Optional
 from typing import Sequence
 from k3dge.engine import gate_facts
@@ -111,6 +112,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 from typing import Dict
+from typing import Optional
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.manifest import Manifest
 from k3dge.engine.manifest import ManifestError
@@ -920,7 +922,7 @@ scan_unfilled_guides(workspace: Path) -> List[str]
 seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gates.Rejection]
     # doc: 策略层：按「硬闸契约」`[checks.seal].preconditions` 求值全部前置闸，返回首个拒绝（None=全绿）。
 seal_checklist(workspace: Path, milestone_id: str) -> list
-    # doc: **全量**封板前置清单：`[(gate_id, ok, message)]`，顺序＝声明序。
+    # doc: **全量**封板前置清单：`[(gate_id, ok, message, auto)]`，顺序＝声明序。
 unmet_seal_preconditions(workspace: Path, milestone_id: str) -> list
     # doc: **需人先办**的未过闸 `[(gate_id, message)]`（由 `seal_checklist` 派生，单一判据源）。
 render_checklist(workspace: Path, milestone_id: str) -> str

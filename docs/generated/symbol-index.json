@@ -146,7 +146,7 @@
   "advance": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 94
+      "line": 93
     }
   ],
   "all_stage_refs": [
@@ -1202,7 +1202,7 @@
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 354
+      "line": 353
     }
   ],
   "managed_docs": [
@@ -1220,7 +1220,7 @@
   "materialize": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 333
+      "line": 332
     }
   ],
   "mcp_server_names": [
@@ -1238,7 +1238,7 @@
   "merge_back": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 217
+      "line": 216
     }
   ],
   "merge_into": [
@@ -1364,7 +1364,7 @@
   "pin_baseline": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 301
+      "line": 300
     }
   ],
   "preconditions": [
@@ -1382,7 +1382,7 @@
   "present": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 73
+      "line": 72
     }
   ],
   "probe_peer_mcp": [
@@ -1406,7 +1406,7 @@
   "prune": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 277
+      "line": 276
     }
   ],
   "question_text": [
@@ -1478,7 +1478,7 @@
   "remove": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 297
+      "line": 296
     }
   ],
   "render": [
@@ -1646,7 +1646,7 @@
   "scaffold": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 264
+      "line": 263
     }
   ],
   "scan": [
@@ -1790,7 +1790,7 @@
   "strip_pins": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 119
+      "line": 118
     }
   ],
   "summary": [
@@ -1974,7 +1974,7 @@
   "workspace_status": [
     {
       "file": "src/k3dge/cli/status.py",
-      "line": 83
+      "line": 81
     }
   ],
   "worktree_path": [
