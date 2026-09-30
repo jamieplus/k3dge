@@ -33,12 +33,30 @@ _CTRL_NODES = (
 def _git_changed_files(workspace: Path) -> List[str]:
     try:
         out = subprocess.run(
-            ["git", "status", "--porcelain"],
+            # `-z`（NUL 分隔、不 quote 非 ASCII）；`--untracked-files=all` 展开新目录为文件
+            # （否则整包只算 1 个 `?? src/x/`、且不以 .py 结尾 ⇒ C2 触发条件系统性漏判，ocr-052）。
+            ["git", "status", "--porcelain", "-z", "--untracked-files=all"],
             cwd=workspace, capture_output=True, text=True,
         )
-        return [ln[3:].strip() for ln in out.stdout.splitlines() if ln.strip()]
     except Exception:
         return []
+    if out.returncode != 0:
+        return []
+    toks = out.stdout.split("\0")
+    files: List[str] = []
+    i = 0
+    while i < len(toks):
+        e = toks[i]
+        i += 1
+        if not e:
+            continue
+        xy, path = e[:2], e[3:]
+        if "R" in xy or "C" in xy:
+            # rename/copy：`-z` 下下一 token 是**原路径**（跳过），本 token 是新路径（取它）。
+            if i < len(toks):
+                i += 1
+        files.append(path.strip())
+    return files
 
 
 def _max_control_depth(path: Path) -> int:

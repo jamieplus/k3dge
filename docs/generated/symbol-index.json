@@ -212,7 +212,7 @@
   "audit_closed": [
     {
       "file": "src/k3dge/engine/audit_trigger.py",
-      "line": 95
+      "line": 113
     }
   ],
   "audit_evidence": [
@@ -698,7 +698,7 @@
   "compute_audit_suggestion": [
     {
       "file": "src/k3dge/engine/audit_trigger.py",
-      "line": 63
+      "line": 81
     }
   ],
   "compute_hash": [
