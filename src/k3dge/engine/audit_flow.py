@@ -111,11 +111,18 @@ def audit_evidence(workspace: Path, milestone_id: str) -> dict:
             rf = _run("for-each-ref", "--format=%(contents)", f"refs/tags/{milestone_id}")
             if rf is not None and rf.returncode == 0:
                 trailers = _parse_trailers(rf.stdout)
-    return {
-        "tag": tag,
-        "trailers": trailers,
-        "sealed": bool(tag) and set(trailers) >= set(SEAL_TRAILER_KEYS),
-    }
+    def _real(v: object) -> bool:
+        # `seal.format_seal_trailers` 对缺失字段写 `-` ⇒ 四键齐全但全是占位的残缺记录也"键存在"
+        # （本函数的定位恰恰是判据，必须核**值**，ocr-210）。
+        s = str(v or "").strip()
+        return bool(s) and s != "-"
+
+    sealed = bool(tag) and set(trailers) >= set(SEAL_TRAILER_KEYS) and all(
+        _real(trailers.get(k)) for k in SEAL_TRAILER_KEYS)
+    base = str(trailers.get("audit-baseline") or "").strip()
+    if sealed and base and tag and not base.startswith(tag[:len(base)] if len(base) >= 7 else tag[:7]):
+        sealed = False      # trailer 的基线与边界 tag 不同指 ⇒ 记录与 tag 不是一对（因果未绑定）
+    return {"tag": tag, "trailers": trailers, "sealed": sealed}
 
 
 def _parse_trailers(text: str) -> dict:

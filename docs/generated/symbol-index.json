@@ -218,7 +218,7 @@
   "audit_closed": [
     {
       "file": "src/k3dge/engine/audit_trigger.py",
-      "line": 113
+      "line": 126
     }
   ],
   "audit_evidence": [
@@ -278,7 +278,7 @@
   "build_checklist": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 77
+      "line": 88
     }
   ],
   "build_docs_index": [
@@ -326,7 +326,7 @@
   "bump_verify_attempt": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 154
+      "line": 169
     }
   ],
   "bump_version": [
@@ -704,7 +704,7 @@
   "compute_audit_suggestion": [
     {
       "file": "src/k3dge/engine/audit_trigger.py",
-      "line": 81
+      "line": 86
     }
   ],
   "compute_hash": [
@@ -716,7 +716,7 @@
   "consume": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 791
+      "line": 793
     }
   ],
   "consume_unreleased": [
@@ -786,7 +786,7 @@
   "ensure_checklist": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 133
+      "line": 148
     }
   ],
   "ensure_mcp_config": [
@@ -948,7 +948,7 @@
   "get_verify_attempts": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 150
+      "line": 165
     }
   ],
   "get_version": [
@@ -996,7 +996,7 @@
   "hunks_overlapping": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 97
+      "line": 103
     }
   ],
   "index_path": [
@@ -1250,7 +1250,7 @@
   "merge_into": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 119
+      "line": 125
     }
   ],
   "milestone_tags": [
@@ -1352,7 +1352,7 @@
   "patch_rels": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 201
+      "line": 208
     }
   ],
   "persist": [
@@ -1418,7 +1418,7 @@
   "prune_finished": [
     {
       "file": "src/k3dge/engine/audit_flow.py",
-      "line": 147
+      "line": 154
     }
   ],
   "question_text": [
@@ -1430,7 +1430,7 @@
   "read_checklist": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 112
+      "line": 123
     }
   ],
   "read_events": [
@@ -1538,13 +1538,13 @@
   "reset_for_audit": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 137
+      "line": 152
     }
   ],
   "reset_verify_attempts": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 161
+      "line": 176
     }
   ],
   "resolve": [
@@ -1878,7 +1878,7 @@
   "union_pins": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 214
+      "line": 232
     }
   ],
   "unmet_seal_preconditions": [
@@ -1938,7 +1938,7 @@
   "verify_bundle_local": [
     {
       "file": "src/k3dge/engine/audit_verify.py",
-      "line": 203
+      "line": 215
     }
   ],
   "verify_commit": [

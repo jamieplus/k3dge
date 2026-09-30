@@ -276,6 +276,7 @@ from k3dge.engine import report_table
 from __future__ import annotations
 from pathlib import Path
 from typing import List
+from typing import Optional
 from typing import Tuple
 from k3dge.engine import gates
 from k3dge.engine.milestone_pointer import get_current_milestone

@@ -783,7 +783,9 @@ def commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str
     rc, out = _git(workspace, "-c", "user.email=k3dge@local", "-c", "user.name=k3dge",
                    "commit", "-q", "-m", message)
     if rc != 0:
-        return "", f"git commit 失败：{out.strip()[-400:]}"
+        # 失败后树停在 staged 态 ⇒ 下一轮 `apply_bundle` 被自家 `DIRTY_TREE` 挡死、要人工 `git reset`（ocr-205）。
+        _git(workspace, "reset", "-q", "--", *files)
+        return "", f"git commit 失败（本轮已退回未暂存）：{out.strip()[-400:]}"
     rc, out = _git(workspace, "rev-parse", "HEAD")
     return (out.strip() if rc == 0 else ""), ""
 
@@ -824,6 +826,7 @@ def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
     unclosed = [str(x) for x in (local.get("unclosed") or [])]
     unclosed_files: List[str] = []
     unclosed_hunks: Dict[str, List[int]] = {}
+    unclosed_whole_files: List[str] = []   # 位置解不出行号 ⇒ 整文件排除
     if unclosed:
         try:
             items = json.loads((Path(bundle) / "findings.json").read_text(encoding="utf-8"))
@@ -837,8 +840,13 @@ def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
                         unclosed_files.append(f)
                         if ln.strip().isdigit():
                             unclosed_hunks.setdefault(f, []).append(int(ln.strip()))
+                        else:
+                            # 空串 / `src/x.py` 无行号 / `12-15` 区间 / `N/A`：只进 unclosed_files 的话，
+                            # partial 的 fail-close 判据看的是"有没有任何 hunk 可剔" ⇒ 只要**别的项**
+                            # 解出了行号就整体放行，这一项照样落进主干（ocr-206）。退到文件级排除。
+                            unclosed_whole_files.append(f)
         except Exception:      # pragma: no cover - 读不出就 fail-close（宁可不落也不乱落）
-            unclosed_files, unclosed_hunks = [], {}
+            unclosed_files, unclosed_hunks, unclosed_whole_files = [], {}, []
     _landing = str(landing or "partial")
     if _landing not in ("closed-only", "partial", "all"):
         return {"ok": False, "error": "BAD_LANDING", "facts": facts,
@@ -854,7 +862,8 @@ def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
         return {"ok": False, "error": "UNRESOLVED_UNCLOSED", "facts": facts, "verify": verified,
                 "detail": f"未关 {len(unclosed)} 项但 findings 里取不到 `location` ⇒ 无法安全排除其文件，"
                           f"不做部分落地（{', '.join(unclosed[:5])}）"}
-    ex_all = sorted({str(x) for x in (exclude or [])})      # 未关项走 **hunk 级**（不再整文件排除）
+    ex_all = sorted({str(x) for x in (exclude or [])} | set(unclosed_whole_files))
+    # 未关项默认走 hunk 级（同文件里别人的修复照落）；解不出行号的退**文件级**，别让它偷渡进主干。
     applied = apply_bundle(workspace, bundle, dry_run=dry_run, exclude=ex_all,
                            exclude_hunks=unclosed_hunks or None)
     if not applied.get("ok"):

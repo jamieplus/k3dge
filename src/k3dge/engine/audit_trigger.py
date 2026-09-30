@@ -17,7 +17,7 @@ from __future__ import annotations
 import ast
 import subprocess
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from k3dge.engine import gates
 from k3dge.engine.audit_report import _find_audit_report
@@ -30,18 +30,19 @@ _CTRL_NODES = (
 
 
 # k3dit:leftover F-7 @line 与 cli 重复 git status（有意留）
-def _git_changed_files(workspace: Path) -> List[str]:
+def _git_changed_files(workspace: Path) -> Optional[List[str]]:
     try:
         out = subprocess.run(
             # `-z`（NUL 分隔、不 quote 非 ASCII）；`--untracked-files=all` 展开新目录为文件
             # （否则整包只算 1 个 `?? src/x/`、且不以 .py 结尾 ⇒ C2 触发条件系统性漏判，ocr-052）。
             ["git", "status", "--porcelain", "-z", "--untracked-files=all"],
-            cwd=workspace, capture_output=True, text=True,
+            cwd=workspace, capture_output=True, text=True, timeout=60,
         )
     except Exception:
-        return []
+        return None                      # git 不可用/异常：与"干净工作区"区分开（ocr-215）
     if out.returncode != 0:
-        return []
+        return None                      # 非仓库 / index.lock / safe.directory ⇒ 未知，不是"没变更"
+
     toks = out.stdout.split("\0")
     files: List[str] = []
     i = 0
@@ -59,11 +60,12 @@ def _git_changed_files(workspace: Path) -> List[str]:
     return files
 
 
-def _max_control_depth(path: Path) -> int:
+def _max_control_depth(path: Path) -> Optional[int]:
+    """None ⇒ **取不到/解析不了**（与"深度 0"不同：这类文件恰恰最可疑，记 0 会让 C2 对它失明，ocr-216）。"""
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"))
-    except Exception:
-        return 0
+    except (OSError, UnicodeDecodeError, SyntaxError, ValueError, RecursionError):
+        return None
     best = 0
 
     def walk(node, depth):
@@ -74,7 +76,10 @@ def _max_control_depth(path: Path) -> int:
         for child in ast.iter_child_nodes(node):
             walk(child, d)
 
-    walk(tree, 0)
+    try:
+        walk(tree, 0)
+    except RecursionError:               # 超深 AST：也不能当成"没嵌套"
+        return None
     return best
 
 
@@ -96,11 +101,19 @@ def compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]:
     c2_max = int(gates.get(workspace, "audit_trigger", "c2_nesting_max"))
     vol_max = int(gates.get(workspace, "audit_trigger", "volume_max"))
     files = _git_changed_files(workspace)
+    if files is None:
+        # 取不到变更集 ⇒ C2/体积本轮**不可判定**，出声而不是静默少两个触发器（ocr-215）。
+        reasons.append("C2/体积不可判定：git 变更集取不到（非仓库/锁/异常）")
+        return (True, reasons)
     srcs = [workspace / f for f in files if f.startswith("src/") and f.endswith(".py")]
     if srcs:
-        depth = max((_max_control_depth(p) for p in srcs), default=0)
+        depths = [_max_control_depth(p) for p in srcs]
+        unparsed = sum(1 for d in depths if d is None)
+        depth = max((d for d in depths if d is not None), default=0)
         if depth >= c2_max:
             reasons.append(f"C2 嵌套：触及 src/ 控制流 AST 深度最大 {depth} ≥ {c2_max}")
+        if unparsed:
+            reasons.append(f"C2 盲区：{unparsed} 个触及文件不可解析（语法未过/读失败）")
     vol = [f for f in files if f.startswith("src/") or f.startswith("docs/specs/")]
     if len(vol) >= vol_max:
         reasons.append(f"体积：变更 {len(vol)} 个 src/specs 文件 ≥ {vol_max}")

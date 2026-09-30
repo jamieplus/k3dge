@@ -59,10 +59,21 @@ def _snapshot(workspace: Path, milestone_id: str) -> dict:
         _, rows = parse_rows(found[1])
         escalated = sum(1 for _i, r in rows
                         if any(m in str(r.get("验证") or "") for m in ESCALATION_MARKERS))
+    pending_total = 0
+    if found:
+        from k3dge.engine.audit_report import _parse_audit_stats
+
+        _st = _parse_audit_stats(found[1])
+        # 状态列与验证列可以是**同一条** finding（reconcile 明写"不动状态列"）⇒ 相加会双计（ocr-207）。
+        _ids = set(str(i) for i in (_st.get("_ids_待修") or []))
+        if rows:
+            _ids |= set(str(r.get("ID", "")) for _i, r in rows
+                        if any(m in str(r.get("验证") or "") for m in ESCALATION_MARKERS))
+        pending_total = len(_ids)
     closure = {
         "audit": {
             "present": found is not None,
-            "pending": ((_parse_audit_stats(found[1])["待修"] + escalated) if found else None),
+            "pending": (pending_total if found else None),
             "escalated": escalated,
         },
     }
@@ -104,7 +115,7 @@ def _read_raw(workspace: Path) -> Optional[dict]:
         return None
     try:
         d = json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, UnicodeDecodeError, ValueError):
         return None
     return d if isinstance(d, dict) else None
 
@@ -115,7 +126,11 @@ def read_checklist(workspace: Path, milestone_id: Optional[str] = None) -> Optio
         return None
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, UnicodeDecodeError, ValueError):
+        # `[]`/`"x"`/`null` 是**合法但非 object** 的 JSON：旧版 `except Exception` 之外还会让
+        # `data.get` 抛 AttributeError 逸出（ensure_checklist → 全流程崩，ocr-208）。
+        return None
+    if not isinstance(data, dict):
         return None
     mid = data.get("milestone_id")
     if mid is None:
@@ -167,4 +182,7 @@ def reset_verify_attempts(workspace: Path) -> None:
 def _write(workspace: Path, data: dict) -> None:
     p = _path(workspace)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    # 原子写：半截 JSON 会被 read_checklist 当"文件不存在"⇒ 状态/预算静默归零（ocr-209）。
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp.replace(p)

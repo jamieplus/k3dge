@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:5b40181d988ca1f23fd2f802c98163d065d4027be74a19d5d505ae05d997e244`
+- **Contract Hash**: `sha256:02fca97931a459ca990f723658445a4394a974f9c49d98982e786736258c6735`
 - **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
@@ -134,6 +134,7 @@ from k3dge.engine import report_table
 from __future__ import annotations
 from pathlib import Path
 from typing import List
+from typing import Optional
 from typing import Tuple
 from k3dge.engine import gates
 from k3dge.engine.milestone_pointer import get_current_milestone

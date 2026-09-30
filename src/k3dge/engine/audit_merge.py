@@ -54,9 +54,15 @@ def _merge_file(ours: Path, base: Path, theirs: Path) -> Dict[str, Any]:
         c.write_bytes(theirs.read_bytes() if theirs.is_file() else b"")
         rc = subprocess.run(["git", "merge-file", "-p", str(a), str(b), str(c)],
                             capture_output=True)
-        text = rc.stdout.decode("utf-8", "replace")
         if rc.returncode == 0:
-            return {"ok": True, "text": text, "conflict": False}
+            try:
+                # `decode(..., "replace")` 把非 UTF-8（GBK/latin-1/二进制）换成 U+FFFD，落盘方
+                # 再 `write_text` 写回 ⇒ 原字节不可恢复的静默改写（ocr-211）。宁可不出结果。
+                return {"ok": True, "text": rc.stdout.decode("utf-8"), "conflict": False}
+            except UnicodeDecodeError:
+                return {"ok": False, "text": "", "conflict": False,
+                        "detail": "merge 输出非 UTF-8（二进制/异编码）⇒ 不落地"}
+        text = rc.stdout.decode("utf-8", "replace")
         if 1 <= rc.returncode <= 127:
             # `git merge-file` 的返回码＝**冲突个数**（不是错误码！）⇒ rc=2 是"2 处冲突"。
             # 真跑实测：把 `>1` 当错误 ⇒ 只要文件里 ≥2 处冲突就误报"合并失败"（detail 空）。
@@ -162,9 +168,10 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
     tmp_mid = str(mid_root) if mid.get("ok") else ""      # 复用包的 `code/`（**别 rmtree 它**）
     try:
         # code-4（报告）：原 `... or True` 是**恒真谓词** ⇒ 过滤完全失效。改成显式语义：
-        # `fix_only`＝fix.patch 声明的文件（有则只合它）；`fix_rels`＝无 fix.patch 时的回落集合。
-        fix_rels = sorted(touched_files(bundle) - excluded)
-        fix_only = sorted(set(patch_rels(bundle, "fix.patch")) - excluded)
+        # 回落集**只认 fix 层**：`fix_only` 为空意味着"没有 fix.patch 或其文件全被排除"，
+        # 用 `touched_files`（fix ∪ pins）当回退会把标注层硬塞进 fix 三路合并，与两层语义矛盾（ocr-212）。
+        fix_rels = sorted(patch_rels(bundle, "fix.patch") - excluded)
+        fix_only = fix_rels
         merged: Dict[str, str] = {}
         conflicts: List[str] = []
         missing: List[str] = []
@@ -199,12 +206,23 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
 
 
 def patch_rels(bundle: Path, name: str) -> Set[str]:
-    """补丁声明的文件集合（`+++ b/<rel>`）——**公开单源**（value-4：送检面内曾有三份同规则实现）。"""
+    """补丁声明的文件集合（`+++ b/<rel>`）——**公开单源**（value-4：送检面内曾有三份同规则实现）。
+
+    `rel` 来自**外部交付包**，且被 `merge_into`/`union_pins`/落盘方拼进路径读写 ⇒ 绝对路径/`..`
+    会逃出工作区（上游 `APPLY_PATH_ESCAPE` 只挡 `git apply`，挡不住这里的 mkdir+写，ocr-213）。
+    """
     p = Path(bundle) / name
     if not p.is_file():
         return set()
-    return {line[6:].strip() for line in p.read_text(encoding="utf-8", errors="replace").splitlines()
-            if line.startswith("+++ b/")}
+    out: Set[str] = set()
+    for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.startswith("+++ b/"):
+            continue
+        rel = line[6:].strip()
+        if not rel or rel.startswith("/") or ".." in Path(rel).parts or re.match(r"^[A-Za-z]:", rel):
+            continue
+        out.add(rel)
+    return out
 
 
 #: 旧名（内部调用点过渡用）

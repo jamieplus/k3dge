@@ -124,9 +124,21 @@ def replay_to_baseline(bundle: Path, dest: Optional[Path] = None,
     if not code.is_dir():
         return {"ok": False, "root": "", "detail": "包内无 code/（无法重放基线）"}
     work = Path(dest) if dest else Path(tempfile.mkdtemp(prefix="k3dge-base-"))
-    if work.exists():
+    if dest:
+        # 调用方传的任意路径**绝不 rmtree**：误传工作区/主干目录就是不可逆数据丢失，且
+        # `ignore_errors=True` 会连失败都吞掉（ocr-218）。只接受不存在或空的目录。
+        if work.exists() and any(work.iterdir()):
+            return {"ok": False, "root": "", "replay": [],
+                    "detail": f"dest 非空目录，拒绝清空：{work}"}
+    elif work.exists():
         shutil.rmtree(work, ignore_errors=True)
-    shutil.copytree(code, work)
+    work.mkdir(parents=True, exist_ok=True)
+    for child in work.iterdir():
+        if child.is_dir():
+            shutil.rmtree(child, ignore_errors=True)
+        else:
+            child.unlink(missing_ok=True)
+    shutil.copytree(code, work, dirs_exist_ok=True)
     env = {"GIT_AUTHOR_NAME": "k3dge", "GIT_AUTHOR_EMAIL": "k3dge@local",
            "GIT_COMMITTER_NAME": "k3dge", "GIT_COMMITTER_EMAIL": "k3dge@local",
            "PATH": "/usr/bin:/bin"}
@@ -246,6 +258,9 @@ def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed:
     unclosed = _unclosed_local({i: x for i, x in by_id.items()})
     terminal_unacked = sorted(str(i) for i, x in by_id.items()
                               if str(x.get("state") or "") in CLOSED_STATES and not x.get("review_ack"))
+    # 模块开头的判据写着"未关＝open 态 **或终态未背书**"，但旧实现只把 `terminal_unacked` 放进
+    # cross_check 当信息 ⇒ 自报已关而无人背书的项会被算成已关（判据与实现漂移，ocr-217）。
+    unclosed = sorted(set(unclosed) | set(terminal_unacked))
     report_rows = 0
     if (bundle / "report.md").is_file():
         report_text = (bundle / "report.md").read_text(encoding="utf-8")
