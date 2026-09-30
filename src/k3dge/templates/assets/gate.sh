@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Locate the repo root relative to this script (works from any cwd).
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$ROOT"
 
 # Forward all args to k3dge; default to 'check' when none given.
@@ -18,15 +18,25 @@ _WANT="${K3DGE_SOURCE:-}"
 if [ -z "$_WANT" ] && [ -f "$ROOT/pyproject.toml" ]; then
   _WANT="$(python3 -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb")).get("tool",{}).get("k3dge",{}).get("source",""))' 2>/dev/null || true)"
   if [ -z "$_WANT" ]; then
-    _WANT="$(sed -n '/^\[tool\.k3dge\]$/,/^\[/p' pyproject.toml 2>/dev/null | sed -n 's/^source *= *"\(.*\)".*/\1/p' | head -1)"
+    # 与 gate.py 同口径：允许 tab、单/双引号、行尾注释（原 `s/^source *= *"\(...\)"*/` 只认双引号 + 无 tab）。
+    _WANT="$(sed -n '/^\[tool\.k3dge\]$/,/^\[/p' pyproject.toml 2>/dev/null \
+             | sed -n "s/^[[:space:]]*source[[:space:]]*=[[:space:]]*[\"']\([^\"']*\)[\"'].*/\1/p" | head -1)"
   fi
 fi
 _SRC_FILE="$ROOT/.venv/k3dge-source.txt"
-if [ -n "$_WANT" ] && [ -f "$_SRC_FILE" ]; then
-  _REC="$(head -1 "$_SRC_FILE" | tr -d ' \t\r\n')"
-  [ -d "$_WANT" ] && _WANT="$(cd "$_WANT" && pwd -P)"
-  [ -d "$_REC" ] && _REC="$(cd "$_REC" && pwd -P)"
-  if [ "$_WANT" != "$_REC" ]; then
+if [ -n "$_WANT" ]; then
+  if [ ! -f "$_SRC_FILE" ]; then
+    # 政策存在而收据缺失 ⇒ 无法证明本 venv 来源与政策一致（删收据/手建 venv 都会溜过）——拒跑，不再静默放行。
+    echo "[k3dge-source] 政策已声明但 .venv/k3dge-source.txt 缺失：无法证明来源一致 ⇒ 拒跑" >&2
+    echo "  重跑 ./k3dge-init.sh 落盘，或 unset K3DGE_SOURCE/改 pyproject 政策。" >&2
+    exit 2
+  fi
+  IFS= read -r _REC < "$_SRC_FILE" || _REC=""       # 不用 `head -1 | tr`（pipefail + SIGPIPE 有静默风险，ocr-154）
+  _REC="${_REC#$'\xef\xbb\xbf'}"                    # 去 BOM（旧 init.ps1 写的 BOM 会让比较恒不等）
+  _REC="$(printf '%s' "$_REC" | tr -d ' \t\r\n')"
+  [ -d "$_WANT" ] && _WANT="$(cd "$_WANT" && pwd -P)"   # 只对真实目录取物理路径；pypi/URL 保持原样
+  [ -n "$_REC" ] && [ -d "$_REC" ] && _REC="$(cd "$_REC" && pwd -P)"
+  if [ -n "$_REC" ] && [ "$_WANT" != "$_REC" ]; then
     echo "[k3dge-source] MISMATCH: want='$_WANT'（env>pyproject） but installed from '$_REC'." >&2
     echo "  重装或改政策后再跑闸。" >&2
     exit 2

@@ -2,29 +2,56 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 $cmdArgs = if ($args.Count -eq 0) { @("check") } else { $args }
+
 # K3DGE_SOURCE 统管校验：环境声明的源 vs 本 venv 的装时落盘，不一致即拦。
+# 优先级与 gate.sh / gate.py 同：环境 > 本仓 pyproject [tool.k3dge].source；都没有 = legacy。
 $srcFile = Join-Path $Root ".venv/k3dge-source.txt"
 $want = $env:K3DGE_SOURCE
 if ([string]::IsNullOrWhiteSpace($want) -and (Test-Path (Join-Path $Root "pyproject.toml"))) {
-  try { $want = (python3 -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb")).get("tool",{}).get("k3dge",{}).get("source",""))' 2>$null).Trim() } catch { $want = "" }
+  # 原生命令 + Stop 下 `2>$null` 会抛 NativeCommandError ⇒ 临时降为 Continue（WinPS 5.1），失败按"取不到"处理（ocr-144/147）。
+  $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  try { $want = ((& python3 -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb")).get("tool",{}).get("k3dge",{}).get("source",""))' 2>$null) | Out-String).Trim() }
+  catch { $want = "" }
+  finally { $ErrorActionPreference = $prev }
   if ([string]::IsNullOrWhiteSpace($want)) {
     $inSec = $false
-    foreach ($ln in (Get-Content (Join-Path $Root "pyproject.toml"))) {
-      if ($ln -match '^\[tool\.k3dge\]$') { $inSec = $true; continue }
+    foreach ($ln in (Get-Content -LiteralPath (Join-Path $Root "pyproject.toml"))) {
+      if ($ln -match '^\[tool\.k3dge\]\s*(#.*)?$') { $inSec = $true; continue }     # 容忍行尾注释（ocr-144）
       if ($inSec -and $ln -match '^\[') { break }
-      if ($inSec -and ($ln -match '^source\s*=\s*"([^"]+)"')) { $want = $Matches[1]; break }
+      if ($inSec -and ($ln -match '^[[:space:]]*source[[:space:]]*=[[:space:]]*[\x22\x27]([^\x22\x27]*)[\x22\x27]')) {
+        $want = $Matches[1]; break                                                   # 两种引号 + 允许缩进
+      }
     }
   }
 }
-if ($want -and (Test-Path $srcFile)) {
-  $rec = ((Get-Content $srcFile | Select-Object -First 1) -replace '\s','')
-  if ($want -ne $rec) {
-    [Console]::Error.WriteLine("[k3dge-source] MISMATCH: want='$want' (env>pyproject) but installed from '$rec'. 重装或改政策后再跑闸.")
+
+function Resolve-PhysPath([string]$p) {
+  # 只对真实目录取物理路径（与 gate.py 的 _norm_path 同口径）；pypi / URL 保持原样。
+  if ($p -and (Test-Path -LiteralPath $p -PathType Container)) {
+    return (Resolve-Path -LiteralPath $p).Path.TrimEnd('\','/')
+  }
+  return $p
+}
+
+if ($want) {
+  if (-not (Test-Path -LiteralPath $srcFile)) {
+    # 政策存在而收据缺失 ⇒ 无法证明 venv 来源一致（删收据/手建 venv 都会溜过，ocr-150 家族）。
+    [Console]::Error.WriteLine("[k3dge-source] 政策已声明但 .venv/k3dge-source.txt 缺失：无法证明来源一致 ⇒ 拒跑")
+    exit 2
+  }
+  # UTF8 读 + Trim：去 BOM 与首尾空白；比较两侧**同一套**归一化；`-cne` 大小写敏感（源一致性是字面比较）。
+  $rec = ((Get-Content -LiteralPath $srcFile -Encoding UTF8 -TotalCount 1) | Out-String).Trim()
+  $w = Resolve-PhysPath $want
+  $r = if ($rec) { Resolve-PhysPath $rec } else { "" }
+  if ($r -and ($w -cne $r)) {
+    [Console]::Error.WriteLine("[k3dge-source] MISMATCH: want='$w' (env>pyproject) but installed from '$r'. 重装或改政策后再跑闸.")
     exit 2
   }
 }
-if (Test-Path ".venv/Scripts/k3dge.exe") {
-  & .venv/Scripts/k3dge @cmdArgs
+
+$venvExe = Join-Path $Root ".venv/Scripts/k3dge.exe"
+if (Test-Path -LiteralPath $venvExe -PathType Leaf) {
+  & $venvExe @cmdArgs        # 与守卫同一路径（不再用相对且无扩展名的调用，ocr-146）
   exit $LASTEXITCODE
 }
 $k3dge = Get-Command k3dge -ErrorAction SilentlyContinue
