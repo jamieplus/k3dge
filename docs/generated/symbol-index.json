@@ -206,7 +206,7 @@
   "audit_call_result": [
     {
       "file": "src/k3dge/engine/audit_flow.py",
-      "line": 39
+      "line": 42
     }
   ],
   "audit_closed": [
@@ -218,7 +218,7 @@
   "audit_evidence": [
     {
       "file": "src/k3dge/engine/audit_flow.py",
-      "line": 62
+      "line": 65
     }
   ],
   "audit_job_ticket_names": [
@@ -230,7 +230,7 @@
   "audit_result_of": [
     {
       "file": "src/k3dge/engine/audit_flow.py",
-      "line": 57
+      "line": 60
     }
   ],
   "begin_run": [
@@ -320,7 +320,7 @@
   "bump_verify_attempt": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 135
+      "line": 154
     }
   ],
   "bump_version": [
@@ -686,7 +686,7 @@
   "commit_applied": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 702
+      "line": 741
     }
   ],
   "completeness_violations": [
@@ -710,7 +710,7 @@
   "consume": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 726
+      "line": 765
     }
   ],
   "consume_unreleased": [
@@ -780,7 +780,7 @@
   "ensure_checklist": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 114
+      "line": 133
     }
   ],
   "ensure_mcp_config": [
@@ -942,7 +942,7 @@
   "get_verify_attempts": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 131
+      "line": 150
     }
   ],
   "get_version": [
@@ -990,7 +990,7 @@
   "hunks_overlapping": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 92
+      "line": 97
     }
   ],
   "index_path": [
@@ -1122,7 +1122,7 @@
   "land_report": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 625
+      "line": 664
     }
   ],
   "legacy_config_present": [
@@ -1244,7 +1244,7 @@
   "merge_into": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 114
+      "line": 119
     }
   ],
   "milestone_tags": [
@@ -1346,7 +1346,7 @@
   "patch_rels": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 187
+      "line": 192
     }
   ],
   "persist": [
@@ -1409,6 +1409,12 @@
       "line": 276
     }
   ],
+  "prune_finished": [
+    {
+      "file": "src/k3dge/engine/audit_flow.py",
+      "line": 147
+    }
+  ],
   "question_text": [
     {
       "file": "src/k3dge/engine/nextstep.py",
@@ -1418,7 +1424,7 @@
   "read_checklist": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 98
+      "line": 112
     }
   ],
   "read_events": [
@@ -1442,7 +1448,7 @@
   "reconcile_report_rows": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 575
+      "line": 614
     }
   ],
   "reconcile_supersedes": [
@@ -1526,13 +1532,13 @@
   "reset_for_audit": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 118
+      "line": 137
     }
   ],
   "reset_verify_attempts": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 142
+      "line": 161
     }
   ],
   "resolve": [
@@ -1866,7 +1872,7 @@
   "union_pins": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 200
+      "line": 205
     }
   ],
   "unmet_seal_preconditions": [

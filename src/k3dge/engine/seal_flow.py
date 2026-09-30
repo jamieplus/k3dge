@@ -359,8 +359,8 @@ def run_seal_flow(
             pr = prune_finished(workspace)
             if pr.get("pruned"):
                 return True, f"\n  审计派生件清理: {pr['pruned']} 组"
-        except Exception:
-            pass
+        except Exception as exc:      # 清理失败不该阻断封板，但**必须可见**（不再静默 pass，ocr-047）
+            return True, f"\n  审计派生件清理: 跳过（{type(exc).__name__}: {exc}）"
         return True, ""
 
     registry = {"full_matrix": _full_matrix, "audit": _audit, "archive": _archive,

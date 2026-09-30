@@ -73,7 +73,12 @@ def _hunks(patch_text: str) -> Dict[str, List[Dict[str, Any]]]:
     rel = ""
     cur: Optional[Dict[str, Any]] = None
     for line in (patch_text or "").splitlines(keepends=True):
-        if line.startswith("+++ b/"):
+        if line.startswith("diff --git "):
+            # 文件边界用 `diff --git`（**不能**用 `--- a/`：正文里被删的 `-- xxx` 行会显示成
+            # `--- xxx`，前缀与 `--- a/` 无法区分 ⇒ 会把下一文件的头吞进上一 hunk，ocr-048）。
+            rel = ""
+            cur = None
+        elif line.startswith("+++ b/"):
             rel = line[6:].strip()
             out.setdefault(rel, [])
             cur = None

@@ -410,7 +410,9 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
     # **有 hunk 级剔除要求时不许走"精确 git apply"快路**：那条路会把未关项所在 hunk 一起落进去
     #（真跑/测试实测：`git apply` 成功 ⇒ 过滤从未发生 ⇒ 未验证的改动进了主干）。一律走合并路径。
     snap0 = _snapshot(workspace)          # code-1：dry-run 之前
-    pre = {"ok": False, "detail": "（有 hunk 级剔除要求 ⇒ 强制走合并路径）"} if exclude_hunks else \
+    # `exclude`（文件级）也只在三路合并里被尊重 ⇒ 有剔除要求就**强制**绕开"精确 git apply"快路，
+    # 否则被排除文件照样落树、报告还写"已排除"（ocr-040）。
+    pre = {"ok": False, "detail": "（有剔除要求 ⇒ 强制走合并路径）"} if (exclude_hunks or exclude) else \
         _dry_run_via_worktree(workspace, bundle, order)
     rolled: List[str] = []
     res: dict = {}
@@ -428,6 +430,10 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
                     "strategy": "git-apply", "excluded": sorted({str(x) for x in (exclude or [])})}
         # code-7：半落 ⇒ **先逆序回滚**再考虑降级合并（否则合并的 ours 被污染）
         rolled = _rollback_applied(workspace, bundle, res.get("applied") or [])
+        if len(rolled) != len([x for x in (res.get("applied") or []) if x]):
+            # 回滚不完整 ⇒ 树里留着半条补丁；此时**不许**继续三路合并（ours 已被污染，ocr-041）。
+            return {"ok": False, "error": "ROLLBACK_INCOMPLETE", "applied": res.get("applied") or [],
+                    "rolled_back": rolled, "detail": "半落补丁回滚不完整 ⇒ 停止（树可能残留半条补丁，请人工核对）"}
     # `git apply` 打不上**不等于修复不可用**：补丁是对审计当时的基线生成的，而主干可能已经往前走
     #（落钉、别的修复、重构）。两侧信息都全 ⇒ 退到**三路合并**（base＝包的可重放基线）。
     # **结构性**失败（补丁缺/不是仓/脏树/无 worktree）不该退合并——那不是"打不上"，是输入不对。
@@ -451,6 +457,36 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
             "detail": got.get("detail") or pre.get("detail", ""),
             "phase": "merge", "applied": res.get("applied") or [], "rolled_back": rolled,
             "files": res.get("files") or [], "conflicts": got.get("conflicts") or []}
+
+
+def _restore_files(workspace: Path, files: List[str]) -> Dict[str, object]:
+    """把 `files` 恢复成 HEAD 状态：**已跟踪**的 `git checkout --`；**未跟踪**（合并新增）的删除。
+
+    必须分批：`git checkout -- <untracked>` 报 `pathspec ... did not match`，一个坏 pathspec 会让
+    整条 checkout 失败 ⇒ 什么都不退，还虚报"已回滚"（ocr-042）。返回 {restored, removed, failed}。
+    """
+    tracked: List[str] = []
+    untracked: List[str] = []
+    for rel in files:
+        rc, _ = _git(workspace, "ls-files", "--error-unmatch", "--", rel)
+        (tracked if rc == 0 else untracked).append(rel)
+    restored: List[str] = []
+    failed: List[str] = []
+    if tracked:
+        rc, _ = _git(workspace, "checkout", "--", *tracked)
+        (restored if rc == 0 else failed).extend(tracked)
+    removed: List[str] = []
+    for rel in untracked:
+        p = workspace / rel
+        try:
+            if p.is_file() or p.is_symlink():
+                p.unlink()
+                removed.append(rel)
+            else:
+                failed.append(rel)
+        except OSError:
+            failed.append(rel)
+    return {"restored": restored, "removed": removed, "failed": failed}
 
 
 def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry_run: bool = False,
@@ -532,14 +568,17 @@ def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry
         check = _post_apply_check(workspace, workspace)
         if check.get("cmd") and not check.get("ok"):
             # 回滚：合并写进去的文件 **＋ 投影**（声明的校验可能跑了 `k3dge sync/index` 之类的投影刷新；
-            # 合并被回滚后那些投影也不再成立 ⇒ 一起退，别留半套状态）
-            if files:
-                _git(workspace, "checkout", "--", *files)
+            # 合并被回滚后那些投影也不再成立 ⇒ 一起退，别留半套状态）。跟踪/未跟踪分批退（ocr-042）。
+            roll = _restore_files(workspace, list(files)) if files else {"restored": [], "removed": [], "failed": []}
             if (workspace / "docs" / "generated").is_dir():
                 _git(workspace, "checkout", "--", "docs/generated")
+            _nback = len(roll["restored"]) + len(roll["removed"])   # type: ignore[arg-type]
+            _fail = roll["failed"]
             return {"ok": False, "error": "POST_APPLY_CHECK_FAILED", "conflicts": [],
-                    "detail": f"落库后校验未过（已回滚 {len(files)} 个文件）：{check.get('cmd')} ⇒ "
-                              f"{check.get('detail')}", "files": []}
+                    "detail": f"落库后校验未过（回滚 {_nback} 个文件"
+                              + (f"，**{len(_fail)} 个未退**: {_fail}" if _fail else "")
+                              + f"）：{check.get('cmd')} ⇒ {check.get('detail')}",
+                    "files": [], "rolled_back": roll}
         return {"ok": True, "files": files, "excluded": res.get("excluded") or [],
                 "conflicts": [], "post_apply_check": check, "dropped_hunks": dropped}
     finally:

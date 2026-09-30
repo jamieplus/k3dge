@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:480d7c0a811a1136d2afbad344ceb386a6e4987b49cc2545e8e5c519229f8fe4`
+- **Contract Hash**: `sha256:66865d9393a08e64066896af1f7cd2b11d020a10c4a5f9330db4bf979e4f489a`
 - **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
@@ -95,8 +95,8 @@ from pathlib import Path
 from typing import Optional
 CHECK_LIST_PATH = '.agent/audit_checklist.json'
 build_checklist(workspace: Path, milestone_id: Optional[str]=None) -> dict
-read_checklist(workspace: Path) -> Optional[dict]
-ensure_checklist(workspace: Path) -> dict
+read_checklist(workspace: Path, milestone_id: Optional[str]=None) -> Optional[dict]
+ensure_checklist(workspace: Path, milestone_id: Optional[str]=None) -> dict
 reset_for_audit(workspace: Path, milestone_id: Optional[str]=None) -> dict
 get_verify_attempts(workspace: Path) -> int
 bump_verify_attempt(workspace: Path) -> int
@@ -107,11 +107,13 @@ from typing import Dict
 from typing import Optional
 from k3dge.engine import report_table
 from k3dge.engine.pipeline_runner import run_action
+STATE_REL = '.agent/audit_jobs.json'
 AUDIT_RESULTS = ('closed', 'degraded-manual', 'escalated', 'refused')
 SEALABLE_AUDIT_RESULTS = ('closed', 'degraded-manual')
 audit_call_result(produced) -> str
 audit_result_of(status: str) -> Optional[str]
 audit_evidence(workspace: Path, milestone_id: str) -> dict
+prune_finished(workspace: Path) -> Dict[str, object]
 from __future__ import annotations
 from pathlib import Path
 from typing import Any

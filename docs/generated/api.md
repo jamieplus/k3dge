@@ -223,8 +223,8 @@ from typing import Optional
 CHECK_LIST_PATH = '.agent/audit_checklist.json'
 build_checklist(workspace: Path, milestone_id: Optional[str]=None) -> dict
     # doc: Recompute the audit-condition snapshot and persist it (keeps counters if the
-read_checklist(workspace: Path) -> Optional[dict]
-ensure_checklist(workspace: Path) -> dict
+read_checklist(workspace: Path, milestone_id: Optional[str]=None) -> Optional[dict]
+ensure_checklist(workspace: Path, milestone_id: Optional[str]=None) -> dict
 reset_for_audit(workspace: Path, milestone_id: Optional[str]=None) -> dict
     # doc: Called when an audit pass is initiated (manual `milestone audit` or auto):
 get_verify_attempts(workspace: Path) -> int
@@ -237,6 +237,7 @@ from typing import Dict
 from typing import Optional
 from k3dge.engine import report_table
 from k3dge.engine.pipeline_runner import run_action
+STATE_REL = '.agent/audit_jobs.json'
 AUDIT_RESULTS = ('closed', 'degraded-manual', 'escalated', 'refused')
 SEALABLE_AUDIT_RESULTS = ('closed', 'degraded-manual')
 audit_call_result(produced) -> str
@@ -245,6 +246,8 @@ audit_result_of(status: str) -> Optional[str]
     # doc: 审计流程状态 → 闭集值；in-flight（尚未正常返回）⇒ None。
 audit_evidence(workspace: Path, milestone_id: str) -> dict
     # doc: 审计的 **durable 证据**（判据只认这些）：边界 tag + 封版提交 trailer。
+prune_finished(workspace: Path) -> Dict[str, object]
+    # doc: 收口清理：删**已终态**审计单的派生件（worktree + 已并入主干的审计线分支）。
 # audit_merge.py
 from __future__ import annotations
 from pathlib import Path

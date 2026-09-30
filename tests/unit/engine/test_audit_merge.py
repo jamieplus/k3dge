@@ -86,3 +86,29 @@ def test_merge_file_rc_is_conflict_count_not_error(tmp_path):
         fromfile=f"a/{rel}", tofile=f"b/{rel}")), encoding="utf-8")
     r = am.merge_into(ws, b)
     assert r["ok"] is False and r["conflicts"] == [rel], r        # 冲突（不是 MERGE_FAILED 那一类）
+
+
+def test_hunks_multi_file_boundary():
+    """`_hunks` 不得把下一文件的 `--- a/` 头吞进上一 hunk（ocr-048）。"""
+    from k3dge.engine import audit_merge as am
+
+    patch = (
+        "diff --git a/x.py b/x.py\n"
+        "--- a/x.py\n"
+        "+++ b/x.py\n"
+        "@@ -1,2 +1,2 @@\n"
+        " a\n"
+        "-b\n"
+        "+B\n"
+        "diff --git a/y.py b/y.py\n"
+        "--- a/y.py\n"
+        "+++ b/y.py\n"
+        "@@ -5,1 +5,1 @@\n"
+        "-c\n"
+        "+C\n"
+    )
+    h = am._hunks(patch)
+    assert set(h) == {"x.py", "y.py"}
+    assert len(h["x.py"]) == 1 and len(h["y.py"]) == 1
+    assert not any("y.py" in ln for ln in h["x.py"][0]["lines"])
+    assert all(not ln.startswith("--- a/") for ln in h["x.py"][0]["lines"])

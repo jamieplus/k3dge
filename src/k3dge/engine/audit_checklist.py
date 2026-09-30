@@ -81,8 +81,10 @@ def build_checklist(workspace: Path, milestone_id: Optional[str] = None) -> dict
 
     mid = milestone_id or get_current_milestone(workspace)
     h = _tasks_hash(workspace, mid)
-    prev = read_checklist(workspace)
-    keep = prev is not None and prev.get("tasks_hash") == h
+    prev = _read_raw(workspace)
+    # 计数器生命周期与快照刷新**解耦**：只要还是同一里程碑就保留——否则审计环内"修→重审"改了任务集就把
+    # verify 预算清零，`attempts >= max` 永不成立、escalated 转人工不可达（ocr-043）。
+    keep = prev is not None and prev.get("milestone_id") == mid
     data = {
         "milestone_id": mid,
         "tasks_hash": h,
@@ -95,7 +97,19 @@ def build_checklist(workspace: Path, milestone_id: Optional[str] = None) -> dict
     return data
 
 
-def read_checklist(workspace: Path) -> Optional[dict]:
+def _read_raw(workspace: Path) -> Optional[dict]:
+    """读快照文件**不做新鲜度判定**（供 `build_checklist` 保留计数器——计数器不该因任务集变了就丢，ocr-043）。"""
+    p = _path(workspace)
+    if not p.is_file():
+        return None
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return d if isinstance(d, dict) else None
+
+
+def read_checklist(workspace: Path, milestone_id: Optional[str] = None) -> Optional[dict]:
     p = _path(workspace)
     if not p.is_file():
         return None
@@ -106,13 +120,18 @@ def read_checklist(workspace: Path) -> Optional[dict]:
     mid = data.get("milestone_id")
     if mid is None:
         return None
+    from k3dge.engine.milestone_pointer import get_current_milestone
+
+    # 快照必须属于**当前里程碑**：否则上一里程碑的 present/pending/预算会被当 fresh（ocr-044）。
+    if mid != (milestone_id or get_current_milestone(workspace)):
+        return None
     if data.get("tasks_hash") != _tasks_hash(workspace, mid):
         return None  # stale: task set changed
     return data
 
 
-def ensure_checklist(workspace: Path) -> dict:
-    return read_checklist(workspace) or build_checklist(workspace)
+def ensure_checklist(workspace: Path, milestone_id: Optional[str] = None) -> dict:
+    return read_checklist(workspace, milestone_id) or build_checklist(workspace, milestone_id)
 
 
 def reset_for_audit(workspace: Path, milestone_id: Optional[str] = None) -> dict:

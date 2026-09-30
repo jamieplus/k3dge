@@ -21,6 +21,9 @@ from k3dge.engine.pipeline_runner import run_action
 
 _REPORT_HEADER_TOKEN = report_table.TABLE_HEADER
 
+#: 审计单编排状态的运行态投影（k3dge 自己的事实；`.agent/audit_jobs.json`）。
+STATE_REL = ".agent/audit_jobs.json"
+
 #: 审计结果的**闭集**（ADR-0004 §2.1.11）。唯一源：CLI / MCP / seal / 封版提交 trailer
 #: 都读这里，不得各自写字符串。前两个允许推进版号，后两个不许。
 AUDIT_RESULTS = ("closed", "degraded-manual", "escalated", "refused")
@@ -72,32 +75,42 @@ def audit_evidence(workspace: Path, milestone_id: str) -> dict:
 
     from k3dge.engine.seal import SEAL_TRAILER_KEYS
 
-    def _git(*args: str) -> str:
+    def _run(*args: str):
         try:
-            r = subprocess.run(["git", "-C", str(workspace), *args], capture_output=True, text=True)
+            return subprocess.run(["git", "-C", str(workspace), *args], capture_output=True, text=True)
         except OSError:
-            return ""
-        return r.stdout.strip() if r.returncode == 0 else ""
+            return None
 
-    tag = _git("rev-parse", f"refs/tags/{milestone_id}^{{commit}}")
+    # "仓里没有封版证据"与"证据读不出来（git 故障）"必须分开（ocr-045）：后者给 error 字段，
+    # 让调用方显示"无法判定"而不是假阴性的"未封"。
+    gd = _run("rev-parse", "--git-dir")
+    if gd is None or gd.returncode != 0:
+        return {"tag": "", "trailers": {}, "sealed": False,
+                "error": "git 不可用" if gd is None else (gd.stderr or "not a git repository").strip()}
+    tag = ""
+    rv = _run("rev-parse", "--verify", "--quiet", f"refs/tags/{milestone_id}^{{commit}}")
+    if rv is not None and rv.returncode == 0:
+        tag = rv.stdout.strip()
     trailers: dict = {}
     if tag:
-        # 记录在**封版提交**上（tag 指基线，那条提交本身没有 trailer）⇒ 沿历史找带
-        # `Seal-milestone: <id>` 的那次提交；记录分隔用 RS，字段用 US（提交正文可能多行）。
-        log = _git("log", "--format=%H%x1f%(trailers)%x1e")
-        for rec in log.split("\x1e"):
-            rec = rec.strip("\n")
-            if not rec:
-                continue
-            _sha, _, body = rec.partition("\x1f")
-            cand = _parse_trailers(body)
-            if cand.get("seal-milestone") == milestone_id:
-                trailers = cand
-                break
+        # **因果绑定 + 有界**：封版提交必在基线 tag 之后 ⇒ 只在 `tag..HEAD` 找带 trailer 的提交，
+        # 不再全历史扫描（ocr-046；旧行为会把无关历史线上带同名 trailer 的提交判成本轮封版）。
+        lg = _run("log", f"{tag}..HEAD", "--format=%H%x1f%(trailers)%x1e")
+        if lg is not None and lg.returncode == 0:
+            for rec in lg.stdout.split("\x1e"):
+                rec = rec.strip("\n")
+                if not rec:
+                    continue
+                _sha, _, body = rec.partition("\x1f")
+                cand = _parse_trailers(body)
+                if cand.get("seal-milestone") == milestone_id:
+                    trailers = cand
+                    break
         if not trailers:
             # 第二载体：tag 注解正文（**零改动封版**没有提交可挂 ⇒ 记录只在注解里）
-            trailers = _parse_trailers(_git("for-each-ref", "--format=%(contents)",
-                                            f"refs/tags/{milestone_id}"))
+            rf = _run("for-each-ref", "--format=%(contents)", f"refs/tags/{milestone_id}")
+            if rf is not None and rf.returncode == 0:
+                trailers = _parse_trailers(rf.stdout)
     return {
         "tag": tag,
         "trailers": trailers,
@@ -129,3 +142,30 @@ def _count_status(report_md: str) -> Dict[str, int]:
 
 # ---------- 两态入口 ----------
 
+
+
+def prune_finished(workspace: Path) -> Dict[str, object]:
+    """收口清理：删**已终态**审计单的派生件（worktree + 已并入主干的审计线分支）。
+
+    源＝`STATE_REL`（`.agent/audit_jobs.json`，运行态投影，可重建）；史在主干，删的只是场地。
+    返回 `{"pruned": n}`（有清理动作的单数）。**恢复：** `seal_flow._prune` 此前 import 本名
+    但本模块已不再导出 ⇒ 每轮封版的清理静默空转（ocr-047）。
+    """
+    from k3dge.engine import worktree
+
+    try:
+        jobs = (json.loads((workspace / STATE_REL).read_text(encoding="utf-8")) or {}).get("jobs") or []
+    except (OSError, ValueError):
+        return {"pruned": 0}
+    terminal = {"collected", "done", "failed", "retired", "closed", "merged"}
+    pruned = 0
+    for j in jobs:
+        jid = str((j or {}).get("job_id") or "")
+        if not jid or str(j.get("state") or "") not in terminal:
+            continue
+        try:
+            if worktree.prune(workspace, jid).get("removed"):
+                pruned += 1
+        except Exception:      # 单只清理失败不连坐其余单
+            continue
+    return {"pruned": pruned}
