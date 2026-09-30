@@ -56,13 +56,15 @@ def _flip_pending_rows(
     """把命中该票的 `待修` 行翻 `已修`；返回 (new_lines, changed, 最后一个待修行 fid)。"""
     new_lines = lines[:]
     changed = False
-    fid = ""   # 表无匹配行时的绑定兜底
+    fid = ""            # 表无匹配行时的绑定兜底（最后一个待修行）
+    matched_fid = ""    # 真正被翻成 已修 的那一行（旧实现返回"末个待修行"，会把别人的 ID 写进回填，ocr-114）
     for i, row in rows:
         if row.get("状态") != "待修":
             continue
         fid = row.get("ID", "")
         if not _row_hits_task(row, title_token, stem_token):
             continue
+        matched_fid = row.get("ID", "")
         row["状态"] = "已修"
         disp = row.get("处置", "")
         if "已修" not in disp:
@@ -70,7 +72,7 @@ def _flip_pending_rows(
                            else f"已修 → {task_name}")
         new_lines[i] = "| " + " | ".join(row[h] for h in header) + " |"
         changed = True
-    return new_lines, changed, fid
+    return new_lines, changed, (matched_fid or fid)
 
 
 def _new_backfill_lines(task_name: str, fid: str) -> List[str]:

@@ -88,8 +88,18 @@ def build_symbol_index(workspace: Path) -> Dict[str, List[dict]]:
 
 def write_symbol_index(workspace: Path) -> Path:
     out = index_path(workspace)
+    index = build_symbol_index(workspace)
+    if not index and out.is_file():
+        # 构建为空但已有**非空**索引 ⇒ 多为 manifest 解析失败放大（坏配置把提交产物清空＝数据丢失）。
+        # 保留旧索引（随后 `check` 的 SYMBOL_INDEX_STALE 会把它作为红暴露，不静默）(ocr-110)。
+        try:
+            existing = json.loads(out.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            existing = {}
+        if existing:
+            return out
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(build_symbol_index(workspace), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    out.write_text(json.dumps(index, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return out
 
 

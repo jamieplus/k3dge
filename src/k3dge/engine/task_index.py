@@ -30,8 +30,12 @@ def audit_job_ticket_names(workspace: Path) -> set:
         raw = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return set()
+    if not isinstance(raw, dict):        # 顶层非对象（数组/字符串）⇒ 优雅退化空集，不崩（ocr-113）
+        return set()
     names: set = set()
     for job in raw.get("jobs") or []:
+        if not isinstance(job, dict):    # 元素非对象也跳过（ocr-113）
+            continue
         rel = str(job.get("ticket_task") or "").replace("\\", "/").strip()
         if rel:
             names.add(Path(rel).name)

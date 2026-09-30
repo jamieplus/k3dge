@@ -62,7 +62,7 @@
   "MilestoneTask": [
     {
       "file": "src/k3dge/engine/task_index.py",
-      "line": 81
+      "line": 85
     }
   ],
   "NextStep": [
@@ -92,7 +92,7 @@
   "TaskIndex": [
     {
       "file": "src/k3dge/engine/task_index.py",
-      "line": 89
+      "line": 93
     }
   ],
   "TaskMove": [
@@ -200,7 +200,7 @@
   "archived_milestone_tasks": [
     {
       "file": "src/k3dge/engine/task_index.py",
-      "line": 108
+      "line": 112
     }
   ],
   "audit_cache_root": [
@@ -314,7 +314,7 @@
   "build_task_name": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 435
+      "line": 437
     }
   ],
   "bump_milestone": [
@@ -698,7 +698,7 @@
   "completeness_violations": [
     {
       "file": "src/k3dge/engine/state_machine.py",
-      "line": 100
+      "line": 117
     }
   ],
   "compute_audit_suggestion": [
@@ -740,7 +740,7 @@
   "create_task": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 173
+      "line": 175
     }
   ],
   "critical_path": [
@@ -1158,7 +1158,7 @@
   "list_tasks": [
     {
       "file": "src/k3dge/engine/task_index.py",
-      "line": 99
+      "line": 103
     }
   ],
   "load": [
@@ -1220,7 +1220,7 @@
   "mark_task_done": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 372
+      "line": 374
     }
   ],
   "materialize": [
@@ -1304,7 +1304,7 @@
   "parse_frontmatter": [
     {
       "file": "src/k3dge/engine/task_index.py",
-      "line": 71
+      "line": 75
     }
   ],
   "parse_frontmatter_pairs": [
@@ -1382,7 +1382,7 @@
   "premature_archive_hint": [
     {
       "file": "src/k3dge/engine/task_index.py",
-      "line": 118
+      "line": 122
     }
   ],
   "present": [
@@ -1442,13 +1442,13 @@
   "reassign_milestone": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 490
+      "line": 492
     }
   ],
   "reassign_task_milestone": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 441
+      "line": 443
     }
   ],
   "reconcile_report_rows": [
@@ -1670,7 +1670,7 @@
   "scan_milestone_tasks": [
     {
       "file": "src/k3dge/engine/task_index.py",
-      "line": 175
+      "line": 179
     }
   ],
   "scan_pending_findings": [
@@ -1730,7 +1730,7 @@
   "search": [
     {
       "file": "src/k3dge/engine/search.py",
-      "line": 215
+      "line": 225
     }
   ],
   "secret": [
@@ -1760,7 +1760,7 @@
   "split_task_name": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 429
+      "line": 431
     }
   ],
   "staged_added": [
@@ -1808,7 +1808,7 @@
   "summary": [
     {
       "file": "src/k3dge/engine/state_machine.py",
-      "line": 105
+      "line": 122
     },
     {
       "file": "src/k3dge/engine/task_dag.py",
@@ -1956,7 +1956,7 @@
   "where": [
     {
       "file": "src/k3dge/engine/search.py",
-      "line": 127
+      "line": 137
     }
   ],
   "where_doc": [
@@ -1980,7 +1980,7 @@
   "work_pending": [
     {
       "file": "src/k3dge/engine/task_index.py",
-      "line": 41
+      "line": 45
     }
   ],
   "workspace_status": [

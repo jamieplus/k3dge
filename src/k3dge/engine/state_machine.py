@@ -85,6 +85,23 @@ def check_completeness(
     for s in sorted(states - set(terminals), key=lambda x: x.value):  # ② 非终态须有出边（防死锁）
         if s not in outgoing:
             v.append(f"非终态 {s.value} 无出边（潜在死锁）")
+
+    def _can_reach_terminal(start: TaskState) -> bool:               # ②b 非终态须**可达终态**（防活锁）
+        seen: Set[TaskState] = {start}
+        stack = [start]
+        while stack:
+            cur = stack.pop()
+            if cur in terminals:
+                return True
+            for t in transitions:
+                if t.source == cur and t.target not in seen:
+                    seen.add(t.target)
+                    stack.append(t.target)
+        return False
+
+    for s in sorted(states - set(terminals), key=lambda x: x.value):
+        if not _can_reach_terminal(s):
+            v.append(f"非终态 {s.value} 无法到达任何终态（活锁）")
     seen: Set[tuple] = set()                                         # ④ `(source, move)` 唯一（非确定/二义）
     for t in transitions:
         key = (t.source, t.move)
