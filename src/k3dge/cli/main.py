@@ -921,18 +921,25 @@ def cmd_commit(args: argparse.Namespace) -> int:
     from k3dge.engine.evaluator import ConsistencyEngine
 
     workspace = _find_workspace(Path.cwd())
-    # 1) stage (GIT-01: -- separator isolates filenames)
-    if args.all:
-        subprocess.run(["git", "add", "-A"], cwd=workspace, check=False)
-    if args.files:
-        subprocess.run(["git", "add", "--", *args.files], cwd=workspace, check=False)
-    # 2) conventional commit message validation
+    # 1) conventional commit message validation（**先校验再动 index**：失败时不留半暂存态，ocr-029）
     if not _conventional_ok(args.message):
         print(
             f"[COMMIT] message '{args.message}' is not Conventional Commits (e.g. 'feat: ...')",
             file=sys.stderr,
         )
         return 1
+    # 2) stage (GIT-01: -- separator isolates filenames)；**判 returncode**：暂存失败必须退，
+    #    否则后续 `evaluate(staged=True)` 会对残留/空暂存区跑闸、再提交出用户没打算提交的内容。
+    _add_argvs = []
+    if args.all:
+        _add_argvs.append(["git", "add", "-A"])
+    if args.files:
+        _add_argvs.append(["git", "add", "--", *args.files])
+    for _argv in _add_argvs:
+        _r = subprocess.run(_argv, cwd=workspace, check=False, capture_output=True, text=True)
+        if _r.returncode != 0:
+            print(_r.stderr or _r.stdout, file=sys.stderr)
+            return 1
     # 3) gate (blocking)：先跑**staged 范围**的一致性集（hook 跑的是 worktree 范围；
     #    两者不同源）。内层只覆盖 `evaluator` 的判据集；引用/名实/markdown/排查闸**不在这里**，
     #    由第 5 步的 live hook 承担 ⇒ 不得再用 --no-verify 跳过它。

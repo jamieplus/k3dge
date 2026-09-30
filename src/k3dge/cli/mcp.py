@@ -172,14 +172,22 @@ def k3dge_verify_domain_contract(domain: str, workspace_path: Optional[str] = No
 
     src_dir = ws / src_rel
     spec_path = ws / spec_rel
+    if not src_dir.is_dir():
+        # src 缺失给明确判决，而不是"接口为空 ⇒ hash 不等 ⇒ 建议 sync"的误导红（ocr-030）。
+        return _err("SrcMissing", f"Source dir '{src_rel}' not found.", path=src_rel)
     if not spec_path.is_file():
         return _err("SpecMissing", f"Spec file '{spec_rel}' not found.", path=spec_rel)
 
-    spec_content = spec_path.read_text(encoding="utf-8")
+    try:
+        spec_content = spec_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return _err("SpecReadError", f"cannot read '{spec_rel}': {exc}", path=spec_rel)
     try:
         current_iface = contract.collect_domain_interface(src_dir, manifest, ws)
     except _ExtractError as exc:
         return _err("ContractExtractFailed", str(exc))
+    except Exception as exc:      # 其余抽取异常也变 verdict，不裸抛（ocr-030）
+        return _err("ContractExtractFailed", f"{type(exc).__name__}: {exc}")
     actual_hash = contract.compute_hash(current_iface)
     from k3dge.engine import spec_schema
 

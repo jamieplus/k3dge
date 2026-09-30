@@ -117,3 +117,22 @@ def test_rejected_idempotent():
         obs.mkdir(parents=True)
         (obs / "0003-bad.md").write_text("---\nStatus: Rejected\n---\n# ADR-0003\n", encoding="utf-8")
         assert adr_gate.reconcile_supersedes(ws) is None
+
+
+def test_landing_pointer_must_stay_in_workspace_and_be_file():
+    """落地指针越出 workspace（绝对路径 / `..`）或指向目录都不算落地（ocr-033）。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {})
+        assert adr_gate._pointer_resolves(ws, "docs/specs/x/spec.md") is True
+        assert adr_gate._pointer_resolves(ws, "docs/specs/x") is False        # 目录不算
+        assert adr_gate._pointer_resolves(ws, "/etc") is False                # 绝对路径越界
+        assert adr_gate._pointer_resolves(ws, "../../etc/hosts") is False     # `..` 越界
+
+
+def test_supersedes_self_is_refused():
+    """`Supersedes` 指向自身必须拒（否则把生效决策自己归档，ocr-035）。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {"0001-a.md": "---\nStatus: Accepted\nSupersedes: ADR-0001\n---\n# ADR-0001\n"})
+        out = adr_gate.reconcile_supersedes(ws)
+        assert out and "自身" in out
+        assert (ws / "docs" / "adr" / "0001-a.md").is_file()

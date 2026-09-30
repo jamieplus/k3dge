@@ -134,7 +134,7 @@
   "adr_landed": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 60
+      "line": 66
     }
   ],
   "adrs_all_accepted": [
@@ -158,7 +158,7 @@
   "amend_format": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 186
+      "line": 201
     }
   ],
   "analyze_adr_coverage": [
@@ -176,7 +176,7 @@
   "append_to_message": [
     {
       "file": "src/k3dge/engine/attest.py",
-      "line": 89
+      "line": 93
     }
   ],
   "apply": [
@@ -290,7 +290,7 @@
   "build_parser": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1095
+      "line": 1102
     }
   ],
   "build_server_params": [
@@ -554,7 +554,7 @@
   "cmd_check_msg": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 980
+      "line": 987
     }
   ],
   "cmd_commit": [
@@ -566,7 +566,7 @@
   "cmd_commit_attest": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 967
+      "line": 974
     }
   ],
   "cmd_doc": [
@@ -584,7 +584,7 @@
   "cmd_incident": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 996
+      "line": 1003
     }
   ],
   "cmd_index": [
@@ -614,7 +614,7 @@
   "cmd_mcp_probe": [
     {
       "file": "src/k3dge/cli/mcp_peers.py",
-      "line": 180
+      "line": 181
     }
   ],
   "cmd_mcp_sync": [
@@ -638,7 +638,7 @@
   "cmd_status": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1018
+      "line": 1025
     }
   ],
   "cmd_sync": [
@@ -656,7 +656,7 @@
   "cmd_verify_attest": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 973
+      "line": 980
     }
   ],
   "cmd_version": [
@@ -1026,13 +1026,13 @@
   "k3dge_5pass_audit_prompt": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 657
+      "line": 665
     }
   ],
   "k3dge_adr_index": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 699
+      "line": 707
     }
   ],
   "k3dge_check": [
@@ -1044,25 +1044,25 @@
   "k3dge_doc_grep": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 370
+      "line": 378
     }
   ],
   "k3dge_doc_list": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 344
+      "line": 352
     }
   ],
   "k3dge_doc_where": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 360
+      "line": 368
     }
   ],
   "k3dge_milestone_control": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 386
+      "line": 394
     }
   ],
   "k3dge_status": [
@@ -1074,31 +1074,31 @@
   "k3dge_submit_audit_report": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 560
+      "line": 568
     }
   ],
   "k3dge_sync": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 204
+      "line": 212
     }
   ],
   "k3dge_task_create": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 265
+      "line": 273
     }
   ],
   "k3dge_task_done": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 302
+      "line": 310
     }
   ],
   "k3dge_task_list": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 311
+      "line": 319
     }
   ],
   "k3dge_verify_domain_contract": [
@@ -1110,7 +1110,7 @@
   "k3dge_version": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 231
+      "line": 239
     }
   ],
   "kind": [
@@ -1140,7 +1140,7 @@
   "line": [
     {
       "file": "src/k3dge/engine/attest.py",
-      "line": 71
+      "line": 75
     }
   ],
   "list_docs": [
@@ -1198,7 +1198,7 @@
     },
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1328
+      "line": 1335
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
@@ -1448,7 +1448,7 @@
   "reconcile_supersedes": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 82
+      "line": 88
     }
   ],
   "record_screen_ack": [
@@ -1842,7 +1842,7 @@
   "token": [
     {
       "file": "src/k3dge/engine/attest.py",
-      "line": 66
+      "line": 70
     }
   ],
   "tool_state_dir": [
@@ -1878,7 +1878,7 @@
   "utc_minute": [
     {
       "file": "src/k3dge/engine/attest.py",
-      "line": 36
+      "line": 40
     }
   ],
   "validate": [
@@ -1932,7 +1932,7 @@
   "verify_commit": [
     {
       "file": "src/k3dge/engine/attest.py",
-      "line": 96
+      "line": 100
     }
   ],
   "verify_contract": [
@@ -1956,13 +1956,13 @@
   "window": [
     {
       "file": "src/k3dge/engine/attest.py",
-      "line": 49
+      "line": 53
     }
   ],
   "windows": [
     {
       "file": "src/k3dge/engine/attest.py",
-      "line": 56
+      "line": 60
     }
   ],
   "work_pending": [

@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:0451809d274e6de4fc661347a46beefd7f2bad80cc3360a87dd87762cdba13e9`
-- **Last Updated**: 2026-09-28
+- **Contract Hash**: `sha256:480d7c0a811a1136d2afbad344ceb386a6e4987b49cc2545e8e5c519229f8fe4`
+- **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -30,6 +30,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List
 from typing import Optional
+from typing import Tuple
 adrs_all_accepted(workspace: Path) -> Optional[str]
 adr_landed(workspace: Path) -> Optional[str]
 reconcile_supersedes(workspace: Path) -> Optional[str]

@@ -151,6 +151,7 @@ def cmd_mcp_sync(workspace: Path) -> int:
     ok_mcp = ensure_mcp_config(workspace)
     if not ok_mcp:
         print("[MCP] .mcp.json skipped due to corruption, see WARN above; not overwriting", file=sys.stderr)
+        return 1   # 损坏 ⇒ 不支持续跑 peer 合并，也**不**报 synced 的假成功（ocr-031）
     # Peer merging from pipeline.toml is best-effort; report if pipeline is unreadable
     # tomllib is 3.11+, tomli is fallback for 3.10; neither present → skip peer merging gracefully
     tomllib_mod = _load_tomllib()

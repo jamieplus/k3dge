@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from k3dge.engine.milestone_files import _DOC_AUX_NAMES  # 单源：doc 辅助文件名集（不另存副本）
 
@@ -54,7 +54,13 @@ def _pointer_resolves(workspace: Path, ptr: str) -> bool:
     first = ptr.strip().split()[0].strip() if ptr.strip() else ""
     if not first:
         return False
-    return (Path(workspace) / first).exists()
+    root = Path(workspace).resolve()
+    cand = (root / first).resolve()
+    # 绝对路径或 `..` 会丢弃 workspace 前缀 ⇒ 必须 containment 校验；且只认**文件**（目录不算"已落地"，
+    # 否则 `Landed-by: /etc` 或仓外路径可把这道 seal 硬闸骗绿，ocr-033）。
+    if cand != root and root not in cand.parents:
+        return False
+    return cand.is_file()
 
 
 def adr_landed(workspace: Path) -> Optional[str]:
@@ -96,6 +102,9 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
     fixed: list[str] = []
 
     # 1. Supersedes 声明 → 标记旧 ADR + 移入 obsolete/
+    #    **两遍**：先只读校验全部声明（缺目标 / 自取代），全通过才动盘——否则前半已落盘、后半 `return`
+    #    会把工作区停在"部分生效"（ocr-034）。
+    plan: list[Tuple[Path, Path, str]] = []   # (声明件, 目标件, my_id)
     for p in _adr_files(workspace):
         try:
             text = p.read_text(encoding="utf-8", errors="replace")
@@ -106,14 +115,20 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
             continue
         ref = m.group(1).strip()
         target_id = ref.replace("ADR-", "").replace("adr-", "")
+        my_id = p.stem[:4]
         target = _find_adr_by_id(d, target_id)
         if target is None:
             return f"[SEAL REJECTED] {p.name} Supersedes: {ref} 但找不到对应 ADR 文件"
+        # 自取代守卫：误填自己会把"正在取代别人的一方"自己归档掉，活跃目录少一条审查对象（ocr-035）。
+        if target_id == my_id or target == p:
+            return (f"[SEAL REJECTED] {p.name} Supersedes 指向自身（ADR-{my_id}）"
+                    "——拒绝自取代（会让生效决策从活跃目录消失）")
+        plan.append((p, target, my_id))
+    for _p, target, my_id in plan:
         try:
             old_text = target.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        my_id = p.stem[:4]
         if _is_superseded(old_text, my_id) and target.parent.name == "obsolete":
             continue
         old_text = _mark_superseded(old_text, my_id)

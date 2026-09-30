@@ -28,9 +28,13 @@ def secret() -> str:
 
 
 def tree_hash(workspace: Path) -> str:
-    return subprocess.run(
+    r = subprocess.run(
         ["git", "write-tree"], cwd=str(workspace), capture_output=True, text=True
-    ).stdout.strip()
+    )
+    if r.returncode != 0:
+        # git 失败必须出声：空 tree 混进 token ⇒ 生成的行永远验不过，报错还指向"非受管路径"（ocr-038）。
+        raise RuntimeError(f"git write-tree failed in {workspace}: {(r.stderr or '').strip()}")
+    return r.stdout.strip()
 
 
 def utc_minute(when_iso: str):
@@ -94,18 +98,20 @@ def append_to_message(workspace: Path, msg: str, who: str = "") -> str:
 
 
 def verify_commit(workspace: Path, h: str) -> Tuple[bool, str]:
-    tree = subprocess.run(
-        ["git", "rev-parse", f"{h}^{{tree}}"], cwd=str(workspace),
-        capture_output=True, text=True,
-    ).stdout.strip()
-    when_iso = subprocess.run(
-        ["git", "show", "-s", "--format=%aI", h], cwd=str(workspace),
-        capture_output=True, text=True,
-    ).stdout.strip()
-    body = subprocess.run(
-        ["git", "log", "-1", "--format=%B", h], cwd=str(workspace),
-        capture_output=True, text=True,
-    ).stdout
+    def _git(*argv: str) -> str:
+        r = subprocess.run(["git", *argv], cwd=str(workspace), capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError((r.stderr or "").strip() or f"git {' '.join(argv)} failed")
+        return r.stdout
+
+    # git 调用失败（坏仓库 / 空提交区间 / 不在 PATH）与"attestation 不合法"是两种 verdict：分开报，
+    # 否则 `tree=""`/`body=""` 会被误判成 missing line / token mismatch（ocr-038）。
+    try:
+        tree = _git("rev-parse", f"{h}^{{tree}}").strip()
+        when_iso = _git("show", "-s", "--format=%aI", h).strip()
+        body = _git("log", "-1", "--format=%B", h)
+    except RuntimeError as exc:
+        return False, f"[ATTEST] git 调用失败（{h}）：{exc}"
     m: Optional[re.Match] = None
     for ln in body.splitlines():
         m = LINE_RE.match(ln.strip())

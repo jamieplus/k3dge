@@ -90,8 +90,20 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
     # 前置闸/动作：读「硬闸契约」`[checks.align]`（ADR-0001 §2 第 8 条）。
     pending = work_pending(tasks, workspace)
     gate_err = _align_run_gates(workspace, milestone_id, tasks, pending)
-    if gate_err:
+    # `Rejection` 是 `str` 子类：空消息的 `Rejection(nid, "")` 布尔值为 False ⇒ 必须 `is not None`
+    # 判空，否则「空消息的闸失败」被当成通过、继续写 align-pass marker（fail-open，ocr-036）。
+    if gate_err is not None:
         return False, gate_err, tasks
+
+    # 报告文案与 marker 必须由「本单元实际会跑哪些 id」派生（ocr-037）：`[checks.align].actions` 可被
+    # 下游 pipeline.toml 覆盖；去掉 `full_matrix` 后 align 仍会写「Regression: PASS」+ align-pass marker，
+    # 而 seal 把这个 marker 当回归已验证的唯一凭据 ⇒ 零回归验证也能封板。这里显式拒绝。
+    if "full_matrix" not in gates.actions(workspace, "align"):
+        return False, gates.Rejection(
+            "align_no_regression",
+            "`[checks.align].actions` 未含 `full_matrix`：align-pass 必须由真实回归验证（Full Matrix）派生，"
+            "不得凭硬编码文案通过。",
+        ), tasks
 
     # 生成极简对齐评审报告（每次重写：它是结构桩，任务集会变；写一次就会让后补的
     # 审计票进不了清单，archive 闸 `_seal_review_gate` 再把别的 M10 报告误判成「无

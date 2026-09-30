@@ -133,6 +133,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List
 from typing import Optional
+from typing import Tuple
 adrs_all_accepted(workspace: Path) -> Optional[str]
     # doc: 未 Accepted 的 ADR 汇总；全 Accepted/Superseded（或无 ADR）⇒ None。
 adr_landed(workspace: Path) -> Optional[str]

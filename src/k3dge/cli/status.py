@@ -114,8 +114,8 @@ def workspace_status(workspace: Path) -> Dict[str, Any]:
                 continue
             try:
                 txt = p.read_text(encoding="utf-8")
-            except OSError:
-                continue
+            except (OSError, UnicodeDecodeError):
+                continue   # 坏编码的 task 文件只跳过这一张，不让 status 整体崩栈（ocr-032）
             fm = parse_frontmatter(txt) or {}
             m = re.search(r"-\s+\*\*Status\*\*:\s*([\w-]+)", txt)
             status = (fm.get("status") or (m.group(1).lower() if m else "")).strip()
