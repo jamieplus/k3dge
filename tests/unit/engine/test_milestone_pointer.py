@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from k3dge.engine.milestone_pointer import (
+    MilestoneError,
     _validate_milestone_id,
     bump_milestone,
     get_current_milestone,
@@ -57,22 +58,24 @@ class TestCursor(unittest.TestCase):
             with self.assertRaises(ValueError):
                 set_current_milestone(Path(d), "../evil")
 
-    def test_corrupt_cursor_falls_back_to_m0(self):
-        """坏内容（含穿越串）不得被当游标读出——回落 M0，不崩。"""
+    def test_corrupt_cursor_raises(self):
+        """坏内容（含穿越串）⇒ 抛 MilestoneError，不得静默回落 M0（ocr-086）。"""
         with tempfile.TemporaryDirectory() as d:
             ws = Path(d)
             p = ws / ".agent" / "milestone"
             p.parent.mkdir(parents=True)
             p.write_text("../../etc/passwd\n", encoding="utf-8")
-            self.assertEqual(get_current_milestone(ws), "M0")
+            with self.assertRaises(MilestoneError):
+                get_current_milestone(ws)
 
-    def test_empty_cursor_falls_back(self):
+    def test_empty_cursor_raises(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Path(d)
             p = ws / ".agent" / "milestone"
             p.parent.mkdir(parents=True)
             p.write_text("   \n", encoding="utf-8")
-            self.assertEqual(get_current_milestone(ws), "M0")
+            with self.assertRaises(MilestoneError):
+                get_current_milestone(ws)
 
 
 class TestBump(unittest.TestCase):
@@ -94,11 +97,12 @@ class TestBump(unittest.TestCase):
             set_current_milestone(ws, "M9")
             self.assertEqual(bump_milestone(ws), "M10")
 
-    def test_non_m_shape_falls_back_to_suffix(self):
+    def test_non_m_shape_raises(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Path(d)
             set_current_milestone(ws, "adhoc")
-            self.assertEqual(bump_milestone(ws), "adhoc-next")
+            with self.assertRaises(MilestoneError):
+                bump_milestone(ws)
 
     def test_bump_persists(self):
         with tempfile.TemporaryDirectory() as d:

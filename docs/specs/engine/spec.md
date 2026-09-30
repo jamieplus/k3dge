@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:c71bd6a2d239e810d5af0795fe5bd7ad889c9683a33d443f4dd8abab53e1d087`
+- **Contract Hash**: `sha256:bd30ac085ebc24baa5f9981a4b56041351f0310dd10c701aa5b786a3ceb347c3`
 - **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
@@ -404,6 +404,7 @@ tasks_after_boundary(workspace: Path) -> List[Tuple[str, str, str]]
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
+class MilestoneError(ValueError)
 get_current_milestone(workspace: Path) -> str
 set_current_milestone(workspace: Path, milestone_id: str) -> None
 bump_milestone(workspace: Path) -> str

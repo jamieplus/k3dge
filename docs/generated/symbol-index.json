@@ -20,7 +20,7 @@
   "GateReport": [
     {
       "file": "src/k3dge/engine/models.py",
-      "line": 39
+      "line": 45
     }
   ],
   "GitError": [
@@ -38,7 +38,7 @@
   "Manifest": [
     {
       "file": "src/k3dge/engine/manifest.py",
-      "line": 68
+      "line": 73
     }
   ],
   "ManifestError": [
@@ -51,6 +51,12 @@
     {
       "file": "src/k3dge/engine/markers.py",
       "line": 56
+    }
+  ],
+  "MilestoneError": [
+    {
+      "file": "src/k3dge/engine/milestone_pointer.py",
+      "line": 11
     }
   ],
   "MilestoneTask": [
@@ -314,7 +320,7 @@
   "bump_milestone": [
     {
       "file": "src/k3dge/engine/milestone_pointer.py",
-      "line": 37
+      "line": 48
     }
   ],
   "bump_verify_attempt": [
@@ -536,7 +542,7 @@
   "closure_ok": [
     {
       "file": "src/k3dge/engine/markers.py",
-      "line": 235
+      "line": 238
     }
   ],
   "cmd_audit": [
@@ -728,7 +734,7 @@
   "counts": [
     {
       "file": "src/k3dge/engine/markers.py",
-      "line": 223
+      "line": 226
     }
   ],
   "create_task": [
@@ -894,7 +900,7 @@
   "get_current_milestone": [
     {
       "file": "src/k3dge/engine/milestone_pointer.py",
-      "line": 15
+      "line": 19
     }
   ],
   "get_domain_spec_resource": [
@@ -1286,7 +1292,7 @@
   "open_samples": [
     {
       "file": "src/k3dge/engine/markers.py",
-      "line": 231
+      "line": 234
     }
   ],
   "parse_doc_schema": [
@@ -1736,7 +1742,7 @@
   "set_current_milestone": [
     {
       "file": "src/k3dge/engine/milestone_pointer.py",
-      "line": 28
+      "line": 39
     }
   ],
   "set_workspace": [
@@ -1890,7 +1896,7 @@
   "validate": [
     {
       "file": "src/k3dge/engine/markers.py",
-      "line": 203
+      "line": 206
     }
   ],
   "validate_docs": [

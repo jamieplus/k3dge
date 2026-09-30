@@ -27,6 +27,12 @@ class Violation:
         dom = f" <{self.domain}>" if self.domain else ""
         if gate_facts.is_declared(self.rule_id):
             facts = dict(self.detail or {})
+            # 声明面模板常用 `{path}`/`{domain}`，而构造点常只给 file_path/domain ⇒ 一并注入，
+            # 否则 fact 里会漏出字面 `{path}`/`{domain}` 占位符（ocr-088）。
+            if self.file_path:
+                facts.setdefault("path", self.file_path)
+            if self.domain:
+                facts.setdefault("domain", self.domain)
             body = gate_facts.render(self.rule_id, facts, where=f"{dom}{loc}".strip())
             tag = {"block": "GATE ERROR", "warn": "GATE WARN", "observe": "GATE NOTE"}[
                 gate_facts.severity(self.rule_id)

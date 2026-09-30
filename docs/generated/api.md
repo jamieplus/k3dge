@@ -634,8 +634,10 @@ tasks_after_boundary(workspace: Path) -> List[Tuple[str, str, str]]
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
+class MilestoneError(ValueError)
+# doc: 游标损坏/不可读——**不得**静默回退成 M0（那会把真实游标永久改写，ocr-086）。
 get_current_milestone(workspace: Path) -> str
-    # doc: Current milestone cursor, default M0; stored in .agent/milestone.
+    # doc: Current milestone cursor, default M0（**仅当文件不存在**）；损坏/不可读 ⇒ 抛错。
 set_current_milestone(workspace: Path, milestone_id: str) -> None
 bump_milestone(workspace: Path) -> str
     # doc: M0 → M1 → M2 …; writes new cursor and returns it.

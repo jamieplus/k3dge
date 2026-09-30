@@ -183,7 +183,9 @@ def extract(workspace: Path, roots: Sequence[str] = ("src", "docs")) -> Tuple[Li
     for rel, path in _iter_scan_files(workspace, roots):
         try:
             text = path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
+        except (UnicodeDecodeError, OSError) as exc:
+            # 别再静默少一个文件：审计计数偏低/开放项被漏可能误判可结项（ocr-082）。
+            problems.append(f"{rel}: 读取失败（{exc}）——其中钉未计入")
             continue
         ms, ps = parse_text(rel, text, max_note=max_note, max_note_pending=max_note_pending)
         markers.extend(ms)
@@ -194,8 +196,9 @@ def extract(workspace: Path, roots: Sequence[str] = ("src", "docs")) -> Tuple[Li
             ms, ps = parse_sidecar(side.read_text(encoding="utf-8"))
             markers.extend(ms)
             problems.extend(ps)
-        except (UnicodeDecodeError, OSError):  # pragma: no cover
-            pass
+        except (UnicodeDecodeError, OSError) as exc:
+            # 根侧车承载 repo-scope 钉；读不出 ⇒ repo 条目整体消失 ⇒ fail-closed（ocr-083）。
+            problems.append(f"{SIDECAR}: 读取失败（{exc}）——repo-scope 钉整体缺失")
     problems.extend(validate(workspace, markers))
     return markers, problems
 

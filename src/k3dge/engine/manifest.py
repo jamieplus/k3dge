@@ -51,9 +51,14 @@ def _validate_domain(domain: str, cfg, domains: dict) -> None:
     if not isinstance(cfg, dict):
         raise ManifestError(f"domain '{domain}' config must be a dict, got {type(cfg).__name__}")
     for key in ("src", "spec", "tests"):
-        val = cfg.get(key)
-        if val:
-            cfg[key] = _require_relative_path(f"domain '{domain}' {key}", val)
+        if key not in cfg:
+            continue
+        val = cfg[key]
+        if val in (None, ""):
+            cfg[key] = ""      # 显式空/缺省 ⇒ 归一成空串（下游 cfg.get(key, "") 拿到 ""，不炸）
+            continue
+        # **不看真假**：`false`/`0`/`[]` 等假值非字符串也要经校验（否则绕过 → 运行期 AttributeError，ocr-080）。
+        cfg[key] = _require_relative_path(f"domain '{domain}' {key}", val)
     dep = cfg.get("depends_on", [])
     if dep is None:
         dep = []
