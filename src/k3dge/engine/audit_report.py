@@ -70,7 +70,6 @@ def _find_audit_report(workspace: Path, milestone_id: str):
 def _parse_audit_stats(text: str) -> dict:
     """Count 待修 / 有意留 / 已修 rows in a 12-col audit table.
 
-    单一解析器：委托 `report_table.count_statuses`（value-2），与 `_count_status`、
-    封板闸同口径。
+    单一解析器：委托 `report_table.count_statuses`（value-2），封板闸与 `k3dge check` 同口径。
     """
     return report_table.count_statuses(text)

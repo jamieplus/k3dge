@@ -112,3 +112,34 @@ def test_hunks_multi_file_boundary():
     assert len(h["x.py"]) == 1 and len(h["y.py"]) == 1
     assert not any("y.py" in ln for ln in h["x.py"][0]["lines"])
     assert all(not ln.startswith("--- a/") for ln in h["x.py"][0]["lines"])
+
+
+def test_fail_channel_matches_success_shape() -> None:
+    """失败面必须与成功面同键，否则新调用方 KeyError（399）。"""
+    from k3dge.engine.audit_merge import _fail
+
+    got = _fail("x")
+    for key in ("ok", "merged", "conflicts", "missing", "pins_rels", "pins_patch",
+                "excluded", "detail"):
+        assert key in got, key
+
+
+def test_missing_files_reach_the_detail(tmp_path, monkeypatch) -> None:
+    """主干缺文件过去只在 `missing` 里、detail 空串 ⇒ 落盘方一句话都拼不出（400）。"""
+    from k3dge.engine import audit_merge as am
+
+    bundle = tmp_path / "bundle"
+    (bundle / "pins").mkdir(parents=True)
+    (tmp_path / "base").mkdir()
+    (bundle / "manifest.json").write_text(
+        '{"bundle_version":"1","apply_order":["fix.patch"],"pins":{"in_code":false}}',
+        encoding="utf-8")
+    (bundle / "fix.patch").write_text("not a real patch\n", encoding="utf-8")
+    monkeypatch.setattr(am, "_owned_replay",
+                        lambda b, **k: {"ok": True, "root": str(tmp_path / "base")})
+    monkeypatch.setattr(am, "patch_rels",
+                        lambda b, name: {"gone.py"} if name == "fix.patch" else set())
+    (tmp_path / "base" / "gone.py").write_text("x\n", encoding="utf-8")   # base 有、主干没有
+    res = am.merge_into(tmp_path, bundle)
+    assert res["missing"] == ["gone.py"], res
+    assert "主干缺文件" in res["detail"], res

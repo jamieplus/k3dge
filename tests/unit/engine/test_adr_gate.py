@@ -152,3 +152,22 @@ def test_amend_format_corrupt_schema_fail_closed():
         (ws / "docs" / "adr" / ".schema.json").write_text("{ broken", encoding="utf-8")
         out = adr_gate.amend_format(ws)
         assert out and "不可读/损坏" in out
+
+
+def test_is_superseded_needs_the_actual_field_line() -> None:
+    """正文提到 `superseded_by:`/`ADR-0026` 不算已标记（子串判据的假幂等，ocr-390）。"""
+    from k3dge.engine.adr_gate import _is_superseded
+
+    body = ("---\nStatus: Superseded\n---\n\n# ADR-0009 x\n\n"
+            "讨论里写过 superseded_by: 与 ADR-0026 的引用，但 frontmatter 没有该字段\n")
+    assert not _is_superseded(body, "0026")
+    assert _is_superseded("---\nStatus: Superseded\nsuperseded_by: ADR-0026\n---\n", "26")
+
+
+def test_mark_superseded_refuses_when_no_status_line() -> None:
+    """没有规范 `Status:` 行 ⇒ 返回 None，调用方必须拒（旧实现照样归档并宣告"已 Superseded"，391）。"""
+    from k3dge.engine.adr_gate import _mark_superseded
+
+    assert _mark_superseded("# ADR-0009 x\n\n正文\n", "0026") is None
+    out = _mark_superseded("---\nStatus: Accepted\n---\n\n# ADR-0009\n", "0026")
+    assert out is not None and "Status: Superseded" in out and "superseded_by: ADR-0026" in out

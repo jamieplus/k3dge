@@ -387,7 +387,7 @@ def load_persisted(workspace: Path) -> Optional[dict]:
     return cards[0]
 
 
-def seal_ready_for(workspace: Path, milestone_id: str) -> "NextStep":
+def seal_ready_for(workspace: Path, milestone_id: str, *, unmet=None, tasks=None) -> "NextStep":
     """`seal_ready` 的**唯一生产构造入口**：把"剩余封板前置闸"填进事实。
 
     为何：`[NEXT]` 此前只说"审计已闭环"就让人去封板，而 `seal` 还要过预审的
@@ -396,13 +396,17 @@ def seal_ready_for(workspace: Path, milestone_id: str) -> "NextStep":
     `seal.unmet_seal_preconditions`）。告警面＝**需人先办**的项（`satisfies` 的 ⚙️ 项不列）。
     零 task ⇒ 不是 seal_ready（ADR-0004 空窗不建议封）。
     """
-    from k3dge.engine.seal import unmet_seal_preconditions
-    from k3dge.engine.task_index import scan_milestone_tasks
+    if tasks is None or unmet is None:
+        from k3dge.engine.seal import unmet_seal_preconditions
+        from k3dge.engine.task_index import scan_milestone_tasks
 
-    if not scan_milestone_tasks(workspace, milestone_id):
+        if tasks is None:
+            tasks = scan_milestone_tasks(workspace, milestone_id)
+        if unmet is None:
+            unmet = unmet_seal_preconditions(workspace, milestone_id)
+    if not tasks:
         return NextStep.from_state("normal", milestone_id)
     ns = NextStep.from_state("seal_ready", milestone_id)
-    unmet = unmet_seal_preconditions(workspace, milestone_id)
     suffix = str(STATE_OPTIONS["seal_ready"].get("fact_with_blockers") or "")
     blockers = "、".join(gid for gid, _ in unmet) or "全绿"
     ns.fact = (ns.fact or "") + suffix.replace("<blockers>", blockers)

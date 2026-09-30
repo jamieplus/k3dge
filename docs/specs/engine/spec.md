@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:259d3af3c6de994a0a51073a259534d2e35c8e710d27bdadcf7298a201ca0bdb`
+- **Contract Hash**: `sha256:60db93f1e70809382dd6e73b34b6a41e5404c71043f490bc0f82d387f1c4f95c`
 - **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
@@ -108,8 +108,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict
 from typing import Optional
-from k3dge.engine import report_table
-from k3dge.engine.pipeline_runner import run_action
 STATE_REL = '.agent/audit_jobs.json'
 AUDIT_RESULTS = ('closed', 'degraded-manual', 'escalated', 'refused')
 SEALABLE_AUDIT_RESULTS = ('closed', 'degraded-manual')
@@ -458,7 +456,7 @@ emit(workspace: Path, ns: NextStep, *, stream: Optional[TextIO]=None) -> str
 emit_all(workspace: Path, steps: list, *, stream: Optional[TextIO]=None) -> list
 load_all(workspace: Path) -> list
 load_persisted(workspace: Path) -> Optional[dict]
-seal_ready_for(workspace: Path, milestone_id: str) -> 'NextStep'
+seal_ready_for(workspace: Path, milestone_id: str, *, unmet=None, tasks=None) -> 'NextStep'
 next_for_rejection(milestone: str, message, gate_id: Optional[str]=None) -> NextStep
 question_text(state: str, milestone: str, *, n: Optional[int]=None) -> str
 from __future__ import annotations

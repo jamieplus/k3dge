@@ -239,8 +239,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict
 from typing import Optional
-from k3dge.engine import report_table
-from k3dge.engine.pipeline_runner import run_action
 STATE_REL = '.agent/audit_jobs.json'
 AUDIT_RESULTS = ('closed', 'degraded-manual', 'escalated', 'refused')
 SEALABLE_AUDIT_RESULTS = ('closed', 'degraded-manual')
@@ -704,7 +702,7 @@ load_all(workspace: Path) -> list
     # doc: 读回本轮全部处理点（新形状 `{"next": [...]}`）；旧单条形状 ⇒ 单元素列表。
 load_persisted(workspace: Path) -> Optional[dict]
     # doc: 读回**主处理点**（`primary`）——MCP/外来 harness 的单值读法。
-seal_ready_for(workspace: Path, milestone_id: str) -> 'NextStep'
+seal_ready_for(workspace: Path, milestone_id: str, *, unmet=None, tasks=None) -> 'NextStep'
     # doc: `seal_ready` 的**唯一生产构造入口**：把"剩余封板前置闸"填进事实。
 next_for_rejection(milestone: str, message, gate_id: Optional[str]=None) -> NextStep
     # doc: Failure -> action. **闭集派发**：`gate_id` → `GATE_NEXT` → state/fact。

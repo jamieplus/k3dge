@@ -130,6 +130,15 @@ def append_to_message(workspace: Path, msg: str, who: str = "") -> str:
 
 
 def verify_commit(workspace: Path, h: str) -> Tuple[bool, str]:
+    # `h` 来自 CI 参数：不校验就拼进 argv ⇒ 以 `-` 开头的取值被 git 当**选项**解析（参数注入面），
+    # 坏值还会让三条 git 命令各报一次难懂的错（393）。
+    sha = str(h or "").strip()
+    # 闭集形状判不了（调用方也传 `HEAD`/tag/`main^`），但**必须**挡掉：空值、以 `-` 开头
+    # （被 git 当选项）、含空白（多参数注入）。剩下的交给 `--verify` 报错。
+    if not sha or sha.startswith("-") or any(c.isspace() for c in sha):
+        return False, ("[ATTEST] 提交标识不合法（{!r}）：要 hex 或 ref 名，"
+                       "非空、不以 - 开头、不含空白".format(h))
+
     def _git(*argv: str) -> str:
         r = subprocess.run(["git", *argv], cwd=str(workspace), capture_output=True, text=True)
         if r.returncode != 0:
@@ -139,9 +148,10 @@ def verify_commit(workspace: Path, h: str) -> Tuple[bool, str]:
     # git 调用失败（坏仓库 / 空提交区间 / 不在 PATH）与"attestation 不合法"是两种 verdict：分开报，
     # 否则 `tree=""`/`body=""` 会被误判成 missing line / token mismatch（ocr-038）。
     try:
-        tree = _git("rev-parse", f"{h}^{{tree}}").strip()
-        when_iso = _git("show", "-s", "--format=%aI", h).strip()
-        body = _git("log", "-1", "--format=%B", h)
+        # rev 不放 `--` 之后（那会被当路径）；注入面由上面"不以 - 开头/不含空白"的判据挡
+        tree = _git("rev-parse", "--verify", f"{sha}^{{tree}}").strip()
+        when_iso = _git("show", "-s", "--format=%aI", sha).strip()
+        body = _git("log", "-1", "--format=%B", sha)
     except RuntimeError as exc:
         return False, f"[ATTEST] git 调用失败（{h}）：{exc}"
     m: Optional[re.Match] = None

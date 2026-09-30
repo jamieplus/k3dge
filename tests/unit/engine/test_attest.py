@@ -66,3 +66,16 @@ def test_attestation_stays_inside_existing_trailer_block() -> None:
 def test_prose_body_still_gets_own_paragraph() -> None:
     out = append_to_message(_repo(), "feat: x\n\n正文说明", who="w")
     assert "\n\nk3dge-commit:" in out
+
+
+def test_verify_commit_rejects_option_shaped_and_blank_ids() -> None:
+    """`h` 来自 CI 参数：以 `-` 开头会被 git 当选项（注入面），空/含空白同样拒（393）。"""
+    for bad in ("", "  ", "--output=cmd", "a b"):
+        ok, msg = verify_commit(Path("."), bad)
+        assert not ok and "不合法" in msg, (bad, msg)
+
+
+def test_verify_commit_accepts_head() -> None:
+    ws = _repo()
+    ok, msg = verify_commit(ws, "HEAD")
+    assert not ok and "missing attestation" in msg, msg   # 通过校验，进到真判据（未署名）

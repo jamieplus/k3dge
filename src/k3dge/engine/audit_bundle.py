@@ -385,6 +385,11 @@ def _dry_run_via_worktree(workspace: Path, bundle: Path, order: List[str]) -> di
     wt = tmp / "wt"
     rc, out = _git(workspace, "worktree", "add", "--detach", "-q", str(wt), "HEAD")
     if rc != 0:
+        # 早退发生在 try/finally **之前** ⇒ mkdtemp 出来的 tmp（以及 git 可能已登记的半截 worktree）
+        # 永远留在系统临时目录（395）
+        if wt.exists():
+            _git(workspace, "worktree", "remove", "--force", str(wt))
+        shutil.rmtree(tmp, ignore_errors=True)
         return {"ok": False, "error": "WORKTREE_UNAVAILABLE", "detail": out.strip()[-200:]}
     try:
         res = _apply_sequential(wt, bundle, order)
@@ -561,7 +566,7 @@ def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry
         if pins:
             from k3dge.engine import audit_merge      # 单源：补丁→文件集合只认 `patch_rels`
 
-            rc, out = _git(wt, "apply", "-p1", str(Path(bundle) / pins))
+            rc, apply_out = _git(wt, "apply", "-p1", str(Path(bundle) / pins))
             if rc != 0:
                 for rel in sorted(res.get("pins_rels") or audit_merge.patch_rels(Path(bundle), pins)):
                     u = audit_merge.union_pins(wt, Path(bundle), rel)
@@ -741,10 +746,6 @@ def land_report(workspace: Path, milestone_id: str, out: Path, *,
         return {"ok": False, "error": "PROJECTION_FAILED",
                 "detail": f"重生投影失败：{exc}", "report": rel, "commit": "",
                 "projection_log": log.getvalue()[-400:]}
-    proj: List[str] = []
-    # 收集面＝**整个 `docs/`**：落报告会动 `docs/reviews/`，落代码会动 `docs/generated/`（投影）
-    # 与 `docs/specs/`（契约哈希 ⇒ `k3dge sync` 回写，真跑实测漏在提交外 ⇒ 钩子按"哈希不一致"拦下）。
-    # 树在本步之前是干净的（`DIRTY_TREE` 已挡）⇒ `docs/` 下的改动必是本轮产物。
     # value-10（报告）：产物清单**显式化**——只认我们自己会写的两处投影根（generated / specs），
     # 不再对**整个 `docs/`** 盲扫（那会把别人的在途文档改动卷进审计提交）。
     proj: List[str] = []
@@ -800,7 +801,6 @@ def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
     **或** `full` 模式下 k3dit 把被审仓 stage 成的 `<state>/hall/run/<job>/stage` 副本（同一仓、仓根相对
     补丁可干净落回）。拿错包（为别的目录做的）多半意味着补丁要打到别的树上，仍拒。
     返回 {ok, facts, verify, apply, digest, error?}。"""
-    bundle = Path(bundle)
     bundle = Path(bundle)
     facts = bundle_facts(bundle)
     if not facts:

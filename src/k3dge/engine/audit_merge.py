@@ -122,6 +122,15 @@ def hunks_overlapping(patch_text: str, rel: str, lines: List[int], *, slack: int
             "dropped": [(h["src_start"], h["src_len"]) for h in hit], "detail": ""}
 
 
+def _fail(detail: str, *, merged=None, conflicts=None, missing=None, excluded=(),
+          pins_rels=(), pins_patch: str = "") -> dict:
+    """失败面的**统一形状**：与成功面同键（缺 `missing`/`pins_rels`/`pins_patch`
+    会让按成功面取值的调用方 KeyError，399）。"""
+    return {"ok": False, "merged": merged or {}, "conflicts": conflicts or [],
+            "missing": missing or [], "pins_rels": list(pins_rels), "pins_patch": pins_patch,
+            "excluded": sorted(excluded), "detail": detail}
+
+
 def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) -> Dict[str, Any]:
     """把包合进 `workspace`（**只算不写**）：返回 {ok, merged{rel: text}, conflicts[], excluded[], pins_rels[], detail}。
 
@@ -139,15 +148,13 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
     excluded = {str(x) for x in exclude}
     rep = _owned_replay(bundle)
     if not rep.get("ok"):
-        return {"ok": False, "merged": {}, "conflicts": [], "excluded": sorted(excluded),
-                "detail": rep.get("detail") or "无法重放基线"}
+        return _fail(rep.get("detail") or "无法重放基线", excluded=excluded)
     try:
         facts = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         # 包缺/坏 manifest（外部交付包完全可能）⇒ fail-clear 且**清掉**刚建的重放树（ocr-049）。
         shutil.rmtree(Path(rep["root"]), ignore_errors=True)
-        return {"ok": False, "merged": {}, "conflicts": [], "excluded": sorted(excluded),
-                "detail": f"manifest.json 不可读/不可解析：{exc}"}
+        return _fail(f"manifest.json 不可读/不可解析：{exc}", excluded=excluded)
     order = [str(x) for x in (facts.get("apply_order") or [])]
     pins_in_code = bool((facts.get("pins") or {}).get("in_code"))
     # "修复后树"（fix 合并的 theirs）怎么取：
@@ -162,8 +169,8 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
         # 重放不成还回落含钉的 `code/` 会把钉当"修复侧改动"合进来、再正向 apply pins.patch ⇒
         # `--union` 对同位置两侧新增都保留 ⇒ 同一枚钉写两遍（ocr-050）。如实报错，不静默降级。
         shutil.rmtree(base_root, ignore_errors=True)
-        return {"ok": False, "merged": {}, "conflicts": [], "excluded": sorted(excluded),
-                "detail": f"pins 重放失败：{mid.get('detail') or '?'}（拒绝用含钉的 code/ 当修复侧）"}
+        return _fail(f"pins 重放失败：{mid.get('detail') or '?'}（拒绝用含钉的 code/ 当修复侧）",
+                     excluded=excluded)
     mid_root = Path(str(mid["root"])) if mid.get("ok") else theirs_root
     tmp_mid = str(mid_root) if mid.get("ok") else ""      # 复用包的 `code/`（**别 rmtree 它**）
     try:
@@ -192,13 +199,18 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
             elif res.get("conflict"):
                 conflicts.append(rel)
             else:
-                return {"ok": False, "merged": merged, "conflicts": conflicts,
-                        "excluded": sorted(excluded), "detail": f"{rel}: {res.get('detail', '')}"}
+                return _fail(f"{rel}: {res.get('detail', '')}", merged=merged,
+                             conflicts=conflicts, missing=missing, excluded=excluded)
         pins_rels = sorted(patch_rels(bundle, "pins.patch") - excluded)
+        _why = []
+        if conflicts:
+            _why.append(f"冲突 {len(conflicts)} 个：{'、'.join(conflicts[:3])}")
+        if missing:      # 落盘方只读 conflicts+detail ⇒ 旧写法"主干被删/找不到"一句消息都没有（400）
+            _why.append(f"主干缺文件 {len(missing)} 个：{'、'.join(missing[:3])}")
         return {"ok": not conflicts and not missing, "merged": merged, "conflicts": conflicts,
                 "missing": missing, "pins_rels": pins_rels, "excluded": sorted(excluded),
                 "pins_patch": "pins.patch" if (bundle / "pins.patch").is_file() and "pins.patch" in order else "",
-                "detail": ""}
+                "detail": "；".join(_why)}
     finally:
         shutil.rmtree(base_root, ignore_errors=True)
         if tmp_mid:

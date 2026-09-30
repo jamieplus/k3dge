@@ -11,15 +11,13 @@
 """
 from __future__ import annotations
 
-import datetime
 import json
 from pathlib import Path
 from typing import Dict, Optional
 
-from k3dge.engine import report_table
-from k3dge.engine.pipeline_runner import run_action
-
-_REPORT_HEADER_TOKEN = report_table.TABLE_HEADER
+# 两态 verb 移除后这些导入/常量已无引用（ocr-397）：`datetime`、`run_action`、
+# `_REPORT_HEADER_TOKEN`（连带只服务它的 `report_table` 导入）——表格口径单源在
+# `report_table.count_statuses`，由 `audit_report._parse_audit_stats` 委托。
 
 #: 审计单编排状态的运行态投影（k3dge 自己的事实；`.agent/audit_jobs.json`）。
 STATE_REL = ".agent/audit_jobs.json"
@@ -132,22 +130,9 @@ def _parse_trailers(text: str) -> dict:
     return parse_seal_trailers(text)
 
 
-# ---------- 编排状态（k3dge 自己的事实，不是 peer 的） ----------
-
-def _count_status(report_md: str) -> Dict[str, int]:
-    """12 列表的 状态 列计数（形式可验；枚举仅三种）。
-
-    单一表格口径：委托 `milestone._parse_audit_stats`（按表头定位「状态」列、跳过
-    len != 表头 的截断行），与封板闸 `audit_trigger.audit_closed` 同源——不再固定
-    cells[7] 取状态（code-13：同一报告两口径待修数会分歧，截断行可误判闭环）。
-    """
-    from k3dge.engine.audit_report import _parse_audit_stats
-
-    stats = _parse_audit_stats(report_md)
-    return {"待修": stats["待修"], "有意留": stats["有意留"], "已修": stats["已修"]}
-
-
 # ---------- 两态入口 ----------
+# 原 `_count_status` 已随两态 verb 退休（唯一消费者 `collect_audit` 不在；口径单源
+# `report_table.count_statuses`，经 `audit_report._parse_audit_stats` 暴露）（ocr-398）
 
 
 

@@ -143,7 +143,11 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
             continue
         if _is_superseded(old_text, my_id) and target.parent.name == "obsolete":
             continue
-        old_text = _mark_superseded(old_text, my_id)
+        marked = _mark_superseded(old_text, my_id)
+        if marked is None:
+            return (f"[SEAL REJECTED] {target.name} 没有可改的 `Status:` 行（缺/小写/全角冒号）"
+                    "——不能把它当'已 Superseded'归档，请先补规范的 Status 头")
+        old_text = marked
         obsolete.mkdir(parents=True, exist_ok=True)
         dest = obsolete / target.name
         if dest.is_file() and target != dest:
@@ -193,12 +197,20 @@ def _is_superseded(text: str, by_id: str) -> bool:
     st = _status(text)
     if st.lower() != "superseded":
         return False
-    return f"superseded_by:" in text and f"ADR-{by_id}" in text
+    # 全文子串判据会把正文里"讨论/示例"提到的 `superseded_by:` 与 `ADR-xxxx` 当"已标记"
+    # ⇒ 幂等早退，真字段永不写入（390）。锚到 frontmatter 行。
+    return bool(re.search(rf"^superseded_by:[ \t]*ADR-0*{int(by_id)}[ \t]*$", text, re.M))
 
 
-def _mark_superseded(text: str, by_id: str) -> str:
-    """Replace Status line with Superseded + inject superseded_by field."""
-    text = re.sub(r"^Status:\s*\S+", "Status: Superseded", text, count=1, flags=re.M)
+def _mark_superseded(text: str, by_id: str) -> "str | None":
+    """Replace Status line with Superseded + inject superseded_by field.
+
+    返回 `None` ＝ 没有可改的 `Status:` 行（缺失/小写/全角冒号）：调用方必须**拒**而不是
+    把没标记的文件当"已 Superseded"移进 obsolete（391）。
+    """
+    text = re.sub(r"^Status[ \t]*[:：]\s*\S+", "Status: Superseded", text, count=1, flags=re.M)
+    if "Status: Superseded" not in text:
+        return None
     # Inject superseded_by after Supersedes line (or after Status if no Supersedes)
     # 旧写法 `"^superseded_by:" not in text` 把正则锚当纯文本找，永远找不到 ⇒ 守卫恒真，
     # 对已有该字段的旧 ADR 再注入一行（frontmatter 重复键）。

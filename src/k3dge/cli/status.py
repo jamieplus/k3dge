@@ -6,6 +6,7 @@ re-filters drift (ADR-0001 decision 6 / ADR-0008). One implementation, isomorphi
 from __future__ import annotations
 
 import json
+import sys
 import re
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -28,7 +29,8 @@ def cache_observability(workspace: Path) -> Optional[Dict[str, Any]]:
     from k3dge.engine.pipeline_runner import run_action
 
     try:
-        res = run_action(workspace, "cache.stats")
+        # 只供展示的遥测 ⇒ 不许按缺省 60s/跳去跑整条传输链（status 是被 harness 高频调的读面）
+        res = run_action(workspace, "cache.stats", timeout_default=10)
     except Exception:  # pragma: no cover - 观测件绝不拖垮 status
         return None
     if not res.ok or res.provider != "mcp":
@@ -64,17 +66,22 @@ def lifecycle_next(workspace: Path) -> Any:
             return nextstep.NextStep.from_state(
                 "pending_findings", mid, pending=count, reasons=[f"标记: {s}" for s in samples[:5]]
             )
-        if not unmet_seal_preconditions(workspace, mid):
-            from k3dge.engine.task_index import scan_milestone_tasks
+        # 一次算清再交给 `seal_ready_for`（它内部原本会**再扫一遍**票与前置闸；status 是高频读面）
+        from k3dge.engine.task_index import scan_milestone_tasks
 
+        unmet = unmet_seal_preconditions(workspace, mid)
+        if not unmet:
             # 零 task 空窗不建议封（ADR-0004 §2.1.4）；M10 封完指针到 M11 曾立刻 seal_ready。
-            if scan_milestone_tasks(workspace, mid):
-                return nextstep.seal_ready_for(workspace, mid)
+            tasks = scan_milestone_tasks(workspace, mid)
+            if tasks:
+                return nextstep.seal_ready_for(workspace, mid, unmet=unmet, tasks=tasks)
         suggested, reasons = compute_audit_suggestion(workspace)
         if suggested:
             return nextstep.NextStep.from_state("audit_suggested", mid, reasons=reasons)
         return None
-    except Exception:  # pragma: no cover - routing must never break status
+    except Exception as exc:  # routing 不得拖垮 status，但**也不得把"坏了"渲染成"没待办"（389）**
+        print(f"[STATUS] WARN: [NEXT] 路由异常（{type(exc).__name__}: {exc}）⇒ 本轮不投影处理点",
+              file=sys.stderr)
         return None
 
 

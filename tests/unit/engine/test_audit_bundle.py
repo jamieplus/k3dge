@@ -769,3 +769,34 @@ def test_cli_command_quotes_substituted_values():
 
     out = _cli_command("k3dit audit --verify {bundle}", {"bundle": "/tmp/a b; rm -rf x"})
     assert out == "k3dit audit --verify '/tmp/a b; rm -rf x'"
+
+
+def test_dry_run_worktree_failure_cleans_tempdir(tmp_path, monkeypatch) -> None:
+    """`worktree add` 失败的早退发生在 try/finally 之前 ⇒ mkdtemp 的目录永久残留（395）。"""
+    import tempfile as _tf
+
+    from k3dge.engine import audit_bundle as ab
+
+    real_mkdtemp = _tf.mkdtemp
+    made: list = []
+
+    def spy(*a, **k):
+        d = real_mkdtemp(*a, **k)
+        made.append(d)
+        return d
+
+    monkeypatch.setattr(_tf, "mkdtemp", spy)
+    monkeypatch.setattr(ab, "_git", lambda *a, **k: (128, "fatal: not a git repository"))
+    res = ab._dry_run_via_worktree(tmp_path, tmp_path / "bundle", ["fix.patch"])
+    assert res["ok"] is False and res["error"] == "WORKTREE_UNAVAILABLE"
+    from pathlib import Path as _P
+
+    assert not [d for d in made if _P(d).exists()], "临时目录没被清"
+
+
+def test_audit_flow_has_no_dead_audit_surface() -> None:
+    """两态 verb 退休后留下的死件不得复活（397/398）。"""
+    from k3dge.engine import audit_flow
+
+    assert not hasattr(audit_flow, "_count_status")
+    assert not hasattr(audit_flow, "_REPORT_HEADER_TOKEN")
