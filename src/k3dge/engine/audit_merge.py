@@ -238,12 +238,12 @@ def patch_rels(bundle: Path, name: str) -> Set[str]:
 
 
 #: 旧名（内部调用点过渡用）
-_rels_of_patch = patch_rels
+# 旧名过渡别名 `_rels_of_patch` 已零引用（src/tests/docs 全走 `patch_rels`）⇒ 删除，
+# 免得"公开单源"出现两个入口（ocr-401）。
 
 
 def union_pins(workspace: Path, bundle: Path, rel: str) -> Dict[str, Any]:
     """钉的并集合并（两边都加了钉 ⇒ 两枚都留）：`merge-file --union`，不产生冲突标记。"""
-    import subprocess as _sp
 
     # code-5（报告）：base 必须是**纯基线**（`code/` 是"基线+fix+钉"，只反向钉会得"基线+fix"",
     # 与 ours（干线）/theirs（基线+fix+钉）不同基 ⇒ 并集会把 fix 当成钉侧的改动重复带入）。原实现还有
@@ -257,7 +257,7 @@ def union_pins(workspace: Path, bundle: Path, rel: str) -> Dict[str, Any]:
         a.write_bytes((workspace / rel).read_bytes() if (workspace / rel).is_file() else b"")
         b.write_bytes((Path(base["root"]) / rel).read_bytes() if (Path(base["root"]) / rel).is_file() else b"")
         c.write_bytes((Path(bundle) / "code" / rel).read_bytes())
-        rc = _sp.run(["git", "merge-file", "--union", "-p", str(a), str(b), str(c)], capture_output=True)
+        rc = subprocess.run(["git", "merge-file", "--union", "-p", str(a), str(b), str(c)], capture_output=True)
         return {"ok": rc.returncode == 0, "text": rc.stdout.decode("utf-8", "replace"),
                 "detail": (rc.stderr or b"").decode("utf-8", "replace")[:200]}
     finally:

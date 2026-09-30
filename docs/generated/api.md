@@ -273,6 +273,8 @@ union_pins(workspace: Path, bundle: Path, rel: str) -> Dict[str, Any]
 # audit_report.py
 from __future__ import annotations
 from pathlib import Path
+from typing import Optional
+from typing import Tuple
 from k3dge.engine import report_table
 # audit_trigger.py
 from __future__ import annotations
@@ -314,8 +316,8 @@ verify_bundle_local(bundle: Path, *, expect_input: str='', require_closed: bool=
 # changelog.py
 from __future__ import annotations
 from pathlib import Path
-mechanical_commit(sha: str, subject: str, body: str) -> bool
-    # doc: **机器造的**提交（不该进 CHANGELOG，也不算"漏项"）：
+mechanical_commit(subject: str, body: str) -> bool
+    # doc: **机器造的**提交（不该进 CHANGELOG，也不算"漏项"）。
 build_notes_from_range(workspace: Path, previous_tag: str='') -> tuple
     # doc: `<previous_tag>..HEAD` 的非机械提交 → `(notes, uncovered)`。
 # contract.py

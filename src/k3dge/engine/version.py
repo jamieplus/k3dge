@@ -270,7 +270,10 @@ def bump_version(workspace: Path, part: str = "patch", set_version: str | None =
     return new_version
 
 
-_CT_MAP = {"feat": "Added", "fix": "Fixed", "audit": "Fixed", "docs": "Changed", "chore": "Changed", "refactor": "Changed", "sec": "Security"}
+#: conventional 前缀 → Keep a Changelog 小节。**与 `changelog._RANGE_TYPES` 同口径**
+#: （`perf` 走 Changed：`_infer_change_type` 把 perf 归 refactor，旧表里没有 perf ⇒ 两处漂移，410）
+_CT_MAP = {"feat": "Added", "fix": "Fixed", "audit": "Fixed", "docs": "Changed",
+           "chore": "Changed", "refactor": "Changed", "perf": "Changed", "sec": "Security"}
 _CC_PREFIX = re.compile(r"^\s*(feat|fix|audit|docs|chore|refactor|perf|sec|security)(\(.+\))?\s*:\s*", re.IGNORECASE)
 _PREAMBLE = (
     "# Changelog\n\n"

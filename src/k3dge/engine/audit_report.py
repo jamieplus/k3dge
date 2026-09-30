@@ -5,7 +5,9 @@ Extracted from `engine/milestone.py` (A-1 第四块).
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
+from typing import Optional, Tuple
 
 from k3dge.engine import report_table
 from k3dge.engine.milestone_files import (
@@ -20,13 +22,20 @@ _QUALITY_MARKER_RE = re.compile(r"k3dge:kind:\s*quality", re.IGNORECASE)
 
 def _report_kind(name: str, text: str) -> str:
     """Classify a 12-col report as 'quality' (legacy kind marker / filename) or 'audit'."""
-    if _QUALITY_MARKER_RE.search(text) or "-quality" in name.lower():
+    # 文件名判据**收到后缀**：`-quality` 作全文子串会把 `2026-09-29-M11-quality-audit.md`
+    # 之类的普通审计报告错分进 quality 桶 ⇒ 审计面找不到报告（假阴，403）
+    if _QUALITY_MARKER_RE.search(text) or name.lower().endswith("-quality.md"):
         return "quality"
     return "audit"
 
 
-def _find_report(workspace: Path, milestone_id: str, kind: str = "audit"):
-    """Return (path, text) of the most recent 12-col report of the given kind."""
+def _find_report(workspace: Path, milestone_id: str,
+                 kind: str = "audit") -> Optional[Tuple[Path, str]]:
+    """Return `(path, text)` of the most recent 12-col report of `kind`; **None** when none.
+
+    调用方一律靠 `is None` / `[1]` 解包判闸门（`audit_trigger.audit_closed`、
+    `seal_flow._report_seat`、`milestone_audit`），故契约必须写出来（404）。
+    """
     reviews = workspace / "docs" / "reviews"
     if not reviews.is_dir():
         return None
@@ -36,7 +45,10 @@ def _find_report(workspace: Path, milestone_id: str, kind: str = "audit"):
             continue
         try:
             text = f.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+        except (OSError, UnicodeDecodeError) as exc:
+            # 整份吞掉会让结论变成"没有审计报告"，而真因是"有一份读不出"——方向性误导（405）
+            print(f"[audit_report] WARN: 候选报告读不出 {f.name}（{type(exc).__name__}: {exc}）"
+                  "⇒ 已跳过该件", file=sys.stderr)
             continue
         # 必须含**真表格**（`|` 起头的 12 列表头行），不能只是正文里抄了表头串——
         # 否则说明稿会被当成本里程碑审计报告、count_statuses 解析 0 行 ⇒ 假闭环（ocr-051）。
@@ -55,7 +67,13 @@ def _find_report(workspace: Path, milestone_id: str, kind: str = "audit"):
                 # 报告既无里程碑文件名、正文也无该里程碑 token（如跨里程碑的通用稿）：
                 # 不得充当任一里程碑的审计闭环（否则 seal_ready 假阳）。
                 continue
-        candidates.append((f.stat().st_mtime, f, text))
+        try:
+            mtime = f.stat().st_mtime          # iterdir 是快照：seal 归档可能在这中间把文件移走（407）
+        except OSError as exc:
+            print(f"[audit_report] WARN: {f.name} 扫描期间不可 stat（{exc}）⇒ 跳过该件",
+                  file=sys.stderr)
+            continue
+        candidates.append((mtime, f, text))
     if not candidates:
         return None
     candidates.sort(reverse=True)

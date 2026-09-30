@@ -379,7 +379,10 @@ def _validate_file(workspace: Path, typ: str, path: Path, schema: dict, seen: di
         )]
     for code, msg, scope in _pure_check_content(schema, path.name, text, ident):
         out.append(Violation(code, msg, file_path=(schema_rel if scope == "schema" else rel)))
-    seen.setdefault(ident, []).append(path.name)
+    # 记账用**工作区相对路径**而不是 `path.name`：`iter_managed_files` 走 `rglob("*.md")` 会纳入
+    # 子目录里的受管件，只记名 ⇒ 冲突项的 file_path 被拼成 `<type>/<basename>`（不存在的错误路径），
+    # 两个同名不同目录的件也会互相顶掉（414）
+    seen.setdefault(ident, []).append(rel)
     index_rel = schema.get("index")
     if index_rel:
         # containment + 读保护：schema 的 `index` 若为绝对路径/含 `..` 会读仓外；坏编码/TOCTOU 会让
@@ -465,7 +468,7 @@ def validate_docs(workspace: Path, types: Optional[Iterable[str]] = None) -> Lis
         if schema.get("filename") and "(" in str(schema.get("filename")):
             for ident, names in seen.items():
                 if len(names) > 1:
-                    rel = str((_type_dir(workspace, typ) / names[0]).relative_to(workspace)).replace("\\", "/")
+                    rel = names[0]
                     violations.append(
                         Violation(
                             _code(schema, "unique"),

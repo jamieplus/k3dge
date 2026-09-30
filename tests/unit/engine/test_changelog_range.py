@@ -39,16 +39,16 @@ def _tag(ws: Path, name: str) -> None:
 
 class TestMechanical(TestCase):
     def test_round_work_and_seal_commits_are_mechanical(self) -> None:
-        self.assertTrue(mechanical_commit("a", "round work M10", ""))
-        self.assertTrue(mechanical_commit("a", "chore(seal): seal milestone M10",
+        self.assertTrue(mechanical_commit("round work M10", ""))
+        self.assertTrue(mechanical_commit("chore(seal): seal milestone M10",
                                           "Seal-milestone: M10\nAudit-result: closed"))
 
     def test_normal_commit_is_not_mechanical(self) -> None:
-        self.assertFalse(mechanical_commit("a", "feat(engine): add x", ""))
-        self.assertFalse(mechanical_commit("a", "fix: correct y", ""))
+        self.assertFalse(mechanical_commit("feat(engine): add x", ""))
+        self.assertFalse(mechanical_commit("fix: correct y", ""))
         # 非 conventional **不是**机械件：它要进 `uncovered`（漏项信号），静默滤掉＝把病藏起来
-        self.assertFalse(mechanical_commit("a", "some prose subject", ""))
-        self.assertFalse(mechanical_commit("a", "unknown-type: x", ""))
+        self.assertFalse(mechanical_commit("some prose subject", ""))
+        self.assertFalse(mechanical_commit("unknown-type: x", ""))
 
 
 class TestRangeNotes(TestCase):
@@ -126,3 +126,21 @@ class TestNoDoubleWrite(TestCase):
         self.assertTrue(ok)
         self.assertTrue(out.name.endswith(".done.md"))
         self.assertEqual(changelog.read_text(encoding="utf-8"), before)
+
+
+def test_change_type_maps_agree_across_the_two_owners() -> None:
+    """`changelog._RANGE_TYPES` 与 `version._CT_MAP` 声称同口径，实际会漂（410）。"""
+    from k3dge.engine import version
+    from k3dge.engine.changelog import _RANGE_TYPES
+
+    drift = {k: (v, version._CT_MAP[k]) for k, v in _RANGE_TYPES.items()
+             if k in version._CT_MAP and version._CT_MAP[k] != v}
+    assert not drift, f"两处映射漂移: {drift}"
+
+
+def test_perf_prefix_lands_in_the_same_section() -> None:
+    from k3dge.engine import version
+    from k3dge.engine.changelog import _RANGE_TYPES
+
+    assert _RANGE_TYPES["perf"] == version._CT_MAP["perf"]
+    assert version._infer_change_type("perf(engine): speed up x", None) == "refactor"

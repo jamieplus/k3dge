@@ -30,7 +30,8 @@ def _try_run(cmd: List[str], cwd: Path) -> subprocess.CompletedProcess:
 def _run(cmd: List[str], cwd: Path) -> str:
     result = _try_run(cmd, cwd)
     if result.returncode != 0:
-        raise GitError(f"git {' '.join(cmd)} failed: {result.stderr.strip()}")
+        # cmd[0] 已是 "git"：再拼前缀就输出 `git git status ... failed`（412）
+        raise GitError(f"{' '.join(cmd)} failed: {result.stderr.strip()}")
     return result.stdout
 
 

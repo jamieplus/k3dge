@@ -205,11 +205,17 @@ def _replay_hashes(bundle: Path) -> Dict[str, Any]:
             if not inside or not f.is_file():
                 mismatched.append(rel)
                 continue
-            raw = f.read_text(encoding="utf-8", errors="replace")
+            try:
+                raw = f.read_bytes().decode("utf-8", errors="surrogateescape")   # 无损往返
+            except OSError as exc:
+                mismatched.append(rel)
+                continue
             sem = strip_markers(raw, rel)          # **去钉后比语义层**（契约 §8 语法单源）
             if has_marker_line(raw, rel):          # 只按"真匹配到钉行"计数（二进制文件不误标）
                 with_pins.append(rel)
-            got = hashlib.sha1(sem.encode("utf-8")).hexdigest()
+            # `errors="replace"` 会把坏字节变成 U+FFFD，再编码 ≠ 原字节 ⇒ 非 UTF-8/二进制文件
+            # 的摘要**永远**对不上产出方的值，整包被判"内容不符"（409）
+            got = hashlib.sha1(sem.encode("utf-8", errors="surrogateescape")).hexdigest()
             if got == digest:
                 checked += 1
             else:

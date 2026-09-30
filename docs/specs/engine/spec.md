@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:60db93f1e70809382dd6e73b34b6a41e5404c71043f490bc0f82d387f1c4f95c`
+- **Contract Hash**: `sha256:34e19a9b477f2c61d139b27eb57c6ebf64a016f59ee5b5a5241191187b03ecf5`
 - **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
@@ -131,6 +131,8 @@ patch_rels(bundle: Path, name: str) -> Set[str]
 union_pins(workspace: Path, bundle: Path, rel: str) -> Dict[str, Any]
 from __future__ import annotations
 from pathlib import Path
+from typing import Optional
+from typing import Tuple
 from k3dge.engine import report_table
 from __future__ import annotations
 from pathlib import Path
@@ -163,7 +165,7 @@ replay_to_baseline(bundle: Path, dest: Optional[Path]=None, only: Optional[List[
 verify_bundle_local(bundle: Path, *, expect_input: str='', require_closed: bool=True, accept_baseline_drift: str='') -> dict
 from __future__ import annotations
 from pathlib import Path
-mechanical_commit(sha: str, subject: str, body: str) -> bool
+mechanical_commit(subject: str, body: str) -> bool
 build_notes_from_range(workspace: Path, previous_tag: str='') -> tuple
 from __future__ import annotations
 from pathlib import Path

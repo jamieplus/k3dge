@@ -86,8 +86,10 @@ def _max_control_depth(path: Path) -> Optional[int]:
 def compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]:
     """Return (suggested, reasons). Only fires on a quantitative event."""
     mid = get_current_milestone(workspace)
-    # An audit report already exists for this milestone -> audit already happened
-    # (or is in progress); do not re-suggest within this snapshot.
+    # 本里程碑已有审计报告 ⇒ 不再**建议**（本轮已审/在审）。口径说明：这里判的是"报告在不在"，
+    # 不是 `audit_closed`（待修=0）——**带待修的报告同样抑制建议**，这是有意的：
+    # "有待修"由 `check` 的 12 列计数与 `[NEXT] audit_open` 负责递到操作者面前，
+    # 建议面（本函数）只管"要不要再开一轮审计"，两处各判各的，别再让文档说它调 `audit_closed`（408）。
     if _find_audit_report(workspace, mid) is not None:
         return False, []
 

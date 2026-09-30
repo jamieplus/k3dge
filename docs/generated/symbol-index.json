@@ -176,13 +176,13 @@
   "analyze_adr_coverage": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 524
+      "line": 527
     }
   ],
   "append_changelog": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 313
+      "line": 316
     }
   ],
   "append_to_message": [
@@ -230,7 +230,7 @@
   "audit_closed": [
     {
       "file": "src/k3dge/engine/audit_trigger.py",
-      "line": 126
+      "line": 128
     }
   ],
   "audit_evidence": [
@@ -302,7 +302,7 @@
   "build_notes_from_range": [
     {
       "file": "src/k3dge/engine/changelog.py",
-      "line": 82
+      "line": 84
     }
   ],
   "build_parser": [
@@ -734,7 +734,7 @@
   "consume_unreleased": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 332
+      "line": 335
     }
   ],
   "count_statuses": [
@@ -906,7 +906,7 @@
   "get_changed_files": [
     {
       "file": "src/k3dge/engine/diff.py",
-      "line": 114
+      "line": 115
     }
   ],
   "get_current_milestone": [
@@ -1598,7 +1598,7 @@
   "resolve_base": [
     {
       "file": "src/k3dge/engine/diff.py",
-      "line": 51
+      "line": 52
     }
   ],
   "resolve_endpoint_command": [
@@ -1920,7 +1920,7 @@
   "union_pins": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 244
+      "line": 245
     }
   ],
   "unmet_seal_preconditions": [
@@ -1944,13 +1944,13 @@
   "validate_docs": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 435
+      "line": 438
     }
   ],
   "validate_docs_index": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 482
+      "line": 485
     }
   ],
   "validate_pipeline_config": [
@@ -1980,7 +1980,7 @@
   "verify_bundle_local": [
     {
       "file": "src/k3dge/engine/audit_verify.py",
-      "line": 224
+      "line": 230
     }
   ],
   "verify_commit": [

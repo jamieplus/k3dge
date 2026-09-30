@@ -18,8 +18,8 @@ from pathlib import Path
 #: 是为了"提交闸允许的类型"都能落进某节，不被静默丢掉）。
 _RANGE_TYPES = {
     "feat": "Added", "add": "Added",
-    "fix": "Fixed", "audit": "Fixed", "perf": "Fixed", "sec": "Security",
-    "docs": "Changed", "refactor": "Changed", "chore": "Changed",
+    "fix": "Fixed", "audit": "Fixed", "sec": "Security",
+    "docs": "Changed", "refactor": "Changed", "chore": "Changed", "perf": "Changed",
     "style": "Changed", "build": "Changed", "ci": "Changed", "test": "Changed",
     "revert": "Removed", "remove": "Removed", "deprecate": "Deprecated",
 }
@@ -62,8 +62,10 @@ def _git(workspace: Path, *args: str) -> str:
     return r.stdout.strip()
 
 
-def mechanical_commit(sha: str, subject: str, body: str) -> bool:
-    """**机器造的**提交（不该进 CHANGELOG，也不算"漏项"）：
+def mechanical_commit(subject: str, body: str) -> bool:
+    """**机器造的**提交（不该进 CHANGELOG，也不算"漏项"）。
+
+    `sha` 参数已删：判据只用 subject/body，留着只是让调用方与测试传占位（411）。
 
     - `round work <job>`：`worktree.advance` 的进程提交（审计线现场）
     - 带 `Seal-milestone:` trailer：封版提交（归档/提版/收摊，不是人的工作内容）
@@ -110,7 +112,7 @@ def build_notes_from_range(workspace: Path, previous_tag: str = "") -> tuple:
         parts = rec.split("\x1f")
         sha, subject = parts[0], (parts[1] if len(parts) > 1 else "")
         body = parts[2] if len(parts) > 2 else ""
-        if mechanical_commit(sha, subject, body):
+        if mechanical_commit(subject, body):
             continue
         m = _SUBJECT_RE.match(subject)
         if not m:
