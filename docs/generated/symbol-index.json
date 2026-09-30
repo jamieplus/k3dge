@@ -122,7 +122,7 @@
   "TransportResult": [
     {
       "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 64
+      "line": 65
     }
   ],
   "Violation": [
@@ -314,7 +314,7 @@
   "build_server_params": [
     {
       "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 150
+      "line": 153
     }
   ],
   "build_symbol_index": [
@@ -374,7 +374,7 @@
   "call_mcp_tool": [
     {
       "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 182
+      "line": 185
     }
   ],
   "check_adr_consistency": [
@@ -764,7 +764,7 @@
   "decl": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 71
+      "line": 72
     }
   ],
   "describe_extractors": [
@@ -786,7 +786,7 @@
   "emit_all": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 327
+      "line": 335
     }
   ],
   "ensure": [
@@ -1152,7 +1152,7 @@
   "kind": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 78
+      "line": 85
     }
   ],
   "land_report": [
@@ -1200,7 +1200,7 @@
   "load_all": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 359
+      "line": 367
     }
   ],
   "load_mcp_document": [
@@ -1218,13 +1218,13 @@
   "load_persisted": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 376
+      "line": 384
     }
   ],
   "load_pipeline_config": [
     {
       "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 85
+      "line": 86
     }
   ],
   "main": [
@@ -1304,7 +1304,7 @@
   "next_for_rejection": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 427
+      "line": 435
     }
   ],
   "normalize": [
@@ -1322,7 +1322,7 @@
   "on_error": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 82
+      "line": 89
     }
   ],
   "open_samples": [
@@ -1436,7 +1436,7 @@
   "probe_servers": [
     {
       "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 273
+      "line": 276
     }
   ],
   "projection": [
@@ -1460,7 +1460,7 @@
   "question_text": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 458
+      "line": 466
     }
   ],
   "read_checklist": [
@@ -1604,7 +1604,7 @@
   "resolve_endpoint_command": [
     {
       "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 126
+      "line": 127
     }
   ],
   "resolve_languages": [
@@ -1634,7 +1634,7 @@
   "run_action": [
     {
       "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 380
+      "line": 383
     }
   ],
   "run_audit_flow": [
@@ -1658,7 +1658,7 @@
   "run_phase": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 108
+      "line": 115
     }
   ],
   "run_schema_gate": [
@@ -1688,7 +1688,7 @@
   "satisfied_ids": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 87
+      "line": 94
     }
   ],
   "scaffold": [
@@ -1754,7 +1754,7 @@
   "seal_ready_for": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 396
+      "line": 404
     }
   ],
   "seal_record": [
@@ -1962,7 +1962,7 @@
   "validate_pipeline_config": [
     {
       "file": "src/k3dge/engine/pipeline_schema.py",
-      "line": 233
+      "line": 235
     }
   ],
   "validate_structure": [

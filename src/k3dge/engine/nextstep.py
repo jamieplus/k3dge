@@ -308,7 +308,7 @@ def _upsert(workspace: Path, ns: NextStep) -> list:
                 merged.append(r_)
         card["reasons"] = merged
     by_state[ns.state] = card
-    cards = sorted(by_state.values(), key=lambda c: c.get("priority", 5))
+    cards = sorted(by_state.values(), key=_prio)     # 同 439：外来 card 的 priority 未必可比
     return cards
 
 
@@ -322,6 +322,14 @@ def emit(workspace: Path, ns: NextStep, *, stream: Optional[TextIO] = None) -> s
     if stream is not None:
         print(text, file=stream)
     return text
+
+
+def _prio(card: dict) -> int:
+    """`priority` 未必可比：旧形状/手工编辑/外来 harness 写的 null 或字符串会让 `sorted` 抛（439）。"""
+    try:
+        return int(card.get("priority", 5))
+    except (TypeError, ValueError):
+        return 5
 
 
 def emit_all(workspace: Path, steps: list, *, stream: Optional[TextIO] = None) -> list:
@@ -345,7 +353,7 @@ def emit_all(workspace: Path, steps: list, *, stream: Optional[TextIO] = None) -
     for c in cards:
         by_state[c.get("state")] = c
     merged = sorted(by_state.values(),
-                    key=lambda c: (c.get("priority", 5),
+                    key=lambda c: (_prio(c),
                                    order.index(c.get("state")) if c.get("state") in order else len(order)))
     _write_cards(workspace, merged, merged[0].get("state") if merged else None)
     from k3dge.engine import events

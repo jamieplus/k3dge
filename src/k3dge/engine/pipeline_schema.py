@@ -136,9 +136,12 @@ def _validate_roles(roles, servers, peers=None):
 
 
 def _validate_peers(workspace, peers, servers, role_bind):
-    """returns (errors, declared stage ids)."""
+    """returns (errors, declared action refs)。
+
+    `declared` 集合在 449 之前是纯写入：唯一消费者 `_validate_pipelines` 从不读它
+    （`[pipelines.*]` 已废、只报存在）⇒ 不再收集，只回 errors（第二元保留为空集，签名不变）。
+    """
     errors: List[PipelineViolation] = []
-    declared: set[str] = set()
     for p_name, p_cfg in peers.items():
         if not isinstance(p_cfg, dict):
             errors.append(("PIPELINE_SCHEMA_INVALID", f"peer '{p_name}' must be a table"))
@@ -152,8 +155,7 @@ def _validate_peers(workspace, peers, servers, role_bind):
             actions = None
         if actions is not None:
             for a_name, a_cfg in actions.items():
-                declared.add(f"{p_name}.actions.{a_name}")
-                declared.add(f"{p_name}.{a_name}")  # 2-part compat alias
+
                 if not isinstance(a_cfg, dict):
                     # 值写成字符串/数组 ⇒ 报错而非 AttributeError 崩（ocr-096）。
                     errors.append(("PIPELINE_SCHEMA_INVALID",
@@ -163,13 +165,13 @@ def _validate_peers(workspace, peers, servers, role_bind):
                     workspace, a_cfg.get("transports", []),
                     f"{p_name}.actions.{a_name}", servers, role_bind))
         else:
-            declared.add(p_name)
+
             errors.extend(_validate_transports(
                 workspace, p_cfg.get("transports", []), p_name, servers, role_bind))
-    return errors, declared
+    return errors, set()  # declared 已无消费者（449）：保留位置返回，签名不变
 
 
-def _validate_pipelines(pipelines, declared) -> List[PipelineViolation]:
+def _validate_pipelines(pipelines) -> List[PipelineViolation]:
     """`[pipelines.*]` 已废（迁为 `[checks.<op>].stages_<phase>`）：留此只做**迁移守卫**。
 
     历史病灶：那两处声明只有本函数校验形状，**没有任何执行者读取**——文档声称的
@@ -261,9 +263,9 @@ def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
     servers = mcp_server_names(workspace)
     r_errs, role_bind = _validate_roles(roles, servers, peers)
     errors.extend(r_errs)
-    p_errs, declared = _validate_peers(workspace, peers, servers, role_bind)
+    p_errs, _declared = _validate_peers(workspace, peers, servers, role_bind)
     errors.extend(p_errs)
-    errors.extend(_validate_pipelines(data.get("pipelines", {}), declared))
+    errors.extend(_validate_pipelines(data.get("pipelines", {})))
     errors.extend(_validate_legacy_gates_toml(workspace))
     errors.extend(_validate_declared_stages(workspace, data))
     return errors

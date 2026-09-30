@@ -31,12 +31,13 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple     # Any/Dict 从未被引用（注解一律用小写内置 dict/list，446）
 
 from k3dge.engine.mcp_json import load_mcp_endpoints
 from k3dge.engine.pipeline_schema import (  # 单源：provider 合法集 + action ref 解析归闸核层
@@ -141,7 +142,9 @@ def resolve_endpoint_command(workspace: Path, endpoint: dict) -> Tuple[Optional[
     if found:
         return found, declared
     if declared in _FALLBACK_INTERPRETERS:
-        venv = workspace / ".venv" / "bin" / declared
+        # venv 布局按平台分叉（同 gate.py / worktree）：Windows 是 `Scripts/<name>.exe`
+        venv = (workspace / ".venv" / ("Scripts" if os.name == "nt" else "bin")
+                / (f"{declared}.exe" if os.name == "nt" else declared))
         if venv.exists():
             return str(venv), f"{declared} -> {venv} (fallback: declared name not on PATH)"
     return None, f"interpreter not found: {declared} (not on PATH, no .venv)"
@@ -415,7 +418,9 @@ def run_action(
             timeout = int(timeout_default) if str(timeout_default).isdigit() else 120
             print(f"[PEER] WARN: action '{action_ref}' 的 timeout 非法（{t.get('timeout')!r}）⇒ 用 {timeout}s",
                   file=sys.stderr)
-        nxt = next((x.get("provider") for x in transports[idx + 1 :] if isinstance(x, dict)), None)
+        # 下一跳也要过合法集：拼错/缺 provider 的条目会被播报成"降级到 <那个值>"（448）
+        nxt = next((p2 for p2 in (x.get("provider") for x in transports[idx + 1:]
+                                  if isinstance(x, dict)) if p2 in _VALID_PROVIDERS), None)
         if prov == "skip":
             _append_log(workspace, f"[{datetime.datetime.now().astimezone().isoformat(timespec='seconds')}] HARNESS_SKIP: action '{action_ref}' resolved to skip transport")
             return TransportResult(True, "skip", "skipped", skipped=True, downgrades=downgrades)

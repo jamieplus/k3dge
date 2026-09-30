@@ -55,7 +55,8 @@ NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {
     "closure_note": {"kind": "projection", "on_error": "continue"},     # 清单可重生成
     "prune": {"kind": "fact", "on_error": "continue", "on_rerun": "append"},  # 派生件清理
     # --- align ---
-    "align_tasks_all_done": {"kind": "projection", "on_error": "stop"},
+    # `align_tasks_all_done` 曾在此声明，但 `[checks.align].preconditions` 用的 id 是
+    # `tasks_all_done`（代码缺省与本仓 pipeline.toml 都是）⇒ 这条永远取不到，删（441）。
     # --- sync 链（顺序＝[checks.sync].actions 的声明序）---
     "sync_extractors": {"kind": "projection", "on_error": "continue"},   # opt-in；配置坏不挡其余步
     "reconcile_adrs": {"kind": "fact", "on_error": "continue", "on_rerun": "append",
@@ -69,9 +70,15 @@ NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {
 
 
 def decl(workspace: Path, node_id: str) -> Dict[str, Any]:
-    """节点属性：`NODE_DEFAULTS` ← `pipeline.toml [nodes.<id>]`（下游可覆盖）。"""
-    merged = dict(NODE_DEFAULTS.get(node_id, {}))
-    merged.update((gates.load(workspace).get("nodes") or {}).get(node_id) or {})
+    """节点属性：`NODE_DEFAULTS` ← `pipeline.toml [nodes.<id>]`（下游可覆盖）。
+
+    **深拷贝**：浅拷贝下 `satisfies`/`produces` 与 `NODE_DEFAULTS` 里是同一个 list，
+    任何调用方 append 一次就污染全进程默认表（442）。
+    """
+    import copy
+
+    merged = copy.deepcopy(NODE_DEFAULTS.get(node_id, {}))
+    merged.update(copy.deepcopy((gates.load(workspace).get("nodes") or {}).get(node_id) or {}))
     return merged
 
 
@@ -119,10 +126,8 @@ def run_phase(
     - precondition 的失败值 ⇒ `Rejection(gid, msg)`；action 的失败值 ⇒ `gates.rejection(out, aid)`
     - `on_error=continue` 的节点失败**不中断**（用于收尾类步骤），其消息并入输出
     """
-    from k3dge.engine import gates as _gates
-
-    ids = (_gates.preconditions(workspace, op) if phase == "preconditions"
-           else _gates.actions(workspace, op))
+    ids = (gates.preconditions(workspace, op) if phase == "preconditions"
+           else gates.actions(workspace, op))
     collected: list[str] = []
     for nid in ids:
         fn = registry.get(nid)
@@ -167,4 +172,4 @@ def run_phase(
             collected.append(str(rej))
             continue
         return False, rej
-    return True, "".join(collected)
+    return True, "\n".join(collected)   # 混装 payload 与拒绝消息，无分隔符会黏成一行读不出（445）

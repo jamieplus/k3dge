@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:5b4a0badacd9a85f58f1a315f25dd8ae88169ef0778892fb8c6f955b1929e7d2`
+- **Contract Hash**: `sha256:4efbed404655f9a66b3f199931167799c4117a5a967a48082eda06bf9ef4a2dd`
 - **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
@@ -471,7 +471,7 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 from k3dge.engine import gates
-NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {'tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'align_pass': {'kind': 'projection', 'on_error': 'stop'}, 'guides_filled': {'kind': 'projection', 'on_error': 'stop'}, 'adrs_all_accepted': {'kind': 'projection', 'on_error': 'stop'}, 'adr_landed': {'kind': 'projection', 'on_error': 'stop'}, 'adr_amend_format': {'kind': 'projection', 'on_error': 'stop'}, 'docs_normalized': {'kind': 'projection', 'on_error': 'stop'}, 'full_matrix': {'kind': 'projection', 'on_error': 'stop', 'satisfies': ['align_pass']}, 'audit': {'kind': 'fact', 'on_error': 'stop', 'on_rerun': 'append'}, 'archive': {'kind': 'fact', 'on_error': 'rollback', 'on_rerun': 'reject', 'produces': ['archived_paths']}, 'version_bump': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'seal_record': {'kind': 'fact', 'on_error': 'stop', 'on_rerun': 'append', 'produces': ['audit_baseline', 'audit_seal_commit']}, 'closure_note': {'kind': 'projection', 'on_error': 'continue'}, 'prune': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'align_tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'sync_extractors': {'kind': 'projection', 'on_error': 'continue'}, 'reconcile_adrs': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append', 'produces': ['adr_report']}, 'sync_domains': {'kind': 'projection', 'on_error': 'stop', 'produces': ['changed']}, 'sync_manual_docs': {'kind': 'projection', 'on_error': 'stop', 'produces': ['docs_updated']}, 'sync_docs_index': {'kind': 'projection', 'on_error': 'stop'}}
+NODE_DEFAULTS: Dict[str, Dict[str, Any]] = {'tasks_all_done': {'kind': 'projection', 'on_error': 'stop'}, 'align_pass': {'kind': 'projection', 'on_error': 'stop'}, 'guides_filled': {'kind': 'projection', 'on_error': 'stop'}, 'adrs_all_accepted': {'kind': 'projection', 'on_error': 'stop'}, 'adr_landed': {'kind': 'projection', 'on_error': 'stop'}, 'adr_amend_format': {'kind': 'projection', 'on_error': 'stop'}, 'docs_normalized': {'kind': 'projection', 'on_error': 'stop'}, 'full_matrix': {'kind': 'projection', 'on_error': 'stop', 'satisfies': ['align_pass']}, 'audit': {'kind': 'fact', 'on_error': 'stop', 'on_rerun': 'append'}, 'archive': {'kind': 'fact', 'on_error': 'rollback', 'on_rerun': 'reject', 'produces': ['archived_paths']}, 'version_bump': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'seal_record': {'kind': 'fact', 'on_error': 'stop', 'on_rerun': 'append', 'produces': ['audit_baseline', 'audit_seal_commit']}, 'closure_note': {'kind': 'projection', 'on_error': 'continue'}, 'prune': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append'}, 'sync_extractors': {'kind': 'projection', 'on_error': 'continue'}, 'reconcile_adrs': {'kind': 'fact', 'on_error': 'continue', 'on_rerun': 'append', 'produces': ['adr_report']}, 'sync_domains': {'kind': 'projection', 'on_error': 'stop', 'produces': ['changed']}, 'sync_manual_docs': {'kind': 'projection', 'on_error': 'stop', 'produces': ['docs_updated']}, 'sync_docs_index': {'kind': 'projection', 'on_error': 'stop'}}
 decl(workspace: Path, node_id: str) -> Dict[str, Any]
 kind(workspace: Path, node_id: str) -> str
 on_error(workspace: Path, node_id: str) -> str
@@ -484,8 +484,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
-from typing import Any
-from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
