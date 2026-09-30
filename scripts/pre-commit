@@ -18,7 +18,11 @@ from pathlib import Path
 
 
 def _workspace() -> Path:
-    r = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    # git 不在 PATH / rev-parse 失败 / 空 stdout ⇒ 回落 cwd；subprocess 本身也不许抛（ocr-025）。
+    try:
+        r = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    except OSError:
+        return Path.cwd().resolve()
     return Path(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip() else Path.cwd().resolve()
 
 
@@ -33,9 +37,13 @@ def _reexec_into_venv(ws: Path) -> None:
     if os.environ.get("K3DGE_HOOK_REEXEC") == "1":
         return
     cand = ws / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-    if cand.is_file():
-        os.environ["K3DGE_HOOK_REEXEC"] = "1"
+    if not (cand.is_file() and os.access(str(cand), os.X_OK)):
+        return
+    os.environ["K3DGE_HOOK_REEXEC"] = "1"
+    try:
         os.execv(str(cand), [str(cand), str(Path(__file__).resolve()), *sys.argv[1:]])
+    except OSError:
+        os.environ.pop("K3DGE_HOOK_REEXEC", None)      # execv 失败 ⇒ 清哨兵，回落当前解释器
 
 
 def _load_doc_gate(ws: Path):
@@ -46,24 +54,43 @@ def _load_doc_gate(ws: Path):
     return doc_gate
 
 
+def _run_consistency_gate(ws: Path, relevant) -> int:
+    """一致性闸 `scripts/gate.py` **独立于 k3dge import**（ocr-027/028）：import 失败或闸崩时也要跑，
+    否则 contract hash / seal / 文档索引等确定性阻断项会被一行 WARN 静默旁路。
+    `relevant is False` ⇒ 明确无关，跳过；True/None ⇒ 跑（None＝拿不到判定核 ⇒ fail-closed）。"""
+    if relevant is False:
+        print("[k3dge check] skipped (no code/spec/agent changes in this commit)")
+        return 0
+    print("[k3dge check] running consistency gate...", flush=True)
+    try:
+        return subprocess.call([sys.executable, str(ws / "scripts" / "gate.py")])
+    except OSError as exc:      # 连 gate.py 都跑不动 ⇒ 工具坏，放行（不阻断提交）
+        print(f"[k3dge check] WARN: consistency gate 不可执行（{exc}）→ 放行", file=sys.stderr)
+        return 0
+
+
 def main() -> int:
-    ws = _workspace()
-    _reexec_into_venv(ws)
+    try:
+        ws = _workspace()
+        _reexec_into_venv(ws)
+    except Exception as exc:      # 环境探测失败不得阻断提交
+        print(f"[k3dge] WARN: 环境探测失败（{exc}）→ 跳过钩子", file=sys.stderr)
+        return 0
     try:
         doc_gate = _load_doc_gate(ws)
-    except Exception as exc:  # 工具坏不得阻断所有提交（与 downgrade 口径一致）
-        print(f"[k3dge doc-gate] WARN: k3dge 不可导入（{exc}）→ 跳过文档/结构闸")
-        return 0
-    doc_gate.set_workspace(ws)
-    rc = doc_gate.main()
-    if rc:
-        return rc
-    files = doc_gate.staged_files()
-    if doc_gate.relevant_for_check(files):
-        print("[k3dge check] running consistency gate...", flush=True)
-        return subprocess.call([sys.executable, str(ws / "scripts" / "gate.py")])
-    print("[k3dge check] skipped (no code/spec/agent changes in this commit)")
-    return 0
+    except Exception as exc:      # k3dge 不可导入 ⇒ 文档/结构闸降级，但**一致性闸仍跑**
+        print(f"[k3dge doc-gate] WARN: k3dge 不可导入（{exc}）→ 跳过文档/结构闸", file=sys.stderr)
+        return _run_consistency_gate(ws, None)
+    try:
+        doc_gate.set_workspace(ws)
+        rc = doc_gate.main()
+        if rc:
+            return rc
+        relevant = doc_gate.relevant_for_check(doc_gate.staged_files())
+    except Exception as exc:      # 闸**自身崩溃**（非判定失败）⇒ WARN 放行文档/结构闸，一致性闸照跑
+        print(f"[k3dge doc-gate] WARN: 闸自身异常（{exc}）→ 跳过文档/结构闸", file=sys.stderr)
+        relevant = None
+    return _run_consistency_gate(ws, relevant)
 
 
 if __name__ == "__main__":

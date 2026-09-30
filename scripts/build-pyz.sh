@@ -5,6 +5,9 @@ set -eu
 cd "$(dirname "$0")/.."
 mkdir -p dist
 PY="${PYTHON:-python3}"
-"$PY" -m zipapp src -m "k3dge.cli.main:main" -p "/usr/bin/env python3" -o dist/k3dge.pyz
+# 产物 shebang 可配（缺省 env python3）；与构建解释器不一致时提示——下游无 `python3` 或版本 < 3.10
+# 会在**别人的机器上**启动失败，且很难归因（ocr-013）。
+SHEBANG="${PYZ_SHEBANG:-/usr/bin/env python3}"
+"$PY" -m zipapp src -m "k3dge.cli.main:main" -p "$SHEBANG" -o dist/k3dge.pyz
 chmod +x dist/k3dge.pyz
 echo "built dist/k3dge.pyz ($(wc -c < dist/k3dge.pyz) bytes)"

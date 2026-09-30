@@ -6,7 +6,14 @@ ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
 
 python3 "${ROOT}/scripts/gate.py" check-msg --file "$1" || exit 1
 
-LINE="$(python3 "${ROOT}/scripts/gate.py" commit-attest)"
+if ! LINE="$(python3 "${ROOT}/scripts/gate.py" commit-attest)"; then
+  echo "[k3dge] commit-attest 失败：拒绝提交（缺 k3dge-commit 署名会被 CI 全量验拦下）" >&2
+  exit 1
+fi
+if ! printf '%s' "$LINE" | grep -Eq '^k3dge-commit: .+ @ .+ #[a-z]+$'; then
+  echo "[k3dge] commit-attest 输出非法（应为一行 k3dge-commit trailer）：$LINE" >&2
+  exit 1
+fi
 if ! grep -q '^k3dge-commit: ' "$1"; then
   printf '\n%s\n' "$LINE" >> "$1"
 fi

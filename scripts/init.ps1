@@ -48,10 +48,15 @@ $PyVenv = if (Test-Path (Join-Path $Target ".venv/Scripts/python.exe")) {
   Join-Path $Target ".venv/bin/python"
 }
 
-$self = ((Resolve-Path $K3dgeHome).Path -eq (Resolve-Path $Target).Path)
+# K3DGE_SOURCE 可能是 pypi / git+https URL（非路径）⇒ 只在确为目录时才 Resolve（ocr-021）。
+$self = $false
+if (Test-Path $K3dgeHome -PathType Container) {
+  $self = ((Resolve-Path $K3dgeHome).Path.TrimEnd('/','\') -eq (Resolve-Path $Target).Path.TrimEnd('/','\'))
+}
 if ($self) {
   Write-Host "[k3dge] pip install -e .[dev] (self)"
   & $Pip install -q -e ".[dev]"
+  if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] pip install 失败 (exit $LASTEXITCODE)"); exit 1 }
 } else {
   $InstallFlags = @()
   if ([string]::IsNullOrWhiteSpace($env:K3DGE_SOURCE) -or $env:K3DGE_SOURCE -eq "pypi") {
@@ -74,6 +79,7 @@ if ($self) {
     Write-Host "[k3dge] Installing editable from K3DGE_HOME: $K3dgeHome"
   }
   & $Pip install -q @InstallFlags $InstallTarget pre-commit pytest
+  if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] pip install 失败 (exit $LASTEXITCODE)"); exit 1 }
   # 统管落盘：记录本 venv 是哪份 K3DGE_SOURCE 装出来的（运行时一律读它，不猜）
   if ($InstallTarget -eq "k3dge[mcp]") { $srcRec = "pypi" }
   elseif ($InstallTarget -match '^k3dge\[mcp\] @ ') { $srcRec = $InstallTarget -replace '^k3dge\[mcp\] @ ','' }
@@ -83,6 +89,7 @@ if ($self) {
 
 Write-Host "[k3dge] generating harness scaffolding in $Target ..."
 & $PyVenv -m k3dge.templates.scaffold $Target
+if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] scaffold 失败 (exit $LASTEXITCODE)"); exit 1 }
 
 $K3dgeExe = if (Test-Path (Join-Path $Target ".venv/Scripts/k3dge.exe")) {
   Join-Path $Target ".venv/Scripts/k3dge.exe"
@@ -91,6 +98,7 @@ $K3dgeExe = if (Test-Path (Join-Path $Target ".venv/Scripts/k3dge.exe")) {
 }
 Write-Host "[k3dge] k3dge sync"
 & $K3dgeExe sync
+if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] k3dge sync 失败 (exit $LASTEXITCODE)"); exit 1 }
 
 $PreCommit = if (Test-Path (Join-Path $Target ".venv/Scripts/pre-commit.exe")) {
   Join-Path $Target ".venv/Scripts/pre-commit.exe"
@@ -99,7 +107,9 @@ $PreCommit = if (Test-Path (Join-Path $Target ".venv/Scripts/pre-commit.exe")) {
 }
 Write-Host "[k3dge] pre-commit install"
 & $PreCommit install
+if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] pre-commit install 失败 (exit $LASTEXITCODE)"); exit 1 }
 & $PreCommit install --hook-type commit-msg
+if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] pre-commit install commit-msg 失败 (exit $LASTEXITCODE)"); exit 1 }
 
 Write-Host ""
 Write-Host "[k3dge] Initialization complete for $Target"

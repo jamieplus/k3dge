@@ -19,7 +19,7 @@ if ([string]::IsNullOrWhiteSpace($want) -and (Test-Path (Join-Path $Root "pyproj
 if ($want -and (Test-Path $srcFile)) {
   $rec = ((Get-Content $srcFile | Select-Object -First 1) -replace '\s','')
   if ($want -ne $rec) {
-    Write-Error "[k3dge-source] MISMATCH: want='$want' (env>pyproject) but installed from '$rec'. 重装或改政策后再跑闸."
+    [Console]::Error.WriteLine("[k3dge-source] MISMATCH: want='$want' (env>pyproject) but installed from '$rec'. 重装或改政策后再跑闸.")
     exit 2
   }
 }
@@ -32,5 +32,5 @@ if ($k3dge) {
   & k3dge @cmdArgs
   exit $LASTEXITCODE
 }
-Write-Error "k3dge not found. Run ./k3dge-init.ps1"
+[Console]::Error.WriteLine("k3dge not found. Run ./k3dge-init.ps1")
 exit 1

@@ -52,7 +52,7 @@ else
     INSTALL_TARGET="${K3DGE_SOURCE}[mcp]"
     INSTALL_FLAGS="-e"
     echo "[k3dge] Installing editable from local path: $K3DGE_SOURCE"
-  elif case "$K3DGE_SOURCE" in git+*|https://*github.com*|https://*/* ) true ;; esac; then
+  elif case "$K3DGE_SOURCE" in git+*|https://*github.com*|https://*/*) true ;; *) false ;; esac; then
     INSTALL_TARGET="k3dge[mcp] @ ${K3DGE_SOURCE}"
     echo "[k3dge] Installing from VCS source (non-editable): $K3DGE_SOURCE"
   else

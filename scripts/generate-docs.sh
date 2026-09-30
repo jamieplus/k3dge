@@ -54,7 +54,7 @@ Spec-gate harness：为 vibecoding agent 提供确定性的契约漂移检测与
 另见：`docs/specs/<domain>/spec.md`（各域契约事实源）。
 EOF
   fi
-  echo "[k3dge] README layout: 归 `k3dge sync`（本脚本不再触碰）"
+  echo '[k3dge] README layout: 归 `k3dge sync`（本脚本不再触碰）'
 else
   echo "[k3dge] disabled in config, skip: readme -> README.md"
 fi
@@ -68,12 +68,11 @@ gen() {
       echo "[k3dge] exists, skip: $file"
     else
       echo "[k3dge] generating: $file"
-      cat > "$file" << EOT
-# ${title}
-
-> Auto-generated stub by \\`./scripts/generate-docs.sh\\` from \\`.agent/docs.toml\\`.
+      printf '# %s\n\n' "$title" > "$file"
+      cat >> "$file" << 'EOT'
+> Auto-generated stub by `./scripts/generate-docs.sh` from `.agent/docs.toml`.
 > Agent: please fill this document per software engineering standards, referencing
-> \\`docs/specs/\\`, \\`.agent/manifest.json\\` and \\`docs/generated/\\`.
+> `docs/specs/`, `.agent/manifest.json` and `docs/generated/`.
 
 ## 概述
 

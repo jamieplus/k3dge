@@ -24,8 +24,8 @@ fi
 _SRC_FILE="$ROOT/.venv/k3dge-source.txt"
 if [ -n "$_WANT" ] && [ -f "$_SRC_FILE" ]; then
   _REC="$(head -1 "$_SRC_FILE" | tr -d ' \t\r\n')"
-  [ -d "$_WANT" ] && _WANT="$(cd "$_WANT" && pwd)"
-  [ -d "$_REC" ] && _REC="$(cd "$_REC" && pwd)"
+  [ -d "$_WANT" ] && _WANT="$(cd "$_WANT" && pwd -P)"
+  [ -d "$_REC" ] && _REC="$(cd "$_REC" && pwd -P)"
   if [ "$_WANT" != "$_REC" ]; then
     echo "[k3dge-source] MISMATCH: want='$_WANT'（env>pyproject） but installed from '$_REC'." >&2
     echo "  重装或改政策后再跑闸。" >&2
