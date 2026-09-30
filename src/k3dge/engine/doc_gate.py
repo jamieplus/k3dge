@@ -225,6 +225,7 @@ def _run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) 
     if not doc_files:
         return errs, warns
     schemas: dict[str, object] = {}
+    schema_err_seen: set = set()
     for rel in doc_files:
         typ = _type_of(rel)
         if typ not in schemas:
@@ -241,7 +242,11 @@ def _run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) 
         except UnicodeDecodeError:
             continue
         if schema_err:
-            errs.append(f"{schema_err}")   # schema 文件本身坏：无 code 可查，直接拦
+            # 裸串塞 errs 会绕过 `_add()` 的档位声明面（不能降级、不走统一渲染），而
+            # `schemas` 按 type 缓存、错误却按**文件**重复报 ⇒ 一处坏 schema 刷屏（419）
+            if typ not in schema_err_seen:
+                schema_err_seen.add(typ)
+                _add("DOC_SCHEMA_INVALID", str(schema_err), where=f"docs/{typ}/.schema.json")
             continue
         if schema is not None:
             # A-part: file-local structure
