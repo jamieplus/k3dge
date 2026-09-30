@@ -20,7 +20,13 @@ _OPEN_ALIASES = ("待验证", "待裁")
 
 
 def _cells(line: str) -> List[str]:
-    return [c.strip() for c in line.strip().strip("|").split("|")]
+    # 只剥**一对**首尾 `|`（分隔符），不把首/尾的空单元一起吃掉（紧凑行尾部空列会被误删/错位，ocr-105）。
+    s = line.strip()
+    if s.startswith("|"):
+        s = s[1:]
+    if s.endswith("|"):
+        s = s[:-1]
+    return [c.strip() for c in s.split("|")]
 
 
 def _is_separator(cells: List[str]) -> bool:

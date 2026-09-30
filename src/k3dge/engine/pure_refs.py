@@ -238,7 +238,9 @@ def check_supersede_unreconciled(workspace: Path, rel: str, text: str) -> List[R
         old = archived[0].read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return []
-    if "Status: Superseded" not in old:
+    # 行锚定 + 大小写不敏感：`Status: superseded` 也算（adr_gate._is_superseded 就是 .lower() 判的）；
+    # 整篇子串匹配会被散文/围栏示例里的同串误放行（ocr-100）。
+    if not re.search(r"^Status:\s*superseded\s*$", old, re.M | re.I):
         return [("ADR_SUPERSEDE_UNRECONCILED",
                  f"{rel}: obsolete/{archived[0].name} 未标 Status: Superseded"
                  f"——run `k3dge sync`")]
@@ -276,14 +278,23 @@ def check_markdown_bytes(raw: bytes, rel: str) -> List[Ref]:
 def check_markdown_text(text: str, rel: str) -> List[Ref]:
     """Unclosed fences, conflict markers, trailing whitespace, missing final newline."""
     out: List[Ref] = []
-    for fence in ("```", "~~~"):
-        n = sum(1 for ln in text.splitlines() if ln.strip().startswith(fence))
-        if n % 2:
-            out.append(("MD_FENCE_UNCLOSED", f"{rel}: unclosed {fence} code fence"))
-    # conflict markers: ======= only counts inside an open <<<<<<< block
-    # (bare ======= lines are legal setext headings)
-    in_conflict = False
+    # 围栏闭合用与 `strip_fences` **同一套状态机**（按标记类型分别数奇偶会把 ``` 块里的单条 ~~~ 示例
+    # 误判未闭合；缩进/引用前缀的定义两处也要一致，ocr-101）。
+    in_fence: Optional[str] = None
     for ln in text.splitlines():
+        m = re.match(r"^(`{3,}|~{3,})", ln)
+        if m:
+            fence = m.group(1)[0] * 3
+            if in_fence is None:
+                in_fence = fence
+            elif ln.startswith(in_fence):
+                in_fence = None
+    if in_fence is not None:
+        out.append(("MD_FENCE_UNCLOSED", f"{rel}: unclosed {in_fence} code fence"))
+    # conflict markers: ======= only counts inside an open <<<<<<< block
+    # (bare ======= lines are legal setext headings)；先在**去围栏**的文本上扫（示例不是真冲突，ocr-102）。
+    in_conflict = False
+    for ln in strip_fences(text).splitlines():
         s = ln.strip()
         if s.startswith(_CONFLICT_START):
             in_conflict = True

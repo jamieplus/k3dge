@@ -128,7 +128,7 @@
   "accounted_adr_numbers": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 504
+      "line": 515
     }
   ],
   "actions": [
@@ -368,31 +368,31 @@
   "check_adr_consistency": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 248
+      "line": 250
     }
   ],
   "check_adr_number_holes": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 509
+      "line": 520
     }
   ],
   "check_adr_number_reuse": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 538
+      "line": 549
     }
   ],
   "check_adr_ref_retired": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 562
+      "line": 573
     }
   ],
   "check_amend": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 282
+      "line": 297
     }
   ],
   "check_completeness": [
@@ -404,7 +404,7 @@
   "check_content": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 422
+      "line": 437
     }
   ],
   "check_dangling_adr": [
@@ -416,7 +416,7 @@
   "check_file": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 441
+      "line": 456
     }
   ],
   "check_filename": [
@@ -434,7 +434,7 @@
   "check_frontmatter": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 215
+      "line": 224
     }
   ],
   "check_h1": [
@@ -446,31 +446,31 @@
   "check_headers": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 244
+      "line": 253
     }
   ],
   "check_incident_id_redundant": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 688
+      "line": 699
     }
   ],
   "check_index_ref": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 266
+      "line": 275
     }
   ],
   "check_markdown_bytes": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 260
+      "line": 262
     }
   ],
   "check_markdown_text": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 276
+      "line": 278
     }
   ],
   "check_one": [
@@ -488,7 +488,7 @@
   "check_retired_adr_dest": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 629
+      "line": 640
     }
   ],
   "check_section_order": [
@@ -500,19 +500,19 @@
   "check_section_ordering": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 197
+      "line": 206
     }
   ],
   "check_sections": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 175
+      "line": 184
     }
   ],
   "check_sections_when": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 156
+      "line": 165
     }
   ],
   "check_supersede_unreconciled": [
@@ -530,7 +530,7 @@
   "check_task_closure_record": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 596
+      "line": 607
     }
   ],
   "check_task_consistency": [
@@ -728,7 +728,7 @@
   "count_statuses": [
     {
       "file": "src/k3dge/engine/report_table.py",
-      "line": 75
+      "line": 81
     }
   ],
   "counts": [
@@ -834,37 +834,37 @@
   "find_orphan_adrs": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 341
+      "line": 352
     }
   ],
   "find_orphan_specs": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 303
+      "line": 314
     }
   ],
   "find_orphan_tests": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 316
+      "line": 327
     }
   ],
   "find_table": [
     {
       "file": "src/k3dge/engine/report_table.py",
-      "line": 35
+      "line": 41
     }
   ],
   "find_unguarded_archives": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 662
+      "line": 673
     }
   ],
   "find_unscreened_new_docs": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 408
+      "line": 419
     }
   ],
   "fix_kind": [
@@ -978,7 +978,7 @@
   "has_table": [
     {
       "file": "src/k3dge/engine/report_table.py",
-      "line": 30
+      "line": 36
     }
   ],
   "head_block_end": [
@@ -1014,7 +1014,7 @@
   "is_screenable_new_doc": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 389
+      "line": 400
     }
   ],
   "iter_doc_types": [
@@ -1322,7 +1322,7 @@
   "parse_rows": [
     {
       "file": "src/k3dge/engine/report_table.py",
-      "line": 49
+      "line": 55
     }
   ],
   "parse_seal_trailers": [
@@ -1466,7 +1466,7 @@
   "record_screen_ack": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 443
+      "line": 454
     }
   ],
   "register_extractor": [
@@ -1586,7 +1586,7 @@
   "retired_adr_numbers": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 468
+      "line": 479
     }
   ],
   "retired_ledger_cards": [
@@ -1688,13 +1688,13 @@
   "screen_ack_path": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 403
+      "line": 414
     }
   ],
   "screen_target_exists": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 431
+      "line": 442
     }
   ],
   "seal_checklist": [

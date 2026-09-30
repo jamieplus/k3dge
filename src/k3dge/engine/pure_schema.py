@@ -144,7 +144,16 @@ def check_h1(
     if not h1_pat:
         return []
     filled = h1_pat.replace("{id}", re.escape(ident))
-    if not re.search(filled, text, re.MULTILINE | re.IGNORECASE):
+    try:
+        matched = re.search(filled, text, re.MULTILINE | re.IGNORECASE)
+    except re.error as exc:
+        # `h1` 是工作区可编辑配置；写坏正则要报 schema 违规，不能崩整轮 check（ocr-103）。
+        return [(
+            code_for(codes, "h1", "DOC_SCHEMA_INVALID"),
+            f"h1 正则非法（{exc}）：{h1_pat!r}",
+            "schema",
+        )]
+    if not matched:
         return [(
             code_for(codes, "h1", "DOC_SCHEMA_INVALID"),
             f"H1 does not match `{h1_pat}` (id={ident}): {filename}",
@@ -270,7 +279,13 @@ def check_index_ref(
     index_rel: str,
     filename: str,
 ) -> List[Check]:
-    if not re.search(rf"^\|\s*{re.escape(token)}\s*\|", index_text, re.MULTILINE) and token not in index_text:
+    # 索引**有表** ⇒ 必须真有一行（旧条件 `and token not in index_text` 让行判据恒失效：格内出现 token
+    # 即放行，票没进表也 GREEN，ocr-104）；无表可查 ⇒ 退回子串判定（另一条路径）。
+    if re.search(r"^\|", index_text, re.MULTILINE):
+        ok = bool(re.search(rf"^\|\s*{re.escape(token)}\s*\|", index_text, re.MULTILINE))
+    else:
+        ok = token in index_text
+    if not ok:
         return [(
             code_for(codes, "index", "DOC_SCHEMA_INVALID"),
             f"{index_rel} has no row for `{token}`: {Path(filename).name}",
