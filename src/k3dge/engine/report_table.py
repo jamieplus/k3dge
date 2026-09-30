@@ -14,6 +14,9 @@ TABLE_HEADER = "ID|日期|严重度|优先级|类型|问题描述|位置|状态|
 
 #: 状态列取值（枚举）。
 STATUSES = ("待修", "有意留", "已修")
+#: **开放态别名**：`待验证`(`fixnote`) / `待裁`(`disputed`) 同为未关（契约 §8 / `audit_verify.ROW_STATE_ZH`）。
+#: 它们计入 `待修` 的开放口径——否则报告里明明有未闭环行，闸仍显示"待修=0"而放行（ocr-009）。
+_OPEN_ALIASES = ("待验证", "待裁")
 
 
 def _cells(line: str) -> List[str]:
@@ -70,14 +73,27 @@ def parse_rows(
 
 
 def count_statuses(text: str) -> Dict[str, object]:
-    """状态列计数（含 `_ids_<状态>`）。封板闸与 `_count_status` 共用此唯一口径。"""
+    """状态列计数（含 `_ids_<状态>`）。封板闸与 `_count_status` 共用此唯一口径。
+
+    **total＝表内所有数据行**（不因状态未知而漏计）；未知/非法状态进 `_ids_未知状态`；
+    开放态别名（`待验证`/`待裁`）并入 `待修` ⇒ fail-closed：有未关行就不可能 `待修==0`（ocr-009）。
+    """
     counts: Dict[str, object] = {s: 0 for s in STATUSES}
     counts["total"] = 0
+    counts["_ids_未知状态"] = []
     _, rows = parse_rows(text)
     for _, row in rows:
-        st = row.get("状态", "")
-        if st in STATUSES:
+        st = str(row.get("状态", "")).strip()
+        rid = row.get("ID", "")
+        counts["total"] = int(counts["total"]) + 1
+        if st == "待修" or st in _OPEN_ALIASES:
+            counts["待修"] = int(counts["待修"]) + 1
+            counts.setdefault("_ids_" + st, []).append(rid)
+            if st != "待修":
+                counts.setdefault("_ids_待修", []).append(rid)   # 未关项下游派单口径一致
+        elif st in STATUSES:
             counts[st] = int(counts[st]) + 1
-            counts["total"] = int(counts["total"]) + 1
-            counts.setdefault("_ids_" + st, []).append(row.get("ID", ""))
+            counts.setdefault("_ids_" + st, []).append(rid)
+        else:
+            counts["_ids_未知状态"].append(rid)
     return counts

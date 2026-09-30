@@ -28,3 +28,19 @@ def test_count_statuses_single_source():
 def test_no_table():
     assert not rt.has_table("no table here")
     assert rt.count_statuses("nothing")["total"] == 0
+
+
+def test_open_aliases_and_unknown_fail_closed():
+    """`待验证`/`待裁` 计入 `待修`；未知状态计 total 并单列（ocr-009）。"""
+    tbl = (
+        "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+        "| A-5 | 2026-01-01 | 低 | P3 | 规范 | d5 | f.py:5 | 待验证 |  |  |  |  |\n"
+        "| A-6 | 2026-01-01 | 低 | P3 | 规范 | d6 | f.py:6 | 待裁 |  |  |  |  |\n"
+        "| A-7 | 2026-01-01 | 低 | P3 | 规范 | d7 | f.py:7 | 怪状态 |  |  |  |  |\n"
+        "| A-8 | 2026-01-01 | 低 | P3 | 规范 | d8 | f.py:8 | 已修 | 已修 | v | 通过 |  |\n"
+    )
+    c = rt.count_statuses(tbl)
+    assert c["待修"] == 2 and c["total"] == 4 and c["已修"] == 1
+    assert c["_ids_未知状态"] == ["A-7"]
+    assert set(c["_ids_待修"]) == {"A-5", "A-6"}

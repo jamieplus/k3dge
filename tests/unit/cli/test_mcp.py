@@ -240,3 +240,16 @@ class TestMcpPeersSync(unittest.TestCase):
                 err = mcp_peers._sync_peers_into_mcp(ws, {"peers": {"k3dit": {"enabled": True}}})
             self.assertIsNotNone(err)
             self.assertEqual((ws / ".mcp.json").read_text(encoding="utf-8"), "{ not json")
+
+
+class TestMcpPrompter(unittest.TestCase):
+    def test_mcp_prompter_writes_stderr_not_stdout(self) -> None:
+        """MCP 出口没有交互通道：prompter 必须写 stderr、非交互、不读 stdin（ocr-003）。"""
+        import sys
+
+        from k3dge.cli import mcp
+
+        p = mcp._mcp_prompter()
+        self.assertIs(p.out_stream, sys.stderr)
+        self.assertEqual(p.answers, [])
+        self.assertFalse(p.isatty())

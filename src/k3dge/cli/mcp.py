@@ -43,6 +43,18 @@ def _err(code: str, message: str, path: Optional[str] = None) -> str:
         payload["path"] = path
     return json.dumps(payload, indent=2, ensure_ascii=False)
 
+
+def _mcp_prompter():
+    """MCP 出口**没有交互通道**（stdout 是 JSON-RPC 帧）：prompter 必须写 stderr 且不读 stdin。
+
+    `Prompt.default()` 写 `sys.stdout` ⇒ 会污染协议帧；`answers=[]` 让 `isatty()` 恒 False、
+    `ask()` 走确定性分支、绝不 block stdin（ocr-003）。"""
+    import sys
+
+    from k3dge.engine.prompt import Prompt
+
+    return Prompt(out_stream=sys.stderr, answers=[])
+
 if FastMCP is not None:
     mcp = FastMCP("k3dge-governance-bridge")
 else:  # pragma: no cover
@@ -402,7 +414,10 @@ def k3dge_milestone_control(
         from k3dge.engine.audit_trigger import compute_audit_suggestion
         from k3dge.engine.seal import unmet_seal_preconditions
 
-        ok, msg, tasks = run_milestone_alignment(ws, milestone_id)
+        try:
+            ok, msg, tasks = run_milestone_alignment(ws, milestone_id)
+        except Exception as exc:
+            return _err("ALIGN_RAISED", f"align raised {type(exc).__name__}: {exc}")
         if not ok:
             nxt = nextstep.next_for_rejection(milestone_id, msg)
         elif not unmet_seal_preconditions(ws, milestone_id):
@@ -427,7 +442,21 @@ def k3dge_milestone_control(
         # Independent audit entry: mandatory loop, 待修==0 to close.
         from k3dge.engine import nextstep
 
-        status, msg = run_audit_flow(ws, milestone_id)
+        try:
+            status, msg = run_audit_flow(ws, milestone_id, prompter=_mcp_prompter())
+        except Exception as exc:      # MCP 出口：异常必须变 verdict，不许 traceback 冲坏 stdout 协议帧
+            return json.dumps(
+                {
+                    "milestone_id": milestone_id,
+                    "status": "error",
+                    "audit_result": "refused",
+                    "audited": False,
+                    "message": f"audit raised {type(exc).__name__}: {exc}",
+                    "next": nextstep.next_for_rejection(milestone_id, str(exc)).render_mcp(),
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
         # 审计结果闭集（ADR-0004 §2.1.11）：只有 closed / degraded-manual 算"审成了"。
         from k3dge.engine.audit_flow import SEALABLE_AUDIT_RESULTS, audit_result_of
 
@@ -470,7 +499,21 @@ def k3dge_milestone_control(
         # （prompt.py:48），旧写法每次必 `seal_declined`，MCP 永远封不了板。工具调用本身就是
         # "要封"的显式意图 ⇒ 走 CLI `--yes` 的等价开关；确认语义由调用方（宿主/人）承担。
         prev = _read_version()
-        status, msg = run_seal_flow(ws, milestone_id, skip_enter_prompt=True)
+        try:
+            status, msg = run_seal_flow(ws, milestone_id, prompter=_mcp_prompter(),
+                                        skip_enter_prompt=True)
+        except Exception as exc:      # 同上：异常变 verdict，不泄漏 traceback 到协议帧
+            return json.dumps(
+                {
+                    "milestone_id": milestone_id,
+                    "sealed": False,
+                    "status": "error",
+                    "message": f"seal raised {type(exc).__name__}: {exc}",
+                    "next": nextstep.next_for_rejection(milestone_id, str(exc)).render_mcp(),
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
         if status != "sealed":
             nxt = nextstep.load_persisted(ws)
             if nxt is None:
