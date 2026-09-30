@@ -84,7 +84,8 @@ if ($self) {
   if ($InstallTarget -eq "k3dge[mcp]") { $srcRec = "pypi" }
   elseif ($InstallTarget -match '^k3dge\[mcp\] @ ') { $srcRec = $InstallTarget -replace '^k3dge\[mcp\] @ ','' }
   else { $srcRec = $InstallTarget -replace '\[mcp\]$','' }
-  $srcRec | Out-File -FilePath (Join-Path $Target ".venv/k3dge-source.txt") -Encoding utf8
+  # 无 BOM 写收据：`-Encoding utf8` 在 WinPS 5.1 会加 BOM ⇒ 装源字符串比较（gate.py/.sh/.ps1）误判（ocr-132）。
+  [System.IO.File]::WriteAllText((Join-Path $Target ".venv/k3dge-source.txt"), $srcRec + "`n", (New-Object System.Text.UTF8Encoding($false)))
 }
 
 Write-Host "[k3dge] generating harness scaffolding in $Target ..."

@@ -1208,7 +1208,7 @@
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 353
+      "line": 356
     }
   ],
   "managed_docs": [
@@ -1658,7 +1658,7 @@
   "scaffold": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 263
+      "line": 266
     }
   ],
   "scan": [

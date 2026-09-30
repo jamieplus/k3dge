@@ -215,11 +215,14 @@ def _ensure_peer_stubs(target: Path) -> None:
     if not names:
         return
     mcp_path = target / ".mcp.json"
-    try:
-        data = json.loads(mcp_path.read_text(encoding="utf-8")) if mcp_path.is_file() else {"mcpServers": {}}
+    if mcp_path.is_file():
+        try:
+            data = json.loads(mcp_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            return          # 损坏 ⇒ 不覆盖（否则静默清空对端 MCP 配置，ocr-136）
         if not isinstance(data, dict):
-            data = {"mcpServers": {}}
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            return
+    else:
         data = {"mcpServers": {}}
     servers = data.setdefault("mcpServers", {})
     changed = False

@@ -70,7 +70,9 @@ function Write-Guide([string]$key, [string]$file, [string]$title) {
       Write-Host "[k3dge] generating: $file"
       $dir = Split-Path -Parent $file
       if ($dir) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
-      @(
+      # LF + 无 BOM：`Set-Content -Encoding utf8` 在 WinPS 5.1 写 BOM、Windows 上写 CRLF ⇒
+      # 会被自家 MD_CRLF/MD_ENCODING 硬闸拦下（ocr-129）。
+      $content = @(
         "# $title",
         "",
         "> Auto-generated stub by ``./scripts/generate-docs.sh`` from ``.agent/docs.toml``.",
@@ -84,7 +86,8 @@ function Write-Guide([string]$key, [string]$file, [string]$title) {
         "## 详细内容",
         "",
         "<!-- k3dge:guide-stub -->"
-      ) | Set-Content -Path $file -Encoding utf8
+      ) -join "`n"
+      [System.IO.File]::WriteAllText($file, $content + "`n", (New-Object System.Text.UTF8Encoding($false)))
     }
   } else {
     Write-Host "[k3dge] disabled in config, skip: $key -> $file"
