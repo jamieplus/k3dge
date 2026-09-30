@@ -571,3 +571,34 @@ class TestSealReadyHasOneConstructionEntry(TestCase):
                 if isinstance(first, ast.Constant) and first.value == "seal_ready":
                     offenders.append(f"{py.relative_to(root)}:{node.lineno}")
         self.assertEqual(offenders, [], f"用 seal_ready_for() 代替：{offenders}")
+
+
+class TestSidecarAndRejectionShape(TestCase):
+    """侧车语义、`seal_ready` 事实的声明单源、`rejected` 的 priority/pointers（ocr-275/276/277）。"""
+
+    def test_emit_all_upserts_instead_of_overwriting(self) -> None:
+        ws = Path(tempfile.mkdtemp())
+        nextstep.emit(ws, nextstep.NextStep.from_state("doc_fix", "M7"))
+        nextstep.emit_all(ws, [nextstep.NextStep.from_state("seal_ready", "M7")])
+        states = [c.get("state") for c in (nextstep.load_all(ws) or [])]
+        self.assertIn("doc_fix", states, "emit_all 整片覆盖会抹掉同轮先落地的处理点")
+        self.assertIn("seal_ready", states)
+
+    def test_blocked_seal_fact_comes_from_declaration(self) -> None:
+        ws = _base_ws()
+        with mock.patch("k3dge.engine.seal.unmet_seal_preconditions",
+                        return_value=[("tasks_all_done", "还有票未 done")]):
+            ns = nextstep.seal_ready_for(ws, "M7")
+        self.assertIn("形式闸未齐", ns.fact)
+        self.assertNotIn("形式闸与票已齐", ns.fact)
+        # 单源＝声明表：改措辞不会让"未齐"退化成"已齐"（旧实现靠散文 replace）
+        self.assertTrue(ns.fact.startswith(
+            nextstep.STATE_OPTIONS["seal_ready"]["fact_blocked"].replace("<id>", "M7")), ns.fact)
+        self.assertTrue(any("tasks_all_done" in r for r in ns.reasons), ns.reasons)
+
+    def test_rejected_keeps_declared_priority_and_pointers(self) -> None:
+        opt = nextstep.STATE_OPTIONS["rejected"]
+        ns = nextstep.next_for_rejection("M7", "某种没登记 gate_id 的拒绝")
+        self.assertEqual(ns.priority, opt["priority"])
+        self.assertEqual(ns.pointers, opt["pointers"])
+        self.assertEqual(ns.state, "rejected")

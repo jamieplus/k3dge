@@ -163,7 +163,7 @@ def _closed_job_evidence(workspace: Path, job: dict, fresh_baseline: str) -> Tup
       ④ job 的基线覆盖本轮 B（`_baseline_covers`，含合线 `landed_head`）——否则这是**旧内容**的审计
     """
     from k3dge.engine import audit_report as _ar
-    from k3dge.engine.process_audit import _SIGN_KEYS, _field
+    from k3dge.engine.process_audit import _field, sign_missing
 
     rel = str(job.get("report") or "")
     if not rel:
@@ -175,7 +175,7 @@ def _closed_job_evidence(workspace: Path, job: dict, fresh_baseline: str) -> Tup
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return False, f"报告不可读（{rel}）"
-    missing = [k for k in _SIGN_KEYS if not _field(text, k)]
+    missing = sign_missing(text)
     if missing:
         return False, f"报告缺署名/来源 {missing}（{path.name}）"
     if (_field(text, "基线") or "").split()[0].strip("`") != (job.get("baseline") or ""):
@@ -317,9 +317,9 @@ def _oneshot_audit_leg(
                     workspace, milestone_id, "audit_report_missing", msg, status="rejected")
             report_path, report_text = found
             if degraded:  # 降级不静默：署名是降级可接受的前提（ADR-0004 §2.1.11）
-                from k3dge.engine.process_audit import _SIGN_KEYS, _field
+                from k3dge.engine.process_audit import _field, sign_missing
 
-                missing = [k for k in _SIGN_KEYS if not _field(report_text, k)]
+                missing = sign_missing(report_text)
                 if missing:
                     msg = (
                         f"审计降级到 manual 但报告缺署名/来源 {missing}（{report_path.name}）——"

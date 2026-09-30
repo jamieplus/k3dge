@@ -230,3 +230,49 @@ transports = [ { provider = "cli", command = "printf hello", timeout = 5 } ]
             res = pr.run_action(ws, "k3dit.actions.audit", io=io.StringIO())
             self.assertTrue(res.ok)
             self.assertEqual(res.payload, "hello")
+
+
+PIPE_CLI_ARGS = """
+[peers.k3dit]
+[peers.k3dit.actions.audit]
+transports = [ { provider = "cli", command = "printf word={w}", args = { w = "from-transport" }, timeout = 10 } ]
+"""
+
+PIPE_CLI_BAD_TIMEOUT = """
+[peers.k3dit]
+[peers.k3dit.actions.audit]
+transports = [ { provider = "cli", command = "echo ok", timeout = "60s" } ]
+"""
+
+
+class CliTransportShape(unittest.TestCase):
+    def test_transport_args_are_the_base_and_call_site_overrides(self) -> None:
+        """cli 分支以前整个忽略 `t["args"]`，与 mcp 分支/校验面漂移（ocr-283）。"""
+        with TemporaryDirectory() as d:
+            ws = _ws(Path(d), {}, PIPE_CLI_ARGS)
+            res = pr.run_action(ws, "k3dit.actions.audit", io=io.StringIO())
+            self.assertTrue(res.ok, res.detail)
+            self.assertIn("word=from-transport", res.payload or res.detail)
+            res2 = pr.run_action(ws, "k3dit.actions.audit", io=io.StringIO(),
+                                 arguments={"w": "from-call"})
+            self.assertIn("word=from-call", res2.payload or res2.detail)
+
+    def test_non_int_timeout_falls_back_instead_of_raising(self) -> None:
+        """`timeout = "60s"` 曾让 `int()` 抛 ValueError 冒到封板流程（ocr-282）。"""
+        with TemporaryDirectory() as d:
+            ws = _ws(Path(d), {}, PIPE_CLI_BAD_TIMEOUT)
+            buf = io.StringIO()
+            res = pr.run_action(ws, "k3dit.actions.audit", io=buf)
+            self.assertTrue(res.ok, res.detail)
+
+    def test_timeout_kills_the_whole_process_group(self) -> None:
+        """shell=True 的超时以前只杀 `/bin/sh`：孙进程继续跑并持有管道（ocr-281）。"""
+        import time
+        with TemporaryDirectory() as d:
+            ws = Path(d)
+            (ws / ".agent").mkdir(parents=True, exist_ok=True)
+            marker = ws / "orphan.txt"
+            res = pr._run_cli(ws, f"( sleep 2; touch {marker} ) & sleep 30", 1, pr._NullIO())
+            self.assertFalse(res.ok)
+            time.sleep(2.5)
+            self.assertFalse(marker.exists(), "超时后孙进程仍在跑 ⇒ 进程组没被终止")

@@ -33,6 +33,7 @@ import datetime
 import json
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -324,15 +325,25 @@ def _run_cli(workspace: Path, command: str, timeout: int, io,
     # k3dit:leftover F-4 @line shell=True 属仓内受信配置（席裁有意留）
     command = _cli_command(command, arguments)
     try:
-        proc = subprocess.run(
-            command,
-            shell=True,
-            cwd=workspace,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
+        # `shell=True` + subprocess.run(timeout=) 只杀 `/bin/sh`：孙进程（真正的透镜 CLI）继续跑，
+        # 且后代持有管道会让 communicate 继续阻塞 ⇒ "已降级"的 CLI 还在后台写（ocr-281）。
+        proc = subprocess.Popen(
+            command, shell=True, cwd=workspace, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, start_new_session=True,
         )
-        out = (proc.stdout or "") + (proc.stderr or "")
+        try:
+            so, se = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            import os
+            import signal
+
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except OSError:      # pragma: no cover - 进程已退
+                proc.kill()
+            so, se = proc.communicate()
+            return TransportResult(False, "cli", f"timeout after {timeout}s（整个进程组已终止）")
+        out = (so or "") + (se or "")
         if proc.returncode == 0:
             return TransportResult(True, "cli", out.strip() or "ok", payload=out.strip())
         return TransportResult(False, "cli", f"exit={proc.returncode}: {out.strip()}")
@@ -395,9 +406,15 @@ def run_action(
         if not isinstance(t, dict):
             continue
         prov = t.get("provider")
-        if prov not in _VALID_PROVIDERS:
+        if not isinstance(prov, str) or prov not in _VALID_PROVIDERS:
+            # 不可哈希的 TOML 值（数组/内联表）会让 frozenset 成员判断抛 TypeError（ocr-287）
             continue
-        timeout = int(t.get("timeout", timeout_default))
+        try:                          # `timeout = "60s"` / 表 / bool 都不该让执行器抛（ocr-282）
+            timeout = int(t.get("timeout", timeout_default))
+        except (TypeError, ValueError):
+            timeout = int(timeout_default) if str(timeout_default).isdigit() else 120
+            print(f"[PEER] WARN: action '{action_ref}' 的 timeout 非法（{t.get('timeout')!r}）⇒ 用 {timeout}s",
+                  file=sys.stderr)
         nxt = next((x.get("provider") for x in transports[idx + 1 :] if isinstance(x, dict)), None)
         if prov == "skip":
             _append_log(workspace, f"[{datetime.datetime.now().astimezone().isoformat(timespec='seconds')}] HARNESS_SKIP: action '{action_ref}' resolved to skip transport")
@@ -407,7 +424,11 @@ def run_action(
             merged.update(arguments or {})
             res = _run_mcp(workspace, peer, str(t.get("tool", "")), timeout, io, merged)
         elif prov == "cli":
-            res = _run_cli(workspace, str(t.get("command", "")), timeout, io, arguments)
+            # 与 mcp 分支同构：传输自己声明的 args 是底座，调用期 arguments 覆盖之（此前 cli 整个忽略，
+            # 与 `_validate_transports` 对所有 provider 都校 args 的口径漂移，ocr-283）。
+            merged_cli = dict(t.get("args") or {})
+            merged_cli.update(arguments or {})
+            res = _run_cli(workspace, str(t.get("command", "")), timeout, io, merged_cli)
         elif prov == "manual":
             # The failed transport above already emitted its own WARN[DOWNGRADE] with
             # to=manual; emitting again here would double-report one downgrade.

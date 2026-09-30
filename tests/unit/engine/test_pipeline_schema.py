@@ -419,3 +419,42 @@ class TestLegacyConfigGuard(unittest.TestCase):
         root = pathlib.Path(__file__).resolve().parents[3]
         self.assertFalse((root / ".agent" / "gates.toml").exists())
         self.assertTrue((root / ".agent" / "pipeline.toml").is_file())
+
+
+class TestTransportShapeRobustness(unittest.TestCase):
+    """畸形 TOML 值不能让校验器崩，也不能顺带放过 peer 级校验（ocr-284/286/287）。"""
+
+    def _errs(self, body: str):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            return validate_pipeline_config(_mk(d, body))
+
+    def test_malformed_actions_still_checks_peer_transports(self):
+        errs = self._errs('[peers.k3dit]\nactions = 7\n'
+                          'transports = [ { provider = "mcp" } ]\n')
+        codes = [c for c, _ in errs]
+        self.assertIn("PIPELINE_SCHEMA_INVALID", codes)
+        self.assertTrue(any("tool" in m for _, m in errs), errs)
+
+    def test_unhashable_provider_does_not_crash(self):
+        errs = self._errs('[peers.k3dit.actions.a]\n'
+                          'transports = [ { provider = ["mcp"], tool = "x" } ]\n')
+        self.assertIsInstance(errs, list)
+
+    def test_manual_protocol_must_be_string(self):
+        errs = self._errs('[peers.k3dit.actions.v]\n'
+                          'transports = [ { provider = "manual", protocol = { path = "x.md" } } ]\n')
+        self.assertTrue(any("must be a string" in m for _, m in errs), errs)
+
+    def test_manual_protocol_stays_inside_workspace(self):
+        errs = self._errs('[peers.k3dit.actions.v]\n'
+                          'transports = [ { provider = "manual", protocol = "../secret.md" } ]\n')
+        self.assertTrue(any("workspace" in m for _, m in errs), errs)
+
+
+def _mk(d: str, body: str):
+    import pathlib
+    root = pathlib.Path(d)
+    (root / ".agent").mkdir(parents=True, exist_ok=True)
+    _write(root, ".agent/pipeline.toml", body)
+    return root

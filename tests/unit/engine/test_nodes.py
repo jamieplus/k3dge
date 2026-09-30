@@ -132,3 +132,36 @@ class TestRepoRegistriesUseTheSingleExecutor(unittest.TestCase):
                 if pat in text:
                     offenders.append(f"{rel}: {pat}")
         self.assertEqual(offenders, [])
+
+
+class TestSatisfiesAndRejectionShape(unittest.TestCase):
+    """`satisfies` 的取值形状与前置闸拒绝的 gate_id 透传（ocr-278/279）。"""
+
+    def _ws_with(self, body: str) -> Path:
+        ws = _ws(Path(tempfile.mkdtemp()))
+        (ws / ".agent" / "pipeline.toml").write_text(body, encoding="utf-8")
+        return ws
+
+    def test_bare_string_satisfies_is_one_id_not_chars(self):
+        ws = self._ws_with('[nodes.audit]\nsatisfies = "align_pass"\n')
+        ids = nodes.satisfied_ids(ws, "seal")
+        self.assertIn("align_pass", ids)
+        self.assertFalse([g for g in ids if len(g) < 2], ids)
+
+    def test_non_iterable_satisfies_is_ignored(self):
+        ws = self._ws_with('[nodes.audit]\nsatisfies = 7\n')
+        self.assertNotIn("7", nodes.satisfied_ids(ws, "seal"))
+
+    def test_precondition_rejection_keeps_its_gate_id(self):
+        ws = self._ws_with('[checks.seal]\npreconditions = ["g_custom"]\n')
+        ok, rej = nodes.run_phase(ws, "seal", "preconditions",
+                                  {"g_custom": lambda ctx: gates.Rejection("MY_GATE", "nope")}, {})
+        self.assertFalse(ok)
+        self.assertEqual(getattr(rej, "gate_id", None), "MY_GATE")
+
+    def test_precondition_plain_string_falls_back_to_node_id(self):
+        ws = self._ws_with('[checks.seal]\npreconditions = ["g_txt"]\n')
+        ok, rej = nodes.run_phase(ws, "seal", "preconditions",
+                                  {"g_txt": lambda ctx: "still bad"}, {})
+        self.assertFalse(ok)
+        self.assertEqual(getattr(rej, "gate_id", None), "g_txt")

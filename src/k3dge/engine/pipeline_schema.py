@@ -144,11 +144,13 @@ def _validate_peers(workspace, peers, servers, role_bind):
             errors.append(("PIPELINE_SCHEMA_INVALID", f"peer '{p_name}' must be a table"))
             continue
         actions = p_cfg.get("actions")
+        if actions is not None and not isinstance(actions, dict):
+            errors.append(("PIPELINE_SCHEMA_INVALID",
+                           f"peer '{p_name}.actions' must be a table"))
+            # 不能整条 continue：那会连带跳过 peer 级 transports 的校验（tool 缺失 / endpoint
+            # 事实泄漏 / 未注册 server 全部漏判，ocr-284）⇒ 置 None 后继续校 peer 级。
+            actions = None
         if actions is not None:
-            if not isinstance(actions, dict):
-                errors.append(("PIPELINE_SCHEMA_INVALID",
-                               f"peer '{p_name}.actions' must be a table"))
-                continue
             for a_name, a_cfg in actions.items():
                 declared.add(f"{p_name}.actions.{a_name}")
                 declared.add(f"{p_name}.{a_name}")  # 2-part compat alias
@@ -184,7 +186,8 @@ def _validate_pipelines(pipelines, declared) -> List[PipelineViolation]:
         errors.append((
             "PIPELINE_SCHEMA_INVALID",
             f"[pipelines.{pipe_name}] is retired: declare external steps as "
-            f"`[checks.<op>].stages_<phase>` (engine/gates.DEFAULTS or .agent/gates.toml); "
+            f"`[checks.<op>].stages_<phase>` in .agent/pipeline.toml "
+            f"(or rely on engine/gates.DEFAULTS — `.agent/gates.toml` is retired); "
             f"nothing reads [pipelines.*] anymore",
         ))
     return errors
@@ -297,6 +300,13 @@ def _validate_cli_transport(workspace: Path, t: dict, idx: int, scope: str, **_k
 
 def _validate_manual_transport(workspace: Path, t: dict, idx: int, scope: str, **_kw) -> List[PipelineViolation]:
     proto = t.get("protocol")
+    if proto is not None and (isinstance(proto, (dict, list, bool)) or not isinstance(proto, str)):
+        return [("PIPELINE_SCHEMA_INVALID",
+                 f"manual transport '{scope}.transports[{idx}]' protocol must be a string")]
+    if isinstance(proto, str) and (Path(proto).is_absolute() or ".." in Path(proto).parts):
+        # 协议必须在 workspace 内：绝对路径 / `..` 让"读协议"变成读仓外任意文件（ocr-286）
+        return [("PIPELINE_SCHEMA_INVALID",
+                 f"manual transport '{scope}.transports[{idx}]' protocol 越出 workspace：{proto!r}")]
     if not proto:
         return [("PIPELINE_SCHEMA_INVALID",
                  f"missing 'protocol' for manual transport in {scope}.transports[{idx}]")]
@@ -325,7 +335,8 @@ def _validate_transports(workspace: Path, transports: object, scope: str,
                          f"{scope}.transports[{idx}] must be a table"))
             continue
         prov = t.get("provider")
-        if prov not in _VALID_PROVIDERS:
+        # 不可哈希的 TOML 值（数组/内联表/布尔）既非法也不能进 frozenset 成员判断（ocr-287）
+        if not isinstance(prov, str) or prov not in _VALID_PROVIDERS:
             errs.append(("PIPELINE_SCHEMA_INVALID",
                          f"invalid provider '{prov}' in {scope}.transports[{idx}] "
                          f"(expected one of {sorted(_VALID_PROVIDERS)})"))

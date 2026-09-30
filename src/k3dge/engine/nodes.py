@@ -91,7 +91,15 @@ def satisfied_ids(workspace: Path, op: str) -> set:
     自己的第一个动作满足，清单里该显示 ⚙️ 而不是"需你先办"（否则误导操作者去手跑 align）。
     """
     aids = gates.actions(workspace, op)
-    return {str(gid) for aid in aids for gid in (decl(workspace, aid).get("satisfies") or [])}
+    out: set = set()
+    for aid in aids:
+        sat = decl(workspace, aid).get("satisfies") or []
+        if isinstance(sat, str):
+            sat = [sat]                 # `satisfies = "align_pass"`：逐字符展开会产出 a/l/i… 垃圾 id（ocr-278）
+        if not isinstance(sat, (list, tuple)):
+            continue
+        out.update(str(gid) for gid in sat)
+    return out
 
 
 NodeFn = Callable[[Dict[str, Any]], Any]
@@ -138,7 +146,9 @@ def run_phase(
             return False, rej
         if phase == "preconditions":
             if out:
-                return False, gates.Rejection(nid, str(out))
+                # 回调可能自带 Rejection（含自己的 gate_id）；硬编 nid 会把它丢掉，与动作分支的
+                # `gates.rejection(...)` 透传不一致（docstring 声明的返回类型就是 Rejection，ocr-279）
+                return False, gates.rejection(out, nid)
             continue
         # 动作形状宽容：`(ok, out)`（seal 动作）或 `Optional[str]`（align 动作，None＝过）
         if isinstance(out, tuple):

@@ -49,3 +49,20 @@ def test_unsigned_report_lists_missing_keys(tmp_path: Path) -> None:
     text = _report(tmp_path, sign=False).read_text(encoding="utf-8")
     missing = [k for k in process_audit._SIGN_KEYS if not process_audit._field(text, k)]
     assert missing == ["审计人", "透镜来源", "基线"]
+
+
+def test_sign_missing_rejects_template_placeholder(tmp_path: Path) -> None:
+    """AUTHORING 模板原句（未填）过 `非空` 判据 ⇒ 锚点是空的（ocr-288）。"""
+    reviews = tmp_path / "docs" / "reviews"
+    reviews.mkdir(parents=True)
+    (reviews / "r.md").write_text(
+        "- **审计人**: k3dit\n- **透镜来源**: k3dit 工单\n- **基线**: commit/tests 状态快照\n",
+        encoding="utf-8")
+    text = (reviews / "r.md").read_text(encoding="utf-8")
+    assert [k for k in process_audit._SIGN_KEYS if not process_audit._field(text, k)] == []
+    assert process_audit.sign_missing(text) == ["基线"]
+
+
+def test_sign_missing_accepts_filled_anchor(tmp_path: Path) -> None:
+    text = _report(tmp_path, sign=True).read_text(encoding="utf-8")
+    assert process_audit.sign_missing(text) == []

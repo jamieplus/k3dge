@@ -79,6 +79,9 @@ STATE_OPTIONS: dict = {
         # 基础事实；**封板前置**由 `seal_ready_for()` 追加（同表另存一句，避免占位符从
         # 其它构造点漏出——`from_state("seal_ready")` 仍可单独用）
         "fact": "里程碑 <id> 形式闸与票已齐；是否收这一章由你决定（seal 会跑：预审 → 审计 → 收摊）",
+        # 有未满足前置时的**另一条声明事实**：以前靠对 fact 做散文 `.replace("形式闸与票已齐",…)`
+        # 修正，措辞一改就静默失效 ⇒ 闸未齐仍宣称已齐（判据与投影背离，ocr-276）。
+        "fact_blocked": "里程碑 <id> 形式闸未齐（见 reasons）；先修完再 seal（seal 会跑：预审 → 审计 → 收摊）",
         "fact_with_blockers": "；预审待办：<blockers>",
         "question": "里程碑 <id>：封板？",
         "options": [
@@ -330,7 +333,15 @@ def emit_all(workspace: Path, steps: list, *, stream: Optional[TextIO] = None) -
     ordered = sorted(seen.values(),
                      key=lambda n: (n.priority, order.index(n.state) if n.state in order else len(order)))
     cards = [_card(n) for n in ordered]
-    _write_cards(workspace, cards, ordered[0].state if ordered else None)
+    # `emit` 走 `_upsert`（先读再合并），`emit_all` 以前**全量覆盖** ⇒ 同轮里 persist/emit
+    # 先落地的处理点（审计/封板判定、前一个 hook 的拒绝）被整片抹掉（ocr-275）。
+    by_state = {c.get("state"): c for c in (load_all(workspace) or []) if isinstance(c, dict)}
+    for c in cards:
+        by_state[c.get("state")] = c
+    merged = sorted(by_state.values(),
+                    key=lambda c: (c.get("priority", 5),
+                                   order.index(c.get("state")) if c.get("state") in order else len(order)))
+    _write_cards(workspace, merged, merged[0].get("state") if merged else None)
     from k3dge.engine import events
     for n in ordered:
         events.emit(workspace, "next", state=n.state, milestone=n.milestone)
@@ -397,9 +408,9 @@ def seal_ready_for(workspace: Path, milestone_id: str) -> "NextStep":
     ns.fact = (ns.fact or "") + suffix.replace("<blockers>", blockers)
     if unmet:
         ns.reasons = [f"{gid}：{msg[:110]}" for gid, msg in unmet[:4]]
-        # 有人待办时不要说「票已齐」
-        if ns.fact:
-            ns.fact = ns.fact.replace("形式闸与票已齐", "形式闸未齐")
+        blocked = str(STATE_OPTIONS["seal_ready"].get("fact_blocked") or "")
+        if blocked:
+            ns.fact = blocked.replace("<id>", milestone_id) + suffix.replace("<blockers>", blockers)
     return ns
 
 
@@ -413,7 +424,13 @@ def next_for_rejection(milestone: str, message, gate_id: Optional[str] = None) -
     text = "" if message is None else str(message)
     route = GATE_NEXT.get(gid) if gid else None
     if route is None:
-        return NextStep(state="rejected", milestone=milestone, fact=f"操作被拒：{text}")
+        opt = STATE_OPTIONS.get("rejected", {})
+        return NextStep(
+            state="rejected", milestone=milestone,
+            fact=f"操作被拒：{text}" if text else str(opt.get("fact", "")).replace("<id>", milestone),
+            priority=int(opt.get("priority", 3)),
+            pointers=list(opt.get("pointers") or []) or None,
+        )
     state, fact_key = route
     fact = REJECTION_FACTS.get(fact_key or "", "").replace("<id>", milestone)
     if not fact:
