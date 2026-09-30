@@ -29,9 +29,16 @@ mode = "bundle"
 #   k3dit_mode = "full"（判读+修+复核，待修=0 才算已审）| "audit-only"（只出证据、不构成封板依据）
 #   k3dit_pins = "inplace"（钉留树）| "artifact"（钉只随包）
 #   k3dit_scope = "src/k3dit/tools"（逗号分隔、相对仓根；空＝k3dit 缺省）——控制送审面，避免整仓一次审
+#   k3dit_timeout = 整条 `k3dit audit` 子进程的**墙钟**天花板（秒；非 k3dit 席位层的探针）。
+#     这是 k3dge 侧的平铺 subprocess 超时（`audit_bundle._run` → `communicate(timeout=)` 到点 `killpg`），
+#     与 k3dit 的 `stall_after_sec` 探针**不是一回事**：探针管单席判活，本墙钟杀整轮。
+#     真跑实测（M11，2026-09-29）：整仓审计仅 doc 窗 59 片 ≈ 2h ⇒ 缺省 7200s 到点被掐、
+#     `hall export` 抢救出 `incomplete` 包、封板被拒。故抬到 6h 兜住整仓一轮；正解是把它改成
+#     认探针的活性上限（pending，见 docs/reviews/LEFTOVERS.md）。
 k3dit_mode = "full"
 k3dit_pins = "inplace"
 k3dit_scope = ""
+k3dit_timeout = "21600"
 
 [roles.cache]
 bind = "k3che"

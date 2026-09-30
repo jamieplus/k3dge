@@ -317,3 +317,28 @@ value-2（with-worktree 上下文管理器，两处脚手架合并）、value-3�
 - **doc-9（rules 04-11 缺"Protocol slice…AGENTS.md wins"头）**：该 precedence 已在 `AGENTS.md` 全局声明（"`.agent/rules/*` are slices; this file wins"）。往 8 份文件各贴一遍＝把全局规则复制成散文，正是规则 10（结构优先于散文）要避的。00-03 上的头是历史遗留，非须补齐的不变量。
 - **doc-11（`AUDIT-QWEN-STATUS.md` 引用外部 `models.json`）**：根级一次性排障笔记，非 `docs/<type>/` 受管面；删/移入库文件归仓主裁定，不由审计轮动。
 - **doc-12（`CHANGELOG.md` 引用已删 `scripts/lib/schema_check.py`）**：CHANGELOG 条目是**历史事实**（当时存在），裸名是当时的写法；改历史条目不如让下一版封版由提交区间重生。
+
+## M11 封板二跑（2026-09-29）：外层墙钟再掐 + `DIRTY_TREE`（记账）
+
+**事实**：`k3dge milestone seal M11` 二跑约 2h 被 k3dge 自家墙钟掐断，`hall export` 抢救出 `incomplete`
+包（31 条全 `pending`，`fix/review` 未裁到闭环），消费侧判 `refused`、落包又撞 `DIRTY_TREE`。报告落 `4bff983`。
+
+**根因（两条，皆结构性）**：
+- **k3dge 外层墙钟 ≠ k3dit 探针**：`[roles.audit] k3dit_timeout`（full 缺省 `7200`s）是 `audit_bundle._run`
+  对整条 `k3dit audit` 子进程的平铺 `communicate(timeout=)`，到点 `killpg`；与 k3dit 席位层
+  `stall_after_sec` 探针是两层——探针只判单席死活，管不到外层天花板。整仓审计（`k3dit_scope=""`）
+  仅 doc 窗就 59 片 ≈ 2h，`code/value/fix/review` 根本没跑。
+- **`DIRTY_TREE`**：`.agent/audit_checklist.json` 是 **tracked** 运行态投影，`run_audit_flow` 开跑即重写
+  （`src/k3dge/engine/milestone_audit.py:567` → `audit_checklist.reset_for_audit`），`apply_order` 非空时
+  `audit_bundle.apply_bundle` 的 `git status --porcelain` 必然看见它 ⇒ 有补丁可落的封板必被挡。
+  （M10 能封，是因为其包 `apply_order` 为空、`apply_bundle` 在脏树判据之前就早返回。）
+
+**本轮处置**：`k3dit_timeout = "21600"`（6h）兜住整仓一轮（`.agent/pipeline.toml` + `templates/assets/pipeline.toml.template` 同步，漂移闸要求两者一致）。
+
+**仍留（需独立批次；reopen 条件见各条）**：
+- **外层墙钟改探针口径**：把 `_run` 的平铺超时换成**认探针的活性上限**（盯 `K3DIT_HALL_ROOT`/`K3DIT_LEDGER`
+  的 mtime 或账本 `events[].ts`；静默超阈值才 `killpg`，否则续等），另留一条可选硬上限当成本天花板。
+  与 k3dit 的 `stall_after_sec` 同口径。配 ADR + 测试（慢但推进不杀 / 真静默才杀）。
+- **`audit_checklist.json` 运行态投影不该 tracked**：应像 `.agent/audit_jobs.json` 一样 gitignore（AGENTS.md
+  已称其"运行态投影，非判据"）；否则只要审计要落补丁，封板必撞 `DIRTY_TREE`。或让 `apply_bundle` 的脏树
+  判据显式豁免该投影。

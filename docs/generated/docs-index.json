@@ -305,6 +305,14 @@
       "tokens": "Memo: `sync` 的 `docs_updated` 标志不含索引写盘 —— 打印/MCP 说\"无改动\"，同一快照其实改了文件"
     },
     {
+      "path": "docs/memo/2026-09-29-audit-chunk-concurrency.md",
+      "type": "memo",
+      "id": "2026-09-29-audit-chunk-concurrency",
+      "title": "Memo: 判读腿分片串行 ⇒ 整仓一轮撞墙钟——并发/收窄选项账",
+      "status": "",
+      "tokens": "Memo: 判读腿分片串行 ⇒ 整仓一轮撞墙钟——并发/收窄选项账"
+    },
+    {
       "path": "docs/protocols/audit_default.md",
       "type": "protocols",
       "id": "audit_default",
@@ -407,6 +415,14 @@
       "title": "审计：.（milestone local）",
       "status": "",
       "tokens": "审计：.（milestone local）"
+    },
+    {
+      "path": "docs/reviews/2026-09-29-M11-ocr-scan.md",
+      "type": "reviews",
+      "id": "2026-09-29-M11-ocr-scan",
+      "title": "审计：open-code-review 全文件扫描（M11）",
+      "status": "",
+      "tokens": "审计：open-code-review 全文件扫描（M11）"
     },
     {
       "path": "docs/specs/_template/spec.md",
