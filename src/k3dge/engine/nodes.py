@@ -123,7 +123,19 @@ def run_phase(
             label = "gate" if phase == "preconditions" else "action"
             return False, gates.Rejection(
                 gid, f"gate contract references unknown {label} id: '{nid}'")
-        out = fn(ctx)
+        try:
+            out = fn(ctx)
+        except Exception as exc:
+            # 节点异常也要经 `gates.rejection` 正规化（文件头承诺）⇒ 消费方永远拿闭集 gate_id、
+            # `[NEXT]` 照常 persist；`on_error=continue` 的节点异常也不中断（ocr-089）。
+            msg = f"{type(exc).__name__}: {exc}"
+            if phase == "preconditions":
+                return False, gates.Rejection(nid, msg)
+            rej = gates.rejection(msg, nid)
+            if on_error(workspace, nid) == "continue":
+                collected.append(str(rej))
+                continue
+            return False, rej
         if phase == "preconditions":
             if out:
                 return False, gates.Rejection(nid, str(out))

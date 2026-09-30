@@ -68,7 +68,8 @@ def resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]:
     parts = action_ref.split(".")
     if len(parts) >= 3 and parts[1] == "actions":
         peer = peers.get(parts[0], {})
-        action = peer.get("actions", {}).get(parts[2])
+        acts = peer.get("actions", {}) if isinstance(peer, dict) else {}
+        action = acts.get(parts[2]) if isinstance(acts, dict) else None   # 类型守卫，别裸 .get（ocr-094）
         if isinstance(action, dict) and action.get("transports"):
             return action["transports"]
     # 2-part alias: peer.name
@@ -106,7 +107,8 @@ def _declares_mcp(peer_cfg) -> bool:
 
     if _has_mcp(peer_cfg.get("transports")):
         return True
-    for spec in (peer_cfg.get("actions") or {}).values():
+    acts = peer_cfg.get("actions")
+    for spec in (acts.values() if isinstance(acts, dict) else []):   # 非映射别 .values() 崩（ocr-095）
         if isinstance(spec, dict) and _has_mcp(spec.get("transports")):
             return True
     return False
@@ -150,6 +152,11 @@ def _validate_peers(workspace, peers, servers, role_bind):
             for a_name, a_cfg in actions.items():
                 declared.add(f"{p_name}.actions.{a_name}")
                 declared.add(f"{p_name}.{a_name}")  # 2-part compat alias
+                if not isinstance(a_cfg, dict):
+                    # 值写成字符串/数组 ⇒ 报错而非 AttributeError 崩（ocr-096）。
+                    errors.append(("PIPELINE_SCHEMA_INVALID",
+                                   f"peer '{p_name}.actions.{a_name}' must be a table"))
+                    continue
                 errors.extend(_validate_transports(
                     workspace, a_cfg.get("transports", []),
                     f"{p_name}.actions.{a_name}", servers, role_bind))

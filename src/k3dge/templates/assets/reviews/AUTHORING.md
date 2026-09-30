@@ -2,7 +2,7 @@
 
 Do not keep a report catalog here — `k3dge doc list --type reviews`. 12 columns: `ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收`. Overturning a leftover = edit `LEFTOVERS.md`, not a new shadow list.
 
-Filename `YYYY-MM-DD-<scope>.md` (include `M<n>` when the report is for that milestone). New reports stay at the top level. `k3dge milestone seal <id>` moves this-milestone files to `archive/<id>/` and rewrites leftover hrefs in `LEFTOVERS.md`. Do not hand-move the current milestone's living reports.
+Filename `YYYY-MM-DD-<scope>.md` (include `M<n>` when the report is for that milestone). New reports stay at the top level. `k3dge milestone seal <id>` moves this-milestone files to `archive/<id>/` and rewrites leftover hrefs in `LEFTOVERS.md`. Do not hand-move the current milestone's living reports. Reports with no milestone token in this repo live in `archive/untagged/`.
 
 ```markdown
 # 审计：<范围>

@@ -225,7 +225,9 @@ def call_mcp_tool(params: dict, tool: str, arguments: dict, timeout: int) -> Tup
     try:
         ok, text, listed = asyncio.run(asyncio.wait_for(_run(), timeout=timeout))
         return ok, text, listed, _stderr()
-    except BaseException as exc:  # timeout / dead child / protocol error
+    except (KeyboardInterrupt, SystemExit):
+        raise                     # 人工中断/退出不得被降格成"mcp 失败"再跑 CLI（ocr-091）
+    except Exception as exc:  # timeout / dead child / protocol error
         tail = _stderr()
         detail = _unwrap_exc(exc)
         if tail and tail.splitlines()[-1] not in detail:
@@ -342,6 +344,9 @@ def _run_cli(workspace: Path, command: str, timeout: int, io,
 
 def _run_manual(workspace: Path, protocol: str, action_ref: str, io) -> TransportResult:
     proto_path = workspace / protocol
+    if not proto_path.is_file():
+        # 协议文件都不在 ⇒ 不能无条件 ok=True（否则"零产物"也能满足闸，ocr-093）。
+        return TransportResult(False, "manual", f"protocol file missing: {protocol}")
     print(
         f"[PEER-MANUAL] action '{action_ref}' has no live lens; follow protocol:\n"
         f"  {proto_path if proto_path.is_file() else protocol}\n"

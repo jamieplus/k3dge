@@ -22,5 +22,7 @@ _SIGN_KEYS = ("审计人", "透镜来源", "基线")
 
 
 def _field(text: str, key: str) -> str:
-    m = re.search(rf"^-\s*\*\*{re.escape(key)}\*\*\s*[:：]\s*(.+)$", text, re.M)
+    # `\s` 含 `\n`：原来 `[:：]\s*(.+)` 在值为空时会跨行捕获**下一行**（假"值非空"，fail-open）。
+    # 改成冒号后只许行内空白 + 值必须同行且以非空白起头（ocr-097）。
+    m = re.search(rf"^-[ \t]*\*\*{re.escape(key)}\*\*[ \t]*[:：][ \t]*(\S.*?)[ \t]*$", text, re.M)
     return m.group(1).strip() if m else ""

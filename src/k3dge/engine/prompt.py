@@ -60,4 +60,6 @@ class Prompt:
                 ans = self.in_stream.readline().strip().lower()
         except (EOFError, OSError):
             return default_yes
+        if not ans:
+            return default_yes    # 空回车＝采纳提示里的默认（[Y/n] ⇒ True），与非 tty 路径一致（ocr-098）
         return ans in ("y", "yes")

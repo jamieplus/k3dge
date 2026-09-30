@@ -50,6 +50,7 @@ PAIRS: list[tuple[str, str]] = [
     ("spec.md.template", "docs/specs/_template/spec.md"),
     ("tasks-readme.md", "docs/tasks/README.md"),
     ("reviews-readme.md", "docs/reviews/README.md"),
+    ("reviews/AUTHORING.md", "docs/reviews/AUTHORING.md"),
     ("tasks/_template.md", "docs/tasks/_template.md"),
     ("memo/_template.md", "docs/memo/_template.md"),
     ("branches/_template.md", "docs/branches/_template.md"),

@@ -1400,7 +1400,7 @@
   "probe_servers": [
     {
       "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 270
+      "line": 272
     }
   ],
   "projection": [
@@ -1598,7 +1598,7 @@
   "run_action": [
     {
       "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 364
+      "line": 369
     }
   ],
   "run_audit_flow": [
@@ -1914,7 +1914,7 @@
   "validate_pipeline_config": [
     {
       "file": "src/k3dge/engine/pipeline_schema.py",
-      "line": 223
+      "line": 230
     }
   ],
   "validate_structure": [
