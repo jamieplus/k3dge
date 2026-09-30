@@ -615,6 +615,38 @@
       "title": "悬空设计盘点：删 3 个零调用 API + `facts_of` 接入生产自检",
       "status": "done",
       "tokens": "悬空设计盘点：删 3 个零调用 API + `facts_of` 接入生产自检"
+    },
+    {
+      "path": "docs/tasks/2026-09-30-M12-docs-pipeline_declaration_convergence.md",
+      "type": "tasks",
+      "id": "2026-09-30-M12-docs-pipeline_declaration_convergence",
+      "title": "pipeline.toml 声明面收敛：一套路由词表、声明形状数量、规范语义的权威载体",
+      "status": "idea",
+      "tokens": "pipeline.toml 声明面收敛：一套路由词表、声明形状数量、规范语义的权威载体"
+    },
+    {
+      "path": "docs/tasks/2026-09-30-M12-refactor-seal_order_invariant.md",
+      "type": "tasks",
+      "id": "2026-09-30-M12-refactor-seal_order_invariant",
+      "title": "seal 动作声明序的不变量层封堵 + kind/on_rerun 通用强制",
+      "status": "idea",
+      "tokens": "seal 动作声明序的不变量层封堵 + kind/on_rerun 通用强制"
+    },
+    {
+      "path": "docs/tasks/2026-09-30-M12-refactor-split_cli_and_bundle_cc.md",
+      "type": "tasks",
+      "id": "2026-09-30-M12-refactor-split_cli_and_bundle_cc",
+      "title": "降分支复杂度：cli/main.py cmd_audit/cmd_doc 与 audit_bundle 五函数",
+      "status": "idea",
+      "tokens": "降分支复杂度：cli/main.py cmd_audit/cmd_doc 与 audit_bundle 五函数"
+    },
+    {
+      "path": "docs/tasks/2026-09-30-M12-refactor-split_consistency_engine.md",
+      "type": "tasks",
+      "id": "2026-09-30-M12-refactor-split_consistency_engine",
+      "title": "拆 ConsistencyEngine：检查组各自成模块，只共享 workspace_root",
+      "status": "idea",
+      "tokens": "拆 ConsistencyEngine：检查组各自成模块，只共享 workspace_root"
     }
   ]
 }
