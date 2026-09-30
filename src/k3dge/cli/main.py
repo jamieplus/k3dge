@@ -1010,10 +1010,26 @@ def cmd_incident(args: argparse.Namespace) -> int:
     from k3dge.engine.protocol import write_incident
 
     workspace = _find_workspace(Path.cwd())
+    # 与 `_read_submit_input` 同口径：交互 tty 直接读 stdin 会**永久阻塞**（hook/CI 场景没人喂输入，ocr-180）。
     if args.from_ci:
-        data = _json.loads(_Path(args.from_ci).read_text(encoding="utf-8"))
+        try:
+            raw = _Path(args.from_ci).read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"[INCIDENT] --from-ci 读不到（{args.from_ci}）：{exc}", file=sys.stderr)
+            return 1
+    elif sys.stdin.isatty():
+        print("[INCIDENT] 需要 JSON 载荷：--from-ci <file> 或 `cat payload.json | k3dge incident ...`", file=sys.stderr)
+        return 1
     else:
-        data = _json.loads(sys.stdin.read())
+        raw = sys.stdin.read()
+    try:
+        data = _json.loads(raw)
+    except ValueError as exc:
+        print(f"[INCIDENT] 载荷不是合法 JSON：{exc}", file=sys.stderr)
+        return 1
+    if not isinstance(data, dict):
+        print(f"[INCIDENT] 载荷必须是 JSON 对象，收到 {type(data).__name__}", file=sys.stderr)
+        return 1
     p = write_incident(
         workspace,
         data.get("path"),

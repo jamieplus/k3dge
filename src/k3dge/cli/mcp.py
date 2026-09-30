@@ -126,7 +126,10 @@ def k3dge_check(
     force_full: bool = False,
 ) -> str:
     """Run k3dge consistency gate directly via ConsistencyEngine."""
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     report: GateReport = ConsistencyEngine(ws).evaluate(run_tests=with_tests, force_full=force_full)
     payload = _to_json(report)
     payload["ok"] = report.passed
@@ -149,7 +152,10 @@ def k3dge_status(workspace_path: Optional[str] = None) -> str:
     """
     from k3dge.cli.status import workspace_status
 
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     status_obj = workspace_status(ws)
     if not status_obj.get("ok", True):
         return _err(status_obj.get("error", "UnknownError"), status_obj.get("message", ""))
@@ -159,7 +165,10 @@ def k3dge_status(workspace_path: Optional[str] = None) -> str:
 @mcp.tool()
 def k3dge_verify_domain_contract(domain: str, workspace_path: Optional[str] = None) -> str:
     """Verify single domain AST interface against spec using k3dge contract engine."""
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     try:
         manifest = Manifest.load(ws)
     except Exception as exc:
@@ -216,7 +225,10 @@ def k3dge_sync(
     """Regenerate spec interface blocks and contract hashes. Same as CLI k3dge sync."""
     from k3dge.sync.generator import sync_all
 
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     if isinstance(domains, str):
         domains = [domains]
     try:
@@ -246,7 +258,10 @@ def k3dge_version(
     """Show or bump project version (same as CLI k3dge version)."""
     from k3dge.engine.version import append_changelog, bump_version, get_version
 
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     act = action.lower().strip()
     if act == "show":
         v = get_version(ws)
@@ -279,7 +294,10 @@ def k3dge_task_create(
     workspace_path: Optional[str] = None,
 ) -> str:
     """Create a living docs/tasks/ file. Same as CLI k3dge task create."""
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     ok, msg, path = create_task(
         ws, title, typ=typ, slug=slug, milestone=milestone_id, priority=priority
     )
@@ -309,7 +327,10 @@ def k3dge_task_create(
 @mcp.tool()
 def k3dge_task_done(path: str, workspace_path: Optional[str] = None) -> str:
     """Mark one task done. Prefer the path from k3dge_task_list."""
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     ok, msg, done_path = mark_task_done(ws, path)
     rel = str(done_path.relative_to(ws)).replace("\\", "/") if done_path else None
     return json.dumps({"ok": ok, "message": msg, "path": rel}, indent=2, ensure_ascii=False)
@@ -322,7 +343,10 @@ def k3dge_task_list(
     workspace_path: Optional[str] = None,
 ) -> str:
     """Index living docs/tasks/*.md (not archive). Returns title/status/milestone/priority, not bodies."""
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     rows = list_tasks(ws, milestone_id=milestone_id, status=status)
     from k3dge.cli.status import lifecycle_next
 
@@ -359,7 +383,10 @@ def k3dge_doc_list(
     """Thin document catalog (path/id/title/status/tokens). Never returns bodies. Same as CLI k3dge doc list."""
     from k3dge.engine.doc_catalog import list_docs
 
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     rows = list_docs(ws, typ=typ, ident=ident, q=q, include_archive=include_archive)
     return json.dumps({"ok": True, "count": len(rows), "docs": rows}, indent=2, ensure_ascii=False)
 
@@ -369,7 +396,10 @@ def k3dge_doc_where(ident: str, workspace_path: Optional[str] = None) -> str:
     """Resolve a document id to catalog cards (path only). Same as CLI k3dge doc where."""
     from k3dge.engine.doc_catalog import where_doc
 
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     rows = where_doc(ws, ident)
     return json.dumps({"ok": True, "count": len(rows), "docs": rows}, indent=2, ensure_ascii=False)
 
@@ -385,7 +415,10 @@ def k3dge_doc_grep(
     """Scan managed doc bodies. Returns path (and line if requested). Never snippets. Same as CLI k3dge doc grep."""
     from k3dge.engine.doc_catalog import grep_docs
 
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     rows = grep_docs(ws, query, typ=typ, line=line, include_archive=include_archive)
     return json.dumps({"ok": True, "count": len(rows), "hits": rows}, indent=2, ensure_ascii=False)
 
@@ -397,7 +430,10 @@ def k3dge_milestone_control(
     workspace_path: Optional[str] = None,
 ) -> str:
     """Control milestone state machine: status, align (full-matrix regression), seal (atomic compaction)."""
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     act = action.lower().strip()
 
     if act == "status":
@@ -557,6 +593,11 @@ def k3dge_milestone_control(
             "previous_version": prev,
             "next": nextstep.NextStep.from_state("sealed", milestone_id).render_mcp(),
         }
+        if status == "sealed" and (not prev or not new_v):
+            # 「读不到版号」不等于「没问题」：ADR-0004 §2.3 要求 MCP 侧 bump 失败不静默（ocr-182）。
+            payload["version_unreadable"] = (
+                f"封板前版号={prev or 'N/A'} / 封板后版号={new_v or 'N/A'}"
+                " ⇒ 无法证明版号前进，请人工核对三件套")
         if prev and new_v and prev == new_v:
             payload["version_bump_failed"] = "封板后版号未前进（相位 3 version_bump 未成，见 message 版本行）"
         return json.dumps(payload, indent=2, ensure_ascii=False)
@@ -579,8 +620,14 @@ def k3dge_submit_audit_report(
     **只补证据**（ADR-0004 §2.1.10/§2.1.11）：不推进版号、不触发封板——版号前进只认
     "审计正常返回"（`seal` 相位 2），边界由 `tag <M>=<B>` 表达。
     """
-    ws = _find_workspace(workspace_path=workspace_path)
-    path = persist_external_audit_report(ws, milestone_id, content or "")
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
+    try:
+        path = persist_external_audit_report(ws, milestone_id, content or "")
+    except Exception as exc:   # 畸形 milestone_id / 写盘失败 ⇒ verdict，不是 traceback（ocr-183）
+        return _err("AuditSubmitFailed", f"{type(exc).__name__}: {exc}", path=milestone_id)
     return json.dumps(
         {"ok": True, "milestone_id": milestone_id, "path": str(path),
          "advances_version": False, "triggers_seal": False},
@@ -598,7 +645,10 @@ def _audit_protocol_with_fallback(workspace_path: Optional[str] = None) -> tuple
     """
     from k3dge.engine.mcp_json import load_mcp_endpoints
 
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     candidates = [
         (ws.parent / "k3dit" / "docs" / "guides" / "audit-method.md", "k3dit"),
         (ws / ".." / "k3dit" / "docs" / "guides" / "audit-method.md", "k3dit alt"),
@@ -661,15 +711,30 @@ def _is_doc_scope(target_scope: str) -> bool:
     return "docs" in segs or segs[0] in _DOC_SCOPE_ROOTS
 
 
+def _harden_prompt_text(s: object, limit: int = 8000) -> str:
+    """调用方可控文本入 prompt 前的收敛：去围栏/控制字符、限长。
+
+    `context_snippet` 原样放进代码围栏 ⇒ 片段自带反引号三串或 `\n\n# 忽略以上` 即可破栏向执行审计的
+    agent 注入指令；无上限也与本模块「Never returns bodies / token 经济」的约束相反（ocr-185）。
+    """
+    text = str(s or "")
+    text = text.replace("``" + "`", "``_").replace("~~~", " ~ ~ ~")
+    text = "".join(ch for ch in text if ch in ("\n", "\t") or (" " <= ch != "\x7f"))
+    return text[:limit]
+
+
 @mcp.prompt()
-def k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str) -> str:
+def k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str,
+                         workspace_path: Optional[str] = None) -> str:
     """Pointer to the independent audit harness (k3dit). Lenses do not live in k3dge.
 
     Unified audit entry — NOT a separate doc harness. Code scope routes to the 5-Pass
     lens; document scope routes to the Doc Audit section of the same protocol. Same peer
     (k3dit), same 12-col report, same on_pre_seal verify (ADR-0005).
     """
-    proto, fell_back, reason = _audit_protocol_with_fallback()
+    proto, fell_back, reason = _audit_protocol_with_fallback(workspace_path=workspace_path)
+    target_scope = _harden_prompt_text(target_scope, 300)     # 可控输入先收敛（ocr-185）
+    context_snippet = _harden_prompt_text(context_snippet)     # 防破围栏指令注入（ocr-185）
     # Highlighted fallback warning when external harness (k3dit) unavailable
     banner = ""
     if fell_back:
@@ -712,7 +777,10 @@ def k3dge_adr_index(workspace_path: Optional[str] = None) -> str:
     """
     from k3dge.engine.doc_catalog import analyze_adr_coverage
 
-    ws = _find_workspace(workspace_path=workspace_path)
+    try:
+        ws = _find_workspace(workspace_path=workspace_path)
+    except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
+        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
     return json.dumps(analyze_adr_coverage(ws), ensure_ascii=False, indent=2)
 
 

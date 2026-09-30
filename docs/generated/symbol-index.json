@@ -140,13 +140,13 @@
   "adr_landed": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 66
+      "line": 69
     }
   ],
   "adrs_all_accepted": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 38
+      "line": 39
     }
   ],
   "advance": [
@@ -164,7 +164,7 @@
   "amend_format": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 203
+      "line": 206
     }
   ],
   "analyze_adr_coverage": [
@@ -296,7 +296,7 @@
   "build_parser": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1105
+      "line": 1121
     }
   ],
   "build_server_params": [
@@ -620,13 +620,13 @@
   "cmd_mcp_probe": [
     {
       "file": "src/k3dge/cli/mcp_peers.py",
-      "line": 181
+      "line": 194
     }
   ],
   "cmd_mcp_sync": [
     {
       "file": "src/k3dge/cli/mcp_peers.py",
-      "line": 148
+      "line": 161
     }
   ],
   "cmd_milestone": [
@@ -644,7 +644,7 @@
   "cmd_status": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1028
+      "line": 1044
     }
   ],
   "cmd_sync": [
@@ -1032,13 +1032,13 @@
   "k3dge_5pass_audit_prompt": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 665
+      "line": 727
     }
   ],
   "k3dge_adr_index": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 707
+      "line": 772
     }
   ],
   "k3dge_check": [
@@ -1050,73 +1050,73 @@
   "k3dge_doc_grep": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 378
+      "line": 408
     }
   ],
   "k3dge_doc_list": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 352
+      "line": 376
     }
   ],
   "k3dge_doc_where": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 368
+      "line": 395
     }
   ],
   "k3dge_milestone_control": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 394
+      "line": 427
     }
   ],
   "k3dge_status": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 143
+      "line": 146
     }
   ],
   "k3dge_submit_audit_report": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 568
+      "line": 609
     }
   ],
   "k3dge_sync": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 212
+      "line": 221
     }
   ],
   "k3dge_task_create": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 273
+      "line": 288
     }
   ],
   "k3dge_task_done": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 310
+      "line": 328
     }
   ],
   "k3dge_task_list": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 319
+      "line": 340
     }
   ],
   "k3dge_verify_domain_contract": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 160
+      "line": 166
     }
   ],
   "k3dge_version": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 239
+      "line": 251
     }
   ],
   "kind": [
@@ -1204,7 +1204,7 @@
     },
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1338
+      "line": 1354
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
@@ -1460,7 +1460,7 @@
   "reconcile_supersedes": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 90
+      "line": 93
     }
   ],
   "record_screen_ack": [

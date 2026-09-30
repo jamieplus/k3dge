@@ -118,9 +118,15 @@ def workspace_status(workspace: Path) -> Dict[str, Any]:
                 continue   # 坏编码的 task 文件只跳过这一张，不让 status 整体崩栈（ocr-032）
             fm = parse_frontmatter(txt) or {}
             m = re.search(r"-\s+\*\*Status\*\*:\s*([\w-]+)", txt)
-            status = (fm.get("status") or (m.group(1).lower() if m else "")).strip()
+            # 值必须小写比较（`parse_frontmatter` 只 lower 键，`Status: Done` 在这里会≠done ⇒ 与引擎
+            # `_scan_task_dir` 判定漂移，同一票 status/`[NEXT]`/MCP 三个出口给相反结论，ocr-188）
+            status = str(fm.get("status") or (m.group(1) if m else "")).strip().lower()
             if status != "done":
-                tm = re.search(r"#\s*(.+)", txt)
+                # 标题复用引擎单源 TITLE_RE（`^#\s+(.+)$` MULTILINE）：原 `#\s*(.+)` 无锚定，
+                # 会命中二级标题/代码注释里的 `#`，三处出口标题不一致（ocr-189）。
+                from k3dge.engine.task_index import TITLE_RE
+
+                tm = re.search(TITLE_RE, txt)
                 unfinished.append(
                     {
                         "task": p.stem,

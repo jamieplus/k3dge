@@ -96,7 +96,7 @@ k3dge_milestone_control(action: str, milestone_id: str, workspace_path: Optional
     # doc: Control milestone state machine: status, align (full-matrix regression), seal (atomic compaction).
 k3dge_submit_audit_report(milestone_id: str, content: str, workspace_path: Optional[str]=None) -> str
     # doc: Persist a human/agent-submitted audit report as the canonical on-disk report.
-k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str) -> str
+k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str, workspace_path: Optional[str]=None) -> str
     # doc: Pointer to the independent audit harness (k3dit). Lenses do not live in k3dge.
 k3dge_adr_index(workspace_path: Optional[str]=None) -> str
     # doc: Fact tool: ADR set self-consistency (coverage/conflict facts). Non-judgmental; k3dit decides.

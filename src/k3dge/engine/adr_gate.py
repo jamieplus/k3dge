@@ -21,6 +21,7 @@ _FM_STATUS = re.compile(r"^Status:\s*(\S+)", re.M)
 _FM_LANDED = re.compile(r"^Landed-by:\s*(.+)$", re.M)
 _FM_SUPERSEDES = re.compile(r"^Supersedes:\s*(.+)$", re.M)
 _UNDECIDED = {"Draft", "Proposed"}
+_ACCEPTED_STATES = {"Accepted", "Superseded"}
 
 
 def _adr_files(workspace: Path) -> List[Path]:
@@ -43,7 +44,9 @@ def adrs_all_accepted(workspace: Path) -> Optional[str]:
             st = _status(p.read_text(encoding="utf-8", errors="replace"))
         except OSError:
             st = ""
-        if st in _UNDECIDED or not st:
+        # 白名单（Accepted/Superseded）而非黑名单：`Rejected` 未及时归档、大小写/尾点变体
+        # （`draft`、`Accepted.`）都不得过闸（同一串在 reconcile 侧是大小写敏感的，黑名单必漏，ocr-190）。
+        if st not in _ACCEPTED_STATES:
             bad.append(f"{p.name}({st or '无 Status'})")
     if bad:
         return f"[SEAL REJECTED] ADR 未 Accepted（封版要求全部 Accepted）：{bad}"

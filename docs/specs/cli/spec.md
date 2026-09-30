@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/cli`
-- **Contract Hash**: `sha256:9f3a3e6a746bff9f1fbbccaa2f40eeab1a77eafc5f7881c91ee56270c6c7de05`
-- **Last Updated**: 2026-09-29
+- **Contract Hash**: `sha256:66fc952903dee083479e3ac2d6fb9866b6cfb732c95bc065b63e2caaddf9ffdc`
+- **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -87,7 +87,7 @@ k3dge_doc_where(ident: str, workspace_path: Optional[str]=None) -> str
 k3dge_doc_grep(query: str, typ: Optional[str]=None, line: bool=False, include_archive: bool=False, workspace_path: Optional[str]=None) -> str
 k3dge_milestone_control(action: str, milestone_id: str, workspace_path: Optional[str]=None) -> str
 k3dge_submit_audit_report(milestone_id: str, content: str, workspace_path: Optional[str]=None) -> str
-k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str) -> str
+k3dge_5pass_audit_prompt(pass_number: int, target_scope: str, context_snippet: str, workspace_path: Optional[str]=None) -> str
 k3dge_adr_index(workspace_path: Optional[str]=None) -> str
 from __future__ import annotations
 from pathlib import Path

@@ -4,7 +4,9 @@ Extracted from cli/main.py to reduce its size and isolate MCP peer logic.
 """
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -28,19 +30,26 @@ def _peer_fallback(pcfg: dict) -> str:
     (multi-purpose). The fallback is the last transport's descriptor: a `manual` provider
     yields its `protocol`, a `skip` provider yields "skip".
     """
+    # pipeline.toml 是用户可编辑的外部输入：一个坏 peer（actions 写成数组表、transports 元素写成
+    # 字符串）不得让整条合并 AttributeError 崩掉（ocr-186）。逐层 isinstance 收窄，坏结构只跳过该跳。
+    if not isinstance(pcfg, dict):
+        return "audit_default.md"
     chains = []
     if pcfg.get("transports"):
         chains.append(pcfg["transports"])
-    for action_cfg in pcfg.get("actions", {}).values():
-        ts = action_cfg.get("transports")
-        if ts:
-            chains.append(ts)
+    actions = pcfg.get("actions")
+    if isinstance(actions, dict):
+        for action_cfg in actions.values():
+            if isinstance(action_cfg, dict) and action_cfg.get("transports"):
+                chains.append(action_cfg["transports"])
     for transports in chains:
-        if not transports:
+        if not isinstance(transports, list) or not transports:
             continue
         last = transports[-1]
+        if not isinstance(last, dict):
+            continue
         if last.get("provider") == "manual":
-            return last.get("protocol", "audit_default.md")
+            return str(last.get("protocol", "audit_default.md"))
         if last.get("provider") == "skip":
             return "skip"
     return "audit_default.md"
@@ -126,12 +135,16 @@ def _sync_peers_into_mcp(workspace: Path, cfg: dict) -> Optional[str]:
             changed = True
             print(f"[MCP] filled PYTHONPATH for peer '{pid}' -> {py_path}", file=sys.stderr)
     if changed:
+        # 固定名 `.mcp.tmp` + 无清理 ⇒ 失败/并发会留半截配置被后续读到（ocr-187）。
+        tmp = mcp_path.with_name(f"{mcp_path.name}.{os.getpid()}.tmp")
         try:
-            tmp = mcp_path.with_suffix(".tmp")
             tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
             tmp.replace(mcp_path)
         except Exception as exc:
             return f"[MCP] peer merge write failed: {exc}"
+        finally:
+            with contextlib.suppress(OSError):
+                tmp.unlink(missing_ok=True)
     return None
 
 
