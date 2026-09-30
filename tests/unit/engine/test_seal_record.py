@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import subprocess
 import tempfile
+import unittest
 from pathlib import Path
 from unittest import TestCase
 
@@ -207,3 +208,29 @@ class TestAuditEvidence(TestCase):
             ' "counts": {"待修": 0}, "merge_ok": true}]}',
             encoding="utf-8")
         self.assertFalse(audit_flow.audit_evidence(ws, "M10")["sealed"])
+
+
+class TestGuideStubScanIgnoresMentions(unittest.TestCase):
+    """桩判定只认真桩：代码块/行内代码里**提到**标记不得把已写好的文档判成未填（guides_filled）。"""
+
+    def _ws(self, body: str) -> Path:
+        import tempfile
+
+        ws = Path(tempfile.mkdtemp())
+        (ws / "docs" / "guides").mkdir(parents=True)
+        (ws / "docs" / "guides" / "g.md").write_text(body, encoding="utf-8")
+        return ws
+
+    def test_mention_in_code_span_is_not_a_stub(self) -> None:
+        from k3dge.engine.seal import scan_unfilled_guides
+
+        ws = self._ws("# G\n\n解释这条闸：`` <!-- k3dge:guide-stub --> `` 会被 seal 前置闸拦。\n")
+        self.assertEqual(scan_unfilled_guides(ws), [])
+        ws2 = self._ws("# G\n\n```md\n<!-- k3dge:guide-stub -->\n```\n\n正文已写。\n")
+        self.assertEqual(scan_unfilled_guides(ws2), [])
+
+    def test_real_marker_still_blocks(self) -> None:
+        from k3dge.engine.seal import scan_unfilled_guides
+
+        ws = self._ws("# G\n\n<!-- k3dge:guide-stub -->\n")
+        self.assertEqual(scan_unfilled_guides(ws), ["g.md"])

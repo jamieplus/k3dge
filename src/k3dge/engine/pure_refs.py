@@ -37,7 +37,9 @@ _ADR_H1_RE = re.compile(r"^#\s+ADR-(\d{4})\b", re.MULTILINE)
 _MATRIX_REF_RE = re.compile(r"`(tests/[^\s`]+)`")
 _CONFLICT_START = "<<<<<<<"
 _CONFLICT_END = ">>>>>>>"
-_CODE_SPAN_RE = re.compile(r"`[^`\n]*`")
+#: 行内代码：CommonMark 允许任意长度的反引号串作定界符（内容不得含同长串）。
+#: 旧只认单反引号 ⇒ 文档里用 `` `x` `` 形式举反引号例子时，示例内容仍被当正文（385 家族/桩判定误读）。
+_CODE_SPAN_RE = re.compile(r"(`+)(?:(?!\1)[^\n])*?\1")
 
 
 def inside_workspace(workspace: Path, ref: str) -> bool:

@@ -47,6 +47,13 @@ def _missing_in(review, tasks) -> list:
 GUIDE_STUB_RE = re.compile(r"<!--\s*k3dge:guide-stub\s*-->", re.IGNORECASE)
 
 
+def _strip_code(text: str) -> str:
+    """去掉围栏与行内代码，只留正文（桩判定看的是**真桩**，不是"提到桩"）。"""
+    from k3dge.engine import pure_refs
+
+    return pure_refs.strip_code_spans(pure_refs.strip_fences(text))
+
+
 def scan_unfilled_guides(workspace: Path) -> List[str]:
     """Names of guide stubs in docs/guides/ still carrying `<!-- k3dge:guide-stub -->`."""
     guides_dir = workspace / "docs" / "guides"
@@ -63,7 +70,9 @@ def scan_unfilled_guides(workspace: Path) -> List[str]:
             # 消息对该文件是错的（GBK 存过的指南会被喊成"请补完文档"，459）
             out.append(f"{g.name}（读不出：{type(exc).__name__}）")
             continue
-        if GUIDE_STUB_RE.search(text):
+        # 只认**真桩**：行内代码/围栏里"提到"这行标记不算（本仓 guides/README 解释这条闸时就把它
+        # 写进了反引号里 ⇒ 全文子串搜索会把已写好的文档判成未填，卡住 guides_filled）
+        if GUIDE_STUB_RE.search(_strip_code(text)):
             out.append(g.name)
     return out
 
