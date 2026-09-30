@@ -56,9 +56,8 @@ if (Test-DocsFlag "readme") {
       "另见：``docs/specs/<domain>/spec.md``（各域契约事实源）。"
     ) | Set-Content -Path "README.md" -Encoding utf8
   }
-  Write-Host "[k3dge] refreshing README layout..."
-  $PyExe = if (Test-Path ".venv/Scripts/python.exe") { ".venv/Scripts/python.exe" } elseif (Test-Path ".venv/bin/python") { ".venv/bin/python" } else { "python" }
-  & $PyExe -c "from pathlib import Path; from k3dge.sync.generator import render_readme_layout; from k3dge.engine.manifest import Manifest; m=Manifest.load(Path('.')); p=render_readme_layout(Path('.'), m); print('  updated' if p else '  already up to date')"
+  # README layout 归 `k3dge sync`（与 generate-docs.sh 同口径；本脚本不再触碰，消跨轨漂移与假绿，ocr-017）。
+  Write-Host "[k3dge] README layout: 归 `k3dge sync`（本脚本不再触碰）"
 } else {
   Write-Host "[k3dge] disabled in config, skip: readme -> README.md"
 }

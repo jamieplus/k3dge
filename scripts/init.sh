@@ -44,13 +44,13 @@ if [ "$K3DGE_HOME" -ef "$TARGET" ]; then
   echo "[k3dge] pip install -e '.[dev]' (self)"
   .venv/bin/pip install -q -e ".[dev]"
 else
-  INSTALL_FLAGS=""
+  INSTALL_FLAGS=()
   if [ -z "${K3DGE_SOURCE:-}" ] || [ "${K3DGE_SOURCE:-}" = "pypi" ]; then
     INSTALL_TARGET="k3dge[mcp]"
     echo "[k3dge] Installing from package index (PyPI)..."
   elif [ -d "${K3DGE_SOURCE:-}" ]; then
     INSTALL_TARGET="${K3DGE_SOURCE}[mcp]"
-    INSTALL_FLAGS="-e"
+    INSTALL_FLAGS=("-e")
     echo "[k3dge] Installing editable from local path: $K3DGE_SOURCE"
   elif case "$K3DGE_SOURCE" in git+*|https://*github.com*|https://*/*) true ;; *) false ;; esac; then
     INSTALL_TARGET="k3dge[mcp] @ ${K3DGE_SOURCE}"
@@ -62,10 +62,14 @@ else
   # Fallback: downstream via /path/to/k3dge/k3dge-init.sh without K3DGE_SOURCE
   if [ -z "${K3DGE_SOURCE:-}" ] && [ -n "${K3DGE_HOME:-}" ] && [ -d "$K3DGE_HOME/src/k3dge" ]; then
     INSTALL_TARGET="${K3DGE_HOME}[mcp]"
-    INSTALL_FLAGS="-e"
+    INSTALL_FLAGS=("-e")
     echo "[k3dge] Installing editable from K3DGE_HOME: $K3DGE_HOME"
   fi
-  .venv/bin/pip install -q ${INSTALL_FLAGS} "$INSTALL_TARGET" pre-commit pytest
+  case "$INSTALL_TARGET" in
+    -*) echo "[k3dge] 非法 INSTALL_TARGET（不得以 - 开头，防 pip 选项注入）：$INSTALL_TARGET" >&2; exit 1 ;;
+  esac
+  # 数组 + `--` 终止选项解析：INSTALL_TARGET 来自 K3DGE_SOURCE（外部输入），不得被 pip 当选项（ocr-024）。
+  .venv/bin/pip install -q ${INSTALL_FLAGS[@]+"${INSTALL_FLAGS[@]}"} -- "$INSTALL_TARGET" pre-commit pytest
   # 统管落盘：唯一值 = 解析后的源。运行时只读它。
   case "$INSTALL_TARGET" in
     "k3dge[mcp]") _SRC_RECORDED="pypi" ;;
