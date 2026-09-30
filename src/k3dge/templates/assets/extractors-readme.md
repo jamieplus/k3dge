@@ -30,7 +30,7 @@ lexical = false
 ```
 
 (`fn`/`container`/`type`/… node tables: copy the closest builtin row from
-`engine/extractor_gen.py` `DEFAULT_LANGS` and adjust names. Node types must be
+`src/k3dge/engine/extractor_gen.py` 的 `DEFAULT_LANGS` 里改（名字与 node type 一律实测，不猜）。 Node types must be
 verified against the real grammar — never guessed.)
 
 Generated files carry a `GENERATED` header. `sync` rewrites changed ones and
@@ -64,5 +64,5 @@ Rules:
 - Files are loaded alphabetically on every `k3dge check`; first `can_handle` match wins.
 - `register_extractor(ext, override=True)` inserts at front (overrides a built-in for the same suffix).
 - Files starting with `_` are skipped (put shared helpers there).
-- One bad file warns (`[WARN][EXTRACTOR]`) and the rest still load — a broken plugin never reds the gate. A generated plugin with a **missing grammar** raises `ImportError` from `extract()`; that is *not* the "broken plugin" path — `engine/contract.py` catches `ImportError` as a skip signal for the whole language. Precedence: the skip-catch is the rule, the `raise` is only its trigger (never fatal).
+- One bad file warns (`[WARN][EXTRACTOR]`) and the rest still load — a broken plugin never reds the gate. A generated plugin with a **missing grammar** raises `ImportError` from `extract()`; that is *not* the "broken plugin" path — `src/k3dge/engine/contract.py` catches `ImportError` as a skip signal for the whole language. Precedence: the skip-catch is the rule, the `raise` is only its trigger (never fatal).
 - Alternatively, declare out-of-repo modules in manifest `extractors: ["mod" / "mod:attr"]`.
