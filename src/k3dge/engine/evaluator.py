@@ -269,9 +269,10 @@ class ConsistencyEngine:
                 timeout=30,
             )
         except (FileNotFoundError, subprocess.TimeoutExpired):
-            return []
+            raise GitError("git 不可用（staged 变更检测）")
         if out.returncode != 0:
-            return []
+            # 不再折叠成空列表（那样 evaluate 会当"无变更"跳过域级门控）；抛出由 caller 转 GIT_UNAVAILABLE（ocr-072）。
+            raise GitError(f"git diff --cached 失败：{(out.stderr or '').strip()[:200]}")
         return [p.strip() for p in out.stdout.splitlines() if p.strip()]
 
 # k3dit:leftover value-1 283行/9门控重构无窗内测试保行为；M7-Q3同域已接受技术债，交独立refactor task
@@ -473,12 +474,19 @@ class ConsistencyEngine:
                 for asset, rel in PAIRS:
                     try:
                         asset_path = assets_root / asset
+                        repo_path = self.workspace_root / rel
+                        # 任一侧缺失都报漂移：PAIRS 是字节锁对，"文件没了"正是门控要抓的（ocr-073）。
                         if not asset_path.is_file():
+                            out.append(Violation(
+                                "TEMPLATE_DRIFT", f"assets/{asset} 缺失（PAIRS 已注册）", file_path=rel,
+                                detail={"asset": f"src/k3dge/templates/assets/{asset}", "repo": rel}))
+                            continue
+                        if not repo_path.is_file():
+                            out.append(Violation(
+                                "TEMPLATE_DRIFT", f"{rel} 缺失（PAIRS 已注册）", file_path=rel,
+                                detail={"asset": f"src/k3dge/templates/assets/{asset}", "repo": rel}))
                             continue
                         asset_text = _without_pins(asset_path.read_text(encoding="utf-8")).rstrip("\n")
-                        repo_path = self.workspace_root / rel
-                        if not repo_path.is_file():
-                            continue
                         repo_text = _without_pins(repo_path.read_text(encoding="utf-8")).rstrip("\n")
                         if asset_text != repo_text:
                             out.append(

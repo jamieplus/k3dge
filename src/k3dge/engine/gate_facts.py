@@ -503,6 +503,16 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "pointers": [".agent/manifest.json", ".agent/rules/08-design-discipline.md", "k3dge ADR-0001 §2"],
     },
     # --- warn：显示但不拦（孤儿＝可能是有意的新增，判定归人）---
+    "ORPHAN_SCAN": {
+        "fix": "judgment",
+        "severity": "warn",
+        "fact": "孤儿扫描（spec/test/adr 零引用）自身异常：{path}",
+        "options": [
+            "按提示修 manifest/权限/JSON 后重跑 `k3dge check`",
+            "确认工具故障 → 本条只观测不拦（工具坏不得阻断提交）",
+        ],
+        "pointers": ["src/k3dge/engine/doc_gate.py", "k3dge ADR-0012"],
+    },
     "ORPHAN_TEST": {
         "fix": "judgment",
         "severity": "warn",

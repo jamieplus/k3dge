@@ -14,7 +14,7 @@
   "ExtractorConfigError": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 142
+      "line": 146
     }
   ],
   "GateReport": [
@@ -752,7 +752,7 @@
   "describe_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 466
+      "line": 486
     }
   ],
   "emit": [
@@ -810,13 +810,13 @@
   "facts_of": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 633
+      "line": 643
     }
   ],
   "fill": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 585
+      "line": 595
     }
   ],
   "find_k3dit": [
@@ -864,7 +864,7 @@
   "fix_kind": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 563
+      "line": 573
     }
   ],
   "format_seal_trailers": [
@@ -1002,7 +1002,7 @@
   "is_declared": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 573
+      "line": 583
     }
   ],
   "is_screenable_new_doc": [
@@ -1400,7 +1400,7 @@
   "projection": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 623
+      "line": 633
     }
   ],
   "prune": [
@@ -1430,7 +1430,7 @@
   "read_events": [
     {
       "file": "src/k3dge/engine/events.py",
-      "line": 54
+      "line": 62
     }
   ],
   "reassign_milestone": [
@@ -1490,7 +1490,7 @@
   "render": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 597
+      "line": 607
     }
   ],
   "render_checklist": [
@@ -1514,7 +1514,7 @@
   "render_plugin": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 237
+      "line": 251
     }
   ],
   "render_readme_layout": [
@@ -1568,7 +1568,7 @@
   "resolve_languages": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 191
+      "line": 205
     }
   ],
   "resolve_role": [
@@ -1748,7 +1748,7 @@
   "severity": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 578
+      "line": 588
     }
   ],
   "split_task_name": [
@@ -1830,7 +1830,7 @@
   "sync_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 424
+      "line": 438
     }
   ],
   "tag_audit_baseline": [
