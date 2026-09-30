@@ -954,9 +954,7 @@ def cmd_commit(args: argparse.Namespace) -> int:
     #    gate”——实际 hook 跑得更多，doc-gate/schema/引用/排查闸 全在 hook 里，绕过它等于
     #    新文档的引用面无人验，PRE-01 实例）。同理**不得改成 `git commit --no-verify`**。
     #    自附 attestation trailer：hook 的 commit-msg 会看到已有该行而不再重复附。
-    msg = args.message
-    if _ATTEST_PREFIX not in msg:
-        msg = _attest.append_to_message(workspace, msg)
+    msg = _attest.append_to_message(workspace, args.message)   # 内部按 LINE_RE 判合法性（子串判断可被伪造/过期，ocr-200）
     res = subprocess.run(
         ["git", "commit", "-m", msg],
         cwd=workspace,

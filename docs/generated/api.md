@@ -172,7 +172,7 @@ windows(when_iso: str) -> List[str]
 token(workspace: Path, when_iso: str) -> str
 line(workspace: Path, who: str='') -> str
 append_to_message(workspace: Path, msg: str, who: str='') -> str
-    # doc: 正文还没有 trailer 就补一行。进程提交与 `k3dge commit` 共用。
+    # doc: 正文没有**合法** trailer 就补一行；有前缀但形状不对（伪造/过期）⇒ 去掉重写。
 verify_commit(workspace: Path, h: str) -> Tuple[bool, str]
 # audit_bundle.py
 from __future__ import annotations

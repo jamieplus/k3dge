@@ -60,8 +60,12 @@ def bundle_input_matches(bundle_input: object, expect_input: object) -> bool:
           `<tool_state_dir(expect_input)>/hall/run/<job>/stage`。该副本与 `expect_input`
           **同一身份**（state 目录按 realpath 确定性生成）；补丁是仓根相对，可干净落回 `expect_input`。
     路径解析失败 ⇒ **放行**（解析异常不该拦住消费）。"""
+    # `manifest.input` 缺失/空 ⇒ `Path("").resolve()` 会退到**进程 CWD**，一只根本没写 input 的包
+    # 会被判"身份相符"并把补丁落到当前树上（与本模块"fail-clear"纪律相反，ocr-201）。
+    if not str(bundle_input or "").strip():
+        return False
     try:
-        got = Path(str(bundle_input or "")).resolve()
+        got = Path(str(bundle_input)).resolve()
         want = Path(str(expect_input or "")).resolve()
     except OSError:      # pragma: no cover - 路径解析异常不拦消费
         return True
@@ -273,9 +277,15 @@ def bundle_facts(bundle: Path) -> dict:
         return {}
     if not isinstance(man, dict):
         return {}
+    def _as_list(v: object) -> list:
+        # docstring 承诺"缺/坏 ⇒ 空值"：`apply_order: 5` / `patches: true` 是真值但不可迭代 ⇒
+        # `list(x or [])` 抛 TypeError，把产出方写坏的包变成消费者侧 traceback（ocr-202）。
+        return [str(x) for x in v] if isinstance(v, list) else []
+
     return {"bundle_version": man.get("bundle_version"), "status": man.get("status"),
-            "unclosed": man.get("unclosed"), "apply_order": list(man.get("apply_order") or []),
-            "patches": list(man.get("patches") or []), "pins": man.get("pins") or {},
+            "unclosed": man.get("unclosed"), "apply_order": _as_list(man.get("apply_order")),
+            "patches": _as_list(man.get("patches")),
+            "pins": man.get("pins") if isinstance(man.get("pins"), dict) else {},
             "flow": man.get("flow") or {}, "coverage": man.get("coverage") or {},
             "input": man.get("input"), "mode": man.get("mode"), "job_id": man.get("job_id"),
             "git_head": man.get("git_head") or ""}
@@ -522,15 +532,22 @@ def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry
         if exclude_hunks:
             from k3dge.engine.audit_merge import hunks_overlapping
 
+            order = [str(x) for x in (bundle_facts(bundle).get("apply_order") or [])]
+            patch_srcs = [Path(bundle) / x for x in order if (Path(bundle) / x).is_file()]
+            if exclude_hunks and not patch_srcs:
+                return {"ok": False, "error": "HUNK_SOURCE_MISSING", "conflicts": [],
+                        "detail": "有 hunk 级剔除要求，但 apply_order 里没有可读的补丁 ⇒ 不落地（fail-close，ocr-203）"}
             for rel, lines in sorted(exclude_hunks.items()):
                 if rel not in files:
                     continue
-                src = Path(bundle) / "fix.patch"
-                if not src.is_file():
-                    continue
-                sel = hunks_overlapping(src.read_text(encoding="utf-8"), rel, list(lines))
+                sel: dict = {"patch": ""}
+                for src in patch_srcs:      # 源可以是 fix.patch **或** 含该改动的其它补丁
+                    sel = hunks_overlapping(src.read_text(encoding="utf-8", errors="replace"),
+                                            rel, list(lines))
+                    if sel.get("patch"):
+                        break
                 if not sel.get("patch"):
-                    continue
+                    continue                  # 无重叠 hunk ⇒ 本就没有要剔的（正常路径）
                 tmpf = wt / ".k3dge-drop.patch"
                 tmpf.write_text(str(sel["patch"]), encoding="utf-8")
                 rc, out = _git(wt, "apply", "-R", "-p1", str(tmpf))
@@ -599,7 +616,16 @@ def _post_apply_check(root: Path, workspace: Path) -> dict:
         cmd = ""
     if not cmd:
         return {"cmd": "", "ok": True, "detail": "未声明 post_apply_check（跳过）"}
-    rc = subprocess.run(["/bin/sh", "-c", cmd], cwd=root, capture_output=True)
+    try:
+        # 声明取自**被审仓**的 pipeline.toml，且可能等 stdin/等锁/跑全量测试 ⇒ 必须有墙钟；
+        # 此前无 timeout 也无进程组隔离，卡住就是整个 consume 无限挂（与本模块"墙钟掐断+抢救"纪律不一致，ocr-204）。
+        rc = subprocess.run(["/bin/sh", "-c", cmd], cwd=root, capture_output=True,
+                            timeout=3600, start_new_session=True)
+    except subprocess.TimeoutExpired:
+        return {"cmd": cmd, "ok": False, "rc": 124,
+                "detail": "post_apply_check 超时（>3600s）⇒ 视为未通过，不落地"}
+    except OSError as exc:
+        return {"cmd": cmd, "ok": False, "rc": 127, "detail": f"post_apply_check 不可执行：{exc}"}
     tail = ((rc.stdout or b"") + (rc.stderr or b"")).decode("utf-8", "replace").strip()[-400:]
     return {"cmd": cmd, "ok": rc.returncode == 0, "rc": rc.returncode, "detail": tail}
 

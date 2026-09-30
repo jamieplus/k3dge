@@ -119,16 +119,23 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
         if not m or m.group(1).strip() == "-":
             continue
         ref = m.group(1).strip()
-        target_id = ref.replace("ADR-", "").replace("adr-", "")
-        my_id = p.stem[:4]
-        target = _find_adr_by_id(d, target_id)
-        if target is None:
-            return f"[SEAL REJECTED] {p.name} Supersedes: {ref} 但找不到对应 ADR 文件"
-        # 自取代守卫：误填自己会把"正在取代别人的一方"自己归档掉，活跃目录少一条审查对象（ocr-035）。
-        if target_id == my_id or target == p:
-            return (f"[SEAL REJECTED] {p.name} Supersedes 指向自身（ADR-{my_id}）"
-                    "——拒绝自取代（会让生效决策从活跃目录消失）")
-        plan.append((p, target, my_id))
+        # `ref.replace("ADR-","")` 会把**整行任意位置**的 `ADR-` 抹掉（`ADR-0001 §2.3` → `0001 §2.3`、
+        # 逗号串 → `0001, 0004`），glob 必落空；一条声明也只认了一个目标（ocr-192）。
+        target_ids = re.findall(r"ADR-(\d{1,4})\b", ref, re.I)
+        if not target_ids:
+            return f"[SEAL REJECTED] {p.name} Supersedes 解析不出 ADR 号：{ref!r}"
+        mm = re.match(r"(\d+)", p.stem)
+        my_id = (mm.group(1).zfill(4) if mm else p.stem[:4])
+        for raw_id in target_ids:
+            tid = raw_id.zfill(4)
+            target = _find_adr_by_id(d, tid)
+            if target is None:
+                return f"[SEAL REJECTED] {p.name} Supersedes: ADR-{tid} 找不到对应 ADR 文件"
+            # 自取代守卫：误填自己会把"正在取代别人的一方"自己归档掉，活跃目录少一条审查对象（ocr-035）。
+            if tid == my_id or target == p:
+                return (f"[SEAL REJECTED] {p.name} Supersedes 指向自身（ADR-{my_id}）"
+                        "——拒绝自取代（会让生效决策从活跃目录消失）")
+            plan.append((p, target, my_id))
     for _p, target, my_id in plan:
         try:
             old_text = target.read_text(encoding="utf-8", errors="replace")
@@ -138,7 +145,15 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
             continue
         old_text = _mark_superseded(old_text, my_id)
         obsolete.mkdir(parents=True, exist_ok=True)
-        (obsolete / target.name).write_text(old_text, encoding="utf-8")
+        dest = obsolete / target.name
+        if dest.is_file() and target != dest:
+            # 无条件覆盖 ⇒ 归档件被静默销毁（编号重用/从备份恢复都会撞上），且 glob 不递归根本看不见（ocr-193）。
+            return (f"[SEAL REJECTED] obsolete/{target.name} 已存在且非本次移动产物"
+                    "——拒绝覆盖归档事实源，请人工裁决")
+        # 原子移动：先写 tmp 再 replace，中断不留"两边都没有/只有一半"的状态
+        tmp = dest.with_name(dest.name + ".tmp")
+        tmp.write_text(old_text, encoding="utf-8")
+        tmp.replace(dest)
         if target.parent != obsolete:
             target.unlink()
         fixed.append(f"{target.name} → obsolete/ (Superseded by ADR-{my_id})")

@@ -23,8 +23,22 @@ WORDLIST = [
 LINE_RE = re.compile(r"^k3dge-commit: (.+?) @ (.+?) #([a-z]+)$")
 
 
+_SECRET_WARNED = False
+
+
 def secret() -> str:
-    return os.environ.get("K3DGE_ATTEST_SECRET") or DEFAULT_SECRET
+    s = (os.environ.get("K3DGE_ATTEST_SECRET") or "").strip()
+    if s:
+        return s
+    global _SECRET_WARNED
+    if not _SECRET_WARNED:
+        import sys
+
+        _SECRET_WARNED = True
+        # 回退常量写在源码里 ⇒ 谁都能算出期望词；CI 若配了真 secret，本地提交会**全量红**。
+        # 两种情形必须在日志里可区分（"威慑-only" 不是 "证明"，ocr-198）。
+        print("[ATTEST] WARN: K3DGE_ATTEST_SECRET 未设 ⇒ 本行是威慑（公开常量），不是证明。", file=sys.stderr)
+    return DEFAULT_SECRET
 
 
 def tree_hash(workspace: Path) -> str:
@@ -53,7 +67,9 @@ def utc_minute(when_iso: str):
 def window(when_iso: str) -> str:
     dt = utc_minute(when_iso)
     if dt is None:
-        return when_iso[:16]
+        # `utc_minute` 明确容忍 None，这里也必须容忍：`None[:16]` 抛 TypeError，且畸形时间戳被
+        # 静默当成一个"窗口"继续算 token ⇒ 报错文案指向"非受管路径"，掩盖真实故障（ocr-199）。
+        return str(when_iso or "")[:16]
     return dt.strftime("%Y-%m-%dT%H:%M")
 
 
@@ -62,7 +78,7 @@ def windows(when_iso: str) -> List[str]:
 
     dt = utc_minute(when_iso)
     if dt is None:
-        return [when_iso[:16]]
+        return [str(when_iso or "")[:16]]
     base = dt.replace(second=0, microsecond=0)
     return [base.strftime("%Y-%m-%dT%H:%M"), (base - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M")]
 
@@ -91,10 +107,18 @@ def line(workspace: Path, who: str = "") -> str:
 
 
 def append_to_message(workspace: Path, msg: str, who: str = "") -> str:
-    """正文还没有 trailer 就补一行。进程提交与 `k3dge commit` 共用。"""
-    if PREFIX in (msg or ""):
-        return msg
-    return f"{(msg or '').rstrip()}\n\n{line(workspace, who=who)}\n"
+    """正文没有**合法** trailer 就补一行；有前缀但形状不对（伪造/过期）⇒ 去掉重写。
+
+    旧实现 `if PREFIX in msg: return msg` 是子串判断：正文里引用一句 `k3dge-commit: ...`
+    就足以让受管路径放弃署名；`--amend` 复用旧行时 tree 已变也不会重算 ⇒ CI 误红（ocr-200）。
+    """
+    body = msg or ""
+    if any(LINE_RE.match(ln.strip()) for ln in body.splitlines()):
+        return body
+    kept = [ln for ln in body.splitlines() if not ln.strip().startswith(PREFIX)]
+    trailer = line(workspace, who=who)
+    cleaned = "\n".join(kept).rstrip()
+    return f"{cleaned}\n\n{trailer}\n" if cleaned else f"{trailer}\n"
 
 
 def verify_commit(workspace: Path, h: str) -> Tuple[bool, str]:

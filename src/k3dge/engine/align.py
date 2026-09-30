@@ -111,6 +111,21 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
     today = datetime.date.today().isoformat()
     review_file = workspace / "docs" / "reviews" / f"{today}-{milestone_id}-align.md"
     review_file.parent.mkdir(parents=True, exist_ok=True)
+    # **机器桩才重写**：操作者填过（stub marker 被删）的正式报告再跑 align 不得被整篇覆盖
+    # （人工结论/证据链不可恢复，ocr-197）。让后补的票进得了清单，只需覆盖桩。
+    if review_file.is_file():
+        try:
+            _prev = review_file.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            _prev = ""
+        if _prev and _ALIGN_STUB_MARKER not in _prev:
+            return True, (
+                f"[ALIGN] Full Matrix verification PASS for milestone '{milestone_id}'.\n"
+                f"  Kept human-filled review: docs/reviews/{review_file.name}"
+                f"（未覆盖已填写报告，ocr-197）\n"
+                f"  Milestone is seal-eligible. Audit is mandatory before seal."
+            ), tasks
+    done = [x for x in tasks if x.status == "done"]
     lines = [
         f"# 里程碑对齐与验收报告: {milestone_id}",
         _ALIGN_STUB_MARKER,
@@ -118,13 +133,16 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
         "",
         f"- **Date**: {today}",
         "- **Regression**: PASS (k3dge milestone align Full Matrix)",
-        f"- **Completed Tasks**: {len(tasks)}",
+        f"- **Completed Tasks**: {len(done)}",
         "",
         "## 1. 目标达成清单",
         "",
     ]
-    for t in tasks:
-        lines.append(f"- [x] `{t.path.name}`")
+    for x in tasks:
+        # 按真实状态打勾：`work_pending` 豁免棘轮工单票 ⇒ 全量 `[x]` 会把未完成的票写成已完成（ocr-196）。
+        mark = "x" if x.status == "done" else " "
+        suffix = "" if x.status == "done" else f"（status: {x.status}）"
+        lines.append(f"- [{mark}] `{x.path.name}`{suffix}")
     lines.extend([
         "",
         "## 2. 重构准入评估",
