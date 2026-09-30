@@ -259,6 +259,52 @@ class TestSealFlow(TestCase):
         audit.assert_called_once()
         seal.assert_not_called()
 
+    def test_rerun_does_not_bump_version_twice(self) -> None:
+        """幂等重入：已立边界 tag ⇒ 第二次 seal **不再推版号**（09-28 code-7 / ocr-443 同族）。"""
+        ws = _ws()
+        (ws / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
+        (ws / "docs" / "tasks" / "2026-09-01-M1-feat-x.md").write_text(
+            "---\nstatus: done\nmilestone: M1\npriority: P2\ndate: 2026-09-01\n---\n\n# X\n",
+            encoding="utf-8")
+        (ws / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.2.3"\n', encoding="utf-8")
+        from k3dge.engine.version import get_version
+
+        with _audit_ok(), _record_ok(), \
+             mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])), \
+             mock.patch("k3dge.engine.seal_flow.seal_preconditions_error", return_value=None), \
+             mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed M1")), \
+             mock.patch("k3dge.engine.seal_flow._milestone_already_sealed", return_value=True):
+            status, msg = run_seal_flow(ws, "M1", skip_enter_prompt=True, prompter=_Prompt(answers=[]))
+        self.assertEqual(status, "sealed")
+        self.assertEqual(get_version(ws), "1.2.3", msg)      # 没被二次 patch
+        self.assertIn("重入不重复提版", msg)
+
+    def test_already_sealed_reads_only_git_facts(self) -> None:
+        """判据＝边界 tag；证据读不出 ⇒ 出声并按"未封"处理（保守：可见的多余提版 > 静默跳过）。"""
+        import contextlib
+        import io
+        import subprocess
+        import tempfile as _tf
+
+        from k3dge.engine.seal_flow import _milestone_already_sealed
+
+        root = Path(_tf.mkdtemp())
+        for cmd in (["init", "-q", "-b", "main"], ["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+            subprocess.run(["git", "-C", str(root), *cmd], check=True, capture_output=True)
+        (root / "a.txt").write_text("x", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "-A"], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", "chore: init"],
+                       check=True, capture_output=True)
+        self.assertFalse(_milestone_already_sealed(root, "M1"))
+        subprocess.run(["git", "-C", str(root), "tag", "M1"], check=True, capture_output=True)
+        self.assertTrue(_milestone_already_sealed(root, "M1"))
+
+        err = io.StringIO()
+        with mock.patch("k3dge.engine.audit_flow.audit_evidence", side_effect=RuntimeError("no git")):
+            with contextlib.redirect_stderr(err):
+                self.assertFalse(_milestone_already_sealed(root, "M1"))
+        self.assertIn("WARN", err.getvalue())
+
     def test_version_advances_after_the_audit_returns(self) -> None:
         """ADR-0004 §2.1.9/§2.1.11：**版号在审计正常返回后前进**，不管有没有报告；
         `no_version_bump` 是显式逃生口（不动版本文件，其余照旧）。"""

@@ -248,6 +248,22 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
     return p
 
 
+def _milestone_already_sealed(workspace: Path, milestone_id: str) -> bool:
+    """本里程碑**已封过**没有——判据只认 git 事实（边界 tag），不读本地账（ADR-0004 §2.1.10）。
+
+    读不出证据时按"未封"处理并出声：宁可照常提版（可见、可回滚），也不静默跳过相位 3①
+    ——跳过会让操作者以为版本已动，而 tag/记录其实不在。
+    """
+    try:
+        from k3dge.engine import audit_flow
+
+        return bool(audit_flow.audit_evidence(workspace, milestone_id).get("tag"))
+    except Exception as exc:
+        print(f"[seal_flow] WARN: 封版证据读不出（{type(exc).__name__}: {exc}）⇒ 本轮按未封处理",
+              file=sys.stderr)
+        return False
+
+
 def run_seal_flow(
     workspace: Path,
     milestone_id: str,
@@ -338,6 +354,11 @@ def run_seal_flow(
         """
         if no_version_bump:
             return True, "\n  版本: 跳过（--no-version-bump）"
+        if _milestone_already_sealed(workspace, milestone_id):
+            # 幂等重入守卫（本流程明写支持"预审失败可修完再 seal"）：已立边界 tag ⇒ 记录面已在，
+            # 重跑**不得再推一格版号**（旧实现第二次 seal 会静默二次 patch-bump + 再写 CHANGELOG；
+            # 09-28 审计 code-7，与 ocr-443「kind/on_rerun 未被执行器强制」同族）
+            return True, f"\n  版本: 跳过（{milestone_id} 已封过：边界 tag 已在，重入不重复提版）"
         try:
             from k3dge.engine.changelog import build_notes_from_range
             from k3dge.engine.version import append_changelog, bump_version, consume_unreleased

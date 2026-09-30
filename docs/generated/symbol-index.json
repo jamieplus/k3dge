@@ -1676,7 +1676,7 @@
   "run_seal_flow": [
     {
       "file": "src/k3dge/engine/seal_flow.py",
-      "line": 251
+      "line": 267
     }
   ],
   "salvage_bundle": [
