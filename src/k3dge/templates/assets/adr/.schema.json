@@ -25,7 +25,6 @@
     "sections": "DOC_SCHEMA_INVALID",
     "section_order": "DOC_SECTION_ORDER",
     "unique": "DOC_SCHEMA_INVALID",
-    "amend": "ADR_AMEND_FORMAT",
     "amend_order": "ADR_AMEND_ORDER",
     "footnote_tail": "ADR_FOOTNOTE_TAIL",
     "amend_marker_text": "ADR_AMEND_MARKER_TEXT",

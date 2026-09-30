@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Tuple
 
@@ -255,8 +256,11 @@ def _apply_version_updates(updates: list) -> None:
         for path, orig in originals.items():
             try:
                 _atomic_write(path, orig)
-            except Exception:
-                pass
+            except Exception as rb_exc:
+                # 恢复动作本身失败**恰恰最需要暴露**：静默 ⇒ 调用方只看到主异常，
+                # 不知道哪个文件仍停在半新半旧（469）
+                print(f"[version] WARN: 回滚 {path} 失败（{type(rb_exc).__name__}: {rb_exc}）"
+                      "⇒ 该文件仍是本轮新内容，请手工核对", file=sys.stderr)
         raise
 
 

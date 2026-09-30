@@ -51,7 +51,7 @@ def work_pending(tasks: List[MilestoneTask], workspace: Optional[Path] = None) -
     root = Path(workspace).resolve() if workspace is not None else None
     out: List[MilestoneTask] = []
     for t in tasks:
-        if t.status == "done":
+        if t.status == TaskState.DONE.value:      # 词表单源派生，别在这里再写一份"done"（467）
             continue
         rel = ""
         if root is not None:

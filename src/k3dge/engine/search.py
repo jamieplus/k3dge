@@ -322,8 +322,11 @@ def search(
     context: int = 2,
     max_snippet: int = 240,
 ) -> List[Location]:
-    """Controlled search. Returns path:line[: snippet]. Snippet window is clamped to
-    _MAX_CONTEXT lines so a query never floods the context window."""
+    """Controlled search. Returns path:line[: snippet].
+
+    窗口上限来自 `gates.get(workspace, "search", "context_max")`（`.agent/pipeline.toml` 可覆盖），
+    `_MAX_CONTEXT` 只是**那张表的缺省**，不是硬钳（463 的文档漂移）。
+    """
     raw = _run_ripgrep(workspace, query)
     if raw is None:
         raw = _python_search(workspace, query)

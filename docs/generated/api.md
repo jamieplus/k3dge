@@ -997,7 +997,7 @@ class IndexUnavailable(RuntimeError)
 where(workspace: Path, symbol: str) -> List[Location]
     # doc: Deterministic name -> file:line. No grep discovery, no model judgment.
 search(workspace: Path, query: str, *, snippet: bool=True, context: int=2, max_snippet: int=240) -> List[Location]
-    # doc: Controlled search. Returns path:line[: snippet]. Snippet window is clamped to
+    # doc: Controlled search. Returns path:line[: snippet].
 # spec_schema.py
 from __future__ import annotations
 from typing import List
@@ -1181,8 +1181,6 @@ from typing import Tuple
 from k3dge.engine import contract
 from k3dge.engine import spec_schema
 from k3dge.engine.atomic import atomic_write_text
-from k3dge.engine.generated_docs import LAYOUT_END
-from k3dge.engine.generated_docs import LAYOUT_START
 from k3dge.engine.generated_docs import render_manual_docs_content
 from k3dge.engine.generated_docs import render_readme_layout
 from k3dge.engine.manifest import Manifest

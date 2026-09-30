@@ -10,7 +10,7 @@ $ScriptRoot = if ($PSScriptRoot) { $PSScriptRoot } elseif ($PSCommandPath) { Spl
 
 if ($env:K3DGE_SOURCE) {
   $K3dgeHome = $env:K3DGE_SOURCE
-} elseif ($ScriptRoot -and (Test-Path (Join-Path $ScriptRoot "src/k3dge"))) {
+} elseif ($ScriptRoot -and (Test-Path -LiteralPath (Join-Path $ScriptRoot "src/k3dge"))) {
   $K3dgeHome = $ScriptRoot
 } else {
   # Stop 偏好下 `Write-Error` 本身就是终止错误 ⇒ 紧随的 `exit 1` 永不执行，调用方拿到未处理异常
@@ -53,9 +53,9 @@ if ($LASTEXITCODE -ne 0 -or -not $top) {
 }
 
 $VenvPy = Join-Path $Target ".venv/Scripts/python.exe"
-if (-not (Test-Path $VenvPy)) {
+if (-not (Test-Path -LiteralPath $VenvPy)) {
   $VenvPyUnix = Join-Path $Target ".venv/bin/python"
-  if (-not (Test-Path $VenvPyUnix)) {
+  if (-not (Test-Path -LiteralPath $VenvPyUnix)) {
     Write-Host "[k3dge] $Py -m venv .venv"
     & $Py -m venv .venv
     # Windows 上 `python3` 常是 Microsoft Store 的 App Execution Alias：开商店、非零退出、**什么都不建**，
@@ -69,13 +69,13 @@ if (-not (Test-Path $VenvPy)) {
 
 # 不再单独探 `pip.exe`/`bin/pip`：探测不到就无条件当 Unix 路径用的兜底**从不验存在**（361）。
 # 上面已验过的 `$PyVenv -m pip` 才是唯一入口。
-$PyVenv = if (Test-Path (Join-Path $Target ".venv/Scripts/python.exe")) {
+$PyVenv = if (Test-Path -LiteralPath (Join-Path $Target ".venv/Scripts/python.exe")) {
   Join-Path $Target ".venv/Scripts/python.exe"
 } else {
   Join-Path $Target ".venv/bin/python"
 }
 # venv 解释器必须真的在（.venv 目录残留会骗过 `Test-Path .venv`），且 pip 可用（坏 venv 的报错最难查，ocr-167）。
-if (-not (Test-Path $PyVenv -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath $PyVenv -PathType Leaf)) {
   [Console]::Error.WriteLine("[k3dge] 无可用的 venv 解释器：$PyVenv（删 .venv 重跑 init）"); exit 1
 }
 & $PyVenv -m pip --version *> $null
@@ -99,7 +99,7 @@ if ($self) {
   if ([string]::IsNullOrWhiteSpace($env:K3DGE_SOURCE) -or $env:K3DGE_SOURCE -eq "pypi") {
     $InstallTarget = "k3dge[mcp]"
     Write-Host "[k3dge] Installing from package index (PyPI)..."
-  } elseif (Test-Path $env:K3DGE_SOURCE -PathType Container) {
+  } elseif (Test-Path -LiteralPath $env:K3DGE_SOURCE -PathType Container) {
     $InstallTarget = "$($env:K3DGE_SOURCE)[mcp]"
     $InstallFlags += "-e"
     Write-Host "[k3dge] Installing editable from local path: $env:K3DGE_SOURCE"
@@ -120,7 +120,7 @@ if ($self) {
     $InstallTarget = "$($env:K3DGE_SOURCE)[mcp]"
     Write-Host "[k3dge] Installing from source/package: $env:K3DGE_SOURCE"
   }
-  if ([string]::IsNullOrWhiteSpace($env:K3DGE_SOURCE) -and (Test-Path (Join-Path $K3dgeHome "src/k3dge"))) {
+  if ([string]::IsNullOrWhiteSpace($env:K3DGE_SOURCE) -and (Test-Path -LiteralPath (Join-Path $K3dgeHome "src/k3dge"))) {
     $InstallTarget = "$K3dgeHome[mcp]"
     $InstallFlags = @("-e")
     Write-Host "[k3dge] Installing editable from K3DGE_HOME: $K3dgeHome"
@@ -139,7 +139,7 @@ Write-Host "[k3dge] generating harness scaffolding in $Target ..."
 & $PyVenv -m k3dge.templates.scaffold $Target
 if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] scaffold 失败 (exit $LASTEXITCODE)"); exit 1 }
 
-$K3dgeExe = if (Test-Path (Join-Path $Target ".venv/Scripts/k3dge.exe")) {
+$K3dgeExe = if (Test-Path -LiteralPath (Join-Path $Target ".venv/Scripts/k3dge.exe")) {
   Join-Path $Target ".venv/Scripts/k3dge.exe"
 } else {
   Join-Path $Target ".venv/bin/k3dge"
@@ -154,14 +154,14 @@ Write-Host "[k3dge] k3dge sync"
 & $K3dgeExe sync
 if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] k3dge sync 失败 (exit $LASTEXITCODE)"); exit 1 }
 
-$PreCommit = if (Test-Path (Join-Path $Target ".venv/Scripts/pre-commit.exe")) {
+$PreCommit = if (Test-Path -LiteralPath (Join-Path $Target ".venv/Scripts/pre-commit.exe")) {
   Join-Path $Target ".venv/Scripts/pre-commit.exe"
 } else {
   Join-Path $Target ".venv/bin/pre-commit"
 }
 Write-Host "[k3dge] pre-commit install"
 # 同 `$K3dgeExe`：兜底的 Unix 路径从不验存在 ⇒ `&` 抛的错与真实原因无关（361）
-if (-not (Test-Path $PreCommit -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath $PreCommit -PathType Leaf)) {
   [Console]::Error.WriteLine("[k3dge] 找不到 pre-commit 入口：$PreCommit ⇒ hook 没装上就是假安全")
   exit 1
 }

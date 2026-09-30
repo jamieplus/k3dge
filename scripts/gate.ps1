@@ -70,8 +70,12 @@ if ($k3dge) {
     # 收据只覆盖 `.venv`；全局那份来源未经校验 ⇒ 至少出声（与 gate.sh 同口径，ocr-158）。
     [Console]::Error.WriteLine("[k3dge-source] WARN: 政策已声明但 .venv/Scripts/k3dge.exe 缺失 ⇒ 回落全局 k3dge（其来源未经收据校验）：$($k3dge.Source)")
   }
-  & k3dge @cmdArgs
-  exit $LASTEXITCODE
+  # 走解析到的那一条（`Get-Command` 可能命中 function/alias/.ps1 垫片；裸名 `& k3dge`
+  # 会**二次解析**，两次未必同一个 ⇒ 且调用没发生时 $LASTEXITCODE 是上一句的陈旧值）（475）
+  $rc = 0
+  try { & $k3dge.Source @cmdArgs; $rc = $LASTEXITCODE }
+  catch { [Console]::Error.WriteLine("[k3dge] 无法执行 $($k3dge.Source)：$_"); exit 127 }
+  exit $rc
 }
 [Console]::Error.WriteLine("k3dge not found. Run ./k3dge-init.ps1")
 exit 1

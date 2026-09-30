@@ -59,7 +59,14 @@ def blocking_dangling(workspace: Path) -> Dict[str, List[str]]:
     if not d.is_dir():
         return out
     open_stems, closed_stems = set(), set()
-    for p in sorted(d.glob("*.md")):
+    # 已关票的常态是 `docs/tasks/archive/M*/X.done.md`（顶层只留未归档的几张）：
+    # 只 glob 顶层 ⇒ 引用一张已归档票时两边都不在，被报成"不存在的票"而非"已关票"（465）
+    files = [p for p in sorted(d.glob("*.md"))] + [p for p in sorted(d.glob("*/**/*.md"))]
+    seen_p: set = set()
+    for p in files:
+        if str(p) in seen_p:
+            continue
+        seen_p.add(str(p))
         if _is_doc_aux(p.name):
             continue
         if p.name.endswith(".done.md"):
@@ -81,9 +88,9 @@ def blocking_dangling(workspace: Path) -> Dict[str, List[str]]:
     return out
 
 
-def blocking_cycles(workspace: Path) -> Dict[str, object]:
-    """互阻工单＝死锁队列：出事实（`cyclic` + 首个环路径）。"""
-    ts = TopologicalSorter(blocking_graph(workspace))
+def _cycles_of(g: Dict[str, List[str]]) -> Dict[str, object]:
+    """在**已建好的图**上找环（466：`critical_path`/`summary` 各自重扫一遍盘）。"""
+    ts = TopologicalSorter(g)
     try:
         tuple(ts.static_order())
         return {"cyclic": False}
@@ -94,10 +101,15 @@ def blocking_cycles(workspace: Path) -> Dict[str, object]:
         return {"cyclic": True, "detail": detail[:200]}
 
 
+def blocking_cycles(workspace: Path) -> Dict[str, object]:
+    """互阻工单＝死锁队列：出事实（`cyclic` + 首个环路径）。"""
+    return _cycles_of(blocking_graph(workspace))
+
+
 def critical_path(workspace: Path) -> Dict[str, object]:
     """最长阻塞链（按节点数）。有环 ⇒ 退化为空（由 `blocking_cycles` 报环）。"""
     g = blocking_graph(workspace)
-    if blocking_cycles(workspace)["cyclic"]:
+    if _cycles_of(g)["cyclic"]:
         return {"path": [], "length": 0, "cyclic": True}
     memo: Dict[str, List[str]] = {}
 

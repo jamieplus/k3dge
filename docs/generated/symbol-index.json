@@ -182,7 +182,7 @@
   "append_changelog": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 316
+      "line": 320
     }
   ],
   "append_to_message": [
@@ -260,7 +260,7 @@
   "blocking_cycles": [
     {
       "file": "src/k3dge/engine/task_dag.py",
-      "line": 84
+      "line": 104
     }
   ],
   "blocking_dangling": [
@@ -326,7 +326,7 @@
   "build_task_name": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 447
+      "line": 452
     }
   ],
   "bump_milestone": [
@@ -344,7 +344,7 @@
   "bump_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 263
+      "line": 267
     }
   ],
   "bundle_digest": [
@@ -410,7 +410,7 @@
   "check_completeness": [
     {
       "file": "src/k3dge/engine/state_machine.py",
-      "line": 68
+      "line": 75
     }
   ],
   "check_content": [
@@ -710,7 +710,7 @@
   "completeness_violations": [
     {
       "file": "src/k3dge/engine/state_machine.py",
-      "line": 125
+      "line": 131
     }
   ],
   "compute_audit_suggestion": [
@@ -734,7 +734,7 @@
   "consume_unreleased": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 335
+      "line": 339
     }
   ],
   "count_statuses": [
@@ -758,7 +758,7 @@
   "critical_path": [
     {
       "file": "src/k3dge/engine/task_dag.py",
-      "line": 97
+      "line": 109
     }
   ],
   "decl": [
@@ -894,7 +894,7 @@
   "format_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 58
+      "line": 59
     }
   ],
   "get": [
@@ -930,7 +930,7 @@
   "get_init_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 139
+      "line": 140
     }
   ],
   "get_manifest_resource": [
@@ -948,13 +948,13 @@
   "get_manifest_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 128
+      "line": 129
     }
   ],
   "get_pyproject_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 103
+      "line": 104
     }
   ],
   "get_verify_attempts": [
@@ -966,7 +966,7 @@
   "get_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 147
+      "line": 148
     }
   ],
   "grep_docs": [
@@ -1238,7 +1238,7 @@
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 404
+      "line": 406
     }
   ],
   "managed_docs": [
@@ -1250,13 +1250,13 @@
   "manifest_read_error": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 110
+      "line": 111
     }
   ],
   "mark_task_done": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 384
+      "line": 389
     }
   ],
   "materialize": [
@@ -1382,7 +1382,7 @@
   "parse_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 51
+      "line": 52
     }
   ],
   "patch_rels": [
@@ -1478,13 +1478,13 @@
   "reassign_milestone": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 502
+      "line": 507
     }
   ],
   "reassign_task_milestone": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 453
+      "line": 458
     }
   ],
   "reconcile_report_rows": [
@@ -1544,7 +1544,7 @@
   "render_manual_docs": [
     {
       "file": "src/k3dge/sync/generator.py",
-      "line": 96
+      "line": 103
     }
   ],
   "render_manual_docs_content": [
@@ -1694,7 +1694,7 @@
   "scaffold": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 311
+      "line": 312
     }
   ],
   "scan": [
@@ -1808,7 +1808,7 @@
   "split_task_name": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 441
+      "line": 446
     }
   ],
   "staged_added": [
@@ -1856,11 +1856,11 @@
   "summary": [
     {
       "file": "src/k3dge/engine/state_machine.py",
-      "line": 130
+      "line": 136
     },
     {
       "file": "src/k3dge/engine/task_dag.py",
-      "line": 123
+      "line": 135
     }
   ],
   "symbol_diff": [
@@ -1872,13 +1872,13 @@
   "sync_all": [
     {
       "file": "src/k3dge/sync/generator.py",
-      "line": 185
+      "line": 192
     }
   ],
   "sync_domain": [
     {
       "file": "src/k3dge/sync/generator.py",
-      "line": 42
+      "line": 40
     }
   ],
   "sync_extractors": [
@@ -1974,7 +1974,7 @@
   "validate_versions": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 155
+      "line": 156
     }
   ],
   "verify_bundle": [

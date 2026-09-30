@@ -11,9 +11,7 @@ from typing import List, Optional, Sequence, Tuple
 from k3dge.engine import contract, spec_schema
 from k3dge.engine.atomic import atomic_write_text
 from k3dge.engine.generated_docs import (
-    LAYOUT_END,
-    LAYOUT_START,
-    _layout_block,
+    # LAYOUT_*/_layout_block 曾在：README 布局块改由 render_readme_layout 内部负责后就是死导入（470）
     _replace_between_all,
     render_manual_docs_content,
     render_readme_layout,
@@ -47,6 +45,15 @@ def sync_domain(
     if not spec_rel or not src_rel:
         return None
 
+    from k3dge.engine.pure_refs import inside_workspace
+
+    # `spec_rel`/`src_rel` 来自 manifest（下游可写）：绝对路径会让 `workspace / rel` **丢掉基路径**，
+    # `..` 同理 ⇒ 读写跑到仓外（471）
+    for label, rel in (("spec", spec_rel), ("src", src_rel)):
+        if not inside_workspace(workspace, rel):
+            print(f"[sync] WARN: 域 {domain} 的 {label} 路径越出仓外（{rel!r}）⇒ 跳过该域",
+                  file=sys.stderr)
+            return None
     spec_path = workspace / spec_rel
     src_dir = workspace / src_rel
     if not spec_path.exists():

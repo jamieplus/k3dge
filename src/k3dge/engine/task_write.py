@@ -304,15 +304,20 @@ def _resolve_task_target(workspace: Path, ident: str, tasks_dir: Path, archive_d
     return matches[0], None
 
 
-def _rename_task_done(target: Path) -> Path:
-    """Rename to `.done.md` unless already done or the target name is taken."""
+def _rename_task_done(target: Path) -> Tuple[Path, str]:
+    """Rename to `.done.md`；返回 `(路径, 告警)`。
+
+    旧实现在目标名已占时**静默返回原路径**：调用方拿不到失败信号 ⇒ frontmatter 已写
+    `status: done` 而文件名没改（468）——那正是 `status: done ⇔ .done.md` 闸要抓的形状。
+    """
     if target.name.endswith(".done.md"):
-        return target
+        return target, ""
     new_path = target.parent / (target.name[:-3] + ".done.md")
     if new_path.exists():
-        return target
+        return target, (f"{new_path.name} 已存在 ⇒ 未改名（status 已 done，"
+                        "文件名与状态不一致，请人工并表）")
     target.rename(new_path)
-    return new_path
+    return new_path, ""
 
 
 def _backfill_task_reviews(workspace: Path, target: Path) -> None:
@@ -370,7 +375,7 @@ def _finalize_task_done(workspace: Path, target: Path, content: str, fm: dict) -
         if new_content == content:
             return False, f"no Status field in {target.name}", target
         target.write_text(new_content, encoding="utf-8")
-    target = _rename_task_done(target)
+    target, rename_note = _rename_task_done(target)
     # 不代写结案段：自动占位 = 伪合规（pure_refs._CLOSURE_HEADINGS 注释）。缺段让
     # TASK_CLOSURE_MISSING 红。collect 关工单票时自己写带报告指针的 ## 结案。
     # CHANGELOG **不在这里写**（ADR-0004 §2.1.12）：它由封版时的提交区间生成——
@@ -378,7 +383,7 @@ def _finalize_task_done(workspace: Path, target: Path, content: str, fm: dict) -
     _backfill_task_reviews(workspace, target)
     from k3dge.engine import events
     events.emit(workspace, "task_done", task=target.name)
-    return True, f"marked done: {target.name}", target
+    return True, (f"marked done: {target.name}" + (f"；⚠️ {rename_note}" if rename_note else "")), target
 
 
 def mark_task_done(workspace: Path, ident: str) -> Tuple[bool, str, Optional[Path]]:

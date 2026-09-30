@@ -65,6 +65,13 @@ def _reachable(transitions: Sequence[Transition], initial: TaskState) -> Set[Tas
     return seen
 
 
+def _dead_states(states: Set[TaskState], terminals: frozenset,
+                 transitions: Sequence[Transition]) -> Set[TaskState]:
+    """非终态且无出边 = 死状态。**判据单源**：CI 完备性检查与观测件 `summary()` 共用这一处（464）。"""
+    outgoing = {t.source for t in transitions}
+    return set(states) - set(terminals) - outgoing
+
+
 def check_completeness(
     transitions: Sequence[Transition],
     states: Set[TaskState],
@@ -89,10 +96,9 @@ def check_completeness(
             v.append(f"未定义目标态 {t.target!r}")
         if t.source in terminals:                                    # ① 终态不得有出边
             v.append(f"终态 {t.source.value} 有出边 -> {t.target.value}")
-    outgoing = {t.source for t in transitions}
-    for s in sorted(states - set(terminals), key=lambda x: x.value):  # ② 非终态须有出边（防死锁）
-        if s not in outgoing:
-            v.append(f"非终态 {s.value} 无出边（潜在死锁）")
+    dead = _dead_states(states, terminals, transitions)
+    for s in sorted(dead, key=lambda x: x.value):                     # ② 非终态须有出边（防死锁）
+        v.append(f"非终态 {s.value} 无出边（潜在死锁）")
 
     def _can_reach_terminal(start: TaskState) -> bool:               # ②b 非终态须**可达终态**（防活锁）
         seen: Set[TaskState] = {start}
@@ -130,11 +136,10 @@ def completeness_violations() -> List[str]:
 def summary() -> Dict[str, object]:
     """观测件：状态/初态/可达/死状态/违规（不判定）。"""
     reach = _reachable(TRANSITIONS, INITIAL)
-    outgoing = {t.source for t in TRANSITIONS}
     return {
         "states": [s.value for s in TaskState],
         "initial": INITIAL.value,
         "reachable": sorted(s.value for s in reach),
-        "dead_states": sorted(s.value for s in (set(TaskState) - TERMINAL_STATES - outgoing)),
+        "dead_states": sorted(s.value for s in _dead_states(set(TaskState), TERMINAL_STATES, TRANSITIONS)),
         "violations": completeness_violations(),
     }

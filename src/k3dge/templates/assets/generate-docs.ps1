@@ -4,7 +4,15 @@ $ErrorActionPreference = "Stop"
 # Reads .agent/docs.toml and creates stub files under docs/guides/.
 # Idempotent: existing files are not overwritten.
 
-$Root = Split-Path -Parent $PSScriptRoot
+# dot-source / `pwsh -Command` 内联时 `$PSScriptRoot` 为空 ⇒ `Split-Path -Parent ''` 给 $null，
+# 后续 Push-Location 落到错误目录（477）
+$Root = if ($PSScriptRoot) { Split-Path -Parent $PSScriptRoot }
+        elseif ($PSCommandPath) { Split-Path -Parent (Split-Path -Parent $PSCommandPath) }
+        else { (Get-Location).Path }
+if (-not (Test-Path -LiteralPath (Join-Path $Root ".agent"))) {
+  [Console]::Error.WriteLine("[k3dge] 定位到的项目根没有 .agent/（$Root）⇒ 请用文件路径运行：pwsh -File ./scripts/generate-docs.ps1")
+  exit 1
+}
 # `Set-Location` 是**进程级**副作用：`.sh` 的 `cd` 关在子进程里不泄漏，而本脚本被 `&`/点源调用时
 # 会把调用方的当前位置改掉且永不恢复（376）。Push/Pop + trap ⇒ 任何出口都还原。
 Push-Location $Root

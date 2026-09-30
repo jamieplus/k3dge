@@ -65,7 +65,6 @@ else
   INSTALL_FLAGS=()
   if [ -z "${K3DGE_SOURCE:-}" ] || [ "${K3DGE_SOURCE:-}" = "pypi" ]; then
     INSTALL_TARGET="k3dge[mcp]"
-    echo "[k3dge] Installing from package index (PyPI)..."
   elif [ -d "${K3DGE_SOURCE:-}" ]; then
     INSTALL_TARGET="${K3DGE_SOURCE}[mcp]"
     INSTALL_FLAGS=("-e")
@@ -81,8 +80,13 @@ else
   if [ -z "${K3DGE_SOURCE:-}" ] && [ -n "${K3DGE_HOME:-}" ] && [ -d "$K3DGE_HOME/src/k3dge" ]; then
     INSTALL_TARGET="${K3DGE_HOME}[mcp]"
     INSTALL_FLAGS=("-e")
-    echo "[k3dge] Installing editable from K3DGE_HOME: $K3DGE_HOME"
   fi
+  # 回声放在**分类之后**：以前 PyPI 那行先印、随后又被改写成 K3DGE_HOME editable ⇒ 诊断信息自相矛盾（481）
+  case "$INSTALL_TARGET" in
+    *" @ "*) echo "[k3dge] Installing from VCS source (non-editable): ${K3DGE_SOURCE}" ;;
+    "k3dge[mcp]") echo "[k3dge] Installing from package index (PyPI)..." ;;
+    *) echo "[k3dge] Installing editable from local path: ${INSTALL_TARGET%[mcp]}" ;;
+  esac
   case "$INSTALL_TARGET" in
     -*) echo "[k3dge] 非法 INSTALL_TARGET（不得以 - 开头，防 pip 选项注入）：$INSTALL_TARGET" >&2; exit 1 ;;
   esac

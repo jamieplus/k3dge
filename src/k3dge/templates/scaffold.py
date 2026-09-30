@@ -220,11 +220,12 @@ def _pipeline_servers(target: Path) -> set:
               file=sys.stderr)
         return set()
     names = set()
-    for r in (data.get("roles") or {}).values():
+    for r in (data.get("roles") or {}).values() if isinstance(data.get("roles"), dict) else []:
         b = r.get("bind") if isinstance(r, dict) else None
         if isinstance(b, str) and b:
             names.add(b)
-    names |= set((data.get("peers") or {}).keys())
+    if isinstance(data.get("peers"), dict):
+        names |= set(data["peers"].keys())
     names.discard("k3dge")
     return names
 
@@ -352,7 +353,7 @@ def scaffold(target: Path, name: str | None = None) -> list:
     _write_if_missing(target / "k3dge-init.ps1", K3DGE_INIT_PS1_WRAPPER)
 
     (target / "docs" / "adr").mkdir(parents=True, exist_ok=True)
-    _write_if_missing(target / "docs" / "adr" / "README.md", ADR_README_TEMPLATE)
+    _write_if_missing(target / "docs" / "adr" / "README.md", _qualify_adr_refs(ADR_README_TEMPLATE))
     _write_if_missing(target / "docs" / "adr" / "AUTHORING.md", _asset("adr/AUTHORING.md"))
     _write_if_missing(target / "docs" / "adr" / ".schema.json", _asset("adr/.schema.json"))
     (target / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
@@ -388,8 +389,9 @@ def scaffold(target: Path, name: str | None = None) -> list:
     _write_if_missing(target / "docs" / "memo" / "AUTHORING.md", _asset("memo/AUTHORING.md"))
     _write_if_missing(target / "docs" / "memo" / ".schema.json", _asset("memo/.schema.json"))
     _write_if_missing(target / "docs" / "architecture" / "overview.md", _qualify_adr_refs(ARCHITECTURE_TEMPLATE))
-    _write_if_missing(target / ".agent" / "docs.toml", DOCS_TOML_TEMPLATE)
-    _write_if_missing(target / ".agent" / "pipeline.toml", PIPELINE_TOML_TEMPLATE)
+    _write_if_missing(target / ".agent" / "docs.toml", _qualify_adr_refs(DOCS_TOML_TEMPLATE))
+    # TOML 注释里也是裸 `ADR-NNNN`（11 处）：下游按这些注释去查**自己的** ADR 就是错靶（484）
+    _write_if_missing(target / ".agent" / "pipeline.toml", _qualify_adr_refs(PIPELINE_TOML_TEMPLATE))
     if not ensure_mcp_config(target):   # 旧实现丢掉这个 bool ⇒ `.mcp.json` 没合并也报成功（372）
         problems.append(".mcp.json 未合并（已有文件损坏/形状不对，见上方 WARN）")
     _ensure_peer_stubs(target)
