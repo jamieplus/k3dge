@@ -124,6 +124,11 @@ def _first_domain_manifest(name: str) -> dict:
 
 
 def _write_if_missing(path: Path, content: str, executable: bool = False) -> bool:
+    # 自限定**集中在这里**，而不是每个调用点各套一次 `_qualify_adr_refs`：t-305 实测漏了
+    # `docs/adr/AUTHORING.md`（下发件里唯一没被包过的一层）⇒ 下游按那句去查自己的 ADR-0026
+    # 就是错靶。只对文本类下发件做（幂等：已限定的 `k3dge ADR-` 不会再匹配）。
+    if path.suffix in (".md", ".toml"):
+        content = _qualify_adr_refs(content)
     if path.exists():
         # 已存在也要**补执行位**：跨文件系统拷贝/checkout 丢 mode/umask 之后，重复跑 init
         # 永远修不回 `scripts/gate.sh`、两个 hook、`k3dge-init.sh`（368）。

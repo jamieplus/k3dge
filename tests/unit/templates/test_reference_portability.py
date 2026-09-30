@@ -33,11 +33,14 @@ class TestScaffoldProtocolPortability(unittest.TestCase):
     def test_protocol_texts_have_no_bare_adr_refs(self):
         with tempfile.TemporaryDirectory() as d:
             t = self._scaffolded(Path(d))
-            targets = [
-                t / "AGENTS.md",
-                *(t / ".agent" / "rules").glob("*.md"),
-                t / ".agent" / "README.md",
-            ]
+            # 旧清单只列 3 份，而 `scaffold()` 实际对**十余份**下发件跑 `_qualify_adr_refs`
+            # （docs.toml / pipeline.toml / guides/{mcp-bridge,downstream} / protocols/*3 /
+            # architecture/overview / adr/README…）⇒ 覆盖洞（t-305）。改成扫整棵下发树。
+            targets = [f for f in sorted(t.rglob("*"))
+                       if f.is_file() and f.suffix in {".md", ".toml"}
+                       and "docs/specs" not in f.relative_to(t).as_posix()
+                       and "docs/generated" not in f.relative_to(t).as_posix()]
+            assert len(targets) >= 12, f"下发面缩水，本测试失去覆盖：{len(targets)}"
             for f in targets:
                 text = f.read_text(encoding="utf-8")
                 for m in BARE_ADR_REF.finditer(text):

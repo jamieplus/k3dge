@@ -804,7 +804,7 @@
   "ensure_mcp_config": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 143
+      "line": 148
     }
   ],
   "extract": [
@@ -1238,7 +1238,7 @@
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 406
+      "line": 411
     }
   ],
   "managed_docs": [
@@ -1694,7 +1694,7 @@
   "scaffold": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 312
+      "line": 317
     }
   ],
   "scan": [

@@ -56,16 +56,13 @@ def test_new_state_without_registration_fails() -> None:
     """新增态若不登记（既不加转移也不标终态）⇒ 完备性红（防漂移核心）。"""
     import enum
 
-    class MoreStates(enum.Enum):
-        IDEA = "idea"
-        DEFERRED = "deferred"
-        IN_PROGRESS = "in-progress"
-        DONE = "done"
-        BLOCKED = "blocked"  # 新增，未登记
-
-    states = set(MoreStates)
-    v = sm.check_completeness(_GOOD, states, sm.TERMINAL_STATES, sm.INITIAL)
-    assert any("无出边" in x or "不可达" in x for x in v), v
+    # 死锁判据必须用**同一套枚举**验：旧写法另造一个 MoreStates，成员与 TaskState 是
+    # 不同对象 ⇒ 每一行都变成"未定义源态/目标态"，`无出边` 其实一条都没产生，
+    # 断言是被**错的理由**满足的（t-281）。
+    deadlocked = tuple(t for t in _GOOD if t.source is not S.DEFERRED)
+    v = sm.check_completeness(deadlocked, set(S), sm.TERMINAL_STATES, S.IDEA)
+    assert any(x.startswith("非终态 deferred 无出边") for x in v), v
+    assert not [x for x in v if "未定义" in x], v        # 声明集本身没问题
 
 
 def test_completeness_checks_the_declaration_set_itself() -> None:

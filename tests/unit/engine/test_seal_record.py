@@ -30,7 +30,17 @@ def _git(ws: Path, *args: str) -> str:
 
 
 def _repo() -> Path:
-    ws = Path(tempfile.mkdtemp())
+    """临时仓必须**脱离任何外层 git 树**。
+
+    `mkdtemp()` 继承 `TMPDIR`；CI 常把 TMPDIR 设在 build 目录下 ⇒ `git -C <ws> status --porcelain`
+    会对**外层仓**成功，于是 `_commit_all` 一路 `git add -A` + commit 污染开发/CI 仓库，
+    测试自己也失（t-274）。`GIT_CEILING_DIRECTORIES` 让 git 不再向上找。
+    """
+    import os
+
+    root = Path(tempfile.mkdtemp()).resolve()
+    os.environ["GIT_CEILING_DIRECTORIES"] = str(root.parent)
+    ws = root
     _git(ws, "init", "-q")
     _git(ws, "-c", "user.name=t", "-c", "user.email=t@t", "commit",
          "-q", "--no-verify", "--allow-empty", "-m", "chore: init")

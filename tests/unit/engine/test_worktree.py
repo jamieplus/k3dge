@@ -54,9 +54,15 @@ def test_non_ff_rejected(tmp_path):
         assert subprocess.run(["git", *a], cwd=other, capture_output=True, text=True).returncode == 0
     theirs = subprocess.run(["git", "rev-parse", "HEAD"], cwd=other, capture_output=True, text=True).stdout.strip()
     subprocess.run(["git", "update-ref", "refs/heads/k3dit/J1", theirs], cwd=ws, check=True)
-    # worktree 留在旧检出但已提交过一次 ⇒ head 与分支互不为祖先 = 真分叉
+    # worktree 留在旧检出但已提交过一次 ⇒ head 与分支互不为祖先 = 真分叉。
+    # 不能用 `HEAD@{1}`：新建的 linked worktree 的 reflog 往往只有一条、旧值是 null OID，
+    # 解不出目标，且不同 git 版本行为不一（t-311）。显式取那次检出的 commit 并判 rc。
     (wt / "conflict.py").write_text("c = 1\n", encoding="utf-8")
-    subprocess.run(["git", "checkout", "-q", "--detach", "HEAD@{1}"], cwd=wt, capture_output=True)
+    base = subprocess.run(["git", "rev-parse", "HEAD~1"], cwd=wt, capture_output=True, text=True)
+    assert base.returncode == 0, base.stderr
+    detach = subprocess.run(["git", "checkout", "-q", "--detach", base.stdout.strip()],
+                            cwd=wt, capture_output=True, text=True)
+    assert detach.returncode == 0, f"分叉前置没造出来：{detach.stderr}"
     with pytest.raises(RuntimeError, match="non-fast-forward"):
         W.advance(ws, "J1")
 
