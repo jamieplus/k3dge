@@ -5,7 +5,7 @@
 
 Requires the grammar package (see pip hint from `k3dge extractor sync`).
 Without it, matching files are silently skipped by the gate: `extract()`
-raises `ImportError`, which `engine/contract.py` treats as a skip signal
+raises `ImportError`, which `src/k3dge/engine/contract.py` treats as a skip signal
 (never fatal) — see `extract_python_interface` caller's `except ImportError`.
 """
 
@@ -89,7 +89,7 @@ def _decl_signature(source: bytes, node, exported: bool = False) -> Optional[str
 
 def _load_language():
     """Construct + cache the grammar Language (immutable ⇒ shareable across threads).
-    A construction failure is re-raised as `ImportError` — `engine/contract.py` treats that
+    A construction failure is re-raised as `ImportError` — `src/k3dge/engine/contract.py` treats that
     as a skip signal, so a broken grammar never reds the whole gate (never fatal)."""
     global _LANGUAGE
     if _LANGUAGE is not None:
