@@ -72,6 +72,14 @@ class TestPyprojectOnlyPolicy(unittest.TestCase):
             encoding="utf-8")
         (root / ".venv").mkdir()
         (root / ".venv" / "k3dge-source.txt").write_text(receipt + "\n", encoding="utf-8")
+        # 密封 fixture：放一个确定退出码的 venv 入口。不放的话，两轨会回落去 exec **全局**
+        # k3dge（CI 里 `pip install -e` 就装着），而 `version` 缺 action 位置参数 ⇒ argparse
+        # 退 2 —— 于是"匹配 ⇒ 政策未拦"这条路只能靠猜环境跑，断言成了环境的函数（t-024）。
+        exe = root / ".venv" / "bin"
+        exe.mkdir(exist_ok=True)
+        stub = exe / "k3dge"
+        stub.write_text("#!/bin/sh\nexit 41\n", encoding="utf-8")
+        stub.chmod(0o755)
         self.addCleanup(shutil.rmtree, root, True)
         return root
 
@@ -92,8 +100,10 @@ class TestPyprojectOnlyPolicy(unittest.TestCase):
         for track in ("sh", "py"):
             r = self._run(track, self._fixture("git+x"))
             self.assertNotIn("MISMATCH", r.stdout + r.stderr, track)
-            self.assertEqual(r.returncode, 1,
-                             f"{track} 应走到'k3dge 不可用'而不是被政策拦下：{r.stderr[-200:]}")
+            # 政策放行才会去 exec 入口；41 来自 fixture 里的桩 ⇒ 证明"闸没拦、执行了"，
+            # 而不是把断言押在下游 CLI 的退出码上（那会随装了哪个 k3dge 而变）。
+            self.assertEqual(r.returncode, 41,
+                             f"{track} 未走到执行入口（政策被误拦？）：{(r.stdout + r.stderr)[-200:]}")
 
     def test_missing_receipt_is_refused_both_tracks(self) -> None:
         for track in ("sh", "py"):

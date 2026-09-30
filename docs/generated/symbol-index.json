@@ -392,13 +392,13 @@
   "check_adr_number_reuse": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 591
+      "line": 595
     }
   ],
   "check_adr_ref_retired": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 615
+      "line": 619
     }
   ],
   "check_amend": [
@@ -464,7 +464,7 @@
   "check_incident_id_redundant": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 749
+      "line": 753
     }
   ],
   "check_index_ref": [
@@ -500,7 +500,7 @@
   "check_retired_adr_dest": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 690
+      "line": 694
     }
   ],
   "check_section_order": [
@@ -542,7 +542,7 @@
   "check_task_closure_record": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 649
+      "line": 653
     }
   ],
   "check_task_consistency": [
@@ -870,7 +870,7 @@
   "find_unguarded_archives": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 723
+      "line": 727
     }
   ],
   "find_unscreened_new_docs": [

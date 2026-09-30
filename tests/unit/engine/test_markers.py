@@ -55,13 +55,6 @@ def test_repo_scope_only_in_sidecar_and_single_anchor():
     assert [x for x in problems if "A-6" in x and "AUDIT.md" in x]
 
 def test_note_overflow_and_placeholder_not_matched():
-    ws = _ws({"docs/x.md": "示例语法 `# k3dit:pending <ID>@line ...` 不算发现\n"
-                           f"<!-- k3dit:pending A-7 {'很长' * 60} -->\n"})
-    ms, problems = K.extract(ws)
-    assert len(ms) == 1 and ms[0].id == "A-7"
-    assert [x for x in problems if "note 超" in x]
-
-def test_note_overflow_and_placeholder_not_matched():
     """§2.7 note 上限按 kind：pending≤500（120 放行）、其余≤80（leftover 120 报超）；占位符不自匹配。"""
     ws = _ws({"docs/x.md": "示例语法 `# k3dit:pending <ID>@line ...` 不算发现\n"
                            f"<!-- k3dit:pending A-7 {'很长' * 60} -->\n"          # 120 字 pending ≤500 → 放行

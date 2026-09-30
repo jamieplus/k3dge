@@ -429,8 +429,6 @@ def test_report_pointer_outside_workspace_is_ignored() -> None:
         got = _report_open_findings(ws, str(outside))
     assert got is None
     assert "越出本仓" in buf.getvalue()
-if __name__ == "__main__":
-    unittest.main()
 
 
 def test_closure_has_tsv_trail(tmp_path):
@@ -590,3 +588,7 @@ class TestSealChecklist(unittest.TestCase):
         self.assertEqual(status, "rejected")
         self.assertIn("封板前置清单（M10）", msg)
         self.assertIn("✅ tasks_all_done", msg)
+
+
+if __name__ == "__main__":
+    unittest.main()

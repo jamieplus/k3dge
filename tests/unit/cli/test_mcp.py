@@ -185,8 +185,6 @@ class TestAuditPromptRouting(unittest.TestCase):
         self.assertNotIn("Doc Audit section", out)
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 def test_server_alive_under_mcp2():
@@ -253,3 +251,7 @@ class TestMcpPrompter(unittest.TestCase):
         self.assertIs(p.out_stream, sys.stderr)
         self.assertEqual(p.answers, [])
         self.assertFalse(p.isatty())
+
+
+if __name__ == "__main__":
+    unittest.main()

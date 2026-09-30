@@ -570,9 +570,10 @@ class TestAdrNumberRetirement(unittest.TestCase):
             (adr / "0001-a.md").write_text("# ADR-0001\n", encoding="utf-8")
             (adr / "0003-c.md").write_text("# ADR-0003\n", encoding="utf-8")
             out = pure_refs.check_adr_number_holes(ws)
-            self.assertEqual([c for c, _ in out], ["ADR_NUMBER_HOLE"])
+            self.assertEqual([c for c, _, _f in out], ["ADR_NUMBER_HOLE"])
             self.assertIn("0002", out[0][1])
             self.assertIn("0003-c.md", out[0][1])
+            self.assertEqual(out[0][2], {"path": "docs/adr/0003-c.md"})   # 锚点走 facts，不靠解析文案
 
     def test_ledger_fills_the_hole(self):
         with tempfile.TemporaryDirectory() as td:

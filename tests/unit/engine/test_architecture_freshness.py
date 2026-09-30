@@ -18,6 +18,9 @@ def _init(repo: Path) -> None:
     _git(repo, "config", "user.name", "tester")
     (repo / "docs" / "architecture").mkdir(parents=True)
     (repo / "docs" / "architecture" / "overview.md").write_text("# Arch\n", encoding="utf-8")
+    # `_architecture_staleness` 盯**两**份文档，两份都在区间内动过才回 ✅；fixture 少了
+    # encyclopedia.md 就永远落在"部分未更新"支路，而那条文案同样含"已更新"（t-048）
+    (repo / "docs" / "architecture" / "encyclopedia.md").write_text("# Enc\n", encoding="utf-8")
     (repo / "src").mkdir()
     (repo / "src" / "a.py").write_text("x = 1\n", encoding="utf-8")
     _git(repo, "add", "-A")
@@ -49,9 +52,12 @@ class TestArchitectureFreshness(unittest.TestCase):
     def test_overview_touched_in_range_is_ok(self) -> None:
         (self.repo / "src" / "a.py").write_text("x = 2\n", encoding="utf-8")
         (self.repo / "docs" / "architecture" / "overview.md").write_text("# Arch v2\n", encoding="utf-8")
+        (self.repo / "docs" / "architecture" / "encyclopedia.md").write_text("# Enc v2\n", encoding="utf-8")
         _git(self.repo, "add", "-A")
         _git(self.repo, "commit", "-q", "-m", "docs: arch + code")
-        self.assertIn("已更新", _architecture_staleness(self.repo, "M10"))
+        line = _architecture_staleness(self.repo, "M10")
+        self.assertTrue(line.startswith("✅"), line)          # 只认 ✅ 支路，不再被子串"已更新"蒙过
+        self.assertIn("都已更新", line)
 
     def test_no_code_change_since_boundary_is_ok(self) -> None:
         (self.repo / "docs" / "memo").mkdir(parents=True)

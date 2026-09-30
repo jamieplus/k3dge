@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:4efbed404655f9a66b3f199931167799c4117a5a967a48082eda06bf9ef4a2dd`
+- **Contract Hash**: `sha256:92b1103bddc7750f093bf7238b9a02382eddcc014df8e57d6469d184d342f676`
 - **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
@@ -557,7 +557,7 @@ screen_target_exists(workspace: Path, into: str) -> bool
 record_screen_ack(workspace: Path, rel: str, *, into: Optional[str]=None) -> Path
 retired_adr_numbers(workspace: Path) -> dict
 accounted_adr_numbers(workspace: Path) -> set
-check_adr_number_holes(workspace: Path) -> List[Ref]
+check_adr_number_holes(workspace: Path) -> List[tuple]
 check_adr_number_reuse(workspace: Path, rel: str) -> List[Ref]
 check_adr_ref_retired(workspace: Path, rel: str, text: str) -> List[Ref]
 check_task_closure_record(rel: str, text: str) -> List[Ref]

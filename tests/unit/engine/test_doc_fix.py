@@ -75,8 +75,11 @@ class TestApplyRules(unittest.TestCase):
         self.assertEqual([f["rule"] for f in rep["fixed"]], ["MD_TRAILING_WS"])
 
     def test_crlf(self):
-        _d, p, _b, _r = self._scan_and_fix("docs/memo/a.md", "# t\r\n\r\n正文\r\n")
-        self.assertNotIn("\r", p.read_text(encoding="utf-8"))
+        _d, p, _b, reported = self._scan_and_fix("docs/memo/a.md", "# t\r\n\r\n正文\r\n")
+        # `read_text()` 是文本模式（universal newlines），\r\n 在读回来前就被翻译成 \n
+        # ⇒ 旧断言 `assertNotIn("\r", read_text())` 恒真，MD_CRLF 没修也绿（t-112）。读字节。
+        self.assertNotIn("\r", p.read_bytes().decode("utf-8"))
+        self.assertIn("MD_CRLF", str(reported))          # 检测面也要真被报出来
 
     def test_final_newline(self):
         _d, p, _b, _r = self._scan_and_fix("docs/memo/a.md", "# t\n\n正文")

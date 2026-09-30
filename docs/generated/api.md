@@ -851,7 +851,7 @@ retired_adr_numbers(workspace: Path) -> dict
     # doc: 退役号 → {was, how, dest}。账本＝`docs/adr/obsolete/README.md` 的表（唯一源）。
 accounted_adr_numbers(workspace: Path) -> set
     # doc: 本仓已经解释过的号：现役文件 ∪ obsolete 墓碑 ∪ 退役账本。
-check_adr_number_holes(workspace: Path) -> List[Ref]
+check_adr_number_holes(workspace: Path) -> List[tuple]
     # doc: 1..最大号之间不得有空洞。
 check_adr_number_reuse(workspace: Path, rel: str) -> List[Ref]
     # doc: 新 ADR 不得占用退役号（`Numbers are never reused` 的机检半边）。

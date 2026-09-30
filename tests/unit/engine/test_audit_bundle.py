@@ -322,8 +322,10 @@ def test_leg_refuses_with_reason_when_commit_fails(tmp_path, monkeypatch):
         '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\nk3dit_mode = "audit-only"\n', encoding="utf-8")
     monkeypatch.setattr(ab, "find_k3dit", lambda w: ["k3dit"])
     monkeypatch.setattr(ab, "run_path_audit", lambda w, out, **k: (
-        (out / "report.md").write_text("# 审计\n", encoding="utf-8"),
+        # 元组自左向右求值：先建目录再写文件（旧顺序在 out 尚不存在时抛 FileNotFoundError，
+        # 于是"提交失败带原因"这条被测路径根本没走到，t-118）
         out.mkdir(parents=True, exist_ok=True),
+        (out / "report.md").write_text("# 审计\n", encoding="utf-8"),
         {"ok": True, "rc": 0, "payload": {"status": "partial", "unclosed": 1}})[-1])
     monkeypatch.setattr(ab, "consume", lambda w, b, **k: {
         "ok": True, "apply": {"files": ["src/a.py"]}, "facts": {"job_id": "j1"}, "digest": "e" * 64})

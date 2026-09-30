@@ -559,8 +559,11 @@ def accounted_adr_numbers(workspace: Path) -> set:
     return _live_adr_numbers(workspace) | _obsolete_adr_numbers(workspace) | set(retired_adr_numbers(workspace))
 
 
-def check_adr_number_holes(workspace: Path) -> List[Ref]:
+def check_adr_number_holes(workspace: Path) -> List[tuple]:
     """1..最大号之间不得有空洞。
+
+    返回 `(code, message, facts)` 三元组：`facts["path"]` 是锚点文件，**消费者不再从 message
+    里反解路径**（对散文的解析就是把判据交给文案，ocr-420/t-154）。
 
     空洞＝既没有现役文件，也没有退役墓碑。k3dit 在只有 0001–0007 时直接新建 0028
     就是这种跳号（去占了别的仓的下一个号）。下一号只能是 max+1。
@@ -585,7 +588,8 @@ def check_adr_number_holes(workspace: Path) -> List[Ref]:
         shown += f" …共 {len(holes)} 个"
     return [("ADR_NUMBER_HOLE",
              f"{rel}: 号池有空洞 {shown}（最大号 {ints[-1]:04d}）。"
-             f"每个号必须是现役文件、obsolete 墓碑或退役账本；下一号只能是 max+1，不能跳去别的仓的号")]
+             f"每个号必须是现役文件、obsolete 墓碑或退役账本；下一号只能是 max+1，不能跳去别的仓的号",
+             {"path": rel})]
 
 
 def check_adr_number_reuse(workspace: Path, rel: str) -> List[Ref]:
