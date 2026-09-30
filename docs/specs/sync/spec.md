@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/sync`
-- **Contract Hash**: `sha256:591f1707390c8fbb36d934cf849b2476db01d054957c083dabdd028693532c99`
-- **Last Updated**: 2026-09-21
+- **Contract Hash**: `sha256:3e37d6b5409ecc5eddd5ff3357c33c001453a8856b8660dcc8e4e5eb1c87e764`
+- **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -27,6 +27,7 @@ from typing import Sequence
 from typing import Tuple
 from k3dge.engine import contract
 from k3dge.engine import spec_schema
+from k3dge.engine.atomic import atomic_write_text
 from k3dge.engine.generated_docs import LAYOUT_END
 from k3dge.engine.generated_docs import LAYOUT_START
 from k3dge.engine.generated_docs import render_manual_docs_content

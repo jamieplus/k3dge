@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import datetime
 import re
+import sys
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
 from k3dge.engine import contract, spec_schema
+from k3dge.engine.atomic import atomic_write_text
 from k3dge.engine.generated_docs import (
     LAYOUT_END,
     LAYOUT_START,
@@ -59,8 +61,11 @@ def sync_domain(
 
     try:
         original = spec_path.read_text(encoding="utf-8")
-    except UnicodeDecodeError as exc:
-        # Spec is not valid UTF-8 — treat as missing and let next sync retry, don't crash
+    except (UnicodeDecodeError, OSError) as exc:
+        # 不是 UTF-8 / 读不出的 spec ⇒ 该域**每一轮 sync 都被无声跳过**，而 verify_contract
+        # 持续以哈希不通过阻断提交，操作者拿不到任何定位信息（340）。跳过仍要出声。
+        print(f"[sync] WARN: {spec_path} 读不出（{type(exc).__name__}: {exc}）⇒ 本轮跳过该域",
+              file=sys.stderr)
         return None
     current_hash = spec_schema.extract_contract_hash(original)
     # 防抖：哈希未变则不触碰接口块与日期，避免无意义脏提交
@@ -84,7 +89,7 @@ def sync_domain(
         lambda m: f"{m.group(1)} `sha256:{new_hash}`", content
     )
     content = DATE_LINE_RE.sub(lambda m: f"{m.group(1)} {today}", content)
-    spec_path.write_text(content, encoding="utf-8")
+    atomic_write_text(spec_path, content)      # 就地截断写会把契约事实源留在半截状态（341）
     return spec_path
 
 
@@ -96,8 +101,12 @@ def render_manual_docs(
     manual_dir.mkdir(parents=True, exist_ok=True)
     written: List[Path] = []
     for path, content in render_manual_docs_content(workspace, manifest, doc_cache).items():
-        if not path.exists() or path.read_text(encoding="utf-8") != content:
-            path.write_text(content, encoding="utf-8")
+        try:
+            same = path.exists() and path.read_text(encoding="utf-8") == content
+        except (OSError, UnicodeDecodeError):
+            same = False
+        if not same:
+            atomic_write_text(path, content)
             written.append(path)
     return written
 

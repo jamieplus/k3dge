@@ -397,6 +397,38 @@ class TestMilestone(unittest.TestCase):
         self.assertTrue((reviews / "2026-08-24-M16-align.md").exists())
 
 
+
+
+def test_backfill_into_third_level_stub_creates_section() -> None:
+    """报告只写了 `### 回填`：子串判据以为"已有回填段"，插入函数找不到锚行 ⇒ 静默漏回填（332）。"""
+    import contextlib
+    import io
+
+    from k3dge.engine.task_write import _ensure_backfill_section
+
+    lines: list = []
+    text = "# 报告\n\n### 回填（上一轮的）\n\n> | 旧票 | 已修 | x |\n"
+    _ensure_backfill_section(lines, text, "2026-09-01-M9-feat-a.md", "A-1")
+    assert any("2026-09-01-M9-feat-a.md" in ln for ln in lines), lines
+
+
+def test_report_pointer_outside_workspace_is_ignored() -> None:
+    """`report:` 是票里可控文本：绝对路径/`..` 不得让引擎去读仓外文件（333）。"""
+    import contextlib
+    import io
+    import tempfile as _tf
+    from pathlib import Path as _P
+
+    from k3dge.engine.task_write import _report_open_findings
+
+    ws = _P(_tf.mkdtemp())
+    outside = ws.parent / "leak.md"
+    outside.write_text("# x\n\n| ID | 状态 |\n| A-1 | 待修 |\n", encoding="utf-8")
+    buf = io.StringIO()
+    with contextlib.redirect_stderr(buf):
+        got = _report_open_findings(ws, str(outside))
+    assert got is None
+    assert "越出本仓" in buf.getvalue()
 if __name__ == "__main__":
     unittest.main()
 

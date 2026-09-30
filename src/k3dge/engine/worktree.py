@@ -98,7 +98,12 @@ def present(workspace: Path, job: str, commit: Optional[str] = None) -> list:
         ]
     finally:
         if commit:
-            _git(wt, "checkout", "-q", br)  # 复位：后人（advance/rebase）都在分支上干活
+            back = _git(wt, "checkout", "-q", br)   # 复位：后人（advance/rebase）都在分支上干活
+            if back.returncode != 0:
+                # 复位失败仍静默 ⇒ worktree 留在 detached，毒化后续 rebase（模块自己声明的不变量）
+                raise RuntimeError(
+                    f"present 复位失败（{br}）：worktree 仍处 detached，"
+                    f"后续 advance/rebase 不可信：{(back.stderr or back.stdout).strip()[:160]}")
 
 
 def advance(workspace: Path, job: str) -> Optional[str]:

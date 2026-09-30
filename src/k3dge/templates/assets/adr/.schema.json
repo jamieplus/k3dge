@@ -19,12 +19,12 @@
     "Date": "date"
   },
   "codes": {
-    "filename": "ADR_FILENAME_MISMATCH",
-    "h1": "ADR_FILENAME_MISMATCH",
-    "frontmatter": "ADR_FRONTMATTER_MISSING",
-    "sections": "ADR_SECTIONS_MISSING",
-    "section_order": "ADR_SECTION_ORDER",
-    "unique": "ADR_NUMBER_COLLISION",
+    "filename": "DOC_SCHEMA_INVALID",
+    "h1": "ADR_NUMBER_MISMATCH",
+    "frontmatter": "DOC_SCHEMA_INVALID",
+    "sections": "DOC_SCHEMA_INVALID",
+    "section_order": "DOC_SECTION_ORDER",
+    "unique": "DOC_SCHEMA_INVALID",
     "amend": "ADR_AMEND_FORMAT",
     "amend_order": "ADR_AMEND_ORDER",
     "footnote_tail": "ADR_FOOTNOTE_TAIL",

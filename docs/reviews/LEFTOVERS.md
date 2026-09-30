@@ -375,3 +375,21 @@ freshness 判定**不能跨决策缓存**：内容编辑不改索引 mtime，mem
 **reopen 条件**：出现真实消费者（无 rg 环境下由恶意/失手 query 造成的挂死报告），
 或决定引入 re2（那时按 `.agent/rules/12-introduction-discipline.md` 配完整实测正向作用）。
 
+---
+
+## `.schema.json` 里还有四个码没进声明表（2026-09-30，OCR 中批 ocr-342 残留）
+
+**事实**：违规码未在 `engine/gate_facts.GATE_FACTS` 声明 ⇒ `doc_gate._add` 走兜底分支，
+回执只剩 `[CODE] 原始消息`，操作者拿不到 `fact / options / pointers`（＝修复面缺失）。
+本轮把 **ADR 面**的六条映射并进已有码（`h1→ADR_NUMBER_MISMATCH`、
+`section_order→DOC_SECTION_ORDER`、`filename/frontmatter/sections/unique→DOC_SCHEMA_INVALID`），
+并立回归测试 `tests/unit/engine/test_doc_catalog.py::test_shipped_schema_codes_are_declared`
+（白名单兜住"别再新增第五个"）。
+
+**仍留**：`ADR_AMEND_FORMAT` / `INCIDENT_FORM_INVALID` / `TASK_STATUS_INVALID` /
+`TASK_SECTION_MISSING` 四码是 schema 专用别名，声明它们要**各自**写清事实与选项
+（例如 `TASK_STATUS_INVALID` 的修复是"改 frontmatter 到闭集"还是"扩闭集"＝两件事），
+属声明面设计而非机械搬移 ⇒ 独立批次（同批还要决定 `doc_fix.FIXABLE_RULES` 里哪些能自动修）。
+
+**reopen 条件**：下一次动 `.schema.json` / `doc_gate` 回执面的批次，或有人报"这码我只看到裸消息"。
+

@@ -154,12 +154,12 @@ Amend 时在正文被修改处紧跟 Markdown footnote：
 - **机验码**（别再误信旧说法）：
   - `ADR_NUMBER_REUSE` — 新 ADR 占了退役号（查 `obsolete/*.md` + 账本表）
   - `ADR_REF_RETIRED` — 正文引用退役号 ⇒ 给出去向（比 `DANGLING_ADR_REF` 更有用：号是"曾存在"，不是"写错"）
-  - `ADR_FILENAME_MISMATCH` — 文件名号 ↔ H1 号一致（**它管不了复用**，旧文声称能管，是错的）
-  - `ADR_NUMBER_COLLISION` — 现役文件之间重号（`doc_catalog.validate_docs`）
+  - `ADR_NUMBER_MISMATCH` — 文件名号 ↔ H1 号一致（**它管不了复用**，旧文声称能管，是错的）
+  - `DOC_SCHEMA_INVALID` — 现役文件之间重号、文件名不合规、缺 frontmatter/必需节（`doc_catalog.validate_docs`；码必须已在 `gate_facts` 声明，否则回执降级成裸 `[CODE] 消息`、拿不到修复指引）
 
 ### 杂项
 
-- **Section numbers must ascend** in document order (`## 1` → `## 2` → `### 2.1` → `### 2.1.1` …). Machine-gated: `k3dge check` fails it with `ADR_SECTION_ORDER`.
+- **Section numbers must ascend** in document order (`## 1` → `## 2` → `### 2.1` → `### 2.1.1` …). Machine-gated: `k3dge check` fails it with `DOC_SECTION_ORDER`.
 - A durable design change = its own ADR, judged by k3dit/human — the same seat must not both write and ratify (ADR-0006). An agent editing an ADR without a human/k3dit pass is **not** a decision record yet.
 - **本文件是这些特权的唯一投递点**：`README.md` 只写默认路径与指针，不复述例外；两者冲突以本文件为准。
 

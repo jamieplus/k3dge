@@ -15,12 +15,17 @@ if ([string]::IsNullOrWhiteSpace($want) -and (Test-Path (Join-Path $Root "pyproj
   finally { $ErrorActionPreference = $prev }
   if ([string]::IsNullOrWhiteSpace($want)) {
     $inSec = $false
+    $sawSec = $false
     foreach ($ln in (Get-Content -LiteralPath (Join-Path $Root "pyproject.toml"))) {
-      if ($ln -match '^\[tool\.k3dge\]\s*(#.*)?$') { $inSec = $true; continue }     # 容忍行尾注释（ocr-144）
+      if ($ln -match '^\[tool\.k3dge\]\s*(#.*)?$') { $inSec = $true; $sawSec = $true; continue }   # 容忍行尾注释（ocr-144）
       if ($inSec -and $ln -match '^\[') { break }
       if ($inSec -and ($ln -match '^[[:space:]]*source[[:space:]]*=[[:space:]]*[\x22\x27]([^\x22\x27]*)[\x22\x27]')) {
         $want = $Matches[1]; break                                                   # 两种引号 + 允许缩进
       }
+    }
+    # 段落存在却没解析到 source ⇒ 政策**声明了但读不懂**，静默按 legacy 跑就是假通过（344）
+    if ($sawSec -and [string]::IsNullOrWhiteSpace($want)) {
+      [Console]::Error.WriteLine("[k3dge-source] WARN: pyproject 有 [tool.k3dge] 段但没解析出 source ⇒ 本轮按 legacy（无来源校验）跑；请检查该行写法")
     }
   }
 }

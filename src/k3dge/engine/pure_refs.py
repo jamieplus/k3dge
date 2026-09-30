@@ -583,7 +583,7 @@ def check_adr_number_reuse(workspace: Path, rel: str) -> List[Ref]:
     """新 ADR 不得占用退役号（`Numbers are never reused` 的机检半边）。
 
     退役面有两处，都算：`obsolete/*.md` 真文件（baseline 之后）+ 账本表（baseline 之前
-    物理删除的 13 个号）。现役号之间的重号由 `ADR_NUMBER_COLLISION` 管，不在此。
+    物理删除的 13 个号）。现役号之间的重号由 schema 的 `unique` 规则（`DOC_SCHEMA_INVALID`）管，不在此。
     """
     name = Path(rel).name
     m = _ADR_NUM_RE.match(name)

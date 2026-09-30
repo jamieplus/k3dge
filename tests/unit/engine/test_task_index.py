@@ -50,3 +50,16 @@ def test_unreadable_ticket_is_skipped_loudly() -> None:
         bad.chmod(0o644)
     assert [r.path.name for r in rows] == [good.name]
     assert "WARN" in err.getvalue()
+
+
+def test_empty_frontmatter_block_does_not_fall_back_to_body() -> None:
+    """`---` 空块 ≠ 没有块：正文一行 `- **Status**: done` 不得冒充元数据（ocr-331）。"""
+    from k3dge.engine.task_index import list_tasks
+
+    ws = Path(tempfile.mkdtemp())
+    d = ws / "docs" / "tasks"
+    d.mkdir(parents=True)
+    (d / "2026-09-01-M9-feat-a.md").write_text("---\n---\n\n# A\n\n- **Status**: done\n",
+                                               encoding="utf-8")
+    rows = list_tasks(ws)
+    assert [r.status for r in rows] == ["unknown"], rows

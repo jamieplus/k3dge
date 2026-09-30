@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:882fa1cca52197ef4196415bca4251079fee4aea2cae5d883bb4f7bbf33d94e1`
+- **Contract Hash**: `sha256:60917b810f6ccb7e22b2217b88a64a728b5f8a0689b3cd25da4bcbe9e5b49579`
 - **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
@@ -46,6 +46,9 @@ from k3dge.engine.task_index import MilestoneTask
 from k3dge.engine.task_index import scan_milestone_tasks
 from k3dge.engine.task_index import work_pending
 run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]
+from __future__ import annotations
+from pathlib import Path
+atomic_write_text(path: Path, text: str, encoding: str='utf-8') -> None
 from __future__ import annotations
 from pathlib import Path
 from typing import List
@@ -719,6 +722,7 @@ STATUS_RE = re.compile('-\\s+\\*\\*Status\\*\\*:\\s*([\\w-]+)', re.IGNORECASE)
 MILESTONE_RE = re.compile('-\\s+\\*\\*Milestone\\*\\*:\\s*([^\\n\\r]+)', re.IGNORECASE)
 PRIORITY_RE = re.compile('-\\s+\\*\\*Priority\\*\\*:\\s*(\\S+)', re.IGNORECASE)
 TITLE_RE = re.compile('^#\\s+(.+)$', re.MULTILINE)
+has_frontmatter(content: str) -> bool
 parse_frontmatter(content: str) -> dict[str, str]
 class MilestoneTask
     path: Path
@@ -758,6 +762,7 @@ from k3dge.engine.models import Violation
 parse_version(v: str) -> Tuple[int, int, int]
 format_version(major: int, minor: int, patch: int) -> str
 get_pyproject_version(workspace: Path) -> str | None
+manifest_read_error(workspace: Path) -> str
 get_manifest_version(workspace: Path) -> str | None
 get_init_version(workspace: Path) -> str | None
 get_version(workspace: Path) -> str | None

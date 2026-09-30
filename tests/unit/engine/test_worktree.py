@@ -227,3 +227,22 @@ def test_merge_back_landing_gate_blocks_and_resets(tmp_path, monkeypatch):
     after = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True,
                            text=True).stdout.strip()
     assert after == before and not (ws / "extra.py").exists()
+
+
+def test_present_raise_when_restore_fails(tmp_path, monkeypatch) -> None:
+    """复位 checkout 失败仍静默 ⇒ worktree 留 detached，毒化后续 rebase（339）。"""
+    calls = []
+
+    class R:
+        def __init__(self, rc):
+            self.returncode, self.stdout, self.stderr = rc, "", "fatal: bad branch"
+
+    def fake_git(wt, *args, **kw):
+        calls.append(args)
+        return R(1) if args[0] == "checkout" and "--detach" not in args else R(0)
+
+    monkeypatch.setattr(W, "_git", fake_git)
+    monkeypatch.setattr(W, "ensure", lambda workspace, job: tmp_path)
+    monkeypatch.setattr(W, "branch_name", lambda job: "k3dge/job")
+    with pytest.raises(RuntimeError, match="复位失败"):
+        W.present(tmp_path, "j1", commit="deadbeef")

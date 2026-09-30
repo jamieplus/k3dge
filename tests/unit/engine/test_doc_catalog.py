@@ -279,3 +279,28 @@ class TestRetiredAdrVisibility(unittest.TestCase):
             # 但默认**列表**不含退役面（现行视图不被污染）
             self.assertEqual(list_docs(ws, typ="adr"), [])
             self.assertEqual(len(list_docs(ws, typ="adr", include_retired=True)), 1)
+
+
+def test_shipped_schema_codes_are_declared() -> None:
+    """`.schema.json` 里的每个码都必须在 `gate_facts` 声明（342）。
+
+    未声明码走 `doc_gate._add` 的兜底分支 ⇒ 只输出 `[CODE] 原始消息`，
+    拿不到 fact/options/pointers——同一不变量在别处有声明码就是两套回执面。
+    """
+    import json
+    from pathlib import Path as _P
+
+    from k3dge.engine.gate_facts import GATE_FACTS, is_declared
+
+    repo = _P(__file__).resolve().parents[3]
+    undeclared = []
+    for f in sorted((repo / "docs").glob("*/.schema.json")):
+        codes = (json.loads(f.read_text(encoding="utf-8")).get("codes") or {})
+        undeclared += [f"{f.parent.name}:{k}={v}" for k, v in codes.items()
+                       if not is_declared(v)]
+    # 已知债（2026-09-30，LEFTOVERS「schema 未声明码」）：这四码是 schema 专用别名，
+    # 需要各自写 fact/options 才能进声明表 ⇒ 独立批次。本测试兜住"别再新增第五个"。
+    known_debt = {"ADR_AMEND_FORMAT", "INCIDENT_FORM_INVALID",
+                  "TASK_STATUS_INVALID", "TASK_SECTION_MISSING"}
+    fresh = [u for u in undeclared if u.split("=")[-1] not in known_debt]
+    assert not fresh, "未声明的 schema 码（回执降级）：" + str(fresh)

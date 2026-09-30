@@ -11,6 +11,13 @@ from typing import Tuple
 from k3dge.engine.models import Violation
 
 _VERSION_RE = re.compile(r'^version\s*=\s*"([^"]+)"', re.MULTILINE)
+# 宽容版回退（无 tomllib 的 3.10）：单引号/缩进都认；`[project]` 段内找，或行内表
+# `project = { version = "…" }`。旧只认 `^version = "` ⇒ 合法 TOML 读不到 ⇒ None，
+# 下游把"pyproject 没有版本行"当成"pyproject 不存在"，版本闸静默（335/338）。
+_VERSION_LINE_RELAXED = re.compile(
+    r"""(?m)^[ \t]*version[ \t]*=[ \t]*(?:"([^"]*)"|'([^']*)')""")
+_VERSION_INLINE_RE = re.compile(
+    r"""(?m)^project[ \t]*=[ \t]*\{[^}]*?version[ \t]*=[ \t]*(?:"([^"]*)"|'([^']*)')""")
 _INIT_VERSION_RE = re.compile(r'^__version__\s*=\s*"([^"]+)"', re.MULTILINE)
 
 
@@ -60,22 +67,62 @@ def _read_utf8(path: Path) -> str:
 
 
 def _atomic_write(path: Path, text: str) -> None:
-    tmp = path.with_name(f".{path.name}.tmp")
+    """委托 `engine.atomic`（版本文件与 sync 产物同一套写法，别各写一遍）。"""
+    from k3dge.engine.atomic import atomic_write_text
+
+    atomic_write_text(path, text)
+
+
+def _pyproject_version(text: str) -> str | None:
+    """从 pyproject 正文取 `[project] version`（3.11+ 用 tomllib，3.10 用宽容正则）。"""
     try:
-        tmp.write_text(text, encoding="utf-8")
-        tmp.replace(path)
-    except Exception:
-        if tmp.exists():
-            tmp.unlink()
-        raise
+        import tomllib
+    except ModuleNotFoundError:            # pragma: no cover - 3.10
+        tomllib = None
+    if tomllib is not None:
+        try:
+            data = tomllib.loads(text)
+        except Exception:
+            return None
+        v = (data.get("project") or {}).get("version")
+        return str(v) if isinstance(v, str) else None
+    m = _VERSION_INLINE_RE.search(text)
+    if m:
+        return m.group(1) or m.group(2)
+    seg = re.split(r"(?m)^\s*\[[^\]]*\]\s*$", text)
+    heads = re.findall(r"(?m)^\s*\[([^\]]*)\]", text)
+    for body, head in zip(seg[1:], heads):
+        if head.strip() != "project":
+            continue
+        lm = _VERSION_LINE_RELAXED.search(body)
+        if lm:
+            return lm.group(1) or lm.group(2)
+    return None
 
 
 def get_pyproject_version(workspace: Path) -> str | None:
     p = _pyproject_path(workspace)
     if not p.is_file():
         return None
-    m = _VERSION_RE.search(_read_utf8(p))
-    return m.group(1) if m else None
+    return _pyproject_version(_read_utf8(p))
+
+
+def manifest_read_error(workspace: Path) -> str:
+    """manifest **存在但读不出**的成因（空串＝没问题）。
+
+    与"文件不存在"混成一个 None ⇒ `get_version`/`validate_versions` 的 canonical 变 None
+    直接 `return []`：坏 JSON 让版本闸在脚手架下彻底静默（337）。
+    """
+    p = _manifest_path(workspace)
+    if not p.is_file():
+        return ""
+    try:
+        data = json.loads(_read_utf8(p))
+    except (json.JSONDecodeError, OSError, ValueError) as exc:
+        return f"{p.name} 读不出/不是合法 JSON（{type(exc).__name__}: {exc}）"
+    if not isinstance(data, dict):
+        return f"{p.name} 顶层不是对象"
+    return ""
 
 
 def get_manifest_version(workspace: Path) -> str | None:
@@ -110,10 +157,16 @@ def validate_versions(workspace: Path) -> list[Violation]:
     py_v = get_pyproject_version(workspace)
     mf_v = get_manifest_version(workspace)
     init_v = get_init_version(workspace)
+    violations: list[Violation] = []
+    err = manifest_read_error(workspace)
+    if err:
+        violations.append(Violation(
+            "VERSION_MISMATCH", f"版本闸无法判定：{err}",
+            file_path=str(_manifest_path(workspace)), detail={"drift": err}))
+        return violations
     canonical = py_v if py_v is not None else mf_v
     if canonical is None:
         return []
-    violations: list[Violation] = []
     if py_v is not None and mf_v != py_v:
         violations.append(
             Violation(
@@ -165,10 +218,19 @@ def _collect_version_updates(workspace: Path, new_version: str) -> list:
     updates: list = []
     p = _pyproject_path(workspace)
     if p.is_file():
-        new_text, n = _VERSION_RE.subn(f'version = "{new_version}"', p.read_text(encoding="utf-8"), count=1)
-        if n == 0:
-            raise RuntimeError("Failed to update pyproject.toml version")
-        updates.append((p, new_text))
+        text = _read_utf8(p)
+        if _pyproject_version(text) is None:
+            # `dynamic = ["version"]` / 无可匹配版本行 ⇒ 与 `get_version`/`validate_versions`
+            # 同口径：当作"pyproject 不持版本"跳过，而不是硬抛 RuntimeError（338）
+            pass
+        else:
+            new_text, n = _VERSION_RE.subn(f'version = "{new_version}"', text, count=1)
+            if n == 0:
+                relaxed = _VERSION_LINE_RELAXED.search(text)
+                if not relaxed:
+                    raise RuntimeError("Failed to update pyproject.toml version")
+                new_text = text[:relaxed.start()] + f'version = "{new_version}"' + text[relaxed.end():]
+            updates.append((p, new_text))
     mp = _manifest_path(workspace)
     if mp.is_file():
         data = json.loads(mp.read_text(encoding="utf-8"))

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import datetime
 import re
+import sys
 from pathlib import Path
 import json
 from typing import List, Optional, Tuple
@@ -105,7 +106,9 @@ def _ensure_backfill_section(new_lines: List[str], text: str, task_name: str, fi
     """回填段幂等：票名已出现在正文 ⇒ 什么都不做。"""
     if task_name in text:
         return
-    if "## 回填" not in text:
+    # 与 `_insert_into_backfill_block` 用**同一个**判据（整行 startswith）。子串判据会把
+    # `### 回填 …` 当成"已有回填段"，于是插入函数找不到锚行、什么都不写 ⇒ 静默漏回填（332）
+    if not any(ln.strip().startswith("## 回填") for ln in text.splitlines()):
         new_lines.extend(_new_backfill_lines(task_name, fid))
         return
     _insert_into_backfill_block(new_lines, task_name)
@@ -252,6 +255,13 @@ def _task_report_pointer(content: str) -> str:
 
 def _report_open_findings(workspace: Path, report_rel: str) -> Optional[List[str]]:
     """待修 IDs still open in a report; None if the report can't be read (don't block)."""
+    from k3dge.engine.pure_refs import inside_workspace
+
+    if not inside_workspace(workspace, report_rel):
+        # report 来自票的 frontmatter（外部可控）：绝对路径/`..` 会让 `workspace / report_rel`
+        # 读到仓外文件（333）
+        print(f"[task_write] WARN: report 指针越出本仓 ⇒ 忽略（{report_rel!r}）", file=sys.stderr)
+        return None
     p = workspace / report_rel
     if not p.is_file():
         return None
@@ -498,12 +508,22 @@ def reassign_milestone(
     ok_all = True
     if not tasks_dir.is_dir():
         return False, [f"no tasks dir: {tasks_dir}"]
+    # **先读完再改**：旧实现在循环里裸 `read_text`，坏文件让整批以异常中断，而它前面的票
+    # 已经改完 ⇒ 部分迁移（334）。读不出的票记 FAIL 并跳过，迁移不因此中断。
+    scanned: list = []
     for p in sorted(tasks_dir.glob("*.md")):
         if p.name in ("README.md", "AUTHORING.md") or p.name.startswith("_"):
             continue
-        fm = parse_frontmatter(p.read_text(encoding="utf-8"))
+        try:
+            fm = parse_frontmatter(p.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError) as exc:
+            lines.append(f"FAIL {p.name}: 读不出（{type(exc).__name__}）⇒ 跳过")
+            ok_all = False
+            continue
         if (fm.get("milestone") or "").strip() != from_milestone:
             continue
+        scanned.append(p)
+    for p in scanned:
         ok, msg, _newp = reassign_task_milestone(workspace, p, to_milestone, dry_run=dry_run)
         lines.append(("OK  " if ok else "FAIL") + " " + msg)
         ok_all = ok_all and ok

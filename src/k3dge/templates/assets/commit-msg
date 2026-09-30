@@ -12,6 +12,12 @@ if [ -z "${1:-}" ]; then
   echo "[k3dge] commit-msg: 缺提交信息文件参数" >&2
   exit 1
 fi
+# 消息文件必须真在：不存在时 `grep -q ... "$1"` 返回 2（错误）被 `!` 取反成"没有 trailer"，
+# 于是走追加分支，而 `>>` 会**凭空造出**这个文件（343）
+if [ ! -f "$1" ] || [ ! -r "$1" ]; then
+  echo "[k3dge] commit-msg: 提交信息文件不存在或不可读：$1 —— 拒绝提交" >&2
+  exit 1
+fi
 
 python3 "${ROOT}/scripts/gate.py" check-msg --file "$1" || exit 1
 

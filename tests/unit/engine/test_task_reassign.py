@@ -165,3 +165,27 @@ class TestBoundaryNudge(TestCase):
                       file_path="docs/tasks/x.md", detail={"path": "docs/tasks/x.md", "milestone": "M10"})
         self.assertTrue(v.format().startswith("[GATE WARN]"))
         self.assertIn("k3dge milestone reassign M10", v.format())
+
+
+    def test_unreadable_ticket_does_not_half_migrate(self) -> None:
+        """坏文件让整批在循环中途抛异常 ⇒ 前面的票已改、后面的没改（334）。"""
+        from unittest import mock
+        from k3dge.engine.task_write import reassign_milestone
+
+        ws = Path(tempfile.mkdtemp())
+        d = ws / "docs" / "tasks"
+        d.mkdir(parents=True)
+        (d / "2026-09-01-M10-feat-a.md").write_text(
+            "---\nmilestone: M10\nstatus: idea\n---\n\n# A\n", encoding="utf-8")
+        bad = d / "2026-09-02-M10-feat-b.md"
+        bad.write_text("---\nmilestone: M10\nstatus: idea\n---\n\n# B\n", encoding="utf-8")
+        bad.chmod(0o000)
+        try:
+            with mock.patch("k3dge.engine.task_write.reassign_task_milestone",
+                            side_effect=lambda *a, **k: (True, "moved", None)) as rr:
+                ok, lines = reassign_milestone(ws, "M10", "M11")
+        finally:
+            bad.chmod(0o644)
+        self.assertFalse(ok, lines)
+        self.assertTrue([l for l in lines if "读不出" in l], lines)
+        self.assertEqual(rr.call_count, 1, "读不出的票不得挡掉别的票，也不得半途崩")

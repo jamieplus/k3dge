@@ -89,6 +89,19 @@ def _frontmatter_pairs(content: str) -> List[tuple]:
     return []
 
 
+def has_frontmatter(content: str) -> bool:
+    """是否存在**闭合的** `---` 头块（与"块里有没有键"是两件事）。
+
+    `_frontmatter_pairs` 用同一个 `[]` 表示"没有块"和"块存在但没有 `key: value` 行"
+    ⇒ `if fm:` 会把"合法但为空的 frontmatter"文件推进正文正则分支，正文一句话就能
+    冒充 status/milestone（元数据唯一源被绕过，331）。
+    """
+    lines = content.splitlines()
+    if len(lines) < 2 or lines[0].strip() != "---":
+        return False
+    return any(ln.strip() == "---" for ln in lines[1:])
+
+
 def parse_frontmatter(content: str) -> dict[str, str]:
     """Strict frontmatter parser: only `---` block at start, YAML-like `key: value`.
 
@@ -174,7 +187,7 @@ def _scan_task_dir(
                   file=sys.stderr)
             continue
         fm = parse_frontmatter(content)
-        if fm:
+        if has_frontmatter(content):        # 有块即认块（哪怕空）：不回退正文正则（331）
             st = fm.get("status", "unknown").lower()
             m_id = fm.get("milestone", "").strip()
             pri = fm.get("priority", "").strip()

@@ -154,6 +154,10 @@ from k3dge.engine.task_index import MilestoneTask
 from k3dge.engine.task_index import scan_milestone_tasks
 from k3dge.engine.task_index import work_pending
 run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, str, List[MilestoneTask]]
+# atomic.py
+from __future__ import annotations
+from pathlib import Path
+atomic_write_text(path: Path, text: str, encoding: str='utf-8') -> None
 # attest.py
 from __future__ import annotations
 from pathlib import Path
@@ -1067,6 +1071,8 @@ STATUS_RE = re.compile('-\\s+\\*\\*Status\\*\\*:\\s*([\\w-]+)', re.IGNORECASE)
 MILESTONE_RE = re.compile('-\\s+\\*\\*Milestone\\*\\*:\\s*([^\\n\\r]+)', re.IGNORECASE)
 PRIORITY_RE = re.compile('-\\s+\\*\\*Priority\\*\\*:\\s*(\\S+)', re.IGNORECASE)
 TITLE_RE = re.compile('^#\\s+(.+)$', re.MULTILINE)
+has_frontmatter(content: str) -> bool
+    # doc: 是否存在**闭合的** `---` 头块（与"块里有没有键"是两件事）。
 parse_frontmatter(content: str) -> dict[str, str]
     # doc: Strict frontmatter parser: only `---` block at start, YAML-like `key: value`.
 class MilestoneTask
@@ -1119,6 +1125,8 @@ from k3dge.engine.models import Violation
 parse_version(v: str) -> Tuple[int, int, int]
 format_version(major: int, minor: int, patch: int) -> str
 get_pyproject_version(workspace: Path) -> str | None
+manifest_read_error(workspace: Path) -> str
+    # doc: manifest **存在但读不出**的成因（空串＝没问题）。
 get_manifest_version(workspace: Path) -> str | None
 get_init_version(workspace: Path) -> str | None
 get_version(workspace: Path) -> str | None
@@ -1171,6 +1179,7 @@ from typing import Sequence
 from typing import Tuple
 from k3dge.engine import contract
 from k3dge.engine import spec_schema
+from k3dge.engine.atomic import atomic_write_text
 from k3dge.engine.generated_docs import LAYOUT_END
 from k3dge.engine.generated_docs import LAYOUT_START
 from k3dge.engine.generated_docs import render_manual_docs_content
