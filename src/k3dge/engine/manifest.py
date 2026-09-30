@@ -34,7 +34,9 @@ def _require_relative_path(label: str, val: Any) -> str:
         raise ManifestError(f"{label} must be relative, got '{val}'")
     if ".." in Path(posix).parts:
         raise ManifestError(f"{label} must not contain '..', got '{val}'")
-    return posix
+    # **返回归一化后的路径**：`"./src"`、`"src//core"` 能过校验却以原样存下来，
+    # 而下游是纯字符串前缀比较 ⇒ 路由/`package_root` 静默失效（ocr-255）。
+    return "/".join(Path(posix).parts)
 
 
 def _parse_ignore(data: Dict[str, Any]) -> List[str]:
@@ -106,17 +108,25 @@ class Manifest:
                 data = json.load(f)
         except json.JSONDecodeError as exc:
             raise ManifestError(f"invalid JSON in {MANIFEST_PATH}: {exc}") from exc
-        except OSError as exc:
+        except (OSError, UnicodeDecodeError) as exc:
+            # UnicodeDecodeError 是 ValueError 而非 OSError：BOM/GBK/二进制写坏的 manifest 会冒泡
+            # 到只 catch ManifestError 的调用方（status/evaluator），崩整条命令（ocr-256）。
             raise ManifestError(f"cannot read {MANIFEST_PATH}: {exc}") from exc
         return cls(data)
 
     def domain_for_src(self, path: str) -> Optional[str]:
+        """嵌套 src ⇒ **最长前缀**胜出（按插入序取首个会把 `src/app/sub/x.py` 判给 `app`，
+        于是 depends_on 允许集/测试批量/契约对象全是错域，ocr-257）。"""
         path = path.replace("\\", "/")
+        best: Optional[str] = None
+        best_len = -1
         for domain, cfg in self.domains.items():
-            src = cfg.get("src", "").replace("\\", "/")
-            if src and (path == src or path.startswith(src.rstrip("/") + "/")):
-                return domain
-        return None
+            src = cfg.get("src", "").replace("\\", "/").rstrip("/")
+            if not src:
+                continue
+            if (path == src or path.startswith(src + "/")) and len(src) > best_len:
+                best, best_len = domain, len(src)
+        return best
 
     def domain_for_spec(self, path: str) -> Optional[str]:
         path = path.replace("\\", "/")

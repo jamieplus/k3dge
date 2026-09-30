@@ -29,7 +29,7 @@ SIDECAR = "AUDIT.md"
 _ATTRS = r"(?:[ \t]+sev=(?P<sev>\S+))?(?:[ \t]+prio=(?P<prio>\S+))?(?:[ \t]+type=(?P<type>\S+))?"
 MARKER_RE = re.compile(
     r"(?:#|//|<!--)[ \t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \t]+"
-    r"(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \t]*@(?P<scope>line|file|repo))?"
+    r"(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \t]*@(?P<scope>line|file|repo)(?![A-Za-z0-9_-]))?"
     + _ATTRS +
     r"[ \t]*(?P<note>[^\n]*?)[ \t]*(?:-->)?[ \t]*$",
     re.M,
@@ -37,7 +37,7 @@ MARKER_RE = re.compile(
 _COMMENT_LINE_RE = re.compile(r"^\s*(?:#|//|<!--)")
 MARKER_RE_MD = re.compile(
     r"<!--[ \t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \t]+"
-    r"(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \t]*@(?P<scope>line|file|repo))?"
+    r"(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \t]*@(?P<scope>line|file|repo)(?![A-Za-z0-9_-]))?"
     + _ATTRS +
     r"(?P<note>[^\n]*?)[ \t]*-->[ \t]*$",
     re.M,
@@ -156,13 +156,14 @@ def parse_sidecar(text: str) -> Tuple[List[Marker], List[str]]:
     cur: Marker | None = None
     for i, raw in enumerate(text.splitlines(), 1):
         if raw.startswith("## "):
-            body = "## " + raw[3:]
-            m = re.search(
+            # 锚定标题正文开头：`## 关于 k3dit:pending 的说明` 这类叙述性标题不该被当审计条目（ocr-259）。
+            m = re.match(
                 r"k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)\s+(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)\s*"
-                r"(?:@(?P<scope>line|file|repo))?(?P<note>.*?)\s*$",
+                r"(?:@(?P<scope>line|file|repo)(?![A-Za-z0-9_-]))?(?P<note>.*?)\s*$",
                 raw[3:],
             )
             if not m:
+                cur = None        # 非条目标题 ⇒ 结束上一条，后续 `- files:` 不再挂到旧条目（ocr-260）
                 continue
             if (m.group("scope") or "line") != "repo":
                 problems.append(f"{SIDECAR}:{i} 条目缺 @repo 作用域")

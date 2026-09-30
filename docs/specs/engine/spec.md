@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:02fca97931a459ca990f723658445a4394a974f9c49d98982e786736258c6735`
+- **Contract Hash**: `sha256:f7c0b371b99754141f3ff05ee4174189898c1643d294a1af232942d49de786b3`
 - **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
@@ -355,8 +355,8 @@ KINDS = ('pending', 'leftover', 'disputed', 'fixnote', 'fixed')
 OPEN_KINDS = frozenset({'pending', 'disputed', 'fixnote'})
 SCOPES = ('line', 'file', 'repo')
 SIDECAR = 'AUDIT.md'
-MARKER_RE = re.compile('(?:#|//|<!--)[ \\t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \\t]+(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \\t]*@(?P<scope>line|file|repo))?' + _ATTRS + '[ \\t]*(?P<note>[^\\n]*?)[ \\t]*(?:-->)?[ \\t]*$', re.M)
-MARKER_RE_MD = re.compile('<!--[ \\t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \\t]+(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \\t]*@(?P<scope>line|file|repo))?' + _ATTRS + '(?P<note>[^\\n]*?)[ \\t]*-->[ \\t]*$', re.M)
+MARKER_RE = re.compile('(?:#|//|<!--)[ \\t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \\t]+(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \\t]*@(?P<scope>line|file|repo)(?![A-Za-z0-9_-]))?' + _ATTRS + '[ \\t]*(?P<note>[^\\n]*?)[ \\t]*(?:-->)?[ \\t]*$', re.M)
+MARKER_RE_MD = re.compile('<!--[ \\t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \\t]+(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \\t]*@(?P<scope>line|file|repo)(?![A-Za-z0-9_-]))?' + _ATTRS + '(?P<note>[^\\n]*?)[ \\t]*-->[ \\t]*$', re.M)
 class Marker
     file: str
     line: int

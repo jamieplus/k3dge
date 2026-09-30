@@ -515,7 +515,7 @@ load(workspace: Path) -> Dict[str, Any]
 legacy_config_present(workspace: Path) -> bool
     # doc: 已废的 `.agent/gates.toml` 是否还在（在 ⇒ 迁移守卫红一次，不静默忽略）。
 get(workspace: Path, section: str, key: str) -> Any
-    # doc: 读某闸的某阈值（含缺省）。
+    # doc: 读某闸的某阈值（含缺省）。调用方普遍 `int(gates.get(...))` ⇒ 绝不返回 None（ocr-247）。
 preconditions(workspace: Path, kind: str) -> list
     # doc: 某编排单元（`check`/`align`/`seal`）的前置闸 id 列表。
 stages(workspace: Path, kind: str, phase: str) -> list
@@ -552,6 +552,7 @@ class Manifest
     @classmethod
     load(cls, workspace: Path) -> 'Manifest'
     domain_for_src(self, path: str) -> Optional[str]
+        # doc: 嵌套 src ⇒ **最长前缀**胜出（按插入序取首个会把 `src/app/sub/x.py` 判给 `app`，
     domain_for_spec(self, path: str) -> Optional[str]
     src_path(self, domain: str) -> Optional[str]
     spec_path(self, domain: str) -> Optional[str]
@@ -569,8 +570,8 @@ KINDS = ('pending', 'leftover', 'disputed', 'fixnote', 'fixed')
 OPEN_KINDS = frozenset({'pending', 'disputed', 'fixnote'})
 SCOPES = ('line', 'file', 'repo')
 SIDECAR = 'AUDIT.md'
-MARKER_RE = re.compile('(?:#|//|<!--)[ \\t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \\t]+(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \\t]*@(?P<scope>line|file|repo))?' + _ATTRS + '[ \\t]*(?P<note>[^\\n]*?)[ \\t]*(?:-->)?[ \\t]*$', re.M)
-MARKER_RE_MD = re.compile('<!--[ \\t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \\t]+(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \\t]*@(?P<scope>line|file|repo))?' + _ATTRS + '(?P<note>[^\\n]*?)[ \\t]*-->[ \\t]*$', re.M)
+MARKER_RE = re.compile('(?:#|//|<!--)[ \\t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \\t]+(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \\t]*@(?P<scope>line|file|repo)(?![A-Za-z0-9_-]))?' + _ATTRS + '[ \\t]*(?P<note>[^\\n]*?)[ \\t]*(?:-->)?[ \\t]*$', re.M)
+MARKER_RE_MD = re.compile('<!--[ \\t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \\t]+(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \\t]*@(?P<scope>line|file|repo)(?![A-Za-z0-9_-]))?' + _ATTRS + '(?P<note>[^\\n]*?)[ \\t]*-->[ \\t]*$', re.M)
 class Marker
     file: str
     line: int

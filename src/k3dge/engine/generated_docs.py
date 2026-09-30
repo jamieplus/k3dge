@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -54,7 +55,7 @@ def render_manual_docs_content(
     for domain in sorted(manifest.domains):
         cfg = manifest.domains[domain]
         arch_lines.append(
-            f"| {domain} | `{cfg.get('src','')}` | `{cfg.get('spec','')}` | {cfg.get('description','')} |"
+            f"| {_cell(domain)} | `{_cell(cfg.get('src',''))}` | `{_cell(cfg.get('spec',''))}` | {_cell(cfg.get('description',''))} |"
         )
     out[manual_dir / "domains.md"] = "\n".join(arch_lines) + "\n"
     return out
@@ -94,18 +95,43 @@ def _layout_block(manifest: Manifest) -> str:
         src = cfg.get("src", "")
         spec = cfg.get("spec", "")
         desc = cfg.get("description", "")
-        rows.append(f"| {domain} | `{src}` | `{spec}` | {desc} |")
+        rows.append(f"| {_cell(domain)} | `{_cell(src)}` | `{_cell(spec)}` | {_cell(desc)} |")
     return f"{LAYOUT_START}\n{header}\n" + "\n".join(rows) + f"\n{LAYOUT_END}"
+
+
+def _cell(v: object) -> str:
+    """Markdown 表格单元转义：manifest 里的 `description`/路径是自由文本，含 `|` 会串列、含换行
+    会把一行撕成两行；含 `<!--`/`-->` 会提前闭合/伪造 README 自动块标记（ocr-251/252）。
+    新鲜度闸与写盘用同一份渲染结果 ⇒ 坏行会同时坏产物与坏判据。"""
+    s = str(v or "").replace("\r\n", " ").replace("\n", " ").replace("\r", " ").strip()
+    return s.replace("|", "\\|").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def render_readme_layout(workspace: Path, manifest: Manifest) -> Optional[Path]:
     """Regenerate the README layout block from the manifest (no-op if README lacks markers)."""
+    import sys
+
     readme = workspace / "README.md"
     if not readme.exists():
         return None
-    content = readme.read_text(encoding="utf-8")
+    with open(readme, encoding="utf-8", newline="") as fh:   # 不做换行转换：CRLF README 不该被整文件改写成 LF（ocr-254）
+        content = fh.read()
+    if LAYOUT_START not in content:
+        return None                                  # 没有标记 ⇒ 正常 no-op
     rendered = _replace_between_all(content, LAYOUT_START, LAYOUT_END, _layout_block(manifest))
-    if rendered is None or rendered == content:
+    if rendered is None:
+        # 标记不成对：与"内容已最新"是两回事，静默 None 会让脚本打 `already up to date`（ocr-253）
+        print(f"[generated_docs] WARN: {readme.name} 的 layout 标记不成对 ⇒ 未刷新", file=sys.stderr)
         return None
-    readme.write_text(rendered, encoding="utf-8")
+    if rendered == content:
+        return None
+    tmp = readme.with_name(readme.name + ".k3dge-tmp")      # 原子替换：截断+写之间被杀不会留空 README（ocr-254）
+    try:
+        with open(tmp, "w", encoding="utf-8", newline="") as fh:
+            fh.write(rendered)
+        tmp.replace(readme)
+    except OSError:
+        with contextlib.suppress(OSError):
+            tmp.unlink(missing_ok=True)
+        raise
     return readme

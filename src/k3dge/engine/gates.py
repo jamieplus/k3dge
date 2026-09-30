@@ -46,7 +46,12 @@ def rejection(message: Any, fallback_gate_id: str) -> Rejection:
     if isinstance(message, Rejection):
         return message
     gid = getattr(message, "gate_id", None) or fallback_gate_id
-    return Rejection(gid, "" if message is None else str(message))
+    text = "" if message is None else str(message)
+    if not text.strip():
+        # `Rejection` 是 str 子类：空消息对象本身 falsy ⇒ `if out:`（nodes.run_phase 前置闸分支、
+        # seal 的 `not e` 判定）会把"失败但没带原因"读成**通过**。永不留空（ocr-248）。
+        text = f"({fallback_gate_id} 判定为失败，但未给出原因)"
+    return Rejection(gid, text)
 
 try:
     import tomllib
@@ -112,7 +117,11 @@ def _merge_section(data: Dict[str, Any], raw: Dict[str, Any]) -> None:
     """段内覆盖；`checks.<kind>` 逐键覆盖（下游只改一个 op 不必抄全表）。"""
     for section, vals in (raw or {}).items():
         if not isinstance(vals, dict):
-            data[section] = vals
+            # 写成标量/列表 ⇒ 下游 `get()` 会 `5.get(key)` AttributeError、`nodes.decl()` 会
+            # `merged.update("fact")` ValueError。忽略该覆盖并出声（ocr-249）。
+            import sys
+
+            print(f"[gates] WARN: 段 '{section}' 不是表（{type(vals).__name__}）⇒ 忽略该覆盖", file=sys.stderr)
             continue
         if section == "checks":
             for kind, decl in vals.items():
@@ -130,7 +139,11 @@ def load(workspace: Path) -> Dict[str, Any]:
         return data
     try:
         raw = tomllib.loads(p.read_text(encoding="utf-8"))
-    except Exception:  # 坏 TOML：回落缺省，不抛（闸继续可用）
+    except Exception as exc:  # 坏 TOML/权限/编码：回落缺省但**必须出声**（静默放宽 preconditions/阈值 = 假绿，ocr-250）
+        import sys
+
+        print(f"[gates] WARN: {REL} 不可读/解析失败（{type(exc).__name__}: {exc}）⇒ 按缺省跑，"
+              "仓内声明的覆盖未生效", file=sys.stderr)
         return data
     if not isinstance(raw, dict):
         return data
@@ -151,8 +164,16 @@ def legacy_config_present(workspace: Path) -> bool:
 
 
 def get(workspace: Path, section: str, key: str) -> Any:
-    """读某闸的某阈值（含缺省）。"""
-    return load(workspace).get(section, {}).get(key, DEFAULTS.get(section, {}).get(key))
+    """读某闸的某阈值（含缺省）。调用方普遍 `int(gates.get(...))` ⇒ 绝不返回 None（ocr-247）。"""
+    sec = load(workspace).get(section)
+    sec = sec if isinstance(sec, dict) else {}
+    val = sec.get(key, DEFAULTS.get(section, {}).get(key))
+    if val is None:
+        import sys
+
+        print(f"[gates] WARN: '{section}.{key}' 无值且缺省也没有 ⇒ 返回 0", file=sys.stderr)
+        return 0
+    return val
 
 
 def preconditions(workspace: Path, kind: str) -> list:
