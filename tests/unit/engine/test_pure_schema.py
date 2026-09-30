@@ -123,5 +123,36 @@ class TestUnits(unittest.TestCase):
         self.assertEqual(len(out), 1)
 
 
+class TestLiteralVsRegex(unittest.TestCase):
+    """字面量清单不再被当正则猜；正则要显式 `re:` 前缀（ocr-300/301/302）。"""
+
+    def test_status_literal_metachars_are_not_relaxed(self) -> None:
+        self.assertFalse(pure_schema._status_ok("2x0", ["2.0"]))
+        self.assertTrue(pure_schema._status_ok("2.0", ["2.0"]))
+        self.assertFalse(pure_schema._status_ok("SuX", ["Su(ed)"]))
+
+    def test_status_re_prefix_is_explicit_regex(self) -> None:
+        self.assertTrue(pure_schema._status_ok("v2", ["re:^v\\d$"]))
+
+    def test_sections_literal_parentheses_are_required(self) -> None:
+        secs = ["## 1. 上下文 (Context)"]
+        out = pure_schema.check_sections(secs, {}, "x.md", "# T\n\n## 1. 上下文 Context\n")
+        self.assertEqual([c for c, _, _ in out], ["DOC_SCHEMA_INVALID"])
+        ok = pure_schema.check_sections(secs, {}, "x.md", "# T\n\n## 1. 上下文 (Context)\n")
+        self.assertEqual(ok, [])
+
+    def test_sections_re_prefix_channel(self) -> None:
+        out = pure_schema.check_sections(["re:^##\\s+1\\."], {}, "x.md",
+                                         "# T\n## 1. 现象\n")
+        self.assertEqual(out, [])
+
+    def test_amend_block_at_eof_without_trailing_newline(self) -> None:
+        text = ("# A\n\n## 2. 决策\n\n§2.1 说过\n\nAmended-by:\n"
+                "  - 🅰1 | k3dit | 2026-09-01 | §1.1 起\n"
+                "  - 🅰2 | k3dit | 2026-09-02 | §2.1 改")     # 文件末尾无换行
+        got = pure_schema._amend_sole_sections(text)
+        self.assertIn("2.1", got, "末条无尾换行被整条丢弃 ⇒ 退役/拆分判据静默失效")
+
+
 if __name__ == "__main__":
     unittest.main()

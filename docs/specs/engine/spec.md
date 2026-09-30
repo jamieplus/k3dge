@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:3650bfc8d85fe2182865e6c334b03d34f9bf1eed284e8a746295c583a131e226`
+- **Contract Hash**: `sha256:ab15123a26c41e772711c15709927d10676b36cee32195da76f37f97c4df5dfc`
 - **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
@@ -528,6 +528,7 @@ from typing import Tuple
 from k3dge.engine.pure_schema import AUX_NAMES
 from k3dge.engine.pure_schema import parse_frontmatter_pairs
 Ref = Tuple[str, str]
+inside_workspace(workspace: Path, ref: str) -> bool
 strip_fences(text: str) -> str
 strip_code_spans(text: str) -> str
 check_dangling_adr(workspace: Path, rel: str, text: str) -> List[Ref]

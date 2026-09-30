@@ -798,6 +798,8 @@ from typing import Tuple
 from k3dge.engine.pure_schema import AUX_NAMES
 from k3dge.engine.pure_schema import parse_frontmatter_pairs
 Ref = Tuple[str, str]
+inside_workspace(workspace: Path, ref: str) -> bool
+    # doc: 指针/回执去向必须落在本仓内：绝对路径会**替换**基路径、`..` 会越界（ocr-295/297）。
 strip_fences(text: str) -> str
     # doc: Remove fenced code blocks (example refs inside them are not real refs).
 strip_code_spans(text: str) -> str

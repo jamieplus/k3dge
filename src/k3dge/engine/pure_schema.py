@@ -88,15 +88,25 @@ def check_section_order(text: str) -> Optional[Tuple[str, str]]:
     return None
 
 
+def _literal_or_re(item: str, match_re, nomatch_literal) -> bool:
+    """声明表的取值一律**字面量**优先；要正则必须显式 `re:` 前缀。
+
+    旧实现把每项都当正则：`"2.0"` 放行 `2x0`、`"Superseded"` 的 `.` 通配 ⇒ 假绿，
+    且含元字符的真字面量反而判不中（假红）。两种错都来自"猜作者的意图"（ocr-300/301）。
+    """
+    if isinstance(item, str) and item.startswith("re:"):
+        try:
+            return match_re(item[3:])
+        except re.error:
+            return nomatch_literal()
+    return nomatch_literal()
+
+
 def _status_ok(value: str, allowed: Iterable[str]) -> bool:
     v = value.strip()
     for item in allowed:
-        try:
-            if re.fullmatch(item, v):
-                return True
-        except re.error:
-            if item == v:
-                return True
+        if _literal_or_re(str(item), lambda pat: bool(re.fullmatch(pat, v)), lambda: str(item) == v):
+            return True
     return False
 
 
@@ -190,10 +200,9 @@ def check_sections(
     out: List[Check] = []
     for heading in sections or []:
         if heading not in text:
-            try:
-                ok = bool(re.search(heading, text, re.MULTILINE))
-            except re.error:
-                ok = False
+            ok = _literal_or_re(str(heading),
+                                lambda pat: bool(re.search(pat, text, re.MULTILINE)),
+                                lambda: False)
             if not ok:
                 out.append((
                     code_for(codes, "sections", "DOC_SCHEMA_INVALID"),
@@ -321,7 +330,7 @@ def check_amend(block: Any, codes: Dict[str, Any], filename: str, text: str) -> 
     lines = text.splitlines()
     nums: List[int] = []
     body_text = "\n".join(l for l in lines if not l.startswith("[^🅰"))
-    m = re.search(r"^Amended-by:\s*\n((?:\s+-.*\n)+)", text, re.M)
+    m = re.search(r"^Amended-by:\s*\n((?:\s+-.*(?:\n|$))+)", text, re.M)
     if m:
         for ln in m.group(1).splitlines():
             if not ln.strip():
@@ -391,7 +400,7 @@ def _most_specific_sections(sections: List[str]) -> List[str]:
 
 def _amend_sole_sections(text: str) -> Dict[str, List[tuple]]:
     """每条修订若只谈论一个节，记到那个节名下。返回节号 → [(修订号, 日期)]。"""
-    m = re.search(r"^Amended-by:\s*\n((?:\s+-.*\n)+)", text, re.M)
+    m = re.search(r"^Amended-by:\s*\n((?:\s+-.*(?:\n|$))+)", text, re.M)
     if not m:
         return {}
     by: Dict[str, List[tuple]] = {}

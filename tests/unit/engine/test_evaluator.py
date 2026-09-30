@@ -403,7 +403,8 @@ class TestIncidentGovernance(unittest.TestCase):
         schema = {
             "filename": r"^INC-\d{8}-[\w-]+\.md$",
             "h1": r"^#\s+Incident",
-            "sections": [r"^##\s+1\.", r"^##\s+2\.", r"^##\s+3\.", r"^##\s+4\."],
+            # 正则要显式 `re:` 前缀：字面量清单不再被当正则猜（ocr-301）
+            "sections": [r"re:^##\s+1\.", r"re:^##\s+2\.", r"re:^##\s+3\.", r"re:^##\s+4\."],
             "codes": {
                 "filename": "INCIDENT_FORM_INVALID",
                 "h1": "INCIDENT_FORM_INVALID",

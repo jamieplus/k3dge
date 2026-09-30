@@ -1,7 +1,7 @@
 {
   "filename": "^INC-\\d{8}-[\\w-]+\\.md$",
   "h1": "^#\\s+Incident",
-  "sections": ["^##\\s+1\\.", "^##\\s+2\\.", "^##\\s+3\\.", "^##\\s+4\\."],
+  "sections": ["re:^##\\s+1\\.", "re:^##\\s+2\\.", "re:^##\\s+3\\.", "re:^##\\s+4\\."],
   "codes": {
     "filename": "INCIDENT_FORM_INVALID",
     "h1": "INCIDENT_FORM_INVALID",

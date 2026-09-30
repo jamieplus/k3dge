@@ -14,6 +14,7 @@ callers print them without failing until the false-positive rate is observed.
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -37,6 +38,21 @@ _MATRIX_REF_RE = re.compile(r"`(tests/[^\s`]+)`")
 _CONFLICT_START = "<<<<<<<"
 _CONFLICT_END = ">>>>>>>"
 _CODE_SPAN_RE = re.compile(r"`[^`\n]*`")
+
+
+def inside_workspace(workspace: Path, ref: str) -> bool:
+    """指针/回执去向必须落在本仓内：绝对路径会**替换**基路径、`..` 会越界（ocr-295/297）。"""
+    s = str(ref or "").strip()
+    if not s:
+        return False
+    cand = Path(s)
+    if cand.is_absolute() or ".." in cand.parts:
+        return False
+    try:
+        root = Path(workspace).resolve()
+        return (root / cand).resolve().is_relative_to(root)
+    except OSError:  # pragma: no cover - 异常按"不在仓内"处理
+        return False
 
 
 def strip_fences(text: str) -> str:
@@ -94,7 +110,9 @@ def check_dangling_adr(workspace: Path, rel: str, text: str) -> List[Ref]:
 
 
 def _report_pointer(text: str) -> str:
-    fm = dict(parse_frontmatter_pairs(text))
+    # 键一律 lower 后比：本模块其余读法（`_fm_value`/`check_retired_adr_dest`）都大小写不敏感，
+    # 这里用原始键 ⇒ `Report: …` 静默不看（判据随作者大小写漂移，ocr-294）
+    fm = {k.lower(): v for k, v in parse_frontmatter_pairs(text)}
     rep = (fm.get("report") or "").strip()
     if not rep:
         m = _REPORT_RE.search(text)
@@ -109,6 +127,9 @@ def check_report_pointer(workspace: Path, rel: str, text: str) -> List[Ref]:
     rep = _report_pointer(text)
     if not rep:
         return []
+    if not inside_workspace(workspace, rep):
+        return [("DANGLING_REPORT_REF",
+                 f"{rel}: report 指针越出本仓（须是仓内相对路径）：{rep}")]
     if not (workspace / rep).is_file():
         return [("DANGLING_REPORT_REF", f"{rel}: report pointer missing: {rep}")]
     return []
@@ -198,7 +219,7 @@ def check_task_body_meta_redundant(rel: str, text: str) -> List[Ref]:
     fm = {k.lower(): v for k, v in parse_frontmatter_pairs(text)}
     if not fm:
         return []
-    hdr = parse_headers(text)
+    hdr = parse_headers(strip_fences(text))  # 围栏里的反面样本不是正文复写（ocr-296）
     dup = sorted({k for k in _BODY_FIELD_MAP.values() if k in hdr})
     if not dup:
         return []
@@ -448,6 +469,8 @@ def screen_target_exists(workspace: Path, into: str) -> bool:
     target = str(into or "").strip()
     if not target:
         return False
+    if not inside_workspace(Path(workspace), target):
+        return False      # 越界去向（`.git/HEAD` 之类）也能"满足"回执 ⇒ 闸对该路径永久沉默（ocr-297）
     return (Path(workspace) / target).is_file()
 
 
@@ -485,11 +508,17 @@ def retired_adr_numbers(workspace: Path) -> dict:
     path = Path(workspace) / _RETIRED_LEDGER_REL
     try:
         text = path.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeDecodeError) as exc:
+        # 退役账本是三个 ADR 闸的唯一源：读不动就静默空 ⇒ 复用号/孤儿号全部漏判（ocr-298）
+        print(f"[pure_refs] WARN: 退役账本不可读（{type(exc).__name__}: {exc}）⇒ 本轮按空账处理",
+              file=sys.stderr)
         return {}
     # 只读「永久退役号」那一段，避免把"曾被复用"表里的现役号也收进来
     seg = text.split("## 永久退役号", 1)
     if len(seg) < 2:
+        if _RETIRED_ROW_RE.search(text):
+            print("[pure_refs] WARN: 退役账本有表行但缺『## 永久退役号』标记 ⇒ 按空账处理（标题漂了）",
+                  file=sys.stderr)
         return {}
     seg = seg[1].split("### 曾被复用的号", 1)[0]
     out: dict = {}
@@ -616,15 +645,23 @@ def check_task_closure_record(rel: str, text: str) -> List[Ref]:
     if Path(rel).name in AUX_NAMES:   # 零依赖层：不 import milestone_files
         return []
     lines = text.splitlines()
+    empty_at = None
     for i, ln in enumerate(lines):
         # 前缀匹配：允许标题带限定词（`## 落地（2026-09-19，①-⑥ 全部执行）` 也算数）
         hit = next((h for h in _CLOSURE_HEADINGS if ln.strip().startswith(h)), None)
-        if hit:
-            rest = "\n".join(lines[i + 1:]).strip()
-            if rest:
-                return []
-            return [("TASK_CLOSURE_MISSING",
-                     f"{rel}: 结案段 `{ln.strip()}` 是空的——闸只验有没有写，内容归人")]
+        if not hit:
+            continue
+        # 段界＝下一个 `## ` 标题：旧实现取"标题之后全文"⇒首个结案段空、后面有别的段也算过（假阴性），
+        # 模板留白的空 `## 进度` 又会被当结案段直接判错（假阳性，ocr-299）
+        j = i + 1
+        while j < len(lines) and not lines[j].startswith("## "):
+            j += 1
+        if "\n".join(lines[i + 1:j]).strip():
+            return []
+        empty_at = empty_at or ln.strip()
+    if empty_at:
+        return [("TASK_CLOSURE_MISSING",
+                 f"{rel}: 结案段 `{empty_at}` 是空的——闸只验有没有写，内容归人")]
     return [("TASK_CLOSURE_MISSING",
              f"{rel}: done 票缺结案记录（需 {' / '.join(_CLOSURE_HEADINGS)} 之一且有内容）"
              f"——票是自包含事实源，不写落地痕迹后续就会漂")]

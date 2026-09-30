@@ -312,6 +312,77 @@ class TestReportPointer(unittest.TestCase):
             self.assertEqual(out, [])
 
 
+class TestPointerAndClosureShape(unittest.TestCase):
+    """report 指针、排查去向、正文复写与结案段的边界（ocr-294..299）。"""
+
+    REL = "docs/tasks/2026-09-16-M10-feat-x.md"
+
+    def _ws_with_report(self, report: str) -> Path:
+        import tempfile
+
+        ws = Path(tempfile.mkdtemp())
+        (ws / "docs" / "reviews").mkdir(parents=True)
+        (ws / "docs" / "reviews" / "r.md").write_text("# r\n", encoding="utf-8")
+        self._report = report
+        return ws
+
+    def test_capitalized_report_key_is_honored(self) -> None:
+        ws = self._ws_with_report("docs/reviews/r.md")
+        text = f"---\nReport: {self._report}\n---\n\n# X\n"
+        self.assertEqual(pure_refs.check_report_pointer(ws, self.REL, text), [])
+
+    def test_report_pointer_must_stay_in_workspace(self) -> None:
+        ws = self._ws_with_report("/etc/hosts")
+        text = f"---\nreport: {self._report}\n---\n\n# X\n"
+        out = pure_refs.check_report_pointer(ws, self.REL, text)
+        self.assertEqual([c for c, _ in out], ["DANGLING_REPORT_REF"])
+        ws2 = self._ws_with_report("../elsewhere/x.md")
+        self.assertTrue(pure_refs.check_report_pointer(
+            ws2, self.REL, f"---\nreport: ../elsewhere/x.md\n---\n"))
+
+    def test_body_meta_gate_ignores_fence_samples(self) -> None:
+        text = "# X\n\n反例长这样：\n\n```md\n- **Status**: done\n```\n"
+        self.assertEqual(pure_refs.check_task_body_meta_redundant(self.REL, text), [])
+
+    def test_screen_ack_target_must_be_in_repo(self) -> None:
+        import tempfile
+
+        ws = Path(tempfile.mkdtemp())
+        (ws / "docs").mkdir()
+        (ws / "docs" / "a.md").write_text("x", encoding="utf-8")
+        outside = Path(tempfile.mkdtemp()) / "elsewhere.md"
+        outside.write_text("x", encoding="utf-8")
+        self.assertTrue(pure_refs.screen_target_exists(ws, "docs/a.md"))
+        self.assertFalse(pure_refs.screen_target_exists(ws, str(outside)))
+        self.assertFalse(pure_refs.screen_target_exists(ws, "../%s" % outside.name))
+
+    def test_retired_ledger_warns_when_marker_drifted(self) -> None:
+        import contextlib
+        import io
+        import tempfile
+
+        ws = Path(tempfile.mkdtemp())
+        led = ws / "docs" / "adr" / "obsolete"
+        led.mkdir(parents=True)
+        (led / "README.md").write_text(
+            "# 退役\n\n| 0007 | was | merged | dest |\n\n", encoding="utf-8")   # 标题漂了
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(pure_refs.retired_adr_numbers(ws), {})
+        self.assertIn("WARN", err.getvalue())
+
+    def test_closure_section_scoped_to_its_own_block(self) -> None:
+        rel = "docs/tasks/2026-09-16-x.done.md"
+        # 模板留白的空 `## 进度` + 真写内容的 `## 结案` ⇒ 必须过（旧实现在第一个命中就返回）
+        good = "# X\n\n## 进度\n\n## 结案\n\n- 落地了\n\n## 其它\n\n内容\n"
+        self.assertEqual(pure_refs.check_task_closure_record(rel, good), [])
+        # 结案段空、后面还有别的段 ⇒ 必须红（旧实现取"全文剩余"判成有内容）
+        bad = "# X\n\n## 结案\n\n## 其它\n\n内容\n"
+        out = pure_refs.check_task_closure_record(rel, bad)
+        self.assertEqual([c for c, _ in out], ["TASK_CLOSURE_MISSING"])
+        self.assertIn("空的", out[0][1])
+
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -74,7 +74,7 @@
   "Prompt": [
     {
       "file": "src/k3dge/engine/prompt.py",
-      "line": 9
+      "line": 14
     }
   ],
   "PythonExtractor": [
@@ -128,7 +128,7 @@
   "accounted_adr_numbers": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 515
+      "line": 544
     }
   ],
   "actions": [
@@ -368,31 +368,31 @@
   "check_adr_consistency": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 250
+      "line": 271
     }
   ],
   "check_adr_number_holes": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 520
+      "line": 549
     }
   ],
   "check_adr_number_reuse": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 549
+      "line": 578
     }
   ],
   "check_adr_ref_retired": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 573
+      "line": 602
     }
   ],
   "check_amend": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 297
+      "line": 306
     }
   ],
   "check_completeness": [
@@ -404,73 +404,73 @@
   "check_content": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 437
+      "line": 446
     }
   ],
   "check_dangling_adr": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 83
+      "line": 99
     }
   ],
   "check_file": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 456
+      "line": 465
     }
   ],
   "check_filename": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 107
+      "line": 117
     }
   ],
   "check_footnotes": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 117
+      "line": 138
     }
   ],
   "check_frontmatter": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 224
+      "line": 233
     }
   ],
   "check_h1": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 137
+      "line": 147
     }
   ],
   "check_headers": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 253
+      "line": 262
     }
   ],
   "check_incident_id_redundant": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 699
+      "line": 736
     }
   ],
   "check_index_ref": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 275
+      "line": 284
     }
   ],
   "check_markdown_bytes": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 262
+      "line": 283
     }
   ],
   "check_markdown_text": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 278
+      "line": 299
     }
   ],
   "check_one": [
@@ -482,13 +482,13 @@
   "check_report_pointer": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 105
+      "line": 123
     }
   ],
   "check_retired_adr_dest": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 640
+      "line": 677
     }
   ],
   "check_section_order": [
@@ -500,43 +500,43 @@
   "check_section_ordering": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 206
+      "line": 215
     }
   ],
   "check_sections": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 184
+      "line": 194
     }
   ],
   "check_sections_when": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 165
+      "line": 175
     }
   ],
   "check_supersede_unreconciled": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 215
+      "line": 236
     }
   ],
   "check_task_body_meta_redundant": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 183
+      "line": 204
     }
   ],
   "check_task_closure_record": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 607
+      "line": 636
     }
   ],
   "check_task_consistency": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 148
+      "line": 169
     }
   ],
   "closure_ok": [
@@ -680,7 +680,7 @@
   "code_for": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 103
+      "line": 113
     }
   ],
   "collect_domain_interface": [
@@ -834,19 +834,19 @@
   "find_orphan_adrs": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 352
+      "line": 373
     }
   ],
   "find_orphan_specs": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 314
+      "line": 335
     }
   ],
   "find_orphan_tests": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 327
+      "line": 348
     }
   ],
   "find_table": [
@@ -858,13 +858,13 @@
   "find_unguarded_archives": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 673
+      "line": 710
     }
   ],
   "find_unscreened_new_docs": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 419
+      "line": 440
     }
   ],
   "fix_kind": [
@@ -972,7 +972,7 @@
   "has_milestone_token": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 134
+      "line": 155
     }
   ],
   "has_table": [
@@ -1005,6 +1005,12 @@
       "line": 39
     }
   ],
+  "inside_workspace": [
+    {
+      "file": "src/k3dge/engine/pure_refs.py",
+      "line": 43
+    }
+  ],
   "is_declared": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
@@ -1014,7 +1020,7 @@
   "is_screenable_new_doc": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 400
+      "line": 421
     }
   ],
   "iter_doc_types": [
@@ -1466,7 +1472,7 @@
   "record_screen_ack": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 454
+      "line": 477
     }
   ],
   "register_extractor": [
@@ -1586,7 +1592,7 @@
   "retired_adr_numbers": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 479
+      "line": 502
     }
   ],
   "retired_ledger_cards": [
@@ -1688,13 +1694,13 @@
   "screen_ack_path": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 414
+      "line": 435
     }
   ],
   "screen_target_exists": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 442
+      "line": 463
     }
   ],
   "seal_checklist": [
@@ -1790,13 +1796,13 @@
   "strip_code_spans": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 60
+      "line": 76
     }
   ],
   "strip_fences": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 42
+      "line": 58
     }
   ],
   "strip_markers": [
@@ -2010,7 +2016,7 @@
   "write_incident": [
     {
       "file": "src/k3dge/engine/protocol.py",
-      "line": 18
+      "line": 38
     }
   ],
   "write_run_digest": [

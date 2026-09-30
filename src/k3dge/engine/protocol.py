@@ -15,6 +15,26 @@ import re
 from pathlib import Path
 
 
+def _inline(text) -> str:
+    """元信息字段压成一行：外部可控文本里的换行会把 `- **Path**: …` 列表截成任意段落（ocr-293）。"""
+    if text is None:
+        return ""
+    return " ".join(str(text).splitlines()).strip()
+
+
+def _block(text) -> str:
+    """正文净化：行首 `#` 转义、去掉会让 `## 2./## 3.` 结构闸误判的裸标题行，长度封顶。"""
+    if text is None:
+        return ""
+    out = []
+    for ln in str(text).splitlines():
+        s = ln.rstrip()
+        if s.startswith("#"):
+            s = "\\" + s           # 行首标题转义：`\## 2.` 不再是标题，B-T-D 结构闸仍数到自己的四节
+        out.append(s[:2000])
+    return "\n".join(out)[:20000]
+
+
 def write_incident(
     workspace: Path,
     target: str | None,
@@ -32,17 +52,27 @@ def write_incident(
     date_iso = datetime.date.today().isoformat()
     date_compact = date_iso.replace("-", "")
     slug = Path(target).stem if target else (task_type or "protocol")
-    safe_slug = re.sub(r"[^A-Za-z0-9._-]", "-", slug)
+    # 白名单去掉 `.`：docs/incidents/.schema.json 的文件名规则是 `^INC-\d{8}-[\w-]+\.md$`，
+    # 中间段不接受点号 ⇒ 带点会产出自相矛盾的破格文件（ocr-292）。
+    safe_slug = re.sub(r"[^A-Za-z0-9_-]", "-", slug).strip("-")
+    # 长度封顶：Linux 单段文件名上限 255，`target` 来自外部 JSON 完全不受控（ocr-291）。
+    # 超长时截断并留 8 位校验和，保证同源输入仍得同名（幂等，不产重复件）。
+    if len(safe_slug) > 60:
+        import hashlib
+
+        sig = hashlib.sha1(slug.encode("utf-8", "replace")).hexdigest()[:8]
+        safe_slug = f"{safe_slug[:52]}-{sig}"
+    safe_slug = safe_slug or "protocol"
     path = inc_dir / f"INC-{date_compact}-protocol-{safe_slug}.md"
     # Emits the B-T-D four core sections (docs/README.md) so the file satisfies the
     # INCIDENT_FORM_INVALID gate; sections 2-4 are placeholders for audit backfill.
     body = (
         f"# Incident: protocol deviation (soft gate ignored)\n\n"
-        f"- **Path**: {target or '(none)'}\n"
-        f"- **Protocol**: {task_type or '(none)'}\n"
-        f"- **Task**: {task_id or '(none)'}\n"
+        f"- **Path**: {_inline(target) or '(none)'}\n"
+        f"- **Protocol**: {_inline(task_type) or '(none)'}\n"
+        f"- **Task**: {_inline(task_id) or '(none)'}\n"
         f"- **Date**: {date_iso}\n\n"
-        f"## 1. 现象与证伪证据 (B-T-D Evidence)\n\n{detail}\n\n"
+        f"## 1. 现象与证伪证据 (B-T-D Evidence)\n\n{_block(detail)}\n\n"
         f"## 2. 根因剖析 (5 Whys)\n\n（待人工/审计回填）\n\n"
         f"## 3. 防退化动作清单\n\n（待人工/审计回填）\n\n"
         f"## 4. 经验灌入\n\n（待人工/审计回填）\n"
