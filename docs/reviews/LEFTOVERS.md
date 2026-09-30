@@ -339,9 +339,8 @@ value-2（with-worktree 上下文管理器，两处脚手架合并）、value-3�
 - **外层墙钟改探针口径**：把 `_run` 的平铺超时换成**认探针的活性上限**（盯 `K3DIT_HALL_ROOT`/`K3DIT_LEDGER`
   的 mtime 或账本 `events[].ts`；静默超阈值才 `killpg`，否则续等），另留一条可选硬上限当成本天花板。
   与 k3dit 的 `stall_after_sec` 同口径。配 ADR + 测试（慢但推进不杀 / 真静默才杀）。
-- **`audit_checklist.json` 运行态投影不该 tracked**：应像 `.agent/audit_jobs.json` 一样 gitignore（AGENTS.md
-  已称其"运行态投影，非判据"）；否则只要审计要落补丁，封板必撞 `DIRTY_TREE`。或让 `apply_bundle` 的脏树
-  判据显式豁免该投影。
+- ~~`audit_checklist.json` 运行态投影不该 tracked~~ **已决（2026-09-30）**：与 `.agent/audit_jobs.json`
+  同批 gitignore 并 `git rm --cached`；`.gitignore` 覆盖两条投影由 `test_audit_bundle.test_repo_gitignore_covers_both_runtime_projections` 钉住。
 
 ---
 

@@ -100,6 +100,30 @@ def test_apply_bundle_uses_standard_git_apply_and_refuses_dirty_tree(tmp_path):
     assert "在途" in r["detail"] or "不干净" in r["detail"]
 
 
+def test_ignored_runtime_projection_does_not_trip_dirty_tree(tmp_path):
+    """审计开跑即重写 `.agent/audit_checklist.json` ⇒ 它必须与工单账一样是 **gitignored 投影**。
+
+    它是 tracked 的时候：任何带补丁的封板在落补丁相位必被自家 `DIRTY_TREE` 挡（真跑实测：M11
+    续跑的包 `apply_order` 非空 ⇒ 直接拒），而那个"脏"既不是被审改动也不是在途工作。
+    """
+    ws = _repo(tmp_path / "proj")
+    (ws / ".gitignore").write_text(".agent/audit_jobs.json\n.agent/audit_checklist.json\n",
+                                   encoding="utf-8")
+    for argv in (["add", "-A"], ["-c", "user.email=a@b", "-c", "user.name=a", "commit", "-qm", "ignore"]):
+        subprocess.run(["git", *argv], cwd=ws, check=True, capture_output=True)
+    (ws / ".agent").mkdir(exist_ok=True)
+    (ws / ".agent" / "audit_checklist.json").write_text('{"milestone": "M1"}\n', encoding="utf-8")
+    rc, out = subprocess.run(["git", "status", "--porcelain"], cwd=ws,
+                             capture_output=True, text=True).returncode, \
+        subprocess.run(["git", "status", "--porcelain"], cwd=ws, capture_output=True,
+                       text=True).stdout
+    assert rc == 0 and out.strip() == "", out        # 投影不污染工作树
+
+    r = ab.apply_bundle(ws, _bundle(tmp_path / "proj"))
+    assert r.get("error") != "DIRTY_TREE", r
+    assert r["ok"] is True, r
+
+
 def test_apply_bundle_reports_missing_patch_file(tmp_path):
     ws = _repo(tmp_path)
     b = _bundle(tmp_path, order=("fix.patch", "pins.patch"), patches=False)
@@ -800,3 +824,18 @@ def test_audit_flow_has_no_dead_audit_surface() -> None:
 
     assert not hasattr(audit_flow, "_count_status")
     assert not hasattr(audit_flow, "_REPORT_HEADER_TOKEN")
+
+
+def test_repo_gitignore_covers_both_runtime_projections():
+    """决策的钉子：`audit_jobs.json` 与 `audit_checklist.json` 都不许再入库（ADR-0004 §2.1.10）。"""
+    import subprocess
+    import tempfile
+
+    repo = Path(__file__).resolve().parents[3]
+    with tempfile.TemporaryDirectory() as d:
+        for rel in (".agent/audit_jobs.json", ".agent/audit_checklist.json"):
+            f = Path(d) / "probe"
+            f.parent.mkdir(exist_ok=True)
+            r = subprocess.run(["git", "-C", str(repo), "check-ignore", "-q", "--", rel],
+                               capture_output=True, text=True)
+            assert r.returncode == 0, f"{rel} 未被 .gitignore 覆盖 ⇒ 审计一跑就会弄脏工作树"

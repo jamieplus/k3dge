@@ -10,3 +10,10 @@ build/
 venv/
 .DS_Store
 logs/
+
+# k3dge 本地账/运行态投影（可删可重建，不作判据 ⇒ 不入库，见 ADR-0004 §2.1.10）
+.agent/audit_jobs.json
+.agent/audit_checklist.json
+.agent/session.json
+.k3dge/
+.protocol-ack/
