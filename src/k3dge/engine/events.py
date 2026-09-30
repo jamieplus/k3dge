@@ -65,13 +65,20 @@ def read_events(workspace: Path, last: int = 20) -> list[dict[str, Any]]:
         path = workspace / _EVENTS_REL
         if not path.is_file():
             return []
-        lines = path.read_text(encoding="utf-8").splitlines()
+        # 非法 UTF-8（并发 rotate 写坏/截断）抛 UnicodeDecodeError（ValueError 子类），不在
+        # `except OSError` 里 ⇒ 会冒到 CLI 展示路径，违背 "Returns [] on any error"（ocr-243）。
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        if last <= 0:
+            # `lines[-0:]` 会返回**全部**事件、`last<0` 返回更早的一批 ⇒ 与"取最后 N 条"相反（ocr-242）。
+            return []
         entries: list[dict[str, Any]] = []
         for ln in lines[-last:]:
             try:
-                entries.append(json.loads(ln))
+                obj = json.loads(ln)
             except (json.JSONDecodeError, ValueError):
                 continue
+            if isinstance(obj, dict):
+                entries.append(obj)
         return entries
     except OSError:
         return []

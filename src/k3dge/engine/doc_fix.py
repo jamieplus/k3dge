@@ -23,6 +23,7 @@
 """
 from __future__ import annotations
 
+import contextlib
 import re
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -168,7 +169,13 @@ def _fix_amend_order(text: str) -> str:
     for ln in entries:
         mm = re.match(r"^(\s*-\s*)(\d+)(\s*\|.*)$", ln)
         fixed.append(f"{mm.group(1)}🅰{mm.group(2)}{mm.group(3)}" if mm else ln)
-    fixed.sort(key=lambda ln: int(re.search(r"🅰(\d+)", ln).group(1)) if "🅰" in ln else 0)
+    def _seq_key(ln: str) -> int:
+        # 判据用 `"🅰" in ln`、取值用 `.group(1)` ⇒ 含 🅰 但后面不是数字的行（正文被并入）
+        # 会让 re.search 返回 None → AttributeError 冒出 apply()（ocr-233）。
+        m = re.search(r"🅰(\d+)", ln)
+        return int(m.group(1)) if m else 0
+
+    fixed.sort(key=_seq_key)
     return text[:m.start(1)] + "\n".join(fixed) + "\n" + text[m.end(1):]
 
 
@@ -234,6 +241,20 @@ def _fix_footnote_seq(text: str) -> str:
             got = order.setdefault(n, [])
             if minor not in got:
                 got.append(minor)
+    # 定义行不参与"正文首现序"是对的，但**孤儿定义**（只定义未引用）也得占号：否则重排后的引用
+    # 可能正好撞上它 ⇒ 同一 `[^🅰N.m]` 两条定义——是"修坏"不是"修不动"（ocr-234）。
+    defined: Dict[int, List[int]] = {}
+    for line in lines:
+        dm = re.match(r"^\[\^🅰(\d+)\.(\d+)\]:", line) if line.startswith("[^🅰") else None
+        if dm:
+            got = defined.setdefault(int(dm.group(1)), [])
+            if int(dm.group(2)) not in got:
+                got.append(int(dm.group(2)))
+    for n, defs in defined.items():
+        got = order.setdefault(n, [])
+        for d in defs:
+            if d not in got:
+                got.append(d)
     mapping = {(n, old): i for n, minors in order.items() for i, old in enumerate(minors, 1)}
     if not mapping or all(new == old for (_n, old), new in mapping.items()):
         return text
@@ -299,9 +320,14 @@ def apply(workspace: Path, *, dry_run: bool = False) -> Dict[str, object]:
             continue
         if not dry_run:
             try:
-                with open(p, "w", encoding="utf-8", newline="") as fh:
+                # 就地 `open(p,"w")` 先把文件截成 0 再写：写途中被杀/磁盘满 ⇒ 半份 Markdown 且无备份（ocr-235）。
+                tmp = p.with_name(p.name + ".k3dge-tmp")
+                with open(tmp, "w", encoding="utf-8", newline="") as fh:
                     fh.write(new)
+                tmp.replace(p)
             except OSError:
+                with contextlib.suppress(OSError):
+                    p.with_name(p.name + ".k3dge-tmp").unlink(missing_ok=True)
                 remaining += len(codes)
                 continue
         for rule in applied:

@@ -199,6 +199,11 @@ def _check_row(name: str, row: Any) -> Dict[str, Any]:
         raise ExtractorConfigError(f"[languages.{name}] 'suffixes' must be non-empty and dot-prefixed")
     if not isinstance(row["lexical"], bool):
         raise ExtractorConfigError(f"[languages.{name}] 'lexical' must be a boolean")
+    if row["lexical"] and (not row["lexical_nodes"] or not row["lexical_markers"]):
+        # lexical=true 但节点/标记为空 ⇒ 生成的插件里 `markers = " or ".join([])` 变空串 ⇒
+        # `if :` 语法错（或分支恒不命中，text 未定义）——文法验证不了就得在声明面拦（ocr-244）。
+        raise ExtractorConfigError(
+            f"[languages.{name}] lexical=true 需要非空 lexical_nodes 与 lexical_markers")
     return dict(row)
 
 

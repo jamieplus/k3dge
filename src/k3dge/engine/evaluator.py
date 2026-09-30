@@ -171,13 +171,42 @@ def _run_batch_tests(
     cmd: Optional[list[str]] = None
     if template:
         try:
-            cmd = shlex.split(template.format(refs=" ".join(refs)))
-        except (KeyError, ValueError, TypeError) as exc:
+            parts = shlex.split(str(template))
+        except ValueError as exc:
+            parts = None
+            bad = exc
+        if parts is None:
             return [
-                Violation("MANIFEST_INVALID", f"test_command_template invalid: {exc}",
+                Violation("MANIFEST_INVALID", f"test_command_template invalid: {bad}",
                           detail={"path": ".agent/manifest.json",
-                                  "reason": f"test_command_template 不是合法模板：{exc}"})
+                                  "reason": f"test_command_template 不是合法模板：{bad}"})
             ]
+        # 先分词模板、再把 refs 作为**独立 argv 元素**插入：`format(refs=" ".join(refs))` 会把多个
+        # ref 拼成一个串再重新分词 ⇒ 含空格/引号的测试路径被拆成多参数（ocr-240）。
+        cmd: list[str] = []
+        placed = False
+        for tok in parts:
+            if "{refs}" in tok:
+                pre, _, post = tok.partition("{refs}")
+                if pre:
+                    cmd.append(pre)
+                cmd.extend(refs)
+                if post:
+                    cmd.append(post)
+                placed = True
+            else:
+                cmd.append(tok)
+        if not placed:
+            cmd.extend(refs)
+        for tok in parts:            # 未知占位符以前靠 .format() 抛 KeyError 兜住；现在显式拒
+            for ph in re.finditer(r"\{(\w*)\}", tok):
+                if ph.group(1) != "refs":
+                    return [
+                        Violation("MANIFEST_INVALID",
+                                  f"test_command_template invalid: unknown placeholder {ph.group(0)}",
+                                  detail={"path": ".agent/manifest.json",
+                                          "reason": f"模板只认 {{refs}}，出现 {ph.group(0)}"})
+                    ]
     else:
         cmd = [sys.executable, "-m", "pytest", *refs, "-q"]
     try:
@@ -576,10 +605,25 @@ class ConsistencyEngine:
 
     @staticmethod
     def _logs_literal(node) -> bool:
-        for sub in ast.walk(node):
-            if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
-                if "logs" in sub.value.replace("\\", "/").split("/") or "logs/" in sub.value.replace("\\", "/"):
-                    return True
+        # 只看**写入目标**侧的字面量：`Path("README.md").write_text("logs")` 的内容参数含 "logs"
+        # 并不代表写进 logs/；旧实现扫整个调用节点的全部字符串常量 ⇒ 误报（ocr-241）。
+        # 调用方也会传非 Call 的表达式（BinOp/Constant 目标）⇒ 先收类型再取 .func。
+        def _hits(expr) -> bool:
+            for sub in ast.walk(expr):
+                if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                    v = sub.value.replace("\\", "/")
+                    if "logs" in v.split("/") or v.startswith("logs/"):
+                        return True
+            return False
+
+        if not isinstance(node, ast.Call):
+            return _hits(node)                   # 传进来的可能直接就是目标表达式
+        f = node.func
+        if isinstance(f, ast.Attribute):           # Path("...").write_text(...) / open(...).write(...)
+            return _hits(f.value)
+        if isinstance(f, ast.Name) and f.id == "open":
+            return bool(node.args) and _hits(node.args[0])
+        return False
         return False
 
     @classmethod

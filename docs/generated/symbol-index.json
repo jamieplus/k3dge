@@ -2,7 +2,7 @@
   "ConsistencyEngine": [
     {
       "file": "src/k3dge/engine/evaluator.py",
-      "line": 256
+      "line": 285
     }
   ],
   "ContractExtractor": [
@@ -188,7 +188,7 @@
   "apply": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 280
+      "line": 301
     }
   ],
   "apply_bundle": [
@@ -758,7 +758,7 @@
   "describe_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 486
+      "line": 491
     }
   ],
   "emit": [
@@ -816,7 +816,7 @@
   "facts_of": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 643
+      "line": 649
     }
   ],
   "fill": [
@@ -1200,7 +1200,7 @@
   "main": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 330
+      "line": 345
     },
     {
       "file": "src/k3dge/cli/main.py",
@@ -1214,7 +1214,7 @@
   "managed_docs": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 84
+      "line": 85
     }
   ],
   "mark_task_done": [
@@ -1262,7 +1262,7 @@
   "missing_declared_facts": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 151
+      "line": 155
     }
   ],
   "next_for_rejection": [
@@ -1406,7 +1406,7 @@
   "projection": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 633
+      "line": 639
     }
   ],
   "prune": [
@@ -1496,7 +1496,7 @@
   "render": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 607
+      "line": 610
     }
   ],
   "render_checklist": [
@@ -1520,7 +1520,7 @@
   "render_plugin": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 251
+      "line": 256
     }
   ],
   "render_readme_layout": [
@@ -1574,7 +1574,7 @@
   "resolve_languages": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 205
+      "line": 210
     }
   ],
   "resolve_role": [
@@ -1628,13 +1628,13 @@
   "run_schema_gate": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 162
+      "line": 166
     }
   ],
   "run_screen_gate": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 270
+      "line": 285
     }
   ],
   "run_seal_flow": [
@@ -1664,7 +1664,7 @@
   "scan": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 262
+      "line": 283
     }
   ],
   "scan_milestone_tasks": [
@@ -1836,7 +1836,7 @@
   "sync_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 438
+      "line": 443
     }
   ],
   "tag_audit_baseline": [

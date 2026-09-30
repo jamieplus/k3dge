@@ -601,7 +601,10 @@ def fill(template: str, facts: Optional[Dict[str, Any]]) -> str:
     try:
         return template.format_map(_SafeFacts({k: v for k, v in facts.items() if v is not None}))
     except (ValueError, IndexError):  # 模板里有非占位的花括号
-        return _PLACEHOLDER.sub(lambda m: str(facts.get(m.group(1), m.group(0))), template)
+        # 兜底路径与主路径同口径：值为 None 视作"事实缺失"，留字面 `{key}`；
+        # 直接 str(None) 会把 "None" 印进闸文（且与 _SafeFacts 不一致，ocr-245）。
+        usable = {k: val for k, val in facts.items() if val is not None}
+        return _PLACEHOLDER.sub(lambda m: str(usable.get(m.group(1), m.group(0))), template)
 
 
 def render(code: str, facts: Optional[Dict[str, Any]] = None, *, where: str = "",
@@ -627,7 +630,10 @@ def render(code: str, facts: Optional[Dict[str, Any]] = None, *, where: str = ""
     if ptrs:
         lines.append("pointers: " + " | ".join(ptrs))
     head = f"[{code}]" + (f" {where}" if where else "")
-    return head + "\n" + "\n".join("  " + ln for ln in lines)
+    # 事实值本身可含换行（如 TEST_FAILURE 的 `\n{pytest_tail}`）⇒ 只给逻辑行加缩进会让
+    # 续行顶到第 0 列，破坏渲染块结构（ocr-246）。
+    return head + "\n" + "\n".join(
+        "\n".join("  " + sub for sub in ln.split("\n")) for ln in lines)
 
 
 def projection(code: str, facts: Optional[Dict[str, Any]] = None) -> dict:

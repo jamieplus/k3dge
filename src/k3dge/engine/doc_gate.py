@@ -93,6 +93,10 @@ def check_one(rel: str) -> list[str]:
     parts = Path(rel).parts
     domain = parts[1] if len(parts) > 1 else ""
     type_dir = WS / "docs" / domain
+    # `docs/foo.md` 这类根下直挂文件：`parts[1]` 是个**文件** ⇒ 产出的报错是 `docs/foo.md/README.md:
+    # missing`，用户怎么补都满足不了，而且 doc-gate 在 schema gate 之前先把提交拦死（ocr-236）。
+    if not type_dir.is_dir():
+        return [f"{rel}: 不在 docs/<type>/ 下（受管面要求一级类型目录；根下直挂文件不属本闸范围）"]
     errs: list[str] = []
     rm = type_dir / "README.md"
     am = type_dir / AUTHORING
@@ -170,7 +174,13 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -
     warns: list[str] = []
 
     def _add(code: str, msg: str, where: str = "", facts: dict | None = None) -> None:
-        sev = gate_facts.severity(code) if gate_facts else "block"
+        if gate_facts is None:
+            # 声明面不可用 ⇒ 无法区分 block/warn：按**非阻断**处理并显式降级（本模块的口径是
+            # "工具坏不得阻断所有提交"；把 ORPHAN_TEST 这类 warn 码悄悄升成 block 正是反例，ocr-237）。
+            print(f"[k3dge schema] WARN: gate_facts 不可用 ⇒ {code} 按非阻断处理", file=sys.stderr)
+            sev = "warn"
+        else:
+            sev = gate_facts.severity(code)
         text = ""
         if gate_facts is not None and gate_facts.is_declared(code):
             # `path` 由调用方显式给（不使用 `msg.split(":")` —— 那是对散文的解析）
@@ -221,7 +231,12 @@ def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -
                 _add(code, msg, where=loc)
             if ok and schema.get("index"):
                 idx_path = WS / "docs" / typ / schema["index"]
-                idx_text = idx_path.read_text(encoding="utf-8") if idx_path.is_file() else ""
+                try:
+                    idx_text = idx_path.read_text(encoding="utf-8") if idx_path.is_file() else ""
+                except (OSError, UnicodeDecodeError) as exc:
+                    # schema["index"] 是仓内可控相对路径：指向目录/无权限/非 UTF-8 不得 traceback（ocr-238）
+                    _add("DOC_INDEX_STALE", f"index 不可读：{exc}", where=f"docs/{typ}/.schema.json")
+                    idx_text = ""
                 for code, msg, _s in pure_schema.check_index_ref(
                         idx_text, ident, schema.get("codes") or {}, schema["index"], Path(rel).name):
                     _add(code, msg, where=rel)
@@ -329,6 +344,9 @@ def _orphan_warnings(pure_refs) -> list[tuple[str, str, dict]]:
 
 def main() -> int:
     if "--scan" in sys.argv:
+        if not (WS / "docs").is_dir():      # 下游刚 init、还没有 docs/ ⇒ 给出可执行结论而不是 traceback（ocr-239）
+            print("[k3dge doc-gate] PASS: 无 docs/ 目录（尚未 init）")
+            return 0
         missing: list[str] = []
         for d in sorted(p for p in (WS / "docs").iterdir() if p.is_dir()):
             if not (d / "README.md").exists():
