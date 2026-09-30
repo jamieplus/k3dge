@@ -37,7 +37,7 @@ cmd_where(args: argparse.Namespace) -> int
 cmd_index(args: argparse.Namespace) -> int
 cmd_commit(args: argparse.Namespace) -> int
 cmd_commit_attest(args: argparse.Namespace) -> int
-    # doc: Print the attestation trailer line for the live commit-msg hook to append.
+    # doc: 打印署名行；给 `--rewrite-file` 时**就地改写**该提交信息文件。
 cmd_verify_attest(args: argparse.Namespace) -> int
     # doc: Verify a commit's attestation token (used by CI). Every commit is in scope; no skip list.
 cmd_check_msg(args: argparse.Namespace) -> int

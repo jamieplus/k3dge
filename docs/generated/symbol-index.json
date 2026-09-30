@@ -308,7 +308,7 @@
   "build_parser": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1127
+      "line": 1172
     }
   ],
   "build_server_params": [
@@ -560,133 +560,133 @@
   "cmd_audit": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 579
+      "line": 603
     }
   ],
   "cmd_check": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 182
+      "line": 206
     }
   ],
   "cmd_check_msg": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 996
+      "line": 1041
     }
   ],
   "cmd_commit": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 929
+      "line": 953
     }
   ],
   "cmd_commit_attest": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 983
+      "line": 1007
     }
   ],
   "cmd_doc": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 337
+      "line": 361
     }
   ],
   "cmd_extractor": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 273
+      "line": 297
     }
   ],
   "cmd_incident": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1012
+      "line": 1057
     }
   ],
   "cmd_index": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 920
+      "line": 944
     }
   ],
   "cmd_init": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 551
+      "line": 575
     }
   ],
   "cmd_markers": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 656
+      "line": 680
     }
   ],
   "cmd_mcp": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 570
+      "line": 594
     }
   ],
   "cmd_mcp_probe": [
     {
       "file": "src/k3dge/cli/mcp_peers.py",
-      "line": 194
+      "line": 196
     }
   ],
   "cmd_mcp_sync": [
     {
       "file": "src/k3dge/cli/mcp_peers.py",
-      "line": 161
+      "line": 163
     }
   ],
   "cmd_milestone": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 690
+      "line": 714
     }
   ],
   "cmd_search": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 871
+      "line": 895
     }
   ],
   "cmd_status": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1050
+      "line": 1095
     }
   ],
   "cmd_sync": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 247
+      "line": 271
     }
   ],
   "cmd_task": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 465
+      "line": 489
     }
   ],
   "cmd_verify_attest": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 989
+      "line": 1034
     }
   ],
   "cmd_version": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 303
+      "line": 327
     }
   ],
   "cmd_where": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 901
+      "line": 925
     }
   ],
   "code_for": [
@@ -918,13 +918,13 @@
   "get_domain_spec_resource": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 99
+      "line": 105
     }
   ],
   "get_domain_spec_resource_for": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 104
+      "line": 110
     }
   ],
   "get_init_version": [
@@ -936,13 +936,13 @@
   "get_manifest_resource": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 82
+      "line": 88
     }
   ],
   "get_manifest_resource_for": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 87
+      "line": 93
     }
   ],
   "get_manifest_version": [
@@ -1062,91 +1062,91 @@
   "k3dge_5pass_audit_prompt": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 727
+      "line": 733
     }
   ],
   "k3dge_adr_index": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 772
+      "line": 778
     }
   ],
   "k3dge_check": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 123
+      "line": 129
     }
   ],
   "k3dge_doc_grep": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 408
+      "line": 414
     }
   ],
   "k3dge_doc_list": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 376
+      "line": 382
     }
   ],
   "k3dge_doc_where": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 395
+      "line": 401
     }
   ],
   "k3dge_milestone_control": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 427
+      "line": 433
     }
   ],
   "k3dge_status": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 146
+      "line": 152
     }
   ],
   "k3dge_submit_audit_report": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 609
+      "line": 615
     }
   ],
   "k3dge_sync": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 221
+      "line": 227
     }
   ],
   "k3dge_task_create": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 288
+      "line": 294
     }
   ],
   "k3dge_task_done": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 328
+      "line": 334
     }
   ],
   "k3dge_task_list": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 340
+      "line": 346
     }
   ],
   "k3dge_verify_domain_contract": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 166
+      "line": 172
     }
   ],
   "k3dge_version": [
     {
       "file": "src/k3dge/cli/mcp.py",
-      "line": 251
+      "line": 257
     }
   ],
   "kind": [
@@ -1234,7 +1234,7 @@
     },
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1360
+      "line": 1407
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
@@ -1316,7 +1316,7 @@
   "old_name_warnings": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 840
+      "line": 864
     }
   ],
   "on_error": [

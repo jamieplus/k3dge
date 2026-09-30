@@ -10,7 +10,12 @@ $want = $env:K3DGE_SOURCE
 if ([string]::IsNullOrWhiteSpace($want) -and (Test-Path (Join-Path $Root "pyproject.toml"))) {
   # 原生命令 + Stop 下 `2>$null` 会抛 NativeCommandError ⇒ 临时降为 Continue（WinPS 5.1），失败按"取不到"处理（ocr-144/147）。
   $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-  try { $want = ((& python3 -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb")).get("tool",{}).get("k3dge",{}).get("source",""))' 2>$null) | Out-String).Trim() }
+  # 绝对路径喂子进程：`Set-Location` 改的是 provider location，不保证同步原生进程的 CWD
+  # ⇒ 相对 `pyproject.toml` 可能打不开（375）
+  try {
+    $env:K3DGE_PYPROJECT = (Join-Path $Root "pyproject.toml")
+    $want = ((& python3 -c 'import os,tomllib;print(tomllib.load(open(os.environ["K3DGE_PYPROJECT"],"rb")).get("tool",{}).get("k3dge",{}).get("source",""))' 2>$null) | Out-String).Trim()
+  }
   catch { $want = "" }
   finally { $ErrorActionPreference = $prev }
   if ([string]::IsNullOrWhiteSpace($want)) {

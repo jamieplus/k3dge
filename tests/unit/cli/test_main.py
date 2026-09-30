@@ -10,6 +10,43 @@ from k3dge.cli.main import build_parser, main
 from k3dge.engine.evaluator import ConsistencyEngine
 
 
+class TestEvidenceAndPorcelain(unittest.TestCase):
+    """日志写不进必须出声；porcelain 的重命名行不得当成路径（ocr-380/381/384）。"""
+
+    def test_append_log_failure_is_loud(self) -> None:
+        import contextlib
+        import io
+
+        from k3dge.cli.main import _append_log
+
+        ws = Path(tempfile.mkdtemp())
+        (ws / "logs").mkdir()
+        (ws / "logs" / "k3dge.log").write_text("", encoding="utf-8")
+        (ws / "logs" / "k3dge.log").chmod(0o000)
+        err = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(err):
+                _append_log(ws, "check rc=0")
+        finally:
+            (ws / "logs" / "k3dge.log").chmod(0o644)
+        self.assertIn("WARN", err.getvalue(), "证据面失败静默 ⇒ 复盘误判'没跑过'")
+
+    def test_porcelain_rename_lines_take_new_path(self) -> None:
+        from k3dge.cli.main import _porcelain_paths
+
+        got = _porcelain_paths(
+            "R  src/b.py\0src/a.py\0 M src/c.py\0A  docs/x.md\0?? src/é.md\0")
+        self.assertEqual(got, ["src/b.py", "src/c.py", "docs/x.md", "src/é.md"])
+
+    def test_mcp_err_normalizes_path_separators(self) -> None:
+        import json as _json
+
+        from k3dge.cli.mcp import _err
+
+        payload = _json.loads(_err("WorkspaceOutsideRoot", "x", path="C:\\ws\\sub"))
+        self.assertEqual(payload["path"], "C:/ws/sub")
+
+
 class TestCli(unittest.TestCase):
     def test_parser_has_audit(self):
         actions = build_parser()._subparsers._group_actions[0].choices  # type: ignore[attr-defined]

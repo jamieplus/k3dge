@@ -4,14 +4,19 @@ $ErrorActionPreference = "Stop"
 # TARGET is always pwd. Harness directories come from scaffold.
 
 $Target = (Get-Location).Path
-$ScriptRoot = Split-Path -Parent $PSScriptRoot
+# `$PSScriptRoot` 在 `iex (Get-Content …)`/`pwsh -Command` 内联等场景是**空串**，
+# `Split-Path -Parent ''` 返回"当前目录的父目录"⇒ K3dgeHome 会指向一个无关目录（378）。
+$ScriptRoot = if ($PSScriptRoot) { $PSScriptRoot } elseif ($PSCommandPath) { Split-Path -Parent $PSCommandPath } else { "" }
 
 if ($env:K3DGE_SOURCE) {
   $K3dgeHome = $env:K3DGE_SOURCE
-} elseif (Test-Path (Join-Path $ScriptRoot "src/k3dge")) {
+} elseif ($ScriptRoot -and (Test-Path (Join-Path $ScriptRoot "src/k3dge"))) {
   $K3dgeHome = $ScriptRoot
 } else {
-  Write-Error "K3DGE_SOURCE is required (this directory is not a k3dge checkout).`n  `$env:K3DGE_SOURCE='/path/to/k3dge'; ./k3dge-init.ps1`n  or:  cd <project>; /path/to/k3dge/k3dge-init.ps1"
+  # Stop 偏好下 `Write-Error` 本身就是终止错误 ⇒ 紧随的 `exit 1` 永不执行，调用方拿到未处理异常
+  # 而不是干净退出码（379）。写 stderr + 显式退出。
+  [Console]::Error.WriteLine("K3DGE_SOURCE is required（本目录不是 k3dge checkout，且定位不到脚本所在目录）")
+  [Console]::Error.WriteLine("  用文件路径跑：powershell -File .\k3dge-init.ps1（在目标项目目录里）")
   exit 1
 }
 
@@ -20,7 +25,7 @@ Set-Location $Target
 # 宣称要 >=3.10 就必须**验版本**：只做存在性检查时，低版本一路跑到 pip/scaffold 才报
 # 难懂的语法/导入错（359）。Windows 上 `python3` 常是商店占位符 ⇒ 优先 `python`。
 if (-not (Get-Command python -ErrorAction SilentlyContinue) -and -not (Get-Command python3 -ErrorAction SilentlyContinue)) {
-  Write-Error "python (>=3.10) is required"
+  [Console]::Error.WriteLine("python (>=3.10) is required")     # 同 379：Stop 下 Write-Error 会吞掉 exit 码
   exit 1
 }
 $Py = if (Get-Command python -ErrorAction SilentlyContinue) { "python" } else { "python3" }

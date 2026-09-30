@@ -15,14 +15,38 @@ from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.models import GateReport
 
 
+def _porcelain_paths(stdout_z: str) -> list:
+    """`git status --porcelain -z` → 改动路径列表。
+
+    非 `-z` 的 v1 把重命名写成 `R <old> -> <new>`、特殊字符路径还要 C 风格引号转义，
+    整段 `ln[3:]` 会被当成一个真实文件（`startswith("src/")` 成立）⇒ 假路径混进 hints（381）。
+    `-z` 用 NUL 分隔且**给出字面 UTF-8 路径**：记录＝`XY path`，`R`/`C` 后紧跟一条原始路径。
+    """
+    fields = (stdout_z or "").split("\0")
+    out: list = []
+    i = 0
+    while i < len(fields):
+        rec = fields[i]
+        i += 1
+        if not rec.strip():
+            continue
+        code, path = rec[:2], rec[3:].strip()
+        if code[:1] in ("R", "C"):
+            i += 1                      # 下一条＝原始路径（改动面只认新路径）
+        if path:
+            out.append(path)
+    return out
+
+
 def _append_log(workspace: Path, line: str) -> None:
     try:
         p = workspace / "logs/k3dge.log"
         p.parent.mkdir(parents=True, exist_ok=True)
         with p.open("a", encoding="utf-8") as f:
-            f.write(line + "\n")
-    except OSError:
-        pass
+            f.write(line + "\n")     # 单行 append：短于 PIPE_BUF 的写对追加是原子的（hook/CLI 并发）
+    except OSError as exc:
+        # 审计日志是这条治理链的**持久证据面**：整类静默吞 ⇒ 事后复盘误判"本轮没跑过 check"（380）
+        print(f"[LOG] WARN: 写不进 {p}（{type(exc).__name__}: {exc}）⇒ 本轮证据未落盘", file=sys.stderr)
 
 
 from k3dge.cli.mcp_peers import (
@@ -92,10 +116,10 @@ def _workspace_hints(workspace: Path) -> list:
         import subprocess
 
         out = subprocess.run(
-            ["git", "status", "--porcelain"],
+            ["git", "status", "--porcelain", "-z"],
             cwd=workspace, capture_output=True, text=True, timeout=10,
         )
-        files = [ln[3:].strip() for ln in out.stdout.splitlines() if ln.strip()]
+        files = _porcelain_paths(out.stdout)
     except Exception:
         return []
     if not files:
@@ -981,8 +1005,29 @@ def cmd_commit(args: argparse.Namespace) -> int:
 
 
 def cmd_commit_attest(args: argparse.Namespace) -> int:
-    """Print the attestation trailer line for the live commit-msg hook to append."""
-    print(_attest.line(_find_workspace(Path.cwd())))
+    """打印署名行；给 `--rewrite-file` 时**就地改写**该提交信息文件。
+
+    改写走库（`attest.append_to_message`）而不是 hook 里的 `grep`+`>>`：两条实现会漂
+    （空行分段、已有 trailer 块并入、伪造行剔除），漂了 hook 署的名 CI 就读不回（374）。
+    """
+    ws = _find_workspace(Path.cwd())
+    target = getattr(args, "rewrite_file", None)
+    if not target:
+        print(_attest.line(ws))
+        return 0
+    path = Path(target)
+    try:
+        msg = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"[COMMIT] 读不出提交信息文件 {path}（{type(exc).__name__}: {exc}）", file=sys.stderr)
+        return 1
+    from k3dge.engine.atomic import atomic_write_text
+
+    try:
+        atomic_write_text(path, _attest.append_to_message(ws, msg, who=""))
+    except OSError as exc:
+        print(f"[COMMIT] 写不回提交信息文件 {path}（{exc}）", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -1349,6 +1394,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_cm.add_argument("--file", dest="file", required=True, help="path to commit message file")
     p_cm.set_defaults(func=cmd_check_msg)
     p_catt = sub.add_parser("commit-attest", help=argparse.SUPPRESS)
+    p_catt.add_argument("--rewrite-file", dest="rewrite_file", default=None,
+                        help="就地用库改写该文件的署名行（commit-msg hook 用）")
     p_catt.set_defaults(func=cmd_commit_attest)
     p_vatt = sub.add_parser("verify-attest", help=argparse.SUPPRESS)
     p_vatt.add_argument("--commit", dest="commit", required=True, help="commit hash/tree-ish")

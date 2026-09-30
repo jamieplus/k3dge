@@ -207,3 +207,45 @@ class TestInitEntrypoints(unittest.TestCase):
         wrapper = (ASSETS / "k3dge-init-wrapper.ps1").read_text(encoding="utf-8")
         self.assertIn("$PSScriptRoot", wrapper)
         self.assertIn("无法定位本脚本所在目录", wrapper)      # 363
+
+
+class TestTrackHygiene(unittest.TestCase):
+    """三轨脚本的进程级副作用与定位假设（ocr-373/375/376/377/378/379）。"""
+
+    def test_build_pyz_resolves_through_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            bindir = root / "bin"
+            bindir.mkdir()
+            link = bindir / "build-pyz.sh"
+            link.symlink_to(K3DGE_SRC.parent / "scripts" / "build-pyz.sh")
+            r = subprocess.run(["bash", str(link)], capture_output=True, text=True,
+                               env={"PATH": "/usr/bin:/bin", "PYTHON": "definitely-not-a-python"},
+                               cwd=root)
+            self.assertTrue(("PYTHON" in r.stderr) or ("不像 k3dge 仓" in r.stderr),
+                            r.stdout + r.stderr)     # 走到 preflight/验根，而不是在错根造 dist
+            self.assertFalse((root / "dist").exists(), "错根上被 mkdir -p dist 造了垃圾")
+
+    def test_gate_ps1_feeds_absolute_path_to_child(self) -> None:
+        ps1 = (ASSETS / "gate.ps1").read_text(encoding="utf-8")
+        self.assertIn("K3DGE_PYPROJECT", ps1)
+        self.assertNotIn('open("pyproject.toml","rb")', ps1, "相对路径依赖子进程 CWD（375）")
+
+    def test_generate_docs_ps1_restores_location_and_names_itself(self) -> None:
+        ps1 = (ASSETS / "generate-docs.ps1").read_text(encoding="utf-8")
+        self.assertIn("Push-Location $Root", ps1)
+        self.assertIn("trap { Pop-Location } EXIT", ps1)             # 376
+        self.assertIn("Auto-generated stub by ``./scripts/generate-docs.ps1``", ps1)  # 377
+        self.assertNotIn("Auto-generated stub by ``./scripts/generate-docs.sh``", ps1)
+
+    def test_init_ps1_guards_script_root_and_exit_codes(self) -> None:
+        ps1 = (ASSETS / "init.ps1").read_text(encoding="utf-8")
+        self.assertIn("} elseif ($PSCommandPath) {", ps1)             # 378：$PSScriptRoot 空不再算错根
+        self.assertIn('$ScriptRoot -and (Test-Path', ps1)
+        self.assertNotIn("\n  Write-Error", ps1,                      # 379：Stop 下 Write-Error 吞掉 exit 码
+                         "该用 [Console]::Error.WriteLine + exit")
+
+    def test_commit_msg_delegates_attestation_to_library(self) -> None:
+        hook = (K3DGE_SRC.parent / "scripts" / "commit-msg").read_text(encoding="utf-8")
+        self.assertIn("commit-attest --rewrite-file", hook)
+        self.assertNotIn("$1.k3dge-tmp", hook, "hook 自己 grep+mv 的实现已退休（374）")

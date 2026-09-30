@@ -2,7 +2,25 @@
 # 构建零依赖单件：dist/k3dge.pyz（stdlib zipapp；无需 shiv/PyInstaller/uv）。
 # 用途：下游仓 / 无 venv 宿主 直接 `python dist/k3dge.pyz …`。发行物，不入库（.gitignore dist/）。
 set -eu
-cd "$(dirname "$0")/.."
+# `$0` 经软链/PATH 裸名调用时指向链接所在位置 ⇒ `cd ../` 落到与仓无关的目录，`mkdir -p dist`
+# 就在那里造垃圾（373）。先把链接解成真实文件，再取物理根，最后**验根**：验不过就拒跑。
+SELF="$0"
+case "$SELF" in
+  /*) ;;
+  *) SELF="$(command -v -- "$SELF" 2>/dev/null || printf '%s' "$SELF")" ;;
+esac
+while [ -L "$SELF" ]; do
+  LINK="$(readlink -- "$SELF")"
+  case "$LINK" in
+    /*) SELF="$LINK" ;;
+    *) SELF="$(cd "$(dirname "$SELF")" && pwd -P)/$LINK" ;;
+  esac
+done
+cd "$(dirname "$SELF")/.." || { echo "[build-pyz] 无法进入仓根（$SELF）" >&2; exit 1; }
+if [ ! -f pyproject.toml ] || [ ! -d src/k3dge ]; then
+  echo "[build-pyz] 推断的仓根 '$(pwd -P)' 不像 k3dge 仓（缺 pyproject.toml 或 src/k3dge）⇒ 拒跑" >&2
+  exit 1
+fi
 mkdir -p dist
 PY="${PYTHON:-python3}"
 # preflight：必须是可用、>=3.10 的 Python（与 pyproject requires-python 对齐）；否则清晰报错（ocr-138）。

@@ -5,7 +5,10 @@ $ErrorActionPreference = "Stop"
 # Idempotent: existing files are not overwritten.
 
 $Root = Split-Path -Parent $PSScriptRoot
-Set-Location $Root
+# `Set-Location` 是**进程级**副作用：`.sh` 的 `cd` 关在子进程里不泄漏，而本脚本被 `&`/点源调用时
+# 会把调用方的当前位置改掉且永不恢复（376）。Push/Pop + trap ⇒ 任何出口都还原。
+Push-Location $Root
+trap { Pop-Location } EXIT
 
 $CONFIG = ".agent/docs.toml"
 # 与 .sh 轨统一：**LF + 无 BOM** 写盘。`Set-Content -Encoding utf8` 在 WinPS 5.1 写 BOM、Windows
@@ -88,7 +91,7 @@ function Write-Guide([string]$key, [string]$file, [string]$title) {
         Write-TextFile $file @(
           "# $title",
           "",
-          "> Auto-generated stub by ``./scripts/generate-docs.sh`` from ``.agent/docs.toml``.",
+          "> Auto-generated stub by ``./scripts/generate-docs.ps1`` from ``.agent/docs.toml``.",
           "> Agent: please fill this document per software engineering standards, referencing",
           "> ``docs/specs/``, ``.agent/manifest.json`` and ``docs/generated/``.",
           "",

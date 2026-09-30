@@ -21,17 +21,10 @@ fi
 
 python3 "${ROOT}/scripts/gate.py" check-msg --file "$1" || exit 1
 
-if ! LINE="$(python3 "${ROOT}/scripts/gate.py" commit-attest)"; then
-  echo "[k3dge] commit-attest 失败：拒绝提交（缺 k3dge-commit 署名会被 CI 全量验拦下）" >&2
+# 署名**由库就地改写**（`append_to_message`）：以前 hook 自己 `grep`+`>>` 补一行，两条实现会漂
+# （空行分段、并入已有 trailer 块、剔除伪造行）⇒ hook 署的名 CI 读不回（374）。
+# 库每轮重算并刷新 `k3dge-commit:` 行：`--amend`/tree 变了仍拿到新 token（ocr-125/142）。
+if ! python3 "${ROOT}/scripts/gate.py" commit-attest --rewrite-file "$1"; then
+  echo "[k3dge] commit-attest 改写失败：拒绝提交（缺 k3dge-commit 署名会被 CI 全量验拦下）" >&2
   exit 1
 fi
-if ! printf '%s' "$LINE" | grep -Eq '^k3dge-commit: .+ @ .+ #[a-z]+$'; then
-  echo "[k3dge] commit-attest 输出非法（应为一行 k3dge-commit trailer）：$LINE" >&2
-  exit 1
-fi
-# 每次**刷新**该行（删旧再追加）：`--amend`/重跑会把旧 tree/旧窗算出的 token 带进来，
-# 跳过会让 token 过期（内容改了 tree 变 ⇒ CI 重算 mismatch）；也挡"正文塞一行伪造署名骗过 hook"（ocr-125/142）。
-if grep -q '^k3dge-commit: ' "$1"; then
-  grep -v '^k3dge-commit: ' "$1" > "$1.k3dge-tmp" && mv "$1.k3dge-tmp" "$1"
-fi
-printf '\n%s\n' "$LINE" >> "$1"

@@ -40,7 +40,9 @@ from k3dge.engine.models import GateReport
 def _err(code: str, message: str, path: Optional[str] = None) -> str:
     payload = {"ok": False, "error": code, "message": message}
     if path is not None:
-        payload["path"] = path
+        # 出口统一正斜杠：其它出口（task_*）都归一过，这里漏一处 ⇒ Windows harness
+        # 在同一份协议里拿到两种分隔符（384）
+        payload["path"] = str(path).replace("\\", "/")
     return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
@@ -73,7 +75,11 @@ else:  # pragma: no cover
             return lambda fn: fn
 
         def run(self, *_a, **_kw):  # type: ignore[no-untyped-def]
-            raise RuntimeError("mcp package not installed; install with: pip install 'k3dge[mcp]'")
+            # 失败原因此前被赋给 `_mcp_import_error` 却从不读：`mcp` 装了但形状不对
+            # （无 MCPServer）时，操作者只看到"没装"这句通用话（383）
+            detail = f"（导入细节：{_mcp_import_error}）" if _mcp_import_error else ""
+            raise RuntimeError(
+                "mcp package not usable; install with: pip install 'k3dge[mcp]'" + detail)
 
     mcp = _DummyMCP()  # type: ignore[assignment]
 

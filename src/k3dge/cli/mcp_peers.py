@@ -17,10 +17,12 @@ from k3dge.engine.mcp_json import probe_peer_mcp
 def _peer_fallback_warn(peer: str, reason: str, fallback: str) -> None:
     """Highlighted warning when an external peer is unavailable and we fall back to default."""
     msg = f"Peer '{peer}' failed ({reason}) → fallback to DEFAULT '{fallback}'"
-    # High-visibility: red background + yellow text + plain fallback for non-TTY
-    banner = f"\033[1;41mWARN[DOWNGRADE]\033[0m \033[1;33m{msg}\033[0m"
-    print(banner, file=sys.stderr)
-    print(f"WARN[DOWNGRADE] {msg}", file=sys.stderr)
+    # docstring 说"非 TTY 走纯文本"，旧实现**两条都印** ⇒ 每条告警重复两遍，且 CI/日志里
+    # 仍混入转义垃圾（下游按 WARN[DOWNGRADE] 计数会翻倍，385）
+    is_tty = bool(getattr(sys.stderr, "isatty", lambda: False)())
+    line = (f"\033[1;41mWARN[DOWNGRADE]\033[0m \033[1;33m{msg}\033[0m" if is_tty
+            else f"WARN[DOWNGRADE] {msg}")
+    print(line, file=sys.stderr)
 
 
 def _peer_fallback(pcfg: dict) -> str:
@@ -199,7 +201,17 @@ def cmd_mcp_probe(args, workspace: Path) -> int:
     timeout = int(getattr(args, "timeout", 20) or 20)
     servers = load_mcp_endpoints(workspace)
     if not servers:
-        print(f"[MCP] no servers declared in {workspace / '.mcp.json'}", file=sys.stderr)
+        # 缺失 / 坏 JSON / 形状不对 / 真的没声明 是四种不同的事实，旧都报"no servers declared"（386）
+        from k3dge.engine.mcp_json import mcp_server_names
+
+        doc_path = workspace / ".mcp.json"
+        if not doc_path.is_file():
+            why = f"没有 {doc_path}（跑 k3dge mcp sync 生成）"
+        elif mcp_server_names(workspace) is None:
+            why = f"{doc_path} 读不出/形状不对（不是对象或缺 mcpServers）"
+        else:
+            why = f"{doc_path} 里没有声明任何 server"
+        print(f"[MCP] {why}", file=sys.stderr)
         return 1
     rows = probe_servers(workspace, timeout=timeout)
     as_json = getattr(args, "json", False)
