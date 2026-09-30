@@ -44,18 +44,28 @@ def _reviews_to_archive(reviews_dir: Path, milestone_id: str, pass_mark: str) ->
     return out
 
 
-def _rewrite_leftover_links(workspace: Path, filename: str, new_href: str) -> None:
+def _rewrite_leftover_links(workspace: Path, filename: str, new_href: str) -> Tuple[bool, str]:
+    """改写 LEFTOVERS.md 里指向该报告的链接。返回 `(ok, note)`。
+
+    调用顺序是**先 move 再改链**（seal.py）：这里静默返回 ⇒ 文件已移走而链接仍指旧路，
+    读者拿到死链且无人知道（ocr-305）。失败必须出声。
+    """
     leftovers = workspace / "docs" / "reviews" / "LEFTOVERS.md"
     if not leftovers.is_file():
-        return
+        return True, ""
     try:
         text = leftovers.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return
+    except (OSError, UnicodeDecodeError) as exc:
+        return False, f"LEFTOVERS.md 读不出（{type(exc).__name__}）⇒ {filename} 的链接未改写"
     updated = text.replace(f"]({filename})", f"]({new_href})")
     updated = updated.replace(f"](./{filename})", f"]({new_href})")
-    if updated != text:
+    if updated == text:
+        return True, ""
+    try:
         leftovers.write_text(updated, encoding="utf-8")
+    except OSError as exc:
+        return False, f"LEFTOVERS.md 写不进（{type(exc).__name__}）⇒ {filename} 的链接未改写"
+    return True, ""
 
 
 def _safe_archive_dir(workspace: Path, kind: str, milestone_id: str) -> Tuple[Optional[Path], str]:

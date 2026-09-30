@@ -157,13 +157,17 @@ def has_milestone_token(text: str, milestone_id: str) -> bool:
 
     `M1` 不得匹配 `M10`（文件名 `2026-08-23-M10-align.md` 或正文里的 `M10`）。
     边界集 `[-_./\s]`（**不含 `+`**：`M10+` 形态不合法，见 `milestone_pointer` 的 id 规则）。
+    大小写不敏感（与 `milestone_files._FILENAME_MILESTONE_RE` 同口径）。
 
     归零依赖层：`milestone_files._has_milestone_token` 是其委托别名（单一实现在此），
     这样闸核（`check_task_consistency`）与生命周期模块判同一个东西，不必各写一遍正则。
     """
     if not milestone_id:
         return False
-    return re.search(rf"(?:^|[-_./\s]){re.escape(milestone_id)}(?:[-_./\s]|$)", text) is not None
+    # 大小写不敏感：`_filename_milestone`/`_FILENAME_MILESTONE_RE` 都带 IGNORECASE，
+    # 这里严格比大小写 ⇒ `2026-09-16-m10-fix.md` 的"M10" 判不出 ⇒ 本里程碑报告漏归档（ocr-304）
+    return re.search(rf"(?:^|[-_./\s]){re.escape(milestone_id)}(?:[-_./\s]|$)",
+                     text, re.IGNORECASE) is not None
 
 
 def check_task_consistency(rel: str, text: str) -> List[Ref]:

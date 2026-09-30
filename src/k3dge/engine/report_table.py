@@ -34,8 +34,17 @@ def _is_separator(cells: List[str]) -> bool:
 
 
 def has_table(text: str) -> bool:
-    """是否含 12 列表头（忽略空白差异）。"""
-    return TABLE_HEADER.replace("|", "") in (text or "").replace("|", "").replace(" ", "")
+    """是否含 12 列表头——判据与 `find_table`/`_cells` **同源**。
+
+    旧实现自己 `replace("|","").replace(" ","")`：只剥半角空格，制表符/全角空格/U+00A0
+    填充时判 False，而 `find_table`（走 `strip()`）认得出 ⇒ 同一个"这张表是不是审计报告"
+    两处互相矛盾（ocr-303）。
+    """
+    _idx, header = find_table(text)
+    if header is None:
+        return False
+    want = [c.strip() for c in TABLE_HEADER.split("|")]
+    return len(header) == len(want) and header == want
 
 
 def find_table(text: str, required: Tuple[str, ...] = ("ID", "状态")):

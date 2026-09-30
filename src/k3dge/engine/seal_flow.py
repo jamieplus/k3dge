@@ -6,6 +6,8 @@ Extracted from `engine/milestone.py` (A-1 第十三块).
 from __future__ import annotations
 
 import datetime
+import re
+import sys
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -17,20 +19,21 @@ from k3dge.engine import seal as seal_mod
 from k3dge.engine.seal import seal_milestone, seal_preconditions_error
 
 
-def _align_review_path(workspace: Path, milestone_id: str) -> Optional[Path]:
-    """Locate the generated align review scaffold for a milestone."""
+def _align_review_paths(workspace: Path, milestone_id: str) -> list:
+    """该里程碑生成的 align 桩文件（**全部**）。
+
+    桩闸（`seal_preconditions_error` → `_seal_review_gate`）扫的是 `docs/reviews/` 下
+    **所有** `-align.md`，只要有一个还带 stub 就判红；这里只回字典序第一个 ⇒ 第二个桩
+    永远清不掉，封板在前置闸处死循环（ocr-309）。
+    """
     reviews = workspace / "docs" / "reviews"
     if not reviews.is_dir():
-        return None
-    for f in sorted(reviews.iterdir()):
-        if (
-            f.is_file()
-            and f.suffix == ".md"
-            and "-align.md" in f.name
-            and _has_milestone_token(f.name, milestone_id)
-        ):
-            return f
-    return None
+        return []
+    return [
+        f for f in sorted(reviews.iterdir())
+        if f.is_file() and f.suffix == ".md" and "-align.md" in f.name
+        and _has_milestone_token(f.name, milestone_id)
+    ]
 
 
 def _strip_align_stub(workspace: Path, milestone_id: str) -> None:
@@ -39,15 +42,18 @@ def _strip_align_stub(workspace: Path, milestone_id: str) -> None:
     The mandatory audit now *is* the real verification; the align scaffold is a
     structural placeholder only.
     """
-    p = _align_review_path(workspace, milestone_id)
-    if not p:
-        return
-    try:
-        text = p.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return
-    if _ALIGN_STUB_MARKER in text:
-        p.write_text(text.replace(_ALIGN_STUB_MARKER, "").strip() + "\n", encoding="utf-8")
+    for p in _align_review_paths(workspace, milestone_id):
+        try:
+            text = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if _ALIGN_STUB_MARKER not in text:
+            continue
+        try:                     # 读保护过、写裸奔 ⇒ OSError 冒穿 run_phase（无异常兜底）→ seal 崩（ocr-310）
+            p.write_text(text.replace(_ALIGN_STUB_MARKER, "").strip() + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"[seal_flow] WARN: 清 align 桩写不回 {p.name}（{type(exc).__name__}: {exc}）"
+                  "⇒ 桩闸仍会红", file=sys.stderr)
 
 
 def _report_seat(workspace: Path, milestone_id: str) -> str:
@@ -77,6 +83,10 @@ def _boundary_tag_before(workspace: Path, milestone_id: str) -> str:
     for name in out.splitlines():
         name = name.strip()
         if not name or name == milestone_id:
+            continue
+        # 前缀 `M*` 粗筛配上"取最后一个数字段"的排序键 ⇒ `Milestone-2024-09-29`(29)、`MAJOR-1.0`
+        # 会盖过真正的 M10/M0，边界选错后 diff 区间与 CHANGELOG 全漂（ocr-311）
+        if not re.fullmatch(r"M\d+", name):
             continue
         if _tag_number(name) > _tag_number(best or "M0"):
             best = name
@@ -116,19 +126,24 @@ def _architecture_staleness(workspace: Path, milestone_id: str) -> str:
     )
 
 
-def _refresh_projections(workspace: Path) -> list:
+def _refresh_projections(workspace: Path, failures: Optional[list] = None) -> list:
     """相位 3 的**纯投影**刷新：`docs/generated/{api,domains,docs-index}.md|json`、符号索引、README 自动块。
 
     返回**实际变化**的相对路径（人读；没变就不列）。全部幂等、零判断；任一件失败 ⇒ 跳过该件
     （投影坏不得拦住封板收尾，但会写进事件面）。
     """
     changed: list = []
+    failures = failures if failures is not None else []
 
     def _track(path: Path, fn) -> None:
         before = path.read_bytes() if path.is_file() else None
         try:
             fn()
-        except Exception:
+        except Exception as exc:
+            # 吞掉具体错误 ⇒ "投影失败"被渲染成"无变化/已与事实一致"（ocr-312/314）
+            failures.append(f"{path.name}: {type(exc).__name__}: {exc}")
+            print(f"[seal_flow] WARN: 投影刷新失败 {path}（{type(exc).__name__}: {exc}）",
+                  file=sys.stderr)
             return
         after = path.read_bytes() if path.is_file() else None
         if after != before and after is not None:
@@ -143,7 +158,12 @@ def _refresh_projections(workspace: Path) -> list:
         from k3dge.engine.manifest import Manifest
         from k3dge.engine.search import index_path, write_symbol_index
 
-        manifest = Manifest.load(workspace)
+        try:
+            manifest = Manifest.load(workspace)
+        except Exception as exc:      # 外层曾经把 Manifest 读坏也一起静默跳过全部投影
+            failures.append(f"manifest: {type(exc).__name__}: {exc}")
+            print(f"[seal_flow] WARN: manifest 读不出 ⇒ 本轮不刷投影（{exc}）", file=sys.stderr)
+            return changed
         for path, content in render_manual_docs_content(workspace, manifest).items():
             _track(path, lambda path=path, content=content: (
                 path.parent.mkdir(parents=True, exist_ok=True),
@@ -152,8 +172,9 @@ def _refresh_projections(workspace: Path) -> list:
         _track(workspace / "README.md", lambda: render_readme_layout(workspace, manifest))
         _track(workspace / INDEX_REL, lambda: write_docs_index(workspace))
         _track(index_path(workspace), lambda: write_symbol_index(workspace))
-    except Exception:
-        pass
+    except Exception as exc:  # pragma: no cover - import/结构异常
+        failures.append(f"projections: {type(exc).__name__}: {exc}")
+        print(f"[seal_flow] WARN: 投影刷新整体失败（{type(exc).__name__}: {exc}）", file=sys.stderr)
     return changed
 
 
@@ -182,9 +203,12 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
         sorted({f.name for f in report_files if f.name.endswith(("-audit.md", "-quality.md"))})
     ) or "-"
     arch_fact = _architecture_staleness(workspace, milestone_id)
-    p = reviews / f"{today}-{milestone_id}-closure.md"
+    # 幂等重入：同一天重跑不得把人已在 `## 1..4` 勾过的清单擦成空桩；跨天重跑也不该另起一份
+    # 把旧的变成孤儿 ⇒ 按里程碑找**已有**清单复用（ocr-313）
+    existing = sorted(reviews.glob(f"*-{milestone_id}-closure.md"))
+    p = existing[0] if existing else reviews / f"{today}-{milestone_id}-closure.md"
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(
+    body = (
         "\n".join(
             [
                 f"# 封板收摊清单（上下文压缩）: {milestone_id}",
@@ -211,9 +235,16 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
                 f"{today}\tseal\tseal {milestone_id}\t审计闭环（合并审计模块单份 12 列，待修=0）\t{audit_reports}\t{sealed_version}",
                 "",
             ]
-        ),
-        encoding="utf-8",
+        )
     )
+    if p.is_file():
+        try:
+            keep = bool(p.read_text(encoding="utf-8").strip())
+        except (OSError, UnicodeDecodeError):
+            keep = False
+        if keep:
+            return p          # 幂等重入：人勾过的清单不擦（旧实现无条件 write_text 覆盖）
+    p.write_text(body + "\n", encoding="utf-8")
     return p
 
 
@@ -344,9 +375,13 @@ def run_seal_flow(
         # 先刷**纯投影**（docs/generated/* + README 自动块 + 符号索引），再写清单 ⇒ 刷出来的内容
         # 落进随后的封版提交。**不跑整条 sync**：spec 接口块/契约哈希与 ADR reconcile 是**事实源写**，
         # 在审计之后动它们等于改审计看过的内容（ADR-0004 §2.1.9「审哪版封哪版」）。
-        refreshed = _refresh_projections(workspace)
+        proj_failures: list = []
+        refreshed = _refresh_projections(workspace, proj_failures)
         p = _write_closure_note(workspace, milestone_id)
-        note = f"\n  派生件: {'、'.join(refreshed) if refreshed else '已与事实一致'}"
+        if proj_failures:
+            note = f"\n  派生件: ⚠️ {len(proj_failures)} 件投影刷新失败（{'；'.join(proj_failures[:3])}）"
+        else:
+            note = f"\n  派生件: {'、'.join(refreshed) if refreshed else '已与事实一致'}"
         # 架构文档新鲜度：清单里已写具体事实，这里再投影一次到 seal 输出（同一判定，两处显示）
         return True, (note
                       + f"\n  收摊清单: {p.relative_to(workspace)}"

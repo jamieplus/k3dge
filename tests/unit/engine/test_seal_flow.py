@@ -804,3 +804,95 @@ class TestAuditNoNoop(TestCase):
         self.assertIsNone(audit_result_of("ratchet_open"))   # in-flight：未正常返回 ⇒ 不推进
         self.assertIsNone(audit_result_of("audit_open"))
         self.assertNotIn("refused", SEALABLE_AUDIT_RESULTS)
+
+
+class TestSealFlowEdges(TestCase):
+    """align 桩全清、写失败出声、边界 tag 只认 `M<n>`、清单幂等（ocr-305/309-314）。"""
+
+    def _ws(self) -> Path:
+        ws = Path(tempfile.mkdtemp())
+        (ws / ".agent").mkdir()
+        (ws / "docs" / "reviews").mkdir(parents=True)
+        return ws
+
+    def test_all_align_stubs_are_cleared(self) -> None:
+        from k3dge.engine.align import _ALIGN_STUB_MARKER
+        from k3dge.engine.seal_flow import _align_review_paths, _strip_align_stub
+
+        ws = self._ws()
+        for name in ("2026-09-01-M11-align.md", "2026-09-02-M11-align.md"):
+            (ws / "docs" / "reviews" / name).write_text(
+                f"# align\n{_ALIGN_STUB_MARKER}\n", encoding="utf-8")
+        self.assertEqual(len(_align_review_paths(ws, "M11")), 2)
+        _strip_align_stub(ws, "M11")
+        for name in ("2026-09-01-M11-align.md", "2026-09-02-M11-align.md"):
+            self.assertNotIn(_ALIGN_STUB_MARKER,
+                             (ws / "docs" / "reviews" / name).read_text(encoding="utf-8"))
+
+    def test_align_stub_write_failure_warns_not_raises(self) -> None:
+        import contextlib
+
+        from k3dge.engine.align import _ALIGN_STUB_MARKER
+        from k3dge.engine import seal_flow
+
+        ws = self._ws()
+        f = ws / "docs" / "reviews" / "2026-09-01-M11-align.md"
+        f.write_text(f"# align\n{_ALIGN_STUB_MARKER}\n", encoding="utf-8")
+        err = io.StringIO()
+        with mock.patch.object(Path, "write_text", side_effect=OSError("read-only fs")), \
+                contextlib.redirect_stderr(err):
+            seal_flow._strip_align_stub(ws, "M11")      # 旧实现直接抛，冒穿 run_phase
+        self.assertIn("WARN", err.getvalue())
+
+    def test_boundary_tag_ignores_non_milestone_names(self) -> None:
+        import subprocess
+
+        from k3dge.engine.seal_flow import _boundary_tag_before
+
+        ws = self._ws()
+        for cmd in (["init", "-q"], ["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+            subprocess.run(["git", "-C", str(ws), *cmd], check=True, capture_output=True)
+        (ws / "a.txt").write_text("x", encoding="utf-8")
+        subprocess.run(["git", "-C", str(ws), "add", "-A"], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(ws), "commit", "-q", "-m", "chore: init"],
+                       check=True, capture_output=True)
+        for tag in ("M9", "Milestone-2024-09-29", "MAJOR-1.0"):
+            subprocess.run(["git", "-C", str(ws), "tag", tag], check=True, capture_output=True)
+        self.assertEqual(_boundary_tag_before(ws, "M10"), "M9")
+
+    def test_projection_failures_are_collected_and_visible(self) -> None:
+        from k3dge.engine import seal_flow
+
+        ws = self._ws()
+        fails: list = []
+        with mock.patch("k3dge.engine.manifest.Manifest.load",
+                        side_effect=RuntimeError("manifest 坏了")):
+            changed = seal_flow._refresh_projections(ws, fails)
+        self.assertEqual(changed, [])
+        self.assertTrue(fails, "投影失败被抹平成'无变化'")
+
+    def test_closure_note_keeps_human_content(self) -> None:
+        from k3dge.engine.seal_flow import _write_closure_note
+
+        ws = self._ws()
+        p = _write_closure_note(ws, "M11")
+        p.write_text(p.read_text(encoding="utf-8") + "\n- [x] 人已补的设计决策\n", encoding="utf-8")
+        again = _write_closure_note(ws, "M11")
+        self.assertEqual(again, p)
+        self.assertIn("人已补的设计决策", p.read_text(encoding="utf-8"))
+
+    def test_leftover_link_failure_returns_note(self) -> None:
+        from k3dge.engine.review_archive import _rewrite_leftover_links
+
+        ws = self._ws()
+        lo = ws / "docs" / "reviews" / "LEFTOVERS.md"
+        lo.write_text("] [x](2026-09-01-M11-audit.md)", encoding="utf-8")
+        ok, _ = _rewrite_leftover_links(ws, "2026-09-01-M11-audit.md", "archive/M11/a.md")
+        self.assertTrue(ok)
+        lo.chmod(0o000)
+        try:
+            ok2, note = _rewrite_leftover_links(ws, "2026-09-02-M11-audit.md", "archive/M12/b.md")
+            self.assertFalse(ok2)
+            self.assertIn("LEFTOVERS.md", note)
+        finally:
+            lo.chmod(0o644)

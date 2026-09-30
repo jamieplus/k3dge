@@ -135,6 +135,7 @@ def _seal_archive(workspace: Path, milestone_id: str, tasks: List[MilestoneTask]
     if to_archive_reviews:
         review_archive.mkdir(parents=True, exist_ok=True)
     moved_records: list[tuple[Path, Path]] = []
+    link_notes: list[str] = []
     try:
         for t in tasks:
             target = task_archive / t.path.name
@@ -144,7 +145,10 @@ def _seal_archive(workspace: Path, milestone_id: str, tasks: List[MilestoneTask]
             target = review_archive / rev.name
             shutil.move(str(rev), str(target))
             moved_records.append((target, rev))
-            _rewrite_leftover_links(workspace, rev.name, f"archive/{milestone_id}/{rev.name}")
+            _ok, _note = _rewrite_leftover_links(
+                workspace, rev.name, f"archive/{milestone_id}/{rev.name}")
+            if not _ok:
+                link_notes.append(_note)   # 不回滚（文件已移走是对的），但必须让操作者看见
     except Exception as exc:
         if leftover_orig is not None:
             try:
@@ -171,6 +175,7 @@ def _seal_archive(workspace: Path, milestone_id: str, tasks: List[MilestoneTask]
     sealed = (
         f"Sealed milestone '{milestone_id}'. Archived {len(tasks)} tasks to "
         f"docs/tasks/archive/{milestone_id}/{review_note}."
+        + ((" " + "；".join(link_notes)) if link_notes else "")
     )
     try:
         nxt = bump_milestone(workspace)
@@ -322,14 +327,36 @@ def head_commit(workspace: Path) -> str:
     return out if rc == 0 else ""
 
 
+#: 允许出现在 trailer 值里的闭集（审计结果）；其余值按事实文本净化，不判对错。
+def _trailer_value(value: str) -> str:
+    """外部（报告/环境/CI）取来的值净化成**单行、不含键形**的文本。
+
+    含换行/空行会把最后一段拆开 ⇒ git 不再当 trailer 块，四键整体读不回；
+    值里再出现 `": "` 会被下游按 `Key: value` 多解析出一个键（占位 `-` 也让
+    「键齐全」判据失去意义）。净化＝压空白 + `": "`→`"; "` + 长度封顶（ocr-306）。
+    """
+    s = " ".join(str(value or "").split())
+    s = s.replace(": ", "; ")
+    return (s[:200] or "-")
+
+
+def _same_commit(full: str, given: str) -> bool:
+    """`rev-parse` 永远回 40 位小写；入参允许缩写/大写（上面的 fullmatch）⇒ 比"同一个 commit"。
+
+    比字符串会把 `--baseline a7259c2` 误判成"边界冲突"（ocr-307）。
+    """
+    a, b = (full or "").strip().lower(), (given or "").strip().lower()
+    return bool(a) and bool(b) and (a == b or a.startswith(b) or b.startswith(a))
+
+
 def format_seal_trailers(milestone_id: str, baseline: str, seat: str, result: str) -> str:
     """封版提交 trailer 文本（git 认 `Key: value`；键用 `SEAL_TRAILER_KEYS`）。"""
     return "\n".join(
         [
-            f"Seal-milestone: {milestone_id}",
-            f"Audit-baseline: {baseline or '-'}",
-            f"Audit-seat: {seat or '-'}",
-            f"Audit-result: {result or '-'}",
+            f"Seal-milestone: {_trailer_value(milestone_id)}",
+            f"Audit-baseline: {_trailer_value(baseline)}",
+            f"Audit-seat: {_trailer_value(seat)}",
+            f"Audit-result: {_trailer_value(result)}",
         ]
     )
 
@@ -368,7 +395,9 @@ def tag_audit_baseline(
         return False, f"审计基线不可用（{baseline!r}）：tag 不立，边界不明就不假装有边界。"
     rc, existing = _git(workspace, "rev-parse", f"refs/tags/{milestone_id}^{{commit}}")
     if rc == 0 and existing:
-        if existing == baseline:
+        # rev-parse 永远回 40 位小写；入参允许缩写/大写（上面的 fullmatch）⇒ 比"同一 commit"
+        # 而不是比字符串，否则 `--baseline a7259c2` 会误判成"边界冲突"（ocr-307）
+        if _same_commit(existing, baseline):
             return True, f"边界 tag 已在（{milestone_id} = {baseline[:12]}）"
         return False, (f"tag {milestone_id} 已存在且指向 {existing[:12]} ≠ 本次基线 "
                        f"{baseline[:12]}：不移动（边界事实不可改写），请人工裁决。")

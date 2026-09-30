@@ -67,3 +67,54 @@ def test_python_search_honors_gitignore():
         files = {h.split(":", 1)[0] for h in hits}
         assert "keep.py" in files
         assert not any(f.startswith("ignored/") for f in files)
+
+
+class TestStalenessSignature(unittest.TestCase):
+    """删除/重命名必须让 `where` 重建；一次进程只扫一遍树（ocr-315/316）。"""
+
+    def _ws(self, root: Path) -> None:
+        pkg = root / "src" / "demo"
+        pkg.mkdir(parents=True)
+        (pkg / "__init__.py").write_text("", encoding="utf-8")
+        (pkg / "gone.py").write_text("def ghost():\n    return 1\n", encoding="utf-8")
+
+    def test_deleted_source_is_not_stale_cheaply_invisible(self) -> None:
+        from k3dge.engine.search import _is_stale_cheaply, index_path, write_symbol_index
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._ws(root)
+            idx = write_symbol_index(root)
+            self.assertIn("ghost", build_symbol_index(root))
+            self.assertFalse(_is_stale_cheaply(root, idx))
+            (root / "src" / "demo" / "gone.py").unlink()
+            self.assertTrue(_is_stale_cheaply(root, idx), "删掉源文件后仍判'不陈旧'⇒ where 给幽灵坐标")
+            self.assertNotIn("ghost", build_symbol_index(root))
+            self.assertIn(str(index_path(root)), str(idx))
+
+    def test_editing_source_still_detected(self) -> None:
+        from k3dge.engine.search import _is_stale_cheaply, write_symbol_index
+        import time
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._ws(root)
+            idx = write_symbol_index(root)
+            self.assertFalse(_is_stale_cheaply(root, idx))
+            time.sleep(0.02)
+            (root / "src" / "demo" / "gone.py").write_text(
+                "def ghost():\n    return 2\n", encoding="utf-8")
+            self.assertTrue(_is_stale_cheaply(root, idx))
+
+    def test_missing_meta_sidecar_forces_one_rebuild(self) -> None:
+        from k3dge.engine.search import (
+            _is_stale_cheaply, index_meta_path, write_symbol_index,
+        )
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._ws(root)
+            idx = write_symbol_index(root)
+            self.assertTrue(index_meta_path(root).is_file())
+            index_meta_path(root).unlink()
+            self.assertTrue(_is_stale_cheaply(root, idx), "无签名 ⇒ 不猜'应该不陈旧'")

@@ -44,3 +44,15 @@ def test_open_aliases_and_unknown_fail_closed():
     assert c["待修"] == 2 and c["total"] == 4 and c["已修"] == 1
     assert c["_ids_未知状态"] == ["A-7"]
     assert set(c["_ids_待修"]) == {"A-5", "A-6"}
+
+
+def test_has_table_shares_find_table_normalization() -> None:
+    """制表符/全角空格/NBSP 填充的 12 列表头：`find_table` 认得出，`has_table` 也必须认（ocr-303）。"""
+    cells = [c.strip() for c in rt.TABLE_HEADER.split("|")]
+    for fill in ("\t", "\u3000", "\u00a0"):
+        text = "# r\n\n|" + "|".join(f"{fill}{c}{fill}" for c in cells) + "|\n| --- |\n"
+        assert rt.find_table(text)[0] >= 0, fill
+        assert rt.has_table(text), fill
+    shuffled = "| " + " | ".join(reversed(cells)) + " |"
+    assert not rt.has_table("# r\n" + shuffled), "列序仍须严格（12 列契约）"
+    assert rt.has_table(_TBL)

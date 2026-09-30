@@ -903,7 +903,7 @@ from typing import Tuple
 TABLE_HEADER = 'ID|日期|严重度|优先级|类型|问题描述|位置|状态|处置|验证|复审|验收'
 STATUSES = ('待修', '有意留', '已修')
 has_table(text: str) -> bool
-    # doc: 是否含 12 列表头（忽略空白差异）。
+    # doc: 是否含 12 列表头——判据与 `find_table`/`_cells` **同源**。
 find_table(text: str, required: Tuple[str, ...]=('ID', '状态'))
     # doc: 定位表头行：返回 (header_line_idx, header_cols)；无 ⇒ (-1, None)。
 parse_rows(text: str, required: Tuple[str, ...]=('ID', '状态')) -> Tuple[Optional[List[str]], List[Tuple[int, Dict[str, str]]]]
@@ -982,6 +982,10 @@ index_path(workspace: Path) -> Path
 build_symbol_index(workspace: Path) -> Dict[str, List[dict]]
     # doc: Map top-level public symbol -> [{file, line}] across all domain src trees.
 write_symbol_index(workspace: Path) -> Path
+INDEX_META_REL = '.k3dge/symbol-index.meta.json'
+index_meta_path(workspace: Path) -> Path
+write_index_meta(workspace: Path) -> None
+    # doc: 索引写成后落签名（与索引同处刷新，避免"索引新、签名旧"的假陈旧）。
 where(workspace: Path, symbol: str) -> List[Location]
     # doc: Deterministic name -> file:line. No grep discovery, no model judgment.
 search(workspace: Path, query: str, *, snippet: bool=True, context: int=2, max_snippet: int=240) -> List[Location]

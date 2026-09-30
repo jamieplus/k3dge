@@ -9,7 +9,9 @@ Ping-Pong (no `-C > 3` firehose).
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
+import os
 import re
 import subprocess
 from dataclasses import dataclass
@@ -100,28 +102,78 @@ def write_symbol_index(workspace: Path) -> Path:
             return out
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(index, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_index_meta(workspace)
     return out
 
 
+#: 符号索引的**本地签名**侧车（gitignored `.k3dge/`）：只做"这版索引对得上这棵树吗"的缓存，
+#: 不是事实源——缺了就走一次全量重建（幂等），`check` 的 `SYMBOL_INDEX_STALE` 仍是权威判据。
+INDEX_META_REL = ".k3dge/symbol-index.meta.json"
+
+def index_meta_path(workspace: Path) -> Path:
+    return Path(workspace) / INDEX_META_REL
+
+
+def _tree_signature(workspace: Path) -> dict:
+    """一次遍历同时拿到**文件集**（增删/重命名）与**最新 mtime**（内容改动）。"""
+    names: list = []
+    newest = 0.0
+    for src in _domain_src_dirs(workspace):
+        for dirpath, dirnames, filenames in os.walk(src):
+            dirnames[:] = [d for d in dirnames if d not in (".git", "__pycache__", "node_modules")]
+            for fn in filenames:
+                if not fn.endswith(".py"):
+                    continue
+                fp = os.path.join(dirpath, fn)
+                try:
+                    st = os.stat(fp)
+                except OSError:
+                    continue
+                names.append(os.path.relpath(fp, workspace))
+                newest = max(newest, st.st_mtime)
+    blob = "\n".join(sorted(names))
+    return {
+        "files": len(names),
+        "names_sha1": hashlib.sha1(blob.encode("utf-8", "surrogatepass")).hexdigest(),
+        "newest_mtime": newest,
+    }
+
+
+def write_index_meta(workspace: Path) -> None:
+    """索引写成后落签名（与索引同处刷新，避免"索引新、签名旧"的假陈旧）。"""
+    meta = index_meta_path(workspace)
+    try:
+        meta.parent.mkdir(parents=True, exist_ok=True)
+        meta.write_text(json.dumps(_tree_signature(workspace), sort_keys=True) + "\n",
+                        encoding="utf-8")
+    except OSError:
+        pass
+
+
 def _is_stale_cheaply(workspace: Path, index: Path) -> bool:
-    """廉价陈旧判定（mtime 启发式）：任一域 src 文件比索引新 ⇒ 重建。
+    """廉价陈旧判定：树签名与索引签名不符、或任一 src 文件比索引新 ⇒ 重建。
 
     权威判据是 `check` 的 `SYMBOL_INDEX_STALE`（重建后逐字比）；这里只是让 `k3dge where`
     **不要**拿旧索引给出错的 file:line（旧行为只在文件缺失时重建 ⇒ 代码写完没跑 `k3dge index`
     就会静默返回过期位置）。
+
+    删除/重命名不会让**残留** .py 的 mtime 变新 ⇒ 旧实现判"不陈旧"，`where` 继续返回已不存在
+    的 `file:line`（幽灵坐标，315）；故判定加**文件集签名**（`.k3dge/` 侧车，gitignored 本地缓存）。
+    一趟 `os.walk` 同时得名与 mtime，不再 `rglob`+逐文件 `stat()` 两趟。
     """
     try:
-        idx_mtime = index.stat().st_mtime
+        idx_st = index.stat()
     except OSError:
         return True
-    for src in _domain_src_dirs(workspace):
-        for path in src.rglob("*.py"):
-            try:
-                if path.stat().st_mtime > idx_mtime:
-                    return True
-            except OSError:
-                continue
-    return False
+    sig = _tree_signature(workspace)          # 一趟：文件集 + 最新 mtime（缓存Freshness判定不安全：内容编辑不改索引 mtime）
+    try:
+        meta = json.loads(index_meta_path(workspace).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return True          # 无签名 ⇒ 重建（重建即补签名），不猜"应该不陈旧"
+    if (meta.get("names_sha1") != sig["names_sha1"]
+            or meta.get("files") != sig["files"]):
+        return True          # 有文件被删/改名/新增
+    return sig["newest_mtime"] > idx_st.st_mtime
 
 
 def _load_index(workspace: Path) -> Dict[str, List[dict]]:

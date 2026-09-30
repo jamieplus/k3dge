@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:ab15123a26c41e772711c15709927d10676b36cee32195da76f37f97c4df5dfc`
+- **Contract Hash**: `sha256:6c2dcfd127053e909dd923172c2789c56b6b1fd6e1c2588cfdaf6566dfb1e31f`
 - **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
@@ -653,6 +653,9 @@ class Location
 index_path(workspace: Path) -> Path
 build_symbol_index(workspace: Path) -> Dict[str, List[dict]]
 write_symbol_index(workspace: Path) -> Path
+INDEX_META_REL = '.k3dge/symbol-index.meta.json'
+index_meta_path(workspace: Path) -> Path
+write_index_meta(workspace: Path) -> None
 where(workspace: Path, symbol: str) -> List[Location]
 search(workspace: Path, query: str, *, snippet: bool=True, context: int=2, max_snippet: int=240) -> List[Location]
 from __future__ import annotations

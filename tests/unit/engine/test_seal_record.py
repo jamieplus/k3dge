@@ -133,6 +133,33 @@ class TestTagBoundary(TestCase):
         self.assertIn("git", msg.lower())
 
 
+class TestTrailerSanitization(TestCase):
+    """外部取来的值不得破坏 trailer 块（ocr-306/307）。"""
+
+    def test_newline_and_colon_in_values_keep_four_keys(self) -> None:
+        from k3dge.engine.seal import _same_commit  # noqa: F401  (同测试类下的相邻判据)
+
+        block = format_seal_trailers(
+            "M11", "a7259c26", "k3dit\nAudit-extra: injected", "closed: with colon")
+        self.assertEqual(len(block.splitlines()), 4, block)
+        self.assertNotIn("\n\n", block, "空行会把最后一段拆开 ⇒ git 不再当 trailer 块")
+        got = parse_seal_trailers(block)
+        self.assertEqual(sorted(k.lower() for k in got), sorted(SEAL_TRAILER_KEYS))
+        self.assertNotIn("audit-extra", {k.lower() for k in got})
+
+    def test_empty_values_still_emit_all_four_keys(self) -> None:
+        got = parse_seal_trailers(format_seal_trailers("M11", "", "", ""))
+        self.assertEqual(len(got), 4)
+
+    def test_same_commit_accepts_abbreviated_and_uppercase(self) -> None:
+        from k3dge.engine.seal import _same_commit
+
+        full = "a7259c26f3c2" + "0" * 28
+        self.assertTrue(_same_commit(full, full[:7]))
+        self.assertTrue(_same_commit(full, full.upper()))
+        self.assertFalse(_same_commit(full, "b" * 40))
+
+
 class TestAuditEvidence(TestCase):
     """判据只认 git 事实；本地账是投影，**冲突以 git 为准**（ADR-0004 §2.1.10）。"""
 

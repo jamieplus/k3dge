@@ -52,3 +52,17 @@ def test_line_replayed_onto_other_commit_is_refused():
     ok, out = verify_commit(ws, h)
     assert not ok
     assert "timestamp mismatch" in out
+def test_attestation_stays_inside_existing_trailer_block() -> None:
+    ws = _repo()
+    """另起一段会把封版四键挤成倒数第二段 ⇒ `%(trailers)` 只读回署名（ocr-308）。"""
+    msg = ("chore: seal\n\n"
+           "Seal-milestone: M11\nAudit-baseline: a7259c2\nAudit-seat: k3dit\nAudit-result: closed")
+    out = append_to_message(ws, msg, who="k3dge-process")
+    last = out.strip().split("\n\n")[-1]
+    assert len(last.splitlines()) == 5, out
+    assert last.startswith("Seal-milestone:"), out
+
+
+def test_prose_body_still_gets_own_paragraph() -> None:
+    out = append_to_message(_repo(), "feat: x\n\n正文说明", who="w")
+    assert "\n\nk3dge-commit:" in out

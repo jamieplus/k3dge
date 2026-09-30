@@ -312,6 +312,14 @@ class TestReportPointer(unittest.TestCase):
             self.assertEqual(out, [])
 
 
+class TestMilestoneTokenCase(unittest.TestCase):
+    def test_lowercase_filename_token_matches_uppercase_id(self) -> None:
+        # `_filename_milestone` 带 IGNORECASE；这里严格比大小写会漏归档本里程碑报告（ocr-304）
+        self.assertTrue(pure_refs.has_milestone_token("2026-09-16-m10-fix.md", "M10"))
+        self.assertTrue(pure_refs.has_milestone_token("2026-09-16-M10-fix.md", "m10"))
+        self.assertFalse(pure_refs.has_milestone_token("2026-08-23-M10-align.md", "M1"))
+
+
 class TestPointerAndClosureShape(unittest.TestCase):
     """report 指针、排查去向、正文复写与结案段的边界（ocr-294..299）。"""
 

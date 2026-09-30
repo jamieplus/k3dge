@@ -118,7 +118,15 @@ def append_to_message(workspace: Path, msg: str, who: str = "") -> str:
     kept = [ln for ln in body.splitlines() if not ln.strip().startswith(PREFIX)]
     trailer = line(workspace, who=who)
     cleaned = "\n".join(kept).rstrip()
-    return f"{cleaned}\n\n{trailer}\n" if cleaned else f"{trailer}\n"
+    if not cleaned:
+        return f"{trailer}\n"
+    # 末段若已是 trailer 块（每行都 `Token: value`），署名**并进同一段**：另起一段会把别人的
+    # 四键挤成倒数第二段 ⇒ `%(trailers)` 只读回署名，封版记录整体读不回（ocr-308）。
+    last_para = [ln for ln in cleaned.split("\n\n")[-1].strip().splitlines() if ln.strip()]
+    _TRAILER_SHAPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*: .*$")
+    if last_para and all(_TRAILER_SHAPE.match(ln.strip()) for ln in last_para):
+        return f"{cleaned}\n{trailer}\n"
+    return f"{cleaned}\n\n{trailer}\n"
 
 
 def verify_commit(workspace: Path, h: str) -> Tuple[bool, str]:
