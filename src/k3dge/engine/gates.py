@@ -40,6 +40,11 @@ class Rejection(str):
     def __repr__(self) -> str:  # pragma: no cover - 调试可读性
         return f"Rejection({self.gate_id!r}, {str.__str__(self)!r})"
 
+    def __reduce__(self):
+        # `str` 子类的 `__getnewargs__` 只给内容一个位置参数 ⇒ `copy`/`pickle` 会以
+        # `Rejection(message)` 重建（缺 gate_id → TypeError，或把 message 当 gate_id）（424）
+        return (self.__class__, (self.gate_id, str.__str__(self)))
+
 
 def rejection(message: Any, fallback_gate_id: str) -> Rejection:
     """把动作/闸的失败返回值正规化为 `Rejection`（已是 Rejection 则原样透传）。"""

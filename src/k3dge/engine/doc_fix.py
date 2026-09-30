@@ -206,8 +206,10 @@ def _fix_footnote_tail(text: str) -> str:
 
 
 def _footnote_continuation(line: str) -> bool:
-    s = line.strip()
-    return bool(s) and not s.startswith("[^") and not s.startswith("#") and s != "---"
+    """**委托 `pure_schema`**：检测端与修复端不得各持一份判据（415）。"""
+    from k3dge.engine.pure_schema import _footnote_continuation as _detected
+
+    return _detected(line)
 
 
 def _fix_footnote_line(text: str) -> str:

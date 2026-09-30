@@ -462,7 +462,7 @@ def sync_extractors(workspace: Path) -> Dict[str, Any]:
             existing = dest.read_text(encoding="utf-8")
         except OSError:
             existing = None
-        if existing is not None and MARKER not in existing[:200]:
+        if existing is not None and not existing.splitlines()[0].startswith(MARKER):
             # 既有文件不是生成产物（用户手写 / 按生成头提示删了标记做定制）⇒ **不覆盖**
             # （与"markerless never pruned or overwritten"自洽，ocr-077）；改名让开是用户的事。
             conflicts.append(dest.name)
@@ -478,7 +478,9 @@ def sync_extractors(workspace: Path) -> Dict[str, Any]:
             head = p.read_text(encoding="utf-8")[:200]
         except OSError:
             continue
-        if MARKER in head:
+        # 只看**首行**：以前 `MARKER in head`（前 200 字符子串）会把手工维护文件里
+        # "提到这行标记"的注释/docstring 当成生成件直接 unlink（破坏性误判，422）
+        if head[:1] and head.splitlines()[0].startswith(MARKER):
             p.unlink()
             pruned.append(p.name)
     missing: List[Tuple[str, str]] = []

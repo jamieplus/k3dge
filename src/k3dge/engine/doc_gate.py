@@ -79,8 +79,9 @@ def staged_added() -> list[str]:
 
 
 # k3dge check only matters when code / spec / agent-config / templates change.
-_CHECK_PREFIXES = ("src/", "docs/specs/", ".agent/", "src/k3dge/templates/")
-_CHECK_SUFFIXES = (".py", "manifest.json", "pyproject.toml", ".toml")
+# 表里不留被完全覆盖的死条件：`src/k3dge/templates/` ⊂ `src/`、`pyproject.toml` ⊂ `.toml`（416）
+_CHECK_PREFIXES = ("src/", "docs/specs/", ".agent/")
+_CHECK_SUFFIXES = (".py", "manifest.json", ".toml")
 
 
 def relevant_for_check(files: list[str]) -> bool:
@@ -107,18 +108,28 @@ def check_one(rel: str) -> list[str]:
     return errs
 
 
+_PURE_CACHE: dict = {}
+
+
 def _load_pure():
     """Import zero-dependency check modules from the `src/` tree (no venv).
 
     Returns (pure_schema, pure_refs) or (None, None) with a WARN — the hook
     must never block commits just because its own tooling failed to load.
     """
+    key = str(WS)
+    if key in _PURE_CACHE:                # main() 里 schema/screen 两道闸各调一次 ⇒ 记忆化（417）
+        return _PURE_CACHE[key]
     try:
-        sys.path.insert(0, str(WS / "src"))
+        root = str(WS / "src")
+        if root not in sys.path:          # 无条件的 insert(0) 会每调一次插一条同名项
+            sys.path.insert(0, root)
         from k3dge.engine import pure_refs, pure_schema
-        return pure_schema, pure_refs
+        _PURE_CACHE[key] = (pure_schema, pure_refs)
+        return _PURE_CACHE[key]
     except Exception as exc:
         print(f"[k3dge schema] WARN: pure checks unavailable ({exc}); legacy gate only")
+        _PURE_CACHE[key] = (None, None)
         return None, None
 
 
@@ -164,6 +175,16 @@ def missing_declared_facts(code: str, facts: dict, gate_facts=None) -> list:
 
 
 def run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -> tuple[list[str], list[str]]:
+    """Returns (blocking, non_blocking). Staged content only.
+
+    入口先复位 `_MISSING_FACTS`：那批累积集合以前**只在 `main()` 末尾清**，测试/hook 直接调
+    本函数（甚至换另一个临时仓）时会看到上一轮的残留（418）。
+    """
+    _MISSING_FACTS.clear()
+    return _run_schema_gate(files, pure_schema, pure_refs, gate_facts)
+
+
+def _run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -> tuple[list[str], list[str]]:
     """Returns (blocking, non_blocking). Staged content only.
 
     **档位由 `gate_facts` 声明面决定**，不由"append 到哪个列表"隐式决定；未声明的 code
@@ -420,7 +441,10 @@ def main(argv: Optional[list] = None) -> int:
                     print(f"  - {e}")
                 rc = 1
             else:
-                print("[k3dge screen] PASS (无待排查的新建受管文档)")
+                # 走到这里只代表"没有阻断级项"；warn/observe 已在上面逐条打印 ⇒ 结论不得说成"无待排查"（421）
+                nonblocking = [txt for sev, txt in screen_out if sev != "block"]
+                print(f"[k3dge screen] PASS (无阻断级待排查项；非阻断 {len(nonblocking)} 条见上)"
+                      if nonblocking else "[k3dge screen] PASS (无待排查的新建受管文档)")
 
     if _MISSING_FACTS:
         # 工具自检：声明要的事实没给全 ⇒ 渲染会留字面 `{key}`。**不阻断提交**（这是我们的 bug，不是仓的）

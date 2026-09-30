@@ -140,7 +140,7 @@
   "actions": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 208
+      "line": 213
     }
   ],
   "adr_landed": [
@@ -164,7 +164,7 @@
   "all_stage_refs": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 195
+      "line": 200
     }
   ],
   "amend_format": [
@@ -194,7 +194,7 @@
   "apply": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 301
+      "line": 303
     }
   ],
   "apply_bundle": [
@@ -488,7 +488,7 @@
   "check_one": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 92
+      "line": 93
     }
   ],
   "check_report_pointer": [
@@ -770,7 +770,7 @@
   "describe_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 491
+      "line": 493
     }
   ],
   "emit": [
@@ -900,7 +900,7 @@
   "get": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 166
+      "line": 171
     }
   ],
   "get_changed_files": [
@@ -1164,7 +1164,7 @@
   "legacy_config_present": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 161
+      "line": 166
     }
   ],
   "lifecycle_next": [
@@ -1194,7 +1194,7 @@
   "load": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 134
+      "line": 139
     }
   ],
   "load_all": [
@@ -1230,7 +1230,7 @@
   "main": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 345
+      "line": 366
     },
     {
       "file": "src/k3dge/cli/main.py",
@@ -1298,7 +1298,7 @@
   "missing_declared_facts": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 155
+      "line": 166
     }
   ],
   "next_for_rejection": [
@@ -1412,7 +1412,7 @@
   "preconditions": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 179
+      "line": 184
     }
   ],
   "premature_archive_hint": [
@@ -1514,13 +1514,13 @@
   "rejection": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 44
+      "line": 49
     }
   ],
   "relevant_for_check": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 86
+      "line": 87
     }
   ],
   "remove": [
@@ -1550,7 +1550,7 @@
   "render_manual_docs_content": [
     {
       "file": "src/k3dge/engine/generated_docs.py",
-      "line": 18
+      "line": 19
     }
   ],
   "render_plugin": [
@@ -1562,7 +1562,7 @@
   "render_readme_layout": [
     {
       "file": "src/k3dge/engine/generated_docs.py",
-      "line": 110
+      "line": 115
     }
   ],
   "replay_to_baseline": [
@@ -1664,13 +1664,13 @@
   "run_schema_gate": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 166
+      "line": 177
     }
   ],
   "run_screen_gate": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 285
+      "line": 306
     }
   ],
   "run_seal_flow": [
@@ -1700,7 +1700,7 @@
   "scan": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 283
+      "line": 285
     }
   ],
   "scan_milestone_tasks": [
@@ -1820,7 +1820,7 @@
   "stages": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 184
+      "line": 189
     }
   ],
   "strip_code_spans": [

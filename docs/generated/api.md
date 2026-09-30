@@ -127,7 +127,7 @@ workspace_status(workspace: Path) -> Dict[str, Any]
 
 ## engine — `src/k3dge/engine`
 
-```python
+````python
 # adr_gate.py
 from __future__ import annotations
 from pathlib import Path
@@ -1166,7 +1166,7 @@ pin_baseline(workspace: Path, name: str, oid: str) -> bool
     # doc: 留存被引用的审计基线（报告引用的 commit 经 rebase 后可能悬空，gc 即不可复验）。
 materialize(workspace: Path, rev: str, dest: Path) -> Path
     # doc: 只读物化：把 rev 的树解到 dest（内容物，无 `.git`；不碰线/worktree/分支）。
-```
+````
 
 ## sync — `src/k3dge/sync`
 

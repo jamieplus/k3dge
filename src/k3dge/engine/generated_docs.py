@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import contextlib
+import re
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -40,9 +41,13 @@ def render_manual_docs_content(
         lines.append(f"## {domain} — `{src}`")
         lines.append("")
         if iface.strip():
-            lines.append("```python")
+            # `iface` 含 docstring 首行原文（`# doc: ...`），里面出现 ``` 就会**提前关围栏**，
+            # 后半截以正文渲染（投影形状坏，426）⇒ 用比内容里最长反引号串更长的围栏
+            runs = max((len(m) for m in re.findall(r"`+", iface)), default=0)
+            fence = "`" * max(3, runs + 1)
+            lines.append(f"{fence}python")
             lines.append(iface)
-            lines.append("```")
+            lines.append(fence)
         else:
             lines.append("_No public interface._")
         lines.append("")

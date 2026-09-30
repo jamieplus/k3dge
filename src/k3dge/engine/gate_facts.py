@@ -650,7 +650,12 @@ def facts_of(code: str) -> List[str]:
     """声明里用到的占位键名（供守卫测试核对检查器是否真给了这些事实）。"""
     decl = GATE_FACTS.get(code) or {}
     keys: List[str] = []
-    for text in [str(decl.get("fact", ""))] + [str(o) for o in (decl.get("options") or [])]:
+    # `render()` 也会对 `fix_hint` 与 `pointers` 填占位 ⇒ 守卫面必须一起扫，否则
+    # "声明要的事实、检查器没给"只在部分字段上被兜住（423）
+    texts = [str(decl.get("fact", "")), str(decl.get("fix_hint", ""))]
+    texts += [str(o) for o in (decl.get("options") or [])]
+    texts += [str(x) for x in (decl.get("pointers") or [])]
+    for text in texts:
         for m in _PLACEHOLDER.finditer(text):
             if m.group(1) not in keys:
                 keys.append(m.group(1))
