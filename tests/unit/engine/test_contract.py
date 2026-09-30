@@ -121,26 +121,32 @@ class TestContract(unittest.TestCase):
         except ImportError:
             self.skipTest("tree-sitter-typescript not installed")
         from k3dge.engine.contract import _EXTRACTORS
+        from k3dge.engine import extractor_gen
         before = list(_EXTRACTORS)
-        # load the bundled ts.py plugin asset (self-registers on import)
-        asset = Path(__file__).resolve().parents[3] / "src" / "k3dge" / "templates" / "assets" / "extractors" / "ts.py"
-        mod_name = "k3dge_plugin_ts_asset_test"
-        try:
+        # 曾经这里去读一个**不存在的**资产 `templates/assets/extractors/ts.py`（TS 插件现在由
+        # `extractor_gen` 生成，资产树里没有该文件）⇒ 断言必红或在 `python -O` 下换成另一种崩，
+        # 且入口名 `extract_ts_interface` 也是旧的（真名 `extract_typescript_interface`，t-095）。
+        # 现在**当场生成插件**再加载：确定、不依赖资产，也不靠 `parents[3]` 猜仓根。
+        mod_name = "k3dge_plugin_ts_generated_test"
+        with tempfile.TemporaryDirectory() as d:
+            asset = Path(d) / "typescript.py"
+            asset.write_text(extractor_gen.render_plugin(
+                "typescript", extractor_gen.DEFAULT_LANGS["typescript"]), encoding="utf-8")
             spec_obj = importlib.util.spec_from_file_location(mod_name, asset)
             assert spec_obj is not None and spec_obj.loader is not None
             mod = importlib.util.module_from_spec(spec_obj)
             sys.modules[mod_name] = mod
-            spec_obj.loader.exec_module(mod)
-            with tempfile.TemporaryDirectory() as d:
+            try:
+                spec_obj.loader.exec_module(mod)
                 path = Path(d) / "mod.ts"
                 path.write_text("export function foo(x: number): number {\n  return x + 1;\n}\nconst skipped = 1;\n")
-                iface = mod.extract_ts_interface(path) or ""
+                iface = mod.extract_typescript_interface(path) or ""
                 self.assertIn("foo", iface)
                 self.assertNotIn("return x", iface)
                 self.assertNotIn("skipped", iface)
-        finally:
-            _EXTRACTORS[:] = before
-            sys.modules.pop(mod_name, None)
+            finally:
+                _EXTRACTORS[:] = before
+                sys.modules.pop(mod_name, None)
 
     def test_rename_preserves_hash(self):
         with tempfile.TemporaryDirectory() as d:

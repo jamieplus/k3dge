@@ -21,6 +21,17 @@ def _write(root: pathlib.Path, rel: str, text: str) -> None:
     p.write_text(text, encoding="utf-8")
 
 
+
+def _mk_cfg(root, toml, mcp_json=None):
+    """写 pipeline.toml（＋可选 .mcp.json）的共享夹具。
+
+    原来是 `TestPipelineSchema._mk`：别的类里 `_mk(...)` 一被真收集就 AttributeError，
+    而它过去恰好被同名类的遮蔽掩盖着（t-219）。提到模块级后所有类共用一份。
+    """
+    _write(root, ".agent/pipeline.toml", toml)
+    if mcp_json is not None:
+        _write(root, ".mcp.json", mcp_json)
+
 def _no_audit_stages(root: pathlib.Path) -> None:
     """下游可配路径：在**同一声明面**（pipeline.toml）把审计线两步清空。"""
     cfg = root / ".agent" / "pipeline.toml"
@@ -189,17 +200,12 @@ class TestPipelineSchema(unittest.TestCase):
             _no_audit_stages(root)   # 本例只测 transport 的 args 表，不涉审计线两步
             self.assertEqual(validate_pipeline_config(root), [])
 
-    def _mk(self, root, toml, mcp_json=None):
-        _write(root, ".agent/pipeline.toml", toml)
-        if mcp_json is not None:
-            _write(root, ".mcp.json", mcp_json)
-
     def test_mcp_transport_must_be_wired_in_mcp_json(self):
         import tempfile
 
         with tempfile.TemporaryDirectory() as d:
             root = pathlib.Path(d)
-            self._mk(root,
+            _mk_cfg(root,
                      "[peers.other.actions.score]\n"
                      "transports = [ { provider = \"mcp\", tool = \"other_score\" } ]\n",
                      '{"mcpServers": {"k3dit": {"command": "python"}}}')
@@ -211,7 +217,7 @@ class TestPipelineSchema(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as d:
             root = pathlib.Path(d)
-            self._mk(root,
+            _mk_cfg(root,
                      "[peers.k3dit.actions.audit]\n"
                      "transports = [ { provider = \"mcp\", tool = \"t\", command = \"python\" } ]\n",
                      '{"mcpServers": {"k3dit": {"command": "python"}}}')
@@ -224,7 +230,7 @@ class TestPipelineSchema(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = pathlib.Path(d)
             # 角色 audit 绑定到 dummy 服务；流程引用 audit.produce
-            self._mk(root,
+            _mk_cfg(root,
                      "[roles.audit]\nbind = \"dummy\"\n"
                      "[peers.dummy.actions.produce]\n"
                      "transports = [ { provider = \"mcp\", tool = \"dummy_submit\" } ]\n",
@@ -233,7 +239,7 @@ class TestPipelineSchema(unittest.TestCase):
             self.assertEqual(validate_pipeline_config(root), [])
             # bind 指向**声明了 mcp 跳**但未登记的 peer ⇒ 必须红
             #（规则 2026-09-26 收紧：只有声明 mcp 跳的 peer 才要求在册——纯 cli 的 peer 不必）
-            self._mk(root,
+            _mk_cfg(root,
                      "[roles.audit]\nbind = \"ghost\"\n"
                      "[peers.ghost.actions.produce]\n"
                      "transports = [ { provider = \"mcp\", tool = \"ghost_submit\" } ]\n",
@@ -312,7 +318,9 @@ class TestLegacyConfigGuard(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as d:
             root = pathlib.Path(d)
-            _write(root, ".agent/pipeline.toml",
+            # 被遮蔽期间这条从没跑过：写成 `_write(root, 路径, toml, mcp)`（4 个实参）——
+            # 意图是 `_mk_cfg(root, toml, mcp)`，现在才真跑得起来
+            _mk_cfg(root,
                    "[roles.audit]\nbind = \"k3dit\"\nmode = \"bundle\"\n\n"
                      "[peers.k3dit]\nenabled = false\n\n"
                      "[peers.k3dit.actions.verify]\n"
@@ -323,7 +331,7 @@ class TestLegacyConfigGuard(unittest.TestCase):
             self.assertFalse([e for e in validate_pipeline_config(root)
                               if e[0] == "PIPELINE_PEER_UNWIRED"])
             # 一旦声明 mcp 跳而没注册 ⇒ 仍要红（规则没被削弱）
-            self._mk(root,
+            _mk_cfg(root,
                      "[roles.audit]\nbind = \"k3dit\"\nmode = \"bundle\"\n\n"
                      "[peers.k3dit]\nenabled = false\n\n"
                      "[peers.k3dit.actions.verify]\n"
@@ -339,7 +347,7 @@ class TestLegacyConfigGuard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = pathlib.Path(d)
             # 角色 audit 绑定到 dummy 服务；流程引用 audit.produce
-            self._mk(root,
+            _mk_cfg(root,
                      "[roles.audit]\nbind = \"dummy\"\n"
                      "[peers.dummy.actions.produce]\n"
                      "transports = [ { provider = \"mcp\", tool = \"dummy_submit\" } ]\n",
@@ -348,7 +356,7 @@ class TestLegacyConfigGuard(unittest.TestCase):
             self.assertEqual(validate_pipeline_config(root), [])
             # bind 指向**声明了 mcp 跳**但未登记的 peer ⇒ 必须红
             #（规则 2026-09-26 收紧：只有声明 mcp 跳的 peer 才要求在册——纯 cli 的 peer 不必）
-            self._mk(root,
+            _mk_cfg(root,
                      "[roles.audit]\nbind = \"ghost\"\n"
                      "[peers.ghost.actions.produce]\n"
                      "transports = [ { provider = \"mcp\", tool = \"ghost_submit\" } ]\n",
@@ -387,34 +395,6 @@ class TestLegacyConfigGuard(unittest.TestCase):
 
 
 
-
-
-class TestLegacyConfigGuard(unittest.TestCase):
-    """已废的第二个配置文件：存在即红一次逼迁移（不静默忽略）。
-
-    前科：本仓 `.agent/gates.toml` 曾是 DEFAULTS 的冗余副本且漂移——覆盖列表漏了
-    reconcile ⇒ 功能静默死亡（2026-09-17-M10-refactor-adr_archive_to_sync）。
-    """
-
-    def test_gates_toml_present_is_flagged(self):
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as d:
-            root = pathlib.Path(d)
-            _write(root, ".agent/pipeline.toml",
-                   '[roles.audit]\nbind = "k3dit"\n'
-                   '[peers.k3dit.actions.audit]\ntransports = [ { provider = "skip" } ]\n'
-                   '[peers.k3dit.actions.verify]\ntransports = [ { provider = "skip" } ]\n')
-            self.assertEqual(validate_pipeline_config(root), [])   # 先证明基线绿
-            _write(root, ".agent/gates.toml", "[checks.seal]\npreconditions = []\n")
-            errs = validate_pipeline_config(root)
-            self.assertTrue(any(c == "PIPELINE_SCHEMA_INVALID" and "gates.toml is retired" in m
-                                for c, m in errs), errs)
-
-    def test_repo_has_no_legacy_config(self):
-        root = pathlib.Path(__file__).resolve().parents[3]
-        self.assertFalse((root / ".agent" / "gates.toml").exists())
-        self.assertTrue((root / ".agent" / "pipeline.toml").is_file())
 
 
 class TestTransportShapeRobustness(unittest.TestCase):
