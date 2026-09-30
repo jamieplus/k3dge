@@ -251,5 +251,80 @@ class TestSync(unittest.TestCase):
                 sys.modules.pop("gen_ts_fidelity", None)
 
 
+class TestGeneratedPluginSurfaceGuards(unittest.TestCase):
+    """生成件里**不需要 grammar** 的两条判据：`can_handle` 的路径面与 `_slice` 的解码形状。
+
+    code-7（09-29）：`can_handle` 旧版只比 `path.parts`，`..`／绝对路径／经 symlink 的
+    忽略目录都能绕过黑名单；code-9（09-28）：`decode(errors="replace")` 把不同非法字节
+    塌成同一个 U+FFFD ⇒ 两份不同文件可产出同一接口文本（哈希碰撞面）。
+    """
+
+    PLUGIN = Path(__file__).resolve().parents[3] / ".agent" / "extractors" / "typescript.py"
+
+    def _load(self):
+        import importlib.util
+        import sys
+
+        from k3dge.engine import contract
+
+        spec = importlib.util.spec_from_file_location("gen_ts_guards", self.PLUGIN)
+        self.assertIsNotNone(spec)
+        mod = importlib.util.module_from_spec(spec)
+        snapshot = list(contract._EXTRACTORS)
+        sys.modules["gen_ts_guards"] = mod
+        try:
+            spec.loader.exec_module(mod)      # 模块体只 import contract；tree-sitter 在函数内才要
+        finally:
+            contract._EXTRACTORS[:] = snapshot
+            sys.modules.pop("gen_ts_guards", None)
+        return mod
+
+    def test_can_handle_rejects_unnormalized_and_escaping_paths(self) -> None:
+        mod = self._load()
+        ext = mod.TypescriptExtractor()
+        self.assertTrue(ext.can_handle(Path("src/a.ts")))
+        self.assertFalse(ext.can_handle(Path("/abs/a.ts")), "绝对路径不得被认领")
+        self.assertFalse(ext.can_handle(Path("src/../node_modules/a.ts")), "`..` 归一后必须撞黑名单")
+        self.assertFalse(ext.can_handle(Path("src/node_modules/a.ts")))
+        self.assertFalse(ext.can_handle(Path("src/a.d.ts")), "声明文件按生成件处理，不抽接口")
+        self.assertFalse(ext.can_handle(Path("src/app.min.js")))
+
+    def test_can_handle_follows_dir_symlink_into_ignored(self) -> None:
+        import os
+
+        mod = self._load()
+        ext = mod.TypescriptExtractor()
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "node_modules").mkdir()
+            f = root / "node_modules" / "a.ts"
+            f.write_text("export const x = 1\n", encoding="utf-8")
+            link = root / "link"
+            try:
+                os.symlink(str(root / "node_modules"), str(link))
+            except (OSError, NotImplementedError):  # pragma: no cover - 平台不支持软链
+                self.skipTest("symlink unsupported")
+            self.assertFalse(ext.can_handle(link / "a.ts"),
+                             "目录 symlink 指向忽略目录 ⇒ 归一后仍须拒")
+
+    def test_slice_is_injective_on_invalid_bytes(self) -> None:
+        class Node:
+            start_byte, end_byte = 0, 2
+
+        mod = self._load()
+        a = mod._slice(b"\x80\x81", Node())
+        b = mod._slice(b"\x81\x80", Node())
+        c = mod._slice(b"\x80\x80", Node())
+        self.assertNotEqual(a, b, "非法字节塌成同一 U+FFFD ⇒ 不同文件同一段接口文本")
+        self.assertNotEqual(a, c)
+
+    def test_generated_header_no_longer_tells_readers_to_edit_it(self) -> None:
+        text = self.PLUGIN.read_text(encoding="utf-8")
+        first = text.splitlines()[0]
+        self.assertIn("do not edit", first)
+        self.assertNotIn("edit freely", text, "同一段头既禁改又教改 ⇒ 分叉指引归 README 单源")
+        self.assertIn("Hand-written", text, "指向 README 的可解析去处")
+
+
 if __name__ == "__main__":
     unittest.main()

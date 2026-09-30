@@ -258,10 +258,9 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
     slug = "".join(c if (c.isalnum() or c == "_") else "_" for c in name).strip("_") or "lang"
     cls = "".join(p[:1].upper() + p[1:] for p in slug.split("_") if p) + "Extractor"
     lines: List[str] = [
-        MARKER + " — do not edit.",
+        MARKER + " — do not edit; `k3dge extractor sync` 会覆盖本文件。",
         f"# Source: .agent/extractors.toml + builtin table (`src/k3dge/engine/extractor_gen.py`).",
-        "# To customize: copy this file to a new name, remove this header",
-        "# (markerless files are never pruned or overwritten), and edit freely.",
+        "# 要自定义：按 `.agent/extractors/README.md`「Hand-written」另建一份（那里的规则才讲标记）。",
         f'"""{{}} interface extractor plugin (generated).'.format(name),
         "",
         "Requires the grammar package (see pip hint from `k3dge extractor sync`).",
@@ -292,7 +291,9 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
         "",
         "",
         "def _slice(source: bytes, node) -> str:",
-        '    text = source[node.start_byte : node.end_byte].decode("utf-8", "replace")',
+        # "replace" 把不同非法字节序列塌成同一个 U+FFFD ⇒ 两份不同文件可产出同一接口文本（哈希
+        # 碰撞面）；"backslashreplace" 保留字面转义，确定性且单射
+        '    text = source[node.start_byte : node.end_byte].decode("utf-8", "backslashreplace")',
         '    return "".join(ch for ch in text if ch in "\\n\\t" or ch.isprintable()).strip()',
         "",
         "",
@@ -427,8 +428,22 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
         "",
         f"class {cls}(ContractExtractor):",
         "    def can_handle(self, path: Path) -> bool:",
-        f"        return (path.suffix in {_tup(row['suffixes'])} and not _IGNORED_DIRS.intersection(path.parts)"
-        " and not _is_generated(path))",
+        "        # 绝对路径/`..` 未归一就比 `parts`：`src/link/x.ts`（link→node_modules）或",
+        "        # `a/../node_modules/x.ts` 都能绕过目录黑名单（判据落在未归一的形状上），故先归一再判（code-7）。",
+        "        import os",
+        "",
+        "        if path.is_absolute() or path.suffix not in " + _tup(row["suffixes"]) + ":",
+        "            return False",
+        "        parts = Path(os.path.normpath(str(path))).parts",
+        "        if \"..\" in parts or _IGNORED_DIRS.intersection(parts):",
+        "            return False",
+        "        if _is_generated(path):",
+        "            return False",
+        "        try:                              # 解析后仍不得越界（symlink 指向忽略目录 ⇒ 拒）",
+        "            resolved = Path(os.path.realpath(str(path))).parts",
+        "        except OSError:                   # pragma: no cover - 罕见 IO 故障",
+        "            return False",
+        "        return not _IGNORED_DIRS.intersection(resolved)",
         "",
         "    def extract(self, path: Path, include_doc: bool = False) -> str:",
         f"        return extract_{slug}_interface(path, include_doc=include_doc)",
