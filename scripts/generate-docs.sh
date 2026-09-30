@@ -6,7 +6,13 @@ set -euo pipefail
 # creates stub files under docs/guides/ for agent to fill per software engineering standards.
 # Idempotent: existing files are not overwritten.
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# ROOT 由"本脚本在 <root>/scripts/ 下"推出：`pwd`（逻辑路径）经符号链接/复制会指错根，
+# 而且从不验根 ⇒ 政策、配置、docs 全在错根上算（355）。取物理路径 + 布局校验。
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+if [ ! -d "$ROOT/.agent" ] && [ ! -d "$ROOT/docs" ]; then
+  echo "[k3dge] generate-docs.sh: 推断的仓根 '$ROOT' 既无 .agent/ 也无 docs/ ⇒ 布局假设不成立，拒跑" >&2
+  exit 1
+fi
 cd "$ROOT"
 
 CONFIG=".agent/docs.toml"
@@ -71,13 +77,25 @@ gen() {
   local key="$1" file="$2" title="$3"
   # 与门禁 `_check_docs_toml` 同判据（全文件找 `key = true`），但用 **POSIX 字符类**：
   # BSD/macOS 的 `grep -E` 不支持 `\s`（会退化成匹配字面 `s`，静默漏判/误开，ocr-165）。
-  if grep -Eq "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*true([[:space:]#]|$)" "$CONFIG"; then
+  # `grep -Eq` 的 rc=2（读不出/权限/二进制）在 `if` 条件里不触发 `set -e`，会掉进 else
+  # ⇒ 每项都报"disabled in config"并以 0 退出：配置坏了却装作跑成功（357）。
+  local _rc=0
+  grep -Eq "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*true([[:space:]#]|$)" "$CONFIG" || _rc=$?
+  if [ "$_rc" -ge 2 ]; then
+    echo "[k3dge] 读不出 $CONFIG（grep rc=$_rc）⇒ 中止，不按'未启用'处理" >&2
+    exit 1
+  fi
+  if [ "$_rc" -eq 0 ]; then
     if [ -f "$file" ]; then
       echo "[k3dge] exists, skip: $file"
     else
       echo "[k3dge] generating: $file"
-      printf '# %s\n\n' "$title" > "$file"
-      cat >> "$file" << 'EOT'
+      # 就地 `> "$file"` 先截断：中途失败（磁盘满/被杀/并发）留下半成品，而"存在即跳过"
+      # 让它**永久**停在半成品上，与脚本开头宣称的幂等不符（356）⇒ 同目录临时件 + mv 原子落盘。
+      local tmp
+      tmp="$(mktemp "${file}.XXXXXX")"
+      printf '# %s\n\n' "$title" > "$tmp"
+      cat >> "$tmp" << 'EOT'
 > Auto-generated stub by `./scripts/generate-docs.sh` from `.agent/docs.toml`.
 > Agent: please fill this document per software engineering standards, referencing
 > `docs/specs/`, `.agent/manifest.json` and `docs/generated/`.
@@ -91,6 +109,11 @@ gen() {
 <!-- k3dge:guide-stub -->
 
 EOT
+      if ! mv "$tmp" "$file"; then
+        rm -f "$tmp"
+        echo "[k3dge] 落盘失败：$file" >&2
+        exit 1
+      fi
     fi
   else
     echo "[k3dge] disabled in config, skip: $key -> $file"

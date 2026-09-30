@@ -2,7 +2,14 @@
 set -euo pipefail
 
 # Locate the repo root relative to this script (works from any cwd).
+# ROOT 只能由"本脚本在 <root>/scripts/ 下"这一布局假设推出：经符号链接调用、复制到别的
+# 深度都会指错，而后续所有路径（政策/收据/venv）都在错根上算（352）。
+# `pwd -P` 取**物理**路径；再用 gate.py 这个治理件是否存在来验根，验不过就拒跑。
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+if [ ! -f "$ROOT/scripts/gate.py" ]; then
+  echo "[k3dge] gate.sh: 推断的仓根 '$ROOT' 里没有 scripts/gate.py ⇒ 布局假设不成立，拒跑" >&2
+  exit 1
+fi
 cd "$ROOT"
 
 # Forward all args to k3dge; default to 'check' when none given.

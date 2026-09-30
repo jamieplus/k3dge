@@ -55,3 +55,57 @@ class TestGateSource(unittest.TestCase):
                            capture_output=True, text=True, env=env, timeout=60)
         self.assertEqual(r.returncode, 2, r.stderr[-300:])
         self.assertIn("MISMATCH", r.stderr)
+
+class TestPyprojectOnlyPolicy(unittest.TestCase):
+    """政策只写在 pyproject（env 未设）这条路——三轨都得判同一件事（ocr-347 的 (b)）。"""
+
+    def _fixture(self, receipt: str) -> Path:
+        import shutil
+        import tempfile
+
+        root = Path(tempfile.mkdtemp())
+        (root / "scripts").mkdir()
+        for f in ("gate.sh", "gate.py"):
+            shutil.copy2(ROOT / "scripts" / f, root / "scripts" / f)
+        (root / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0.1.0"\n\n[tool.k3dge]\nsource = "git+x"\n',
+            encoding="utf-8")
+        (root / ".venv").mkdir()
+        (root / ".venv" / "k3dge-source.txt").write_text(receipt + "\n", encoding="utf-8")
+        self.addCleanup(shutil.rmtree, root, True)
+        return root
+
+    def _run(self, track, root):
+        env = dict(os.environ)
+        env.pop("K3DGE_SOURCE", None)
+        cmd = (["bash", "scripts/gate.sh", "version"] if track == "sh"
+               else [sys.executable, "scripts/gate.py", "version"])
+        return subprocess.run(cmd, cwd=root, capture_output=True, text=True, env=env, timeout=60)
+
+    def test_mismatch_from_pyproject_exits_2_both_tracks(self) -> None:
+        for track in ("sh", "py"):
+            r = self._run(track, self._fixture("git+y"))
+            self.assertEqual(r.returncode, 2, f"{track}: {r.stderr[-300:]}")
+            self.assertIn("MISMATCH", r.stderr, track)
+
+    def test_matching_pyproject_policy_passes_the_gate(self) -> None:
+        for track in ("sh", "py"):
+            r = self._run(track, self._fixture("git+x"))
+            self.assertNotIn("MISMATCH", r.stdout + r.stderr, track)
+            self.assertEqual(r.returncode, 1,
+                             f"{track} 应走到'k3dge 不可用'而不是被政策拦下：{r.stderr[-200:]}")
+
+    def test_missing_receipt_is_refused_both_tracks(self) -> None:
+        for track in ("sh", "py"):
+            root = self._fixture("git+x")
+            (root / ".venv" / "k3dge-source.txt").unlink()
+            r = self._run(track, root)
+            self.assertEqual(r.returncode, 2, f"{track}: {r.stderr[-300:]}")
+            self.assertIn("缺失", r.stderr, track)
+
+    def test_ps1_shares_the_decision_markers(self) -> None:
+        """`gate.ps1` 本机不可跑（无 pwsh），但判据文案与比较方式必须同轨（347/345/346）。"""
+        ps1 = (ROOT / "scripts" / "gate.ps1").read_text(encoding="utf-8")
+        for m in ("k3dge-source", "MISMATCH", "缺失", "Resolve-PhysPath"):
+            self.assertIn(m, ps1, f"gate.ps1 缺判据标记：{m}")
+        self.assertIn("-cne", ps1, "来源一致性是字面比较，不得用大小写不敏感的 -ne")

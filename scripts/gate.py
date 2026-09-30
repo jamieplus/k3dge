@@ -83,7 +83,11 @@ if _want:
 # Prefer project venv：与 gate.sh 的 `[ -x ]` 同口径（只看存在会 exec 一个坏解释器崩闸，ocr-153）。
 venv_k3dge = ROOT / ".venv" / ("Scripts/k3dge.exe" if os.name == "nt" else "bin/k3dge")
 if venv_k3dge.is_file() and os.access(str(venv_k3dge), os.X_OK):
-    sys.exit(subprocess.call([str(venv_k3dge)] + args))
+    try:            # 丢 +x 已被上面的 X_OK 挡住；shebang 指向已删解释器仍会 OSError ⇒ 不得裸抛（351）
+        sys.exit(subprocess.call([str(venv_k3dge)] + args))
+    except OSError as exc:
+        print(f"[k3dge] 无法执行 {venv_k3dge}：{exc} ⇒ 闸中止（不静默放行）", file=sys.stderr)
+        sys.exit(127)
 
 # Fall back to globally installed k3dge
 k3dge = shutil.which("k3dge")
@@ -91,7 +95,11 @@ if k3dge:
     if _want:   # 收据只覆盖 `.venv`；全局那份来源未经校验 ⇒ 至少出声（与 gate.sh 同口径，ocr-158）。
         print(f"[k3dge-source] WARN: 政策已声明但 .venv/bin/k3dge 缺失 ⇒ 回落全局 k3dge（其来源未经收据校验）：{k3dge}",
               file=sys.stderr)
-    sys.exit(subprocess.call([k3dge] + args))
+    try:
+        sys.exit(subprocess.call([k3dge] + args))
+    except OSError as exc:
+        print(f"[k3dge] 无法执行 {k3dge}：{exc} ⇒ 闸中止（不静默放行）", file=sys.stderr)
+        sys.exit(127)
 
 print("k3dge not found. Run ./k3dge-init.sh or ./k3dge-init.ps1", file=sys.stderr)
 print("See README.md for details.", file=sys.stderr)
