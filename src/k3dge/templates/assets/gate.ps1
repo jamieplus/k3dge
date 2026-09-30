@@ -18,7 +18,6 @@ if ([string]::IsNullOrWhiteSpace($want) -and (Test-Path (Join-Path $Root "pyproj
 }
 if ($want -and (Test-Path $srcFile)) {
   $rec = ((Get-Content $srcFile | Select-Object -First 1) -replace '\s','')
-  $want = $env:K3DGE_SOURCE
   if ($want -ne $rec) {
     Write-Error "[k3dge-source] MISMATCH: want='$want' (env>pyproject) but installed from '$rec'. 重装或改政策后再跑闸."
     exit 2

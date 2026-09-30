@@ -303,12 +303,17 @@ def _cli_command(command: str, arguments: Optional[dict]) -> str:
 
     为什么不用 `str.format`：shell 命令里 `{}`（brace expansion/awk 脚本）很常见，format 会把它们
     当占位符炸掉。这里只做**已知键**的字面替换，未提供的键原样保留（可见地不生效，好过静默错替换）。
-    """
+
+    值一律 `shlex.quote`：命令经 `shell=True` 执行，而 `{path}`/`{bundle}` 来自被审仓路径 ⇒ 含空格/
+    shell 元字符（`; & $( ) ' "`）时会裂参或命令注入（code-10）。引号化保留 shell 语义（管道/重定向
+    仍由命令自身书写），只把**插值**变成单个安全参数。"""
+    import shlex
+
     out = command or ""
     for k, v in (arguments or {}).items():
         if v is None:
             continue
-        out = out.replace("{" + str(k) + "}", str(v))
+        out = out.replace("{" + str(k) + "}", shlex.quote(str(v)))
     return out
 
 

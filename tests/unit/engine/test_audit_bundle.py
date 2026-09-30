@@ -746,3 +746,26 @@ def test_consume_accepts_bundle_recorded_against_stage(tmp_path, monkeypatch):
     (bundle / "manifest.json").write_text(json.dumps(man, ensure_ascii=False), encoding="utf-8")
     r = ab.consume(ws, bundle, expect_input=str(ws))
     assert r.get("error") != "INPUT_MISMATCH", r
+
+
+def test_bundle_leg_success_returns_audited_not_audit_noop(tmp_path, monkeypatch):
+    """bundle 腿闭环后必须返回 `audited`（ocr-008）：否则掉进 oneshot 的 `audit_noop`
+    （"声明面无 produce 步 ⇒ 一次都没跑"）把已闭环的边界误判成 refused。"""
+    from k3dge.engine import milestone_audit as ma
+
+    ws = _repo(tmp_path)
+    (ws / ".agent").mkdir(exist_ok=True)
+    (ws / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\n', encoding="utf-8")
+    monkeypatch.setattr(ma, "_bundle_audit_leg", lambda *a, **k: (None, "closed!"))
+    status, msg = ma.run_audit_flow(ws, "M1", prompter=ma._Prompt.default())
+    assert status == "audited", (status, msg)
+    assert "audit_noop" not in msg
+
+
+def test_cli_command_quotes_substituted_values():
+    """`{path}` 等插值经 `shell=True` 执行 ⇒ 值必须引号化（防裂参/命令注入，code-10）。"""
+    from k3dge.engine.pipeline_runner import _cli_command
+
+    out = _cli_command("k3dit audit --verify {bundle}", {"bundle": "/tmp/a b; rm -rf x"})
+    assert out == "k3dit audit --verify '/tmp/a b; rm -rf x'"

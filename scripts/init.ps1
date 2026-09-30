@@ -79,6 +79,7 @@ if ($self) {
   elseif ($InstallTarget -match '^k3dge\[mcp\] @ ') { $srcRec = $InstallTarget -replace '^k3dge\[mcp\] @ ','' }
   else { $srcRec = $InstallTarget -replace '\[mcp\]$','' }
   $srcRec | Out-File -FilePath (Join-Path $Target ".venv/k3dge-source.txt") -Encoding utf8
+}
 
 Write-Host "[k3dge] generating harness scaffolding in $Target ..."
 & $PyVenv -m k3dge.templates.scaffold $Target

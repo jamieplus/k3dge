@@ -149,7 +149,7 @@ def _snippet_window(path: Path, line_no: int, context: int, cap: int = _MAX_CONT
 def _run_ripgrep(workspace: Path, query: str) -> Optional[List[str]]:
     try:
         res = subprocess.run(
-            ["rg", "-n", "--with-filename", "--no-heading", "--hidden", "--glob", "!docs/generated/**", query],
+            ["rg", "-n", "--with-filename", "--no-heading", "--hidden", "--glob", "!docs/generated/**", "-e", query],
             cwd=workspace,
             capture_output=True,
             text=True,

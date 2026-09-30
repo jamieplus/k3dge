@@ -99,7 +99,7 @@ def verify_commit(workspace: Path, h: str) -> Tuple[bool, str]:
         capture_output=True, text=True,
     ).stdout.strip()
     when_iso = subprocess.run(
-        ["git", "show", "-s", "--format=%cI", h], cwd=str(workspace),
+        ["git", "show", "-s", "--format=%aI", h], cwd=str(workspace),
         capture_output=True, text=True,
     ).stdout.strip()
     body = subprocess.run(
@@ -114,13 +114,19 @@ def verify_commit(workspace: Path, h: str) -> Tuple[bool, str]:
     if not m:
         return False, f"[ATTEST] commit {h} missing attestation line"
     who, when, tok = m.group(1), m.group(2), m.group(3)
+    # 时间绑定：行必须与本提交的**作者时间**同窗（±1 分钟），否则把一条合法行原样搬到另一提交
+    # （同树）即可复用（ocr-005）。用作者时间而非提交者时间：rebase/amend 会改提交者时间但保留
+    # 作者时间 ⇒ 不误杀正常历史重写；攻击者复用须显式改作者时间（留痕）。
+    if window(when_iso) not in windows(when):
+        return False, (f"[ATTEST] commit {h} timestamp mismatch "
+                       "-- attestation line not bound to this commit's author date")
     expected = [
         WORDLIST[int(hashlib.sha256(f"{secret()}|{w}|{tree}".encode()).hexdigest(), 16) % len(WORDLIST)]
         for w in windows(when)
     ]
     if tok not in expected:
         return False, (
-            f"[ATTEST] commit {h} token mismatch (got '{tok}', expected '{expected[0]}') "
+            f"[ATTEST] commit {h} token mismatch "
             "-- attestation was not produced by the governed path"
         )
     return True, f"[ATTEST] commit {h} OK ({who} @ {when})"

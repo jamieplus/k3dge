@@ -14,7 +14,7 @@
   "ExtractorConfigError": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 126
+      "line": 142
     }
   ],
   "GateReport": [
@@ -614,13 +614,13 @@
   "cmd_mcp_probe": [
     {
       "file": "src/k3dge/cli/mcp_peers.py",
-      "line": 176
+      "line": 180
     }
   ],
   "cmd_mcp_sync": [
     {
       "file": "src/k3dge/cli/mcp_peers.py",
-      "line": 144
+      "line": 148
     }
   ],
   "cmd_milestone": [
@@ -752,7 +752,7 @@
   "describe_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 427
+      "line": 445
     }
   ],
   "emit": [
@@ -1508,7 +1508,7 @@
   "render_plugin": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 219
+      "line": 237
     }
   ],
   "render_readme_layout": [
@@ -1562,7 +1562,7 @@
   "resolve_languages": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 175
+      "line": 191
     }
   ],
   "resolve_role": [
@@ -1586,7 +1586,7 @@
   "run_action": [
     {
       "file": "src/k3dge/engine/pipeline_runner.py",
-      "line": 359
+      "line": 364
     }
   ],
   "run_audit_flow": [
@@ -1824,7 +1824,7 @@
   "sync_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 385
+      "line": 403
     }
   ],
   "tag_audit_baseline": [

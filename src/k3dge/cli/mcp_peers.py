@@ -94,11 +94,15 @@ def _mcp_servers(workspace: Path) -> dict:
 def _sync_peers_into_mcp(workspace: Path, cfg: dict) -> Optional[str]:
     """Merge enabled peers from pipeline.toml into .mcp.json. Returns error string or None."""
     mcp_path = workspace / ".mcp.json"
-    try:
-        data = json.loads(mcp_path.read_text(encoding="utf-8")) if mcp_path.is_file() else {"mcpServers": {}}
+    if mcp_path.is_file():
+        try:
+            data = json.loads(mcp_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            # 存在但读不了 ⇒ **绝不**用空骨架覆盖（否则用户手写的 mcpServers/其它顶层键静默丢失，ocr-004）。
+            return f".mcp.json 存在但不可解析（{exc}）⇒ 跳过写盘（不覆盖用户内容）"
         if not isinstance(data, dict):
-            data = {"mcpServers": {}}
-    except Exception:
+            return ".mcp.json 根节点不是对象 ⇒ 跳过写盘（不覆盖用户内容）"
+    else:
         data = {"mcpServers": {}}
     if "mcpServers" not in data or not isinstance(data["mcpServers"], dict):
         data["mcpServers"] = {}

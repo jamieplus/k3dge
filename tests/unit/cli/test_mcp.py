@@ -224,3 +224,19 @@ class TestMcpExitIsomorphism(unittest.TestCase):
                 tl = json.loads(mcp.k3dge_task_list(workspace_path=d))
         self.assertEqual(chk["next"], ns.render_mcp())
         self.assertEqual(tl["next"], ns.render_mcp())
+
+
+class TestMcpPeersSync(unittest.TestCase):
+    def test_broken_mcp_json_is_refused_not_clobbered(self) -> None:
+        """`.mcp.json` 存在但不可解析 ⇒ 跳过写盘，不覆盖用户内容（ocr-004）。"""
+        from unittest import mock
+
+        from k3dge.cli import mcp_peers
+
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            (ws / ".mcp.json").write_text("{ not json", encoding="utf-8")
+            with mock.patch.object(mcp_peers, "probe_peer_mcp", return_value=("/x", "mod", "/py")):
+                err = mcp_peers._sync_peers_into_mcp(ws, {"peers": {"k3dit": {"enabled": True}}})
+            self.assertIsNotNone(err)
+            self.assertEqual((ws / ".mcp.json").read_text(encoding="utf-8"), "{ not json")

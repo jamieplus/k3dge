@@ -576,10 +576,17 @@ def run_audit_flow(
     _mode = _audit_mode(workspace)
     if _mode == "bundle":
         # bundle 审计腿：k3dit 是**本地命令行工具**（与 `git` 同层）⇒ 按 argv 调用、读包、落树、落账。
-        # 闭环后**落到共用尾**（verify 步 + nextstep persist），与 oneshot 腿同形；未闭环则提前返回。
+        # 闭环 ⇒ 走共用尾（nextstep persist + 返回 audited）；未闭环则提前返回。
         early, _bmsg = _bundle_audit_leg(workspace, milestone_id, prompt, fresh_baseline)
         if early is not None:
             return early
+        # **闭环必须在此返回**：bundle 模式的声明面通常不写 `stages_produce`（产包的是本地 k3dit，
+        # 不是外部 produce 步）⇒ 继续往下会被 `audit_noop`（"审计未声明 ⇒ 一次都没跑"）误拒，
+        # 把已闭环的边界判成 refused，甚至再跑一遍完整审计（ocr-008）。共用尾＝persist + seal_ready。
+        from k3dge.engine import nextstep
+        _ns = nextstep.seal_ready_for(workspace, milestone_id)
+        nextstep.persist(workspace, _ns)
+        return "audited", _bmsg + "\n" + _ns.render_cli()
     elif _mode == "ratchet":
         # 棘轮形状已退休（2026-09-26）：它要的对端 verb（submit/collect/present/status）随 k3dit 的
         # MCP 服务端面一并消失。**显式拒绝**而不是静默换成别的形状（ADR-0004 §2.1.11）。

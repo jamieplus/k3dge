@@ -123,6 +123,18 @@ class TestResolve(unittest.TestCase):
                 g.resolve_languages(ws)
             self.assertIn("klingon", str(ctx.exception))
 
+    def test_invalid_name_rejected(self):
+        """语言名进 `plugdir / f"{name}.py"` 当文件名 ⇒ 路径分隔/`..` 必须拒（ocr-007）。"""
+        row = ('grammar = "x"\npackage = "x"\nlang_func = "language"\nlang_name = "x"\n'
+               'suffixes = [".x"]\nwrapper = []\nwrapper_kw = ""\nfn = []\ncontainer = []\n'
+               'body = []\nmember = []\ntype = []\nlexical_nodes = []\n'
+               'lexical_markers = []\nlexical = false\n')
+        for bad in (f'[languages."../evil"]\n{row}', 'enable = ["a/b"]\n'):
+            with tempfile.TemporaryDirectory() as d:
+                ws = _ws(d, bad)
+                with self.assertRaises(g.ExtractorConfigError):
+                    g.resolve_languages(ws)
+
     def test_custom_row_replaces_builtin(self):
         with tempfile.TemporaryDirectory() as d:
             ws = _ws(d, 'enable = ["go"]\n[languages.go]\n'
