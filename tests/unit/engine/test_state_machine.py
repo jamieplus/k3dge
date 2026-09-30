@@ -66,3 +66,15 @@ def test_new_state_without_registration_fails() -> None:
     states = set(MoreStates)
     v = sm.check_completeness(_GOOD, states, sm.TERMINAL_STATES, sm.INITIAL)
     assert any("无出边" in x or "不可达" in x for x in v), v
+
+
+def test_completeness_checks_the_declaration_set_itself() -> None:
+    """source/initial/terminals 不在 states 里也必须红（旧只校 target，CI 漏判，ocr-325）。"""
+    v_src = sm.check_completeness(_GOOD, set(S) - {S.IN_PROGRESS}, sm.TERMINAL_STATES, S.IDEA)
+    assert any("未定义源态" in x for x in v_src), v_src
+
+    v_term = sm.check_completeness(_GOOD, set(S) - {S.DONE}, sm.TERMINAL_STATES, S.IDEA)
+    assert any("未声明在 states" in x for x in v_term), v_term
+
+    v_init = sm.check_completeness(_GOOD, set(S), sm.TERMINAL_STATES, "nope")   # type: ignore[arg-type]
+    assert any("初始态" in x for x in v_init), v_init

@@ -971,6 +971,7 @@ from pathlib import Path
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 from k3dge.engine import gates
 INDEX_REL = 'docs/generated/symbol-index.json'
 class Location
@@ -986,6 +987,8 @@ INDEX_META_REL = '.k3dge/symbol-index.meta.json'
 index_meta_path(workspace: Path) -> Path
 write_index_meta(workspace: Path) -> None
     # doc: 索引写成后落签名（与索引同处刷新，避免"索引新、签名旧"的假陈旧）。
+class IndexUnavailable(RuntimeError)
+# doc: 索引**不可用**（损坏/读不出/形状不对），与"这个符号不存在"是两件事。
 where(workspace: Path, symbol: str) -> List[Location]
     # doc: Deterministic name -> file:line. No grep discovery, no model judgment.
 search(workspace: Path, query: str, *, snippet: bool=True, context: int=2, max_snippet: int=240) -> List[Location]
@@ -995,8 +998,8 @@ from __future__ import annotations
 from typing import List
 from typing import Optional
 from typing import Tuple
-REQUIRED_SECTIONS: List[Tuple[str, 're.Pattern[str]']] = [('Domain Boundary & Responsibilities', re.compile('^#{2,3}\\s+.*Domain Boundary', re.MULTILINE)), ('Public Interfaces & Type Contracts', re.compile('^#{2,3}\\s+.*Public Interfaces', re.MULTILINE)), ('Verification Matrix', re.compile('^#{2,3}\\s+.*Verification Matrix', re.MULTILINE))]
-CONTRACT_HASH_RE = re.compile('\\*\\*Contract Hash\\*\\*:\\s*`?sha256:([0-9a-f]{64})`?', re.IGNORECASE)
+REQUIRED_SECTIONS: List[Tuple[str, 're.Pattern[str]']] = [('Domain Boundary & Responsibilities', re.compile(_HEADING_PREFIX + 'Domain Boundary\\b', re.MULTILINE)), ('Public Interfaces & Type Contracts', re.compile(_HEADING_PREFIX + 'Public Interfaces\\b', re.MULTILINE)), ('Verification Matrix', re.compile(_HEADING_PREFIX + 'Verification Matrix\\b', re.MULTILINE))]
+CONTRACT_HASH_RE = re.compile('\\*\\*Contract Hash\\*\\*:\\s*`?sha256:([0-9a-f]{64})(?![0-9a-f])`?', re.IGNORECASE)
 validate_structure(content: str) -> List[str]
 extract_contract_hash(content: str) -> Optional[str]
 # state_machine.py
@@ -1056,10 +1059,10 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from k3dge.engine.state_machine import TaskState
-audit_job_ticket_names(workspace: Path) -> set
+audit_job_ticket_paths(workspace: Path) -> set
     # doc: 棘轮工单票＝本地账 `ticket_task` 记下的路径，不是文件名模式。
 work_pending(tasks: List[MilestoneTask], workspace: Optional[Path]=None) -> List[MilestoneTask]
-    # doc: 人待办：未 done，且不是账本里的棘轮工单票。
+    # doc: 人待办：未 done，且不是账本里的棘轮工单票（按**指针路径**比，不比文件名）。
 STATUS_RE = re.compile('-\\s+\\*\\*Status\\*\\*:\\s*([\\w-]+)', re.IGNORECASE)
 MILESTONE_RE = re.compile('-\\s+\\*\\*Milestone\\*\\*:\\s*([^\\n\\r]+)', re.IGNORECASE)
 PRIORITY_RE = re.compile('-\\s+\\*\\*Priority\\*\\*:\\s*(\\S+)', re.IGNORECASE)

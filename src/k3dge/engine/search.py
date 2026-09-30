@@ -13,15 +13,20 @@ import hashlib
 import json
 import os
 import re
+import sys
+import time
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from k3dge.engine import gates
 
 INDEX_REL = "docs/generated/symbol-index.json"
 _MAX_CONTEXT = 3
+#: 兜底扫描（rg 缺席）的遍历预算与单行探测上限（320）
+_FALLBACK_BUDGET_SEC = 20.0
+_FALLBACK_LINE_CAP = 4000
 
 
 @dataclass(frozen=True)
@@ -176,21 +181,39 @@ def _is_stale_cheaply(workspace: Path, index: Path) -> bool:
     return sig["newest_mtime"] > idx_st.st_mtime
 
 
+class IndexUnavailable(RuntimeError):
+    """索引**不可用**（损坏/读不出/形状不对），与"这个符号不存在"是两件事。
+
+    旧实现降级成 `return {}` ⇒ CLI 统一喊 `no symbol …(run 'k3dge index')`：坏索引被读成
+    "该公开符号不存在"，Agent 据此判"没有这个东西"（317）。
+    """
+
+
 def _load_index(workspace: Path) -> Dict[str, List[dict]]:
     p = index_path(workspace)
     if not p.is_file() or _is_stale_cheaply(workspace, p):
         write_symbol_index(workspace)
     try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise IndexUnavailable(f"符号索引读不出（{p}：{type(exc).__name__}: {exc}）") from exc
+    if not isinstance(data, dict):
+        raise IndexUnavailable(f"符号索引顶层不是对象（{p}）")
+    return data
 
 
 def where(workspace: Path, symbol: str) -> List[Location]:
-    """Deterministic name -> file:line. No grep discovery, no model judgment."""
+    """Deterministic name -> file:line. No grep discovery, no model judgment.
+
+    Raises `IndexUnavailable` when the index itself is broken（区别于"查无此符号"）。
+    """
     index = _load_index(workspace)
-    hits = index.get(symbol, [])
-    return [Location(file=h["file"], line=h.get("line")) for h in hits]
+    hits = index.get(symbol) or []
+    out: List[Location] = []
+    for h in hits:
+        if isinstance(h, dict) and h.get("file"):
+            out.append(Location(file=str(h["file"]), line=h.get("line")))
+    return out
 
 
 def _snippet_window(path: Path, line_no: int, context: int, cap: int = _MAX_CONTEXT) -> str:
@@ -211,7 +234,9 @@ def _snippet_window(path: Path, line_no: int, context: int, cap: int = _MAX_CONT
 def _run_ripgrep(workspace: Path, query: str) -> Optional[List[str]]:
     try:
         res = subprocess.run(
-            ["rg", "-n", "--with-filename", "--no-heading", "--hidden", "--glob", "!docs/generated/**", "-e", query],
+            ["rg", "-n", "--with-filename", "--no-heading", "--hidden",
+             # `--hidden` 会把 `.git` 也拉进来，而兜底路径明确跳 `.git` ⇒ 装不装 rg 命中集不同（319）
+             "--glob", "!docs/generated/**", "--glob", "!.git/**", "-e", query],
             cwd=workspace,
             capture_output=True,
             text=True,
@@ -250,10 +275,21 @@ def _python_search(workspace: Path, query: str) -> List[str]:
         rx = re.compile(query)
     except re.error:
         rx = None
+    # 兜底**没有** rg 那条 30s 超时（`_run_ripgrep` 超时也回 None ⇒ 立刻接一次无截止的全仓扫描，
+    # `re` 也没有回溯保险）⇒ 加遍历预算：到点就停并出声，宁可少给也不挂死（320）。
+    deadline = time.monotonic() + _FALLBACK_BUDGET_SEC
     skip_dirs = {".git", ".venv", "venv", "node_modules", "__pycache__"}
     ignored = _gitignored_prefixes(workspace)
+    truncated = False
     for path in workspace.rglob("*"):
+        if time.monotonic() > deadline:
+            truncated = True
+            break
         rel_parts = path.relative_to(workspace).parts
+        if path.is_symlink():
+            # rg 默认不跟随符号链接（需 `--follow`）：`link -> /etc/passwd` 在兜底路径会被整读，
+            # 既与 rg 语义相反又能越界读仓外（318）
+            continue
         if not path.is_file() or set(rel_parts) & skip_dirs or rel_parts[:2] == ("docs", "generated"):
             continue
         rel = str(path.relative_to(workspace)).replace("\\", "/")
@@ -269,8 +305,12 @@ def _python_search(workspace: Path, query: str) -> List[str]:
         except OSError:
             continue
         for i, line in enumerate(text.splitlines(), 1):
-            if (rx.search(line) if rx is not None else query in line):
+            probe = line if len(line) <= _FALLBACK_LINE_CAP else line[:_FALLBACK_LINE_CAP]
+            if (rx.search(probe) if rx is not None else query in probe):
                 out.append(f"{rel}:{i}:{line}")
+    if truncated:
+        print(f"[SEARCH] WARN: 兜底扫描到 {_FALLBACK_BUDGET_SEC}s 预算上限即停 ⇒ 结果可能不完整",
+              file=sys.stderr)
     return out
 
 
@@ -288,23 +328,34 @@ def search(
     if raw is None:
         raw = _python_search(workspace, query)
     cap = int(gates.get(workspace, "search", "context_max"))
+    parsed = _split_hit_line
     context = max(0, min(context, cap))  # 单源 context_max；_snippet_window 按同一 cap 钳（不硬编 3）
     locs: List[Location] = []
     for ln in raw:
-        # format: file:line:content
-        head, sep, content = ln.partition(":")
-        if not sep:
-            locs.append(Location(file=ln))
-            continue
-        line_no_str, _, content = content.partition(":")
-        try:
-            line_no = int(line_no_str)
-        except ValueError:
-            locs.append(Location(file=head))
+        # format: file:line:content —— POSIX 文件名合法可含 `:` ⇒ 按 `:` 硬切会把路径截到
+        # **第一个**冒号并丢行号（静默给错坐标）。用贪婪正则锚定"最后一段数字"即行号（321）。
+        head, line_no = parsed(ln)
+        if line_no is None:
+            locs.append(Location(file=head or ln))
             continue
         snippet_text: Optional[str] = None
         if snippet:
             snip = _snippet_window(workspace / head, line_no, context, cap=cap)
             snippet_text = snip[:max_snippet]
         locs.append(Location(file=head, line=line_no, snippet=snippet_text))
+    return locs
+
+
+def _split_hit_line(line: str) -> Tuple[str, Optional[int]]:
+    """`file:line:content` → `(file, line)`；无行号 → `(整串, None)`。
+
+    `.+` 贪婪 ⇒ 匹配到**最后一个**"冒号+数字"，文件名里的冒号不再把路径切断（321）。
+    """
+    m = re.match(r"^(?P<f>.+):(?P<l>\d+):", line)
+    if m:
+        return m.group("f").replace("\\", "/"), int(m.group("l"))
+    m2 = re.match(r"^(?P<f>.+):(?P<l>\d+)$", line)
+    if m2:
+        return m2.group("f").replace("\\", "/"), int(m2.group("l"))
+    return line, None
     return locs

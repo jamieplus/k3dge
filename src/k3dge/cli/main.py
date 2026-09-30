@@ -897,10 +897,16 @@ def cmd_search(args: argparse.Namespace) -> int:
 
 
 def cmd_where(args: argparse.Namespace) -> int:
-    from k3dge.engine.search import where
+    from k3dge.engine.search import IndexUnavailable, where
 
     workspace = _find_workspace(Path.cwd())
-    locs = where(workspace, args.symbol)
+    try:
+        locs = where(workspace, args.symbol)
+    except IndexUnavailable as exc:
+        # 索引坏 ≠ 符号不存在：后者是"仓里没有这个东西"的判据，前者要人去修索引（317）
+        print(f"[WHERE] 索引不可用：{exc}\n  ⇒ 跑 'k3dge index' 重建（别把读不出当成查无此符号）",
+              file=sys.stderr)
+        return 2
     if not locs:
         print(f"[WHERE] no symbol '{args.symbol}' in index (run 'k3dge index')", file=sys.stderr)
         return 1

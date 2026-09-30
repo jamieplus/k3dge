@@ -76,7 +76,15 @@ def check_completeness(
     只查**声明表**，不查手写消费者（那须表驱动，见模块 docstring）。
     """
     v: List[str] = []
+    # 先校**声明集自身**：source/initial/terminals 不在 states 里时，下面的死锁/可达/确定性
+    # 判据全都建立在错误前提上（CI 只查 target ⇒ 自造表漏判，325）
+    for s in sorted(set(terminals) - set(states), key=lambda x: getattr(x, "value", str(x))):
+        v.append(f"终态 {getattr(s, 'value', s)!r} 未声明在 states 里")
+    if initial not in states:
+        v.append(f"初始态 {getattr(initial, 'value', initial)!r} 未声明在 states 里")
     for t in transitions:
+        if t.source not in states:                                   # ③b 源态已定义
+            v.append(f"未定义源态 {t.source!r}")
         if t.target not in states:                                   # ③ 目标态已定义
             v.append(f"未定义目标态 {t.target!r}")
         if t.source in terminals:                                    # ① 终态不得有出边

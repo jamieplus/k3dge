@@ -22,12 +22,17 @@ def blocking_graph(workspace: Path) -> Dict[str, List[str]]:
     g: Dict[str, List[str]] = {}
     if not d.is_dir():
         return g
-    files = [p for p in sorted(d.glob("*.md")) if not _is_doc_aux(p.name)]
+    # 已关票（`X.done.md`）**不作节点**：`p.stem` 对它是 `X.done`，于是关掉的票仍以节点身份
+    # 进图、其 frontmatter 残留的 `blocking:` 仍是活边 ⇒ `critical_path` 把已关票报成关键链起点、
+    # `blocking_cycles` 报出"互阻环"（已关票不可能阻塞任何人，326）。引用已关票由
+    # `blocking_dangling` 单独出事实。
+    files = [p for p in sorted(d.glob("*.md"))
+             if not _is_doc_aux(p.name) and not p.name.endswith(".done.md")]
     stems = {p.stem for p in files}
     for p in files:
         try:
             fm = parse_frontmatter(p.read_text(encoding="utf-8")) or {}
-        except OSError:
+        except (OSError, UnicodeDecodeError):     # 坏编码票不得炸掉整份 DAG 观测（327）
             fm = {}
         deps = [x for x in _SPLIT.split(str(fm.get("blocking", "")).strip()) if x]
         g[p.stem] = [x for x in deps if x in stems]
@@ -66,7 +71,7 @@ def blocking_dangling(workspace: Path) -> Dict[str, List[str]]:
             continue
         try:
             fm = parse_frontmatter(p.read_text(encoding="utf-8")) or {}
-        except OSError:
+        except (OSError, UnicodeDecodeError):      # 同 327：两个读环同判据
             continue
         for dep in [x for x in _SPLIT.split(str(fm.get("blocking", "")).strip()) if x]:
             if dep in open_stems:
@@ -83,7 +88,10 @@ def blocking_cycles(workspace: Path) -> Dict[str, object]:
         tuple(ts.static_order())
         return {"cyclic": False}
     except CycleError as exc:
-        return {"cyclic": True, "detail": str(exc.args[0])[:200]}
+        # CycleError.args == ("Cyclic dependencies exist among these items: ", "a -> b -> a")
+        # **固定标签在 args[0]，环路径在最后** ⇒ 取 args[0] 只会重复标签、把真正的环丢掉（328）
+        detail = str(exc.args[-1]) if exc.args else str(exc)
+        return {"cyclic": True, "detail": detail[:200]}
 
 
 def critical_path(workspace: Path) -> Dict[str, object]:
