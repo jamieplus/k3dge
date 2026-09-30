@@ -260,7 +260,7 @@ def run_seal_flow(
 
     唯一入口：人发起 `seal` 就是在宣布"要收这一章"；幂等重入（预审失败可修完再 seal）。
     审计是封板的**主体**（相位 2，本流程自己跑，不靠外部 hook 先跑一遍）；审计正常返回
-    ⇒ 版号前进（ADR-0004 §2.1.11），不管有没有报告。status ∈ {sealed, seal_declined, rejected}。
+    status 闭集＝{sealed, seal_declined, rejected, audit_open, escalated}：审计在办/升级态**原样返回**（不是 docstring 漏掉的野值），只有 `sealed` 代表收章完成（462）
     """
     from k3dge.engine import nextstep
     from k3dge.engine.seal import render_checklist, unmet_seal_preconditions

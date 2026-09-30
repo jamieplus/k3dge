@@ -43,11 +43,15 @@ class Prompt:
             suffix = f" [{default}]"
         self._write(question + suffix + ": ")
         if self.answers is not None:
-            ans = (
-                self.answers[self._ai]
-                if self._ai < len(self.answers)
-                else ("y" if default_yes else "n")
-            )
+            if self._ai >= len(self.answers):
+                # 注入答案耗尽还继续"按默认走" ⇒ 问题数多于答案数的测试会**假通过**（451）
+                import sys
+
+                print(f"[PROMPT] WARN: 注入答案已用尽（第 {self._ai + 1} 问）⇒ 按默认 "
+                      f"{'Y' if default_yes else 'N'} 继续；测试需补齐 answers", file=sys.stderr)
+                ans = "y" if default_yes else "n"
+            else:
+                ans = self.answers[self._ai]
             self._ai += 1
             return str(ans).strip().lower() in ("y", "yes")
         if not self.isatty():

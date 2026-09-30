@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -37,9 +38,12 @@ def _reviews_to_archive(reviews_dir: Path, milestone_id: str, pass_mark: str) ->
             continue
         try:
             text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+        except (OSError, UnicodeDecodeError) as exc:
+            # 静默丢弃 ⇒ 调用方（seal）仍报"Archived N reviews"，少掉的这张没人知道（457）
+            print(f"[review_archive] WARN: {path.name} 读不出（{type(exc).__name__}）⇒ 本轮不归档它",
+                  file=sys.stderr)
             continue
-        if pass_mark in text:
+        if pass_mark and pass_mark in text:   # 空 pass_mark 时 `"" in text` 恒真 ⇒ 全部 living 报告都被卷进归档（458）
             out.append(path)
     return out
 

@@ -88,7 +88,9 @@ def strip_code_spans(text: str) -> str:
 #: 下游仓自带 `docs/adr/` 从 0001 起编号，若这里也要求"解析得到"，则 k3dge **自己下发的文档**
 #: 永远过不了自己的 hook（实测 2026-09-21：init 后首次提交被 `DANGLING_ADR_REF` 拦）。
 #: 代价：k3dge 自举仓里带 `k3dge ` 前缀的引用不再被本闸校验（有意留，见 LEFTOVERS）。
-_QUALIFIED_ADR_RE = re.compile(r"(?:k3dge|where)\s+ADR-\d{4}", re.IGNORECASE)
+# `where` 是普通英文连接词：`, where ADR-0001 mandates …` 会被整段豁免 ⇒ B1 对该号完全不校验（452）。
+# 跨仓自限定只认工具名前缀这一种形状（LEFTOVERS 记其代价）。
+_QUALIFIED_ADR_RE = re.compile(r"k3dge\s+ADR-\d{4}", re.IGNORECASE)
 
 
 def _adr_numbers_to_resolve(text: str) -> List[str]:
@@ -437,8 +439,13 @@ def is_screenable_new_doc(rel: str) -> bool:
 
 
 def screen_ack_path(workspace: Path, rel: str) -> Path:
+    import hashlib
+
+    # 折叠不是单射：`/` 与 `-` 折成同一字符 ⇒ `docs/guides/a-b.md` 与 `docs/guides/a/b.md`
+    # 共享一份回执，一份排查做完另一份也"免了"（453）⇒ 名字尾部带原路径摘要
     slug = re.sub(r"[^A-Za-z0-9._-]", "-", rel)
-    return Path(workspace) / SCREEN_ACK_REL / f"{slug}.ack"
+    sig = hashlib.sha1(rel.encode("utf-8", "surrogatepass")).hexdigest()[:10]
+    return Path(workspace) / SCREEN_ACK_REL / f"{slug}.{sig}.ack"
 
 
 def find_unscreened_new_docs(workspace: Path, added_rels) -> List[Ref]:

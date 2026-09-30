@@ -95,7 +95,10 @@ def count_statuses(text: str) -> Dict[str, object]:
     """
     counts: Dict[str, object] = {s: 0 for s in STATUSES}
     counts["total"] = 0
-    counts["_ids_未知状态"] = []
+    # `_ids_*` 键**无论命中与否都存在**：调用方按 `counts["_ids_待修"]` 取值时，
+    # "这一态没出现过"与"键不存在"是两种形状，前者安全后者让新代码 KeyError（456）
+    for s in list(STATUSES) + list(_OPEN_ALIASES) + ["待修", "未知状态"]:
+        counts.setdefault(f"_ids_{s}", [])
     _, rows = parse_rows(text)
     for _, row in rows:
         st = str(row.get("状态", "")).strip()

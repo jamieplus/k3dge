@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -28,6 +29,21 @@ from k3dge.engine.task_index import (
 )
 from k3dge.engine import task_index
 
+def _missing_in(review, tasks) -> list:
+    """已扫到的评审里缺哪些票名。
+
+    拒绝消息以前**在这儿裸 `read_text` 二次读盘**：文件在扫描与渲染之间被移走/坏编码
+    会让闸函数抛出而不是给出拒绝理由（460）⇒ 读不回就出声并给占位项。
+    """
+    try:
+        text = review.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"[seal] WARN: {review.name} 复核时读不出（{type(exc).__name__}）⇒ 缺项清单不可得",
+              file=sys.stderr)
+        return ["<读不出>"]
+    return [t.path.name for t in tasks if t.path.name not in text]
+
+
 GUIDE_STUB_RE = re.compile(r"<!--\s*k3dge:guide-stub\s*-->", re.IGNORECASE)
 
 
@@ -42,8 +58,10 @@ def scan_unfilled_guides(workspace: Path) -> List[str]:
             continue
         try:
             text = g.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            out.append(g.name)
+        except (OSError, UnicodeDecodeError) as exc:
+            # 仍**拦**（读不出不能当"已填"），但理由要说清：旧写法把它混进"未填桩"名单，
+            # 消息对该文件是错的（GBK 存过的指南会被喊成"请补完文档"，459）
+            out.append(f"{g.name}（读不出：{type(exc).__name__}）")
             continue
         if GUIDE_STUB_RE.search(text):
             out.append(g.name)
@@ -99,7 +117,7 @@ def _seal_review_gate(workspace: Path, milestone_id: str, tasks: List[MilestoneT
     if incomplete_reviews:
         return (
             f"[SEAL REJECTED] Review for milestone '{milestone_id}' does not list all tasks.\n"
-            f"  Missing in {incomplete_reviews[0].name}: {[t.path.name for t in tasks if t.path.name not in incomplete_reviews[0].read_text(encoding='utf-8')]}"
+            f"  Missing in {incomplete_reviews[0].name}: {_missing_in(incomplete_reviews[0], tasks)}\n"
         )
     return (
         f"[SEAL REJECTED] Missing audit review document for milestone '{milestone_id}'.\n"
@@ -180,8 +198,9 @@ def _seal_archive(workspace: Path, milestone_id: str, tasks: List[MilestoneTask]
     try:
         nxt = bump_milestone(workspace)
         return True, f"{sealed} Next milestone: {nxt}"
-    except Exception:
-        return True, f"{sealed} (milestone bump failed)"
+    except Exception as exc:
+        # 指针没前进是**事实**：吞掉异常 ⇒ 调用方（seal_flow._archive 只看 ok）无从得知原因（461）
+        return True, f"{sealed} ⚠️ 里程碑指针未前进（{type(exc).__name__}: {exc}）⇒ 手工 'k3dge milestone' 查因"
 
 
 def _docs_normalized_error(workspace: Path) -> Optional[str]:

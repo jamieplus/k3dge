@@ -139,8 +139,11 @@ def check_filename(
             f"filename does not match {filename_pat}: {Path(filename).name}",
             "file",
         )], ident, False
+    # 可选分组没参与匹配时 `m.group(1)` 是 None，而 `lastindex` 只指"最后参与匹配的组"
+    # ⇒ 判据要落在 **group(1) 本身**，否则 ident 被赋成 None 再流进 h1 模板（454）
     if m.lastindex:
-        ident = m.group(1)
+        g1 = m.group(1)
+        ident = g1 if isinstance(g1, str) else ident
     return [], ident, True
 
 
@@ -256,6 +259,24 @@ def check_frontmatter(
                     f"{key}={val!r} not in {rule}: {Path(filename).name}",
                     "file",
                 ))
+        elif isinstance(rule, str):
+            if val.strip() != rule:
+                out.append((
+                    code_for(codes, "frontmatter", "DOC_SCHEMA_INVALID"),
+                    f"{key}={val!r} != 声明的唯一值 {rule!r}: {Path(filename).name}", "file"))
+        elif isinstance(rule, dict) and ("enum" in rule or "pattern" in rule):
+            ok = _status_ok(val, [str(x) for x in (rule.get("enum") or [])]) if rule.get("enum") \
+                else bool(re.fullmatch(str(rule.get("pattern")), val))
+            if not ok:
+                out.append((
+                    code_for(codes, "frontmatter", "DOC_SCHEMA_INVALID"),
+                    f"{key}={val!r} 不满足声明 {rule}: {Path(filename).name}", "file"))
+        else:
+            # 形状不认识 ⇒ **报出来**：静默跳过等于该键永远绿（455）
+            out.append((
+                code_for(codes, "frontmatter", "DOC_SCHEMA_INVALID"),
+                f"{schema_rel} 的 frontmatter.{key} 规则形状不支持（{type(rule).__name__}）",
+                "schema"))
     return out
 
 
