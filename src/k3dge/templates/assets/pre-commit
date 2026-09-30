@@ -47,11 +47,23 @@ def _reexec_into_venv(ws: Path) -> None:
 
 
 def _load_doc_gate(ws: Path):
-    if (ws / "src" / "k3dge" / "engine" / "__init__.py").is_file():
-        sys.path.insert(0, str(ws / "src"))  # 自举仓：import 本仓源码，不需要 venv
-    from k3dge.engine import doc_gate  # noqa: WPS433 — 延迟导入：先定位才知道从哪导
+    """定位 doc_gate：**已装的那份优先**，只有导不进来才回落到仓内 `ws/src`。
 
-    return doc_gate
+    旧实现无条件 `sys.path.insert(0, ws/src)`：它总盖过上一步 re-exec 进来的 venv 版本
+    ⇒ 换解释器的意义被抵消，同一个提交里还并存两套实现（367）。
+    """
+    try:
+        from k3dge.engine import doc_gate  # noqa: PLC0415 — 延迟导入：先定位才知道从哪导
+
+        return doc_gate
+    except ImportError:
+        pass
+    if (ws / "src" / "k3dge" / "engine" / "__init__.py").is_file():
+        sys.path.append(str(ws / "src"))   # 追加（不是插到 [0]）：自举仓兜底，不遮蔽已装版本
+        from k3dge.engine import doc_gate  # noqa: PLC0415
+
+        return doc_gate
+    raise
 
 
 def _run_consistency_gate(ws: Path, relevant) -> int:
@@ -95,7 +107,7 @@ def main() -> int:
         return _run_consistency_gate(ws, None)
     try:
         doc_gate.set_workspace(ws)
-        rc = doc_gate.main()
+        rc = doc_gate.main(sys.argv[1:])   # 显式传参（366）：薄壳的 `--scan` 不再靠引擎偷读 sys.argv
         if rc:
             return rc
         relevant = doc_gate.relevant_for_check(doc_gate.staged_files())

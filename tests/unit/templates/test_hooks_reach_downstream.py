@@ -125,3 +125,85 @@ class TestHooksReachDownstream(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+ASSETS = K3DGE_SRC / "k3dge" / "templates" / "assets"
+
+
+class TestInitEntrypoints(unittest.TestCase):
+    """init 入口三件：包装壳校验目标、参数契约、argv 显式化（ocr-363..367）。"""
+
+    def _wrapper(self, root: Path) -> Path:
+        w = root / "k3dge-init.sh"
+        w.write_text((ASSETS / "k3dge-init-wrapper.sh").read_text(encoding="utf-8"), encoding="utf-8")
+        w.chmod(0o755)
+        return w
+
+    def test_wrapper_refuses_missing_init(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            w = self._wrapper(root)
+            r = subprocess.run([str(w)], capture_output=True, text=True, cwd=root)
+            self.assertEqual(r.returncode, 1)
+            self.assertIn("找不到", r.stderr)
+
+    def test_wrapper_refuses_foreign_init_sh(self) -> None:
+        (root := Path(tempfile.mkdtemp()))
+        (root / "scripts").mkdir()
+        (root / "scripts" / "init.sh").write_text("#!/usr/bin/env bash\necho 外来脚本\n", encoding="utf-8")
+        w = self._wrapper(root)
+        r = subprocess.run([str(w)], capture_output=True, text=True, cwd=root)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("不是 k3dge 下发", r.stderr)
+        self.assertNotIn("外来脚本", r.stdout)
+
+    def test_wrapper_rejects_positional_args_with_the_right_hint(self) -> None:
+        root = Path(tempfile.mkdtemp())
+        (root / "scripts").mkdir()
+        (root / "scripts" / "init.sh").write_text(
+            "#!/usr/bin/env bash\n# k3dge init\ntrue\n", encoding="utf-8")
+        w = self._wrapper(root)
+        r = subprocess.run([str(w), "/some/other/repo"], capture_output=True, text=True, cwd=root)
+        self.assertIn("K3DGE_SOURCE", r.stderr)      # 365：不接受位置参数，别再给"生效"假象
+
+    def test_doc_gate_scan_takes_explicit_argv(self) -> None:
+        """`--scan` 由调用方传参，不再靠引擎偷读 sys.argv（366）。"""
+        import io
+        from contextlib import redirect_stdout
+        from unittest import mock
+
+        from k3dge.engine import doc_gate
+
+        with tempfile.TemporaryDirectory() as d:
+            doc_gate.set_workspace(Path(d))
+            buf = io.StringIO()
+            with mock.patch.object(sys, "argv", ["prog"]), redirect_stdout(buf):
+                rc = doc_gate.main(["--scan"])
+            self.assertEqual(rc, 0)
+            self.assertIn("无 docs/ 目录", buf.getvalue())
+
+    def test_load_doc_gate_prefers_installed_k3dge(self) -> None:
+        """自举兜底不得遮蔽已装那份（367）。"""
+        import importlib.util
+
+        ws = Path(tempfile.mkdtemp())
+        (ws / "src" / "k3dge" / "engine").mkdir(parents=True)
+        (ws / "src" / "k3dge" / "engine" / "__init__.py").write_text("", encoding="utf-8")
+        spec = importlib.util.spec_from_loader(
+            "pc_mod", importlib.machinery.SourceFileLoader("pc_mod", str(K3DGE_SRC.parent / "scripts" / "pre-commit")))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        before = list(sys.path)
+        dg = mod._load_doc_gate(ws)
+        self.assertTrue(str(Path(dg.__file__)).startswith(str(K3DGE_SRC / "k3dge")))
+        self.assertNotIn(str(ws / "src"), sys.path, "已能 import 时不得再塞仓内路径")
+
+    def test_ps1_init_gates_are_declared(self) -> None:
+        """`init.ps1` 在本机（无 pwsh）不可跑，但四条判据必须在文本里成对存在（358/359/360/361/362）。"""
+        ps1 = (ASSETS / "init.ps1").read_text(encoding="utf-8")
+        for marker in ("sys.version_info >= (3, 10)", "rev-parse --show-toplevel",
+                       "找不到 k3dge 入口", "找不到 pre-commit 入口", "if ($Src -notmatch"):
+            self.assertIn(marker, ps1, f"init.ps1 缺判据：{marker}")
+        wrapper = (ASSETS / "k3dge-init-wrapper.ps1").read_text(encoding="utf-8")
+        self.assertIn("$PSScriptRoot", wrapper)
+        self.assertIn("无法定位本脚本所在目录", wrapper)      # 363

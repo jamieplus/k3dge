@@ -429,7 +429,8 @@ run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -> tu
     # doc: Returns (blocking, non_blocking). Staged content only.
 run_screen_gate(added: list[str], pure_refs, gate_facts=None) -> list[tuple[str, str]]
     # doc: 新建受管文档的首次排查闸。返回 [(severity, 渲染文本)]。
-main() -> int
+main(argv: Optional[list]=None) -> int
+    # doc: 薄壳入口。`argv` **由调用方显式传入**：旧实现读全局 `sys.argv` 判 `--scan`
 # evaluator.py
 from __future__ import annotations
 from pathlib import Path
@@ -1240,6 +1241,7 @@ MEMO_README_TEMPLATE = _asset('memo-readme.md')
 RULE_ASSETS = ('00-core-discipline.md', '01-docs-structure.md', '02-simplification.md', '03-self-contained.md', '04-milestone.md', '05-branches.md', '06-memo.md', '07-audit.md', '08-design-discipline.md', '09-absorption.md', '10-structure-over-prose.md', '11-next-sidecar.md', '12-introduction-discipline.md')
 ensure_mcp_config(target: Path) -> bool
     # doc: Idempotently merge k3dge (and pipeline-enabled peers) into .mcp.json.
-scaffold(target: Path, name: str | None=None) -> None
+scaffold(target: Path, name: str | None=None) -> list
+    # doc: 铺脚手架。返回**问题清单**（空＝干净）；调用方（`k3dge init`）据此决定退出码。
 main(argv: Optional[Sequence[str]]=None) -> int
 ```

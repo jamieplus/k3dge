@@ -342,8 +342,11 @@ def _orphan_warnings(pure_refs) -> list[tuple[str, str, dict]]:
     return out
 
 
-def main() -> int:
-    if "--scan" in sys.argv:
+def main(argv: Optional[list] = None) -> int:
+    """薄壳入口。`argv` **由调用方显式传入**：旧实现读全局 `sys.argv` 判 `--scan`
+    ⇒ 与 pre-commit 隐式耦合（引擎改解析方式就静默失效），hook 还得手工重建 argv（366）。"""
+    flags = list(sys.argv[1:] if argv is None else argv)
+    if "--scan" in flags:
         if not (WS / "docs").is_dir():      # 下游刚 init、还没有 docs/ ⇒ 给出可执行结论而不是 traceback（ocr-239）
             print("[k3dge doc-gate] PASS: 无 docs/ 目录（尚未 init）")
             return 0

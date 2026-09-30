@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:60917b810f6ccb7e22b2217b88a64a728b5f8a0689b3cd25da4bcbe9e5b49579`
+- **Contract Hash**: `sha256:259d3af3c6de994a0a51073a259534d2e35c8e710d27bdadcf7298a201ca0bdb`
 - **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
@@ -248,7 +248,7 @@ check_one(rel: str) -> list[str]
 missing_declared_facts(code: str, facts: dict, gate_facts=None) -> list
 run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) -> tuple[list[str], list[str]]
 run_screen_gate(added: list[str], pure_refs, gate_facts=None) -> list[tuple[str, str]]
-main() -> int
+main(argv: Optional[list]=None) -> int
 from __future__ import annotations
 from pathlib import Path
 from typing import List

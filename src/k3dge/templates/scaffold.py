@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import stat
+import sys
 from importlib import resources
 from pathlib import Path
 from typing import Optional, Sequence
@@ -124,6 +125,13 @@ def _first_domain_manifest(name: str) -> dict:
 
 def _write_if_missing(path: Path, content: str, executable: bool = False) -> bool:
     if path.exists():
+        # 已存在也要**补执行位**：跨文件系统拷贝/checkout 丢 mode/umask 之后，重复跑 init
+        # 永远修不回 `scripts/gate.sh`、两个 hook、`k3dge-init.sh`（368）。
+        if executable:
+            try:
+                path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            except OSError as exc:
+                print(f"[k3dge scaffold] WARN: 补执行位失败 {path}（{exc}）", file=sys.stderr)
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -192,8 +200,24 @@ def _pipeline_servers(target: Path) -> set:
             import tomllib as _toml
         else:
             import tomli as _toml  # type: ignore
+    except ImportError as exc:
+        print(f"[k3dge scaffold] WARN: 无 TOML 解析器（{exc}）⇒ peer stubs 不写，出生即红有线索（369）",
+              file=sys.stderr)
+        return set()
+    try:
         data = _toml.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+    except OSError as exc:
+        print(f"[k3dge scaffold] WARN: 读不到 {p}（{exc}）⇒ peer stubs 不写", file=sys.stderr)
+        return set()
+    except UnicodeDecodeError as exc:
+        print(f"[k3dge scaffold] WARN: {p} 不是 UTF-8（{exc}）⇒ peer stubs 不写", file=sys.stderr)
+        return set()
+    except ValueError as exc:      # TOML 语法错：静默空集 = 下游出生即红且无线索（369）
+        print(f"[k3dge scaffold] WARN: {p} 解析失败（{exc}）⇒ peer stubs 不写", file=sys.stderr)
+        return set()
+    except Exception as exc:  # pragma: no cover - 解析器实现差异
+        print(f"[k3dge scaffold] WARN: {p} 解析异常（{type(exc).__name__}: {exc}）⇒ peer stubs 不写",
+              file=sys.stderr)
         return set()
     names = set()
     for r in (data.get("roles") or {}).values():
@@ -238,19 +262,39 @@ def _ensure_peer_stubs(target: Path) -> None:
         tmp.replace(mcp_path)
 
 
-def _ensure_first_domain(target: Path, name: str, today: str) -> None:
-    """Write or upgrade an empty manifest so the gate has at least one domain."""
+def _ensure_first_domain(target: Path, name: str, today: str) -> list:
+    """Write or upgrade an empty manifest so the gate has at least one domain.
+
+    返回**问题清单**（空＝没问题）：以前解析失败静默 `return` ⇒ init 报成功而域脚手架没铺（370）。
+    """
     path = target / ".agent" / "manifest.json"
     if path.exists():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-            return
-        if isinstance(data, dict) and data.get("domains"):
-            return
-        data = _first_domain_manifest(name)
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+            msg = f".agent/manifest.json 读不出（{type(exc).__name__}: {exc}）⇒ 不猜内容，域脚手架未铺"
+            print(f"[k3dge scaffold] FAIL: {msg}", file=sys.stderr)
+            return [msg]
+        if not isinstance(data, dict):
+            msg = f".agent/manifest.json 顶层不是对象（{type(data).__name__}）⇒ 不动它，域脚手架未铺"
+            print(f"[k3dge scaffold] FAIL: {msg}", file=sys.stderr)
+            return [msg]
+        if data.get("domains"):
+            return []
+        fresh = _first_domain_manifest(name)
+        # **保用户键**：旧实现整份覆盖 ⇒ `package_root`/`ignore`/`version`/`self_hosting`
+        # 被默认值抹掉（下游按 docs 改过一次 init 就丢，371）
+        merged = dict(data)
+        merged.setdefault("package_root", fresh["package_root"])
+        merged.setdefault("ignore", fresh["ignore"])
+        merged.setdefault("version", fresh["version"])
+        merged.setdefault("self_hosting", fresh["self_hosting"])
+        # `name` 走调用方意图（`--name`/目录名）：这条路只在"没有任何域"时进，且 init 的
+        # 语义＝"我要把这个项目命名/铺成 name"；其余用户键一律保留（371）
+        merged["name"] = name
+        merged["domains"] = fresh["domains"]
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        path.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")
     else:
         _write_if_missing(path, json.dumps(_first_domain_manifest(name), indent=2) + "\n")
     spec = SPEC_TEMPLATE.replace("<domain>", name)
@@ -261,9 +305,11 @@ def _ensure_first_domain(target: Path, name: str, today: str) -> None:
         target / "tests" / "unit" / name / "test_smoke.py",
         'def test_smoke() -> None:\n    assert True\n',
     )
+    return []
 
 
-def scaffold(target: Path, name: str | None = None) -> None:
+def scaffold(target: Path, name: str | None = None) -> list:
+    """铺脚手架。返回**问题清单**（空＝干净）；调用方（`k3dge init`）据此决定退出码。"""
     import datetime
 
     target.mkdir(parents=True, exist_ok=True)
@@ -271,7 +317,7 @@ def scaffold(target: Path, name: str | None = None) -> None:
     slug = _slug(name or target.name)
 
     _write_if_missing(target / "AGENTS.md", _qualify_adr_refs(AGENTS_TEMPLATE))
-    _ensure_first_domain(target, slug, today)
+    problems: list = list(_ensure_first_domain(target, slug, today))
     for rule_file in RULE_ASSETS:
         _write_if_missing(
             target / ".agent" / "rules" / rule_file,
@@ -344,13 +390,15 @@ def scaffold(target: Path, name: str | None = None) -> None:
     _write_if_missing(target / "docs" / "architecture" / "overview.md", _qualify_adr_refs(ARCHITECTURE_TEMPLATE))
     _write_if_missing(target / ".agent" / "docs.toml", DOCS_TOML_TEMPLATE)
     _write_if_missing(target / ".agent" / "pipeline.toml", PIPELINE_TOML_TEMPLATE)
-    ensure_mcp_config(target)
+    if not ensure_mcp_config(target):   # 旧实现丢掉这个 bool ⇒ `.mcp.json` 没合并也报成功（372）
+        problems.append(".mcp.json 未合并（已有文件损坏/形状不对，见上方 WARN）")
     _ensure_peer_stubs(target)
     # git hooks：这两件此前**不在资产里** ⇒ 下游 init 后照 AGENTS.md 激活 hooks 会被 git 静默跳过
     _write_if_missing(target / "scripts" / "pre-commit", PRE_COMMIT_HOOK_TEMPLATE, executable=True)
     _write_if_missing(target / "scripts" / "commit-msg", COMMIT_MSG_HOOK_TEMPLATE, executable=True)
     _write_if_missing(target / "scripts" / "generate-docs.sh", GENERATE_DOCS_SH_TEMPLATE, executable=True)
     _write_if_missing(target / "scripts" / "generate-docs.ps1", GENERATE_DOCS_PS1_TEMPLATE)
+    return problems
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -361,7 +409,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("target", nargs="?", default=".", help="target project root")
     parser.add_argument("--name", dest="name", default=None, help="project/domain slug (default: directory name)")
     args = parser.parse_args(argv)
-    scaffold(Path(args.target).resolve(), name=args.name)
+    problems = scaffold(Path(args.target).resolve(), name=args.name)
+    if problems:
+        print(f"[k3dge init] 完成但有 {len(problems)} 项未落：", file=sys.stderr)
+        for m in problems:
+            print(f"  - {m}", file=sys.stderr)
+        return 1
     return 0
 
 

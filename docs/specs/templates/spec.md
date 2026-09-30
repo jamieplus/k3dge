@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/templates`
-- **Contract Hash**: `sha256:e221b623cb80275486a834f0da4f0e549a91f44ae8216df1f0318a190ddf7df2`
-- **Last Updated**: 2026-09-21
+- **Contract Hash**: `sha256:aab417420e1cee93a32c7b9aa376d1a109da99cb7fac74f82c8d1aa89539bb44`
+- **Last Updated**: 2026-09-30
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -57,7 +57,7 @@ BRANCHES_README_TEMPLATE = _asset('branches-readme.md')
 MEMO_README_TEMPLATE = _asset('memo-readme.md')
 RULE_ASSETS = ('00-core-discipline.md', '01-docs-structure.md', '02-simplification.md', '03-self-contained.md', '04-milestone.md', '05-branches.md', '06-memo.md', '07-audit.md', '08-design-discipline.md', '09-absorption.md', '10-structure-over-prose.md', '11-next-sidecar.md', '12-introduction-discipline.md')
 ensure_mcp_config(target: Path) -> bool
-scaffold(target: Path, name: str | None=None) -> None
+scaffold(target: Path, name: str | None=None) -> list
 main(argv: Optional[Sequence[str]]=None) -> int
 ```
 <!-- k3dge:interfaces-end -->

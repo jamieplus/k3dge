@@ -17,15 +17,34 @@ if ($env:K3DGE_SOURCE) {
 
 Set-Location $Target
 
+# 宣称要 >=3.10 就必须**验版本**：只做存在性检查时，低版本一路跑到 pip/scaffold 才报
+# 难懂的语法/导入错（359）。Windows 上 `python3` 常是商店占位符 ⇒ 优先 `python`。
 if (-not (Get-Command python -ErrorAction SilentlyContinue) -and -not (Get-Command python3 -ErrorAction SilentlyContinue)) {
   Write-Error "python (>=3.10) is required"
   exit 1
 }
-$Py = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
+$Py = if (Get-Command python -ErrorAction SilentlyContinue) { "python" } else { "python3" }
+$prevPref = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+try { & $Py -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" *> $null }
+catch { $global:LASTEXITCODE = 1 }
+finally { $ErrorActionPreference = $prevPref }
+if ($LASTEXITCODE -ne 0) {
+  [Console]::Error.WriteLine("[k3dge] 需要 Python >= 3.10，实际：$(& $Py --version 2>&1)（`$Py='$Py'）")
+  exit 1
+}
 
-if (-not (Test-Path ".git")) {
+# 只看**当前目录**有没有 `.git` ⇒ 在既有仓库的子目录里跑 init 会造嵌套仓：外层仓的提交
+# 完全绕过 k3dge 闸口（360）。用 rev-parse 向上找真正的仓根。
+$prevPref = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+try { $top = ((& git rev-parse --show-toplevel 2>$null) | Out-String).Trim() }
+catch { $top = "" }
+finally { $ErrorActionPreference = $prevPref }
+if ($LASTEXITCODE -ne 0 -or -not $top) {
   Write-Host "[k3dge] git init -b main  ($Target)"
   git init -b main
+} elseif (((Resolve-Path $top).Path).TrimEnd('\','/') -ne ((Resolve-Path $Target).Path).TrimEnd('\','/')) {
+  [Console]::Error.WriteLine("[k3dge] 当前目录在既有仓库里（toplevel=$top）但根不是目标目录 ⇒ 拒跑（会造嵌套仓，绕过外层闸口）")
+  exit 1
 }
 
 $VenvPy = Join-Path $Target ".venv/Scripts/python.exe"
@@ -43,11 +62,8 @@ if (-not (Test-Path $VenvPy)) {
   }
 }
 
-$Pip = if (Test-Path (Join-Path $Target ".venv/Scripts/pip.exe")) {
-  Join-Path $Target ".venv/Scripts/pip.exe"
-} else {
-  Join-Path $Target ".venv/bin/pip"
-}
+# 不再单独探 `pip.exe`/`bin/pip`：探测不到就无条件当 Unix 路径用的兜底**从不验存在**（361）。
+# 上面已验过的 `$PyVenv -m pip` 才是唯一入口。
 $PyVenv = if (Test-Path (Join-Path $Target ".venv/Scripts/python.exe")) {
   Join-Path $Target ".venv/Scripts/python.exe"
 } else {
@@ -71,7 +87,7 @@ if (Test-Path $K3dgeHome -PathType Container) {
 }
 if ($self) {
   Write-Host "[k3dge] pip install -e .[dev] (self)"
-  & $Pip install -q -e ".[dev]"
+  & $PyVenv -m pip install -q -e ".[dev]"
   if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] pip install 失败 (exit $LASTEXITCODE)"); exit 1 }
 } else {
   $InstallFlags = @()
@@ -82,8 +98,12 @@ if ($self) {
     $InstallTarget = "$($env:K3DGE_SOURCE)[mcp]"
     $InstallFlags += "-e"
     Write-Host "[k3dge] Installing editable from local path: $env:K3DGE_SOURCE"
-  } elseif ($env:K3DGE_SOURCE -match '^(git\+|https://(github\.com|.*\.git))') {
-    $InstallTarget = "k3dge[mcp] @ $($env:K3DGE_SOURCE)"
+  } elseif ($env:K3DGE_SOURCE -match '^(git\+|https?://(github\.com|gitlab\.com|bitbucket\.org)|.*\.git)') {
+    # pip 的 direct reference 要 PEP 440 形式 `git+<url>`：裸 `https://github.com/o/r` 会被 pip
+    # 拒（分类正则放行≠语法合法，362）⇒ 归一化补 `git+`。
+    $Src = $env:K3DGE_SOURCE
+    if ($Src -notmatch '^git\+') { $Src = "git+$Src" }
+    $InstallTarget = "k3dge[mcp] @ $Src"
     Write-Host "[k3dge] Installing from VCS source (non-editable): $env:K3DGE_SOURCE"
   } else {
     # 兜底把 K3DGE_SOURCE 当**包名**交给默认索引：路径打错/typosquat 会静默从 PyPI 拉同名片段（供应链面，ocr-168）。
@@ -100,7 +120,7 @@ if ($self) {
     $InstallFlags = @("-e")
     Write-Host "[k3dge] Installing editable from K3DGE_HOME: $K3dgeHome"
   }
-  & $Pip install -q @InstallFlags $InstallTarget pre-commit pytest
+  & $PyVenv -m pip install -q @InstallFlags $InstallTarget pre-commit pytest
   if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] pip install 失败 (exit $LASTEXITCODE)"); exit 1 }
   # 统管落盘：记录本 venv 是哪份 K3DGE_SOURCE 装出来的（运行时一律读它，不猜）
   if ($InstallTarget -eq "k3dge[mcp]") { $srcRec = "pypi" }
@@ -119,6 +139,12 @@ $K3dgeExe = if (Test-Path (Join-Path $Target ".venv/Scripts/k3dge.exe")) {
 } else {
   Join-Path $Target ".venv/bin/k3dge"
 }
+# 兜底路径**必须验存在**：venv 里没有这个入口还继续 `&` 会抛 CommandNotFoundException
+# （报错与真实原因无关），而它上游的退出码又没查 ⇒ 半初始化一路装完（361）。
+if (-not (Test-Path $K3dgeExe -PathType Leaf)) {
+  [Console]::Error.WriteLine("[k3dge] 找不到 k3dge 入口：$K3dgeExe ⇒ pip install 未落进本 venv，删 .venv 重跑 init")
+  exit 1
+}
 Write-Host "[k3dge] k3dge sync"
 & $K3dgeExe sync
 if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] k3dge sync 失败 (exit $LASTEXITCODE)"); exit 1 }
@@ -129,6 +155,11 @@ $PreCommit = if (Test-Path (Join-Path $Target ".venv/Scripts/pre-commit.exe")) {
   Join-Path $Target ".venv/bin/pre-commit"
 }
 Write-Host "[k3dge] pre-commit install"
+# 同 `$K3dgeExe`：兜底的 Unix 路径从不验存在 ⇒ `&` 抛的错与真实原因无关（361）
+if (-not (Test-Path $PreCommit -PathType Leaf)) {
+  [Console]::Error.WriteLine("[k3dge] 找不到 pre-commit 入口：$PreCommit ⇒ hook 没装上就是假安全")
+  exit 1
+}
 & $PreCommit install
 if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] pre-commit install 失败 (exit $LASTEXITCODE)"); exit 1 }
 & $PreCommit install --hook-type commit-msg

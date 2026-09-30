@@ -555,7 +555,9 @@ def cmd_init(args: argparse.Namespace) -> int:
     from k3dge.templates.scaffold import scaffold
 
     target = Path(args.target).resolve()
-    scaffold(target, name=args.name)
+    problems = scaffold(target, name=args.name)   # 契约是 list：不消费就又是"报成功而没铺"（372）
+    for m in problems:
+        print(f"[INIT] 未落: {m}", file=sys.stderr)
     # Generate initial contract hash for first domain
     try:
         sync_all(target)

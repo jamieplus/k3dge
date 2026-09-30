@@ -7,6 +7,60 @@ from pathlib import Path
 from k3dge.templates.scaffold import scaffold
 
 
+
+
+class TestScaffoldProblemsChannel(unittest.TestCase):
+    """脚手架的失败必须有通道：执行位可补、坏输入出声、用户键不被抹（ocr-368..372）。"""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.target = Path(self._tmp.name) / "p"
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_exec_bit_is_restored_on_existing_file(self) -> None:
+        from k3dge.templates.scaffold import _write_if_missing
+
+        self.target.mkdir(parents=True)
+        f = self.target / "scripts" / "gate.sh"
+        f.parent.mkdir(parents=True)
+        f.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+        f.chmod(0o644)                      # 跨_fs/checkout 丢 mode
+        _write_if_missing(f, "别的\n", executable=True)
+        self.assertTrue(os.stat(f).st_mode & 0o111, "重复跑 init 永远修不回执行位")
+        self.assertEqual(f.read_text(encoding="utf-8"), "#!/usr/bin/env bash\n")   # 内容仍不动
+
+    def test_manifest_problems_come_back_in_the_channel(self) -> None:
+        from k3dge.templates.scaffold import scaffold
+
+        (self.target / ".agent").mkdir(parents=True)
+        (self.target / ".agent" / "manifest.json").write_text("{ 坏 json", encoding="utf-8")
+        problems = scaffold(self.target, name="p")
+        self.assertTrue([m for m in problems if "manifest.json" in m], problems)
+
+    def test_user_keys_survive_domain_upgrade(self) -> None:
+        from k3dge.templates.scaffold import scaffold
+
+        (self.target / ".agent").mkdir(parents=True)
+        (self.target / ".agent" / "manifest.json").write_text(json.dumps({
+            "name": "old", "package_root": "lib", "ignore": ["vendor/**"],
+            "version": "9.9.9", "self_hosting": True, "domains": {}}) + "\n", encoding="utf-8")
+        self.assertEqual(scaffold(self.target, name="p"), [])
+        data = json.loads((self.target / ".agent" / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["package_root"], "lib")
+        self.assertEqual(data["ignore"], ["vendor/**"])
+        self.assertEqual(data["version"], "9.9.9")
+        self.assertTrue(data["self_hosting"])
+        self.assertIn("p", data["domains"])
+
+    def test_corrupt_mcp_json_is_a_problem(self) -> None:
+        from k3dge.templates.scaffold import scaffold
+
+        self.target.mkdir(parents=True)
+        (self.target / ".mcp.json").write_text("{ nope", encoding="utf-8")
+        problems = scaffold(self.target, name="p")
+        self.assertTrue([m for m in problems if ".mcp.json" in m], problems)
 class TestScaffold(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
