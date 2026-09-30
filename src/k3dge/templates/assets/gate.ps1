@@ -56,6 +56,10 @@ if (Test-Path -LiteralPath $venvExe -PathType Leaf) {
 }
 $k3dge = Get-Command k3dge -ErrorAction SilentlyContinue
 if ($k3dge) {
+  if ($want) {
+    # 收据只覆盖 `.venv`；全局那份来源未经校验 ⇒ 至少出声（与 gate.sh 同口径，ocr-158）。
+    [Console]::Error.WriteLine("[k3dge-source] WARN: 政策已声明但 .venv/Scripts/k3dge.exe 缺失 ⇒ 回落全局 k3dge（其来源未经收据校验）：$($k3dge.Source)")
+  }
   & k3dge @cmdArgs
   exit $LASTEXITCODE
 }

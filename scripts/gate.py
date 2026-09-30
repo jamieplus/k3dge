@@ -88,6 +88,9 @@ if venv_k3dge.is_file() and os.access(str(venv_k3dge), os.X_OK):
 # Fall back to globally installed k3dge
 k3dge = shutil.which("k3dge")
 if k3dge:
+    if _want:   # 收据只覆盖 `.venv`；全局那份来源未经校验 ⇒ 至少出声（与 gate.sh 同口径，ocr-158）。
+        print(f"[k3dge-source] WARN: 政策已声明但 .venv/bin/k3dge 缺失 ⇒ 回落全局 k3dge（其来源未经收据校验）：{k3dge}",
+              file=sys.stderr)
     sys.exit(subprocess.call([k3dge] + args))
 
 print("k3dge not found. Run ./k3dge-init.sh or ./k3dge-init.ps1", file=sys.stderr)

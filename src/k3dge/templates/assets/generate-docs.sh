@@ -13,7 +13,13 @@ CONFIG=".agent/docs.toml"
 if [ ! -f "$CONFIG" ]; then
   echo "[k3dge] $CONFIG not found, creating from preset..."
   mkdir -p .agent
-  cat > "$CONFIG" << 'EOF'
+  # 首选字节锁定的模板（`pairs.PAIRS` 把 `.agent/docs.toml` 与它对锁）；就地重写一份内联预设
+  # 会让"配置丢失→恢复"这条路造出与模板不一致的内容 ⇒ 自举下 TEMPLATE_DRIFT 红（ocr-164）。
+  TPL="$ROOT/src/k3dge/templates/assets/docs.toml.template"
+  if [ -f "$TPL" ]; then
+    cp "$TPL" "$CONFIG"
+  else
+    cat > "$CONFIG" << 'EOF'
 [docs]
 readme = true
 user_guide = true
@@ -23,6 +29,7 @@ deployment = false
 changelog = true
 faq = false
 EOF
+  fi
 fi
 
 mkdir -p docs/guides
@@ -62,8 +69,9 @@ fi
 # helper: create file if enabled and not exists
 gen() {
   local key="$1" file="$2" title="$3"
-  # simple TOML boolean parse: key = true (allow spaces, ignore comments)
-  if grep -Eq "^\\s*${key}\\s*=\\s*true" "$CONFIG"; then
+  # 与门禁 `_check_docs_toml` 同判据（全文件找 `key = true`），但用 **POSIX 字符类**：
+  # BSD/macOS 的 `grep -E` 不支持 `\s`（会退化成匹配字面 `s`，静默漏判/误开，ocr-165）。
+  if grep -Eq "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*true([[:space:]#]|$)" "$CONFIG"; then
     if [ -f "$file" ]; then
       echo "[k3dge] exists, skip: $file"
     else
