@@ -152,7 +152,7 @@
   "advance": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 93
+      "line": 104
     }
   ],
   "all_stage_refs": [
@@ -266,7 +266,7 @@
   "branch_name": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 23
+      "line": 34
     }
   ],
   "build_card": [
@@ -780,7 +780,7 @@
   "ensure": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 45
+      "line": 56
     }
   ],
   "ensure_checklist": [
@@ -1226,7 +1226,7 @@
   "materialize": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 332
+      "line": 343
     }
   ],
   "mcp_server_names": [
@@ -1244,7 +1244,7 @@
   "merge_back": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 216
+      "line": 227
     }
   ],
   "merge_into": [
@@ -1370,7 +1370,7 @@
   "pin_baseline": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 300
+      "line": 311
     }
   ],
   "preconditions": [
@@ -1388,7 +1388,7 @@
   "present": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 72
+      "line": 83
     }
   ],
   "probe_peer_mcp": [
@@ -1412,7 +1412,7 @@
   "prune": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 276
+      "line": 287
     }
   ],
   "prune_finished": [
@@ -1490,7 +1490,7 @@
   "remove": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 296
+      "line": 307
     }
   ],
   "render": [
@@ -1508,7 +1508,7 @@
   "render_manual_docs": [
     {
       "file": "src/k3dge/sync/generator.py",
-      "line": 87
+      "line": 91
     }
   ],
   "render_manual_docs_content": [
@@ -1802,7 +1802,7 @@
   "strip_pins": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 118
+      "line": 129
     }
   ],
   "summary": [
@@ -1824,7 +1824,7 @@
   "sync_all": [
     {
       "file": "src/k3dge/sync/generator.py",
-      "line": 172
+      "line": 176
     }
   ],
   "sync_domain": [
@@ -1992,7 +1992,7 @@
   "worktree_path": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 27
+      "line": 38
     }
   ],
   "write_docs_index": [

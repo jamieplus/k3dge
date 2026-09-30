@@ -8,11 +8,22 @@ present 由进程从 worktree 抽取（markers.extract），席位口供退居�
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Optional
 
 from k3dge.engine.markers import Marker, extract, parse_text
+
+#: job id 白名单：它进 `.k3dge/wt/<job>` 与分支名 `k3dit/<job>` ⇒ 分隔符/`..`/git 非法 ref 字符都要挡（ocr-119）。
+_JOB_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def _safe_job(job: str) -> str:
+    j = str(job or "")
+    if not j or ".." in j or not _JOB_RE.fullmatch(j):
+        raise ValueError(f"invalid job id {job!r}（分隔符/`..` 会越出 .k3dge/wt 或造出畸形分支）")
+    return j
 
 
 def _git(workspace: Path, *args: str) -> subprocess.CompletedProcess:
@@ -21,11 +32,11 @@ def _git(workspace: Path, *args: str) -> subprocess.CompletedProcess:
 
 
 def branch_name(job: str) -> str:
-    return f"k3dit/{job}"
+    return f"k3dit/{_safe_job(job)}"
 
 
 def worktree_path(workspace: Path, job: str) -> Path:
-    return workspace / ".k3dge" / "wt" / job
+    return workspace / ".k3dge" / "wt" / _safe_job(job)
 
 
 def _exclude_derived(workspace: Path) -> None:

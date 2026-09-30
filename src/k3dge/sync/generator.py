@@ -76,6 +76,10 @@ def sync_domain(
     else:
         content = _insert_after_heading(content, PUBLIC_INTERFACES_RE, _interface_block(interface))
 
+    if content == original:
+        # 接口块**没落位**（既无 k3dge:interfaces markers、也无 Public Interfaces 标题）⇒ 不得写
+        # 哈希/日期：否则闸拿"哈希行 == 现采"判绿，而 spec 接口块实际缺失且永不自愈（ocr-123）。
+        return None
     content = HASH_LINE_RE.sub(
         lambda m: f"{m.group(1)} `sha256:{new_hash}`", content
     )
