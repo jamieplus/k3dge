@@ -342,3 +342,20 @@ value-2（with-worktree 上下文管理器，两处脚手架合并）、value-3�
 - **`audit_checklist.json` 运行态投影不该 tracked**：应像 `.agent/audit_jobs.json` 一样 gitignore（AGENTS.md
   已称其"运行态投影，非判据"）；否则只要审计要落补丁，封板必撞 `DIRTY_TREE`。或让 `apply_bundle` 的脏树
   判据显式豁免该投影。
+
+---
+
+## 符号索引陈旧判定的成本（2026-09-30，OCR 中批 ocr-316 有意留）
+
+**事实**：`search._is_stale_cheaply` 每次 `where` 都要遍历域 src 树取「文件集 + 最新 mtime」；
+函数名叫「廉价」，实为 O(树大小) 的 readdir + stat。本轮已把它从 `rglob`+逐文件 `stat()` **两趟**
+并成 `os.walk` **一趟**，并加了文件集签名侧车 `.k3dge/symbol-index.meta.json` 解决删除/重命名
+看不见的问题（ocr-315）。
+
+**仍留**：再往下只有**增量化**（目录签名/树 hash + 只 stat 可疑目录）。不做进程内 memo——
+freshness 判定**不能跨决策缓存**：内容编辑不改索引 mtime，memo 会把"已改"判成"未改"，
+正是本轮要修的错。增量化是新机制，按 `.agent/rules/12-introduction-discipline.md` 需先有
+实测消费者（万级文件仓的 `where` 延迟数据）再动。
+
+**reopen 条件**：出现真实消费者（MCP/长驻进程反复 `where` 的 profiling 显示 stat 遍历占大头）。
+
