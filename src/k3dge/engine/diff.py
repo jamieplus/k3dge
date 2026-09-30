@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 from typing import List
@@ -37,6 +38,13 @@ def _is_shallow(workspace: Path) -> bool:
     result = _try_run(
         ["git", "rev-parse", "--is-shallow-repository"], cwd=workspace
     )
+    if result.returncode != 0:
+        # git < 2.15 不认这个 flag / 非仓库 ⇒ 旧实现拿空 stdout 返回 False，浅克隆守卫整条被跳过，
+        # 与 HEAD 回退叠加成静默漏检（ocr-227）。判不出来就报错。
+        raise GitError(
+            "无法判定是否浅克隆（git rev-parse --is-shallow-repository rc="
+            f"{result.returncode}）：" + (result.stderr or "").strip()[:200]
+        )
     return result.stdout.strip() == "true"
 
 
@@ -77,7 +85,7 @@ def _parse_porcelain(status: str) -> List[str]:
         raw = line[3:]
         if ("R" in status_code or "C" in status_code) and " -> " in raw:
             # take the destination of a rename/copy only when status is rename/copy
-            raw = raw.split(" -> ", 1)[1]
+            raw = raw.rpartition(" -> ")[2]   # 源路径本身可含 " -> "：从右切才拿到目标（左切截成源尾，ocr-228）
         path = _strip_quotes(raw.strip())
         if path:
             files.append(path)
@@ -118,9 +126,13 @@ def get_changed_files(workspace: Path) -> List[str]:
             seen.add(path)
             files.append(path)
 
-    base = __import__("os").environ.get("K3DGE_BASE_SHA", "").strip()
+    base = os.environ.get("K3DGE_BASE_SHA", "").strip()
     if not base:
         base = resolve_base(workspace)
+    elif base.startswith("-") or any(c.isspace() for c in base):
+        # K3DGE_BASE_SHA 来自 CI 环境：`-` 开头会被 git 当选项、含空白会裂参；非法 rev 又只报成
+        # GIT_UNAVAILABLE（配置错误伪装成环境故障，ocr-229）。显式拒。
+        raise GitError(f"K3DGE_BASE_SHA 非法（不得以 - 开头或含空白）：{base!r}")
     if base != "HEAD":
         committed = _run(
             ["git", "-c", "core.quotePath=false", "diff", "--name-only", "-z", f"{base}...HEAD"],

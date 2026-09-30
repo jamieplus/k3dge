@@ -26,7 +26,7 @@
   "GitError": [
     {
       "file": "src/k3dge/engine/diff.py",
-      "line": 12
+      "line": 13
     }
   ],
   "Location": [
@@ -290,7 +290,7 @@
   "build_notes_from_range": [
     {
       "file": "src/k3dge/engine/changelog.py",
-      "line": 64
+      "line": 82
     }
   ],
   "build_parser": [
@@ -894,7 +894,7 @@
   "get_changed_files": [
     {
       "file": "src/k3dge/engine/diff.py",
-      "line": 106
+      "line": 114
     }
   ],
   "get_current_milestone": [
@@ -1238,7 +1238,7 @@
   "mechanical_commit": [
     {
       "file": "src/k3dge/engine/changelog.py",
-      "line": 50
+      "line": 65
     }
   ],
   "merge_back": [
@@ -1562,7 +1562,7 @@
   "resolve_base": [
     {
       "file": "src/k3dge/engine/diff.py",
-      "line": 43
+      "line": 51
     }
   ],
   "resolve_endpoint_command": [
@@ -1818,7 +1818,7 @@
   "symbol_diff": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 497
+      "line": 503
     }
   ],
   "sync_all": [
@@ -1938,7 +1938,7 @@
   "verify_bundle_local": [
     {
       "file": "src/k3dge/engine/audit_verify.py",
-      "line": 215
+      "line": 224
     }
   ],
   "verify_commit": [
@@ -1950,7 +1950,7 @@
   "verify_contract": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 424
+      "line": 430
     }
   ],
   "where": [

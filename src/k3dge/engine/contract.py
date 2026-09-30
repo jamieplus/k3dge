@@ -413,11 +413,17 @@ def collect_domain_interface(
                             chunks.append(f"# {file_path.name}\n{iface}")
                         else:
                             chunks.append(iface)
-                except ImportError:
-                    pass
+                    break          # 只有真拿到接口才认领这个 extractor
+                except ImportError as exc:
+                    # 依赖缺失 ≠ 认领成功：`break` 会让该文件谁都没计（合同只覆盖一部分还判"一致"），
+                    # 也没给别的 extractor 机会；至少出声（ocr-225）。
+                    import sys as _sys
+
+                    print(f"[contract] WARN: {file_path} 的 extractor 依赖缺失（{exc}）⇒ 尝试下一个",
+                          file=_sys.stderr)
+                    continue
                 except (SyntaxError, UnicodeDecodeError, OSError) as exc:
                     raise _ExtractError(f"failed to extract interface from {file_path}: {exc}") from exc
-                break
     return "\n".join(chunks)
 
 

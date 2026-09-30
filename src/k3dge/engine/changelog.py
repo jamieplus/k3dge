@@ -29,8 +29,23 @@ _TRAILER_SEAL = "seal-milestone"
 
 def _tag_number(tag: str) -> tuple:
     """里程碑 tag 的排序键：先按数字、再按原串（`M10` > `M9`；非数字 id 退化为字典序）。"""
+    # 里程碑 tag 形如 `M11`：取**整串**首字母+数字。`findall` 取最后一段数字会被 `v1.2.3`
+    # 这类非里程碑 tag 干扰（3 > 11 的比较会选错边界，且候选集没过滤里程碑形状，ocr-222）。
+    m = re.fullmatch(r"([A-Za-z]*)(\d+)", tag.strip())
+    if m:
+        return (1, int(m.group(2)), m.group(1))
     digits = re.findall(r"\d+", tag)
-    return (int(digits[-1]) if digits else -1, tag)
+    return (0, int(digits[-1]) if digits else -1, tag)
+
+
+def _try(workspace: Path, *args: str):
+    """不抛的 git 调用（git 缺失/不可执行 ⇒ None）。`_git` 的 fail-loud 语义保持不变。"""
+    import subprocess
+
+    try:
+        return subprocess.run(["git", *args], cwd=str(workspace), capture_output=True, text=True)
+    except OSError:
+        return None
 
 
 def _git(workspace: Path, *args: str) -> str:
@@ -58,7 +73,10 @@ def mechanical_commit(sha: str, subject: str, body: str) -> bool:
     """
     if subject.startswith("round work ") or subject.startswith("round work\t"):
         return True
-    return f"{_TRAILER_SEAL}:" in (body or "").lower()
+    # trailer 只在**末段**（`Key: value` 行）；正文/引用/测试里写过 `seal-milestone:` 不该把一条
+    # 人工提交判成机械件而从 CHANGELOG 里消失（全文子串匹配过宽，ocr-223）。
+    tail = (body or "").rstrip().split("\n\n")[-1] if (body or "").strip() else ""
+    return any(ln.strip().lower().startswith(_TRAILER_SEAL + ":") for ln in tail.splitlines())
 
 
 def build_notes_from_range(workspace: Path, previous_tag: str = "") -> tuple:
@@ -75,9 +93,8 @@ def build_notes_from_range(workspace: Path, previous_tag: str = "") -> tuple:
 
         cands = []
         for tag in milestone_tags(workspace):
-            r = subprocess.run(["git", "-C", str(workspace), "merge-base", "--is-ancestor",
-                                tag, "HEAD"], capture_output=True, text=True)
-            if r.returncode == 0:      # 只认是 HEAD 祖先的边界（别的分支的 tag 不算）
+            r = _try(workspace, "merge-base", "--is-ancestor", tag, "HEAD")
+            if r is not None and r.returncode == 0:   # 只认是 HEAD 祖先的边界（别的分支的 tag 不算）
                 cands.append(tag)
         if not cands:
             return "", []

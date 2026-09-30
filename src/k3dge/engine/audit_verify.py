@@ -144,7 +144,16 @@ def replay_to_baseline(bundle: Path, dest: Optional[Path] = None,
            "PATH": "/usr/bin:/bin"}
     for cmd in (["git", "init", "-q"], ["git", "add", "-A"],
                 ["git", "-c", "user.email=k3dge@local", "-c", "user.name=k3dge", "commit", "-qm", "code"]):
-        subprocess.run(cmd, cwd=work, capture_output=True, env=env, check=False)
+        try:
+            r = subprocess.run(cmd, cwd=work, capture_output=True, env=env, check=False)
+        except OSError as exc:
+            shutil.rmtree(work, ignore_errors=True)
+            return {"ok": False, "root": "", "replay": [], "detail": f"git 不可用：{exc}"}
+        if r.returncode != 0:   # 环境故障不得伪装成"产物不合格"（反向应用失败/哈希链不通过，ocr-219）
+            shutil.rmtree(work, ignore_errors=True)
+            return {"ok": False, "root": "", "replay": [],
+                    "detail": f"重放树初始化失败（git {cmd[1]} rc={r.returncode}）："
+                              + (r.stderr or b"").decode("utf-8", "replace")[:160]}
     if only is not None:      # `only`＝只反向这些补丁（合并器用它拿"语义层修复后"的中间树）
         replay = [p for p in order if p in set(only)]
     else:
@@ -221,6 +230,10 @@ def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed:
     if not facts:
         return {"ok": False, "errors": ["manifest.json 缺失或不可解析"], "facts": {},
                 "report_rows": 0, "unclosed": [], "hash": {}, "cross_check": {}}
+    if not isinstance(facts, dict):
+        # 合法 JSON 但不是 object（数组/字符串/数字）⇒ `facts.get` 会 AttributeError 崩验收（ocr-220）
+        return {"ok": False, "errors": [f"manifest.json 顶层不是对象（{type(facts).__name__}）"],
+                "facts": {}, "report_rows": 0, "unclosed": [], "hash": {}, "cross_check": {}}
     try:
         from k3dge.engine.audit_bundle import SUPPORTED_BUNDLE_VERSIONS, bundle_input_matches
     except Exception:      # pragma: no cover - 防御
@@ -263,7 +276,11 @@ def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed:
     unclosed = sorted(set(unclosed) | set(terminal_unacked))
     report_rows = 0
     if (bundle / "report.md").is_file():
-        report_text = (bundle / "report.md").read_text(encoding="utf-8")
+        try:
+            report_text = (bundle / "report.md").read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:   # 报告含非法字节 ⇒ 报 errors，不崩验收（ocr-221）
+            errors.append(f"report.md 不可读：{exc}")
+            report_text = ""
         header, rows, table_lines = _table_rows(report_text)
         report_rows = len(rows)
         if tuple(header or ()) != REPORT_COLUMNS:
