@@ -69,7 +69,9 @@ def adr_landed(workspace: Path) -> Optional[str]:
     for p in _adr_files(workspace):
         try:
             text = p.read_text(encoding="utf-8", errors="replace")
-        except OSError:
+        except OSError as exc:
+            # seal 硬闸 ⇒ 读不出 = **无法取证**，计入 bad（与 `adrs_all_accepted` 同口径，不静默旁路，ocr-191）。
+            bad.append(f"{p.name}(不可读:{type(exc).__name__})")
             continue
         if _status(text) != "Accepted":
             continue
@@ -81,7 +83,7 @@ def adr_landed(workspace: Path) -> Optional[str]:
         if not _pointer_resolves(workspace, ptr):
             bad.append(f"{p.name}->{ptr}(指针不可解析)")
     if bad:
-        return f"[SEAL REJECTED] Accepted ADR 缺可解析落地指针 `Landed-by:`：{bad}"
+        return f"[SEAL REJECTED] Accepted ADR 缺可解析落地指针（或不可取证）：{bad}"
     return None
 
 
@@ -202,17 +204,32 @@ def amend_format(workspace: Path) -> Optional[str]:
     """seal 预审入口：**委托** `pure_schema.check_amend`（与 `k3dge check` 同一实现，避免两套判据）。
 
     判据与动因见 `pure_schema.check_amend` 的 docstring；此处只做"扫 ADR 目录 + 汇总一句话"。
+    **fail-closed**：schema 缺失/损坏/顶层非对象 ⇒ 报错（此前 `schema={}` 让 `check_amend` 首行直接
+    return [] ⇒ 该 seal 前置闸静默全绿，且与 schema 装配链「缺文件硬报错」口径不一致，ocr-194）。
     """
     from k3dge.engine.pure_schema import check_amend
 
-    probs: List[str] = []
+    adrs = _adr_files(workspace)
+    if not adrs:
+        return None
     schema_path = Path(workspace) / "docs" / "adr" / ".schema.json"
+    if not schema_path.is_file():
+        return ("[SEAL REJECTED] docs/adr/.schema.json 缺失：adr_amend_format 无法取证"
+                "——建表或跑 `k3dge sync`")
     try:
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        schema = {}
-    for f in _adr_files(workspace):
+    except (OSError, ValueError) as exc:
+        return f"[SEAL REJECTED] docs/adr/.schema.json 不可读/损坏：{exc}"
+    if not isinstance(schema, dict):
+        return f"[SEAL REJECTED] docs/adr/.schema.json 顶层不是对象（{type(schema).__name__}）"
+    probs: List[str] = []
+    for f in adrs:
+        try:
+            text = f.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            probs.append(f"{f.name}: 不可读（{type(exc).__name__}）")
+            continue
         for code, msg, _scope in check_amend(schema.get("amend"), schema.get("codes") or {},
-                                             f.name, f.read_text(encoding="utf-8")):
+                                             f.name, text):
             probs.append(f"{f.name}: {msg}")
     return None if not probs else "ADR amend 形态不合规：" + "；".join(probs[:4])

@@ -136,3 +136,19 @@ def test_supersedes_self_is_refused():
         out = adr_gate.reconcile_supersedes(ws)
         assert out and "自身" in out
         assert (ws / "docs" / "adr" / "0001-a.md").is_file()
+
+
+def test_amend_format_missing_schema_fail_closed():
+    """`.schema.json` 缺失 ⇒ seal 前置 `adr_amend_format` 必须红（不能静默全绿，ocr-194）。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {"0001-a.md": "---\nStatus: Accepted\n---\n# ADR-0001\n"})
+        out = adr_gate.amend_format(ws)
+        assert out and ".schema.json 缺失" in out
+
+
+def test_amend_format_corrupt_schema_fail_closed():
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {"0001-a.md": "---\nStatus: Accepted\n---\n# ADR-0001\n"})
+        (ws / "docs" / "adr" / ".schema.json").write_text("{ broken", encoding="utf-8")
+        out = adr_gate.amend_format(ws)
+        assert out and "不可读/损坏" in out
