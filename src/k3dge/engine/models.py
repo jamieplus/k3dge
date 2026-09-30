@@ -34,9 +34,7 @@ class Violation:
             if self.domain:
                 facts.setdefault("domain", self.domain)
             body = gate_facts.render(self.rule_id, facts, where=f"{dom}{loc}".strip())
-            tag = {"block": "GATE ERROR", "warn": "GATE WARN", "observe": "GATE NOTE"}[
-                gate_facts.severity(self.rule_id)
-            ]
+            tag = gate_facts.severity_tag(gate_facts.severity(self.rule_id))   # 标签单源在声明面（435）
             return f"[{tag}] {body}"
         return f"[GATE ERROR] {self.rule_id}{dom}: {self.message}{loc}"
 
@@ -49,7 +47,9 @@ class GateReport:
     violations: Tuple[Violation, ...] = ()
 
     def render(self) -> str:
-        if self.violations:
+        # `passed` 是 CLI 退出码的判据（`cli/main.py`），以前 render 只看 violations/changed_files
+        # 是否为空 ⇒ `passed=False` 而 violations 为空的一轮会被渲染成"干净"（436）
+        if self.violations or not self.passed:
             from k3dge.engine import gate_facts
 
             # `warn`/`observe` 不拦提交（gate_facts 的语义），横幅却写死 "Commit Blocked"、

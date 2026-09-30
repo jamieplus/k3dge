@@ -62,8 +62,17 @@ def probe_peer_mcp(workspace: Path, pid: str) -> Tuple[Optional[Path], Optional[
     （`evaluator` 的 `MCP_JSON_PEER_MISSING`）都走这里——否则"哪些 peer 该出现在
     `.mcp.json`"会有两份判据，迟早漂移。纯路径探测，不改盘、不起进程。
     """
-    sibling = workspace.parent / pid
-    alt_sibling = workspace / pid
+    import re
+    import sys
+
+    # `pid` 来自 `[peers.*]` 表名（下游可写的配置）：绝对路径会让 `workspace.parent / pid`
+    # **丢掉左操作数**、`..` 会越界 ⇒ 先验"单个安全路径分量"（429）
+    comp = str(pid or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", comp) or ".." in Path(comp).parts:
+        print(f"[mcp_json] WARN: peer id 不是安全路径分量 ⇒ 跳过探测（{pid!r}）", file=sys.stderr)
+        return None, None, None
+    sibling = workspace.parent / comp
+    alt_sibling = workspace / comp
     probe = sibling if sibling.is_dir() else (alt_sibling if alt_sibling.is_dir() else None)
     if probe is None:
         return None, None, None

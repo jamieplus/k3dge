@@ -68,7 +68,12 @@ _SAFE_MILESTONE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
 def milestone_tags(workspace: Path) -> dict:
-    """本仓的**里程碑边界 tag** → `{tag: sha}`（ADR-0004 §2.1.9：`tag <M> = <B>`）。"""
+    """本仓的**里程碑边界 tag** → `{tag: ""}`（键＝集合，ADR-0004 §2.1.9：`tag <M> = <B>`）。
+
+    便宜面：绝大多数消费者只问"这个号是不是边界"（`milestone_files` 的归属提醒、
+    `changelog` 的区间切分）， sha 值无人读 ⇒ 每个 tag 一次的 `rev-parse` 子进程纯属浪费（433）。
+    需要 sha 的调用点自己 `rev-parse`（目前全仓没有）。
+    """
     rc, out = _git(workspace, "tag", "--list")
     if rc != 0:
         return {}
@@ -77,9 +82,7 @@ def milestone_tags(workspace: Path) -> dict:
         name = name.strip()
         if not name or not _SAFE_MILESTONE_ID.fullmatch(name):
             continue
-        rc2, sha = _git(workspace, "rev-parse", f"refs/tags/{name}^{{commit}}")
-        if rc2 == 0 and sha:
-            tags[name] = sha
+        tags[name] = ""
     return tags
 
 

@@ -102,14 +102,23 @@ def head_block_end(lines: Sequence[str]) -> int:
 _LINE_BREAK_RE = re.compile(r"\r\n|[\r\n\v\f\x1c-\x1e\x85\u2028\u2029]")
 
 
-def _line_index(text: str, pos: int) -> int:
-    """char offset -> 1-based line number，与 str.splitlines() 同口径。"""
-    import bisect
-
+def _line_starts(text: str) -> list:
+    """行首偏移表（与 str.splitlines() 同口径）。一次算好可复用（428）。"""
     starts = [0]
     for bm in _LINE_BREAK_RE.finditer(text):
         starts.append(bm.end())
+    return starts
+
+
+def _line_index_from(starts: list, pos: int) -> int:
+    import bisect
+
     return bisect.bisect_right(starts, pos)
+
+
+def _line_index(text: str, pos: int) -> int:
+    """char offset -> 1-based line number（单点调用；多处请复用 `_line_starts`）。"""
+    return _line_index_from(_line_starts(text), pos)
 
 
 def parse_text(rel: str, text: str, *, max_note: int = _MAX_NOTE,
@@ -119,8 +128,9 @@ def parse_text(rel: str, text: str, *, max_note: int = _MAX_NOTE,
     markers: List[Marker] = []
     problems: List[str] = []
     rx = MARKER_RE_MD if rel.endswith((".md", ".html")) else MARKER_RE
+    starts = _line_starts(text)
     for m in rx.finditer(text):
-        line_no = _line_index(text, m.start())
+        line_no = _line_index_from(starts, m.start())
         kind = m.group("kind")
         note = m.group("note") or ""
         cap = max_note_pending if kind == "pending" else max_note

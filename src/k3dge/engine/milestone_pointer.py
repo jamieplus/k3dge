@@ -63,6 +63,8 @@ def bump_milestone(workspace: Path) -> str:
 
 def _validate_milestone_id(milestone_id: str) -> Optional[str]:
     """Return an error message if `milestone_id` is unsafe as a path component."""
+    if milestone_id and ".." in Path(str(milestone_id)).parts:
+        return f"Invalid milestone id '{milestone_id}': 不得含 '..'（它是路径分量）"
     if not milestone_id or not _SAFE_MILESTONE_ID_RE.fullmatch(milestone_id):
         return (
             f"Invalid milestone id '{milestone_id}': use a letter/digit start, "

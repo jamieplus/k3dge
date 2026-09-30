@@ -151,10 +151,15 @@ class Manifest:
             if not pattern:
                 continue
             pat = pattern.replace("\\", "/")
+            # 三条判据对"目录型模式"的行为原本不一致：`fnmatch(path, "src/gen")` 要整串相等、
+            # `p.match` 也只到同名 ⇒ `"src/gen"` 这种目录忽略**静默失效**；而 basename 匹配
+            # 又会过度匹配（任意层级的同名文件）。统一加"目录前缀"这一路（427）。
+            core = pat.rstrip("/")
             if (
                 fnmatch.fnmatch(path_posix, pat)
                 or fnmatch.fnmatch(p_name, pat)
                 or p.match(pat)
+                or (core and (path_posix == core or path_posix.startswith(core + "/")))
             ):
                 return True
         return False

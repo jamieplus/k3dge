@@ -28,6 +28,12 @@ from typing import Any, Dict, List, Optional
 
 #: 档位闭集（唯一源）。block=拦提交/红闸；warn=显示但不拦；observe=观测建议，不判定。
 SEVERITIES: tuple = ("block", "warn", "observe")
+#: 档位 → 横幅标签。**消费者查这张表**，不得自己复制字面量字典（435）。
+SEVERITY_TAGS = {"block": "GATE ERROR", "warn": "GATE WARN", "observe": "GATE NOTE"}
+
+
+def severity_tag(severity: str) -> str:
+    return SEVERITY_TAGS.get(severity, "GATE NOTE")
 DEFAULT_SEVERITY = "block"
 
 _PLACEHOLDER = re.compile(r"\{(\w+)\}")

@@ -105,6 +105,15 @@ def _git_is_ancestor(workspace: Path, anc: str, desc: str) -> bool:
     """`anc` 是 `desc` 的祖先（含相等由调用方先判）。"""
     import subprocess
 
+    import re as _re
+
+    # `anc`/`desc` 来自本地账 `audit_jobs.json`（gitignored、非权威）与报告字段：
+    # 以 `-` 开头会被 git 当**选项**解析（参数注入面），空值/含空白同理（430）
+    for ref in (anc, desc):
+        if not isinstance(ref, str) or not ref or ref.startswith("-") or any(c.isspace() for c in ref):
+            return False
+        if not _re.fullmatch(r"[0-9a-fA-F]{7,40}|[A-Za-z0-9._/@{}^~\-]+", ref):
+            return False
     try:
         r = subprocess.run(
             ["git", "-C", str(workspace), "merge-base", "--is-ancestor", anc, desc],
@@ -460,7 +469,7 @@ def _bundle_audit_leg(
                             f'[roles.audit] k3dit_landing={landing!r} 不合法（closed-only / partial / all）'), ""
     ran = ab.run_path_audit(workspace, out, mode=k3dit_mode, pins=k3dit_pins, scope=k3dit_scope,
                             timeout=_tmo)
-    payload = ran.get("payload") or {}
+    # 原 `payload = ran.get("payload")` 是死局部（取出后全文未读）⇒ 删（431）。
     if not ran.get("ok"):
         # **抢救**（用户裁定：超时也要出报告，不能让流程停在中间）：工具被杀时不会 write_bundle，
         # 但它账本里状态是全的 ⇒ `k3dit hall export --latest` 抢救出"未完成导出"包，再照常验收/部分落地。
@@ -492,7 +501,8 @@ def _bundle_audit_leg(
     # 纯审计（audit-only）：    # 纯审计（audit-only）：`status=partial` 是设计（钉留树）；它**只出证据，不构成封板依据** ⇒ 落报告后
     # 以 refused 交回（带理由），不推进任何"已审"判定。full 才要求闭环。
     # **闭环判据归 k3dge**：`consume` 里的 `audit_verify.verify_bundle_local` 从 findings 自己算未关项，
-    # 产出方自报的 `payload.status` 只作交叉核（不一致会被验收报出来）；不在此处读它当闸。
+    # 产出方自报的 `payload.status` **不在这里读**（交叉核归 `audit_verify.verify_bundle_local`
+    # 从 findings 自己算 ⇒ 自报与包内容不一致会在验收里现形，431 的注释承诺由那条腿兑现）。
     audit_only = k3dit_mode == "audit-only"
     salvaged = bool(_salv_ok and _salv.get("ok"))
     _salv_note = f"（工具被掐断 ⇒ 由 `hall export` **抢救**出包；摘要 {_dig}）" if salvaged else ""
@@ -609,9 +619,8 @@ def run_audit_flow(
             '审计腿声明为 `mode = "ratchet"`，但棘轮形状已退休：改用 `mode = "bundle"`（本地工具 k3dit，'
             '推荐）或 `mode = "oneshot"`（显式声明外部 produce/verify 步）。')
 
-    ratchet = False
     # 单报告（ADR-0025 合并审计模块）：一轮 = 一份 12 列；quality 是模块内窗口，
-    # 不再是独立 peer/report。ratchet 模式下审计腿已由步进器闭环，streams 空。
+    # 不再是独立 peer/report。`ratchet` 死赋值与"步进器已闭环"的旧说明随棘轮腿退休一并删（432）。
     # 外部步读**声明面**（gates [checks.audit].stages_produce/stages_verify），
     # 不再硬编码 action ref —— 原 pipeline.toml 的 [pipelines.*] 只有校验、无执行者。
     _produce = _gates.stages(workspace, "audit", "produce")

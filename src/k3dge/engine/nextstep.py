@@ -15,13 +15,15 @@ Rejection routing is **closed-set**: a rejection carries a `gate_id`
 No prose substring matching — wording changes must not be able to silently
 break the branch (memo §S7: 投影给进程的判定必须是闭集；参见 A-01 前科).
 
-Shape (CLI):
+Shape (CLI) — 陈述句投影，**疑问句只在 prompt 侧**（`question_text()`；`[NEXT]` 里没有 ask/if）:
     [NEXT] state=<state> milestone=<id>[ pending=<n>]
-      ask: <question>          (only when a decision is required)
-      if y: <action>
-      if n: <action>
+      reason: <一条一项>        (有则列)
+      fact: <事实陈述>
+      option: <可选动作>        (成对出现，决策类)
+      pointers: <指针 | 指针>
 
-MCP isomorphic JSON: {"next": {"state", "milestone", "pending"?, "reasons"?, "fact"?, "options"?, "question"?, "pointers"?}}
+MCP isomorphic JSON: {"next": {"state", "milestone", "priority", "pending"?, "reasons"?,
+"fact"?, "options"?, "question"?, "pointers"?}}（`priority` 也在卡里，读侧按它排序）
 
 Constraints (design review):
   - success -> state; failure -> action. Never decide for the human.
@@ -179,6 +181,10 @@ class NextStep:
     @classmethod
     def from_state(cls, state: str, milestone: str, *, pending: Optional[int] = None, reasons: Optional[list] = None) -> "NextStep":
         opt = STATE_OPTIONS.get(state, {})
+        if not opt:
+            # 未知 state 静默当空声明 ⇒ 投出"没有下一步"的假象，与"确实没有待办"不可分（438）
+            print(f"[NEXT] WARN: 未知 state={state!r}（不在 STATE_OPTIONS 闭集里）⇒ 只登事实，不投影处理点",
+                  file=sys.stderr)
         return cls(
             state=state,
             milestone=milestone,

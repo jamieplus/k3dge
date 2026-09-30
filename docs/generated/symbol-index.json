@@ -20,7 +20,7 @@
   "GateReport": [
     {
       "file": "src/k3dge/engine/models.py",
-      "line": 45
+      "line": 43
     }
   ],
   "GitError": [
@@ -74,7 +74,7 @@
   "NextStep": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 168
+      "line": 170
     }
   ],
   "Prompt": [
@@ -254,7 +254,7 @@
   "begin_run": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 271
+      "line": 277
     }
   ],
   "blocking_cycles": [
@@ -554,7 +554,7 @@
   "closure_ok": [
     {
       "file": "src/k3dge/engine/markers.py",
-      "line": 239
+      "line": 249
     }
   ],
   "cmd_audit": [
@@ -746,7 +746,7 @@
   "counts": [
     {
       "file": "src/k3dge/engine/markers.py",
-      "line": 227
+      "line": 237
     }
   ],
   "create_task": [
@@ -780,13 +780,13 @@
     },
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 309
+      "line": 315
     }
   ],
   "emit_all": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 321
+      "line": 327
     }
   ],
   "ensure": [
@@ -810,7 +810,7 @@
   "extract": [
     {
       "file": "src/k3dge/engine/markers.py",
-      "line": 177
+      "line": 187
     }
   ],
   "extract_contract_hash": [
@@ -828,13 +828,13 @@
   "facts_of": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 649
+      "line": 655
     }
   ],
   "fill": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 595
+      "line": 601
     }
   ],
   "find_k3dit": [
@@ -882,7 +882,7 @@
   "fix_kind": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 573
+      "line": 579
     }
   ],
   "format_seal_trailers": [
@@ -1038,7 +1038,7 @@
   "is_declared": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 583
+      "line": 589
     }
   ],
   "is_screenable_new_doc": [
@@ -1200,7 +1200,7 @@
   "load_all": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 353
+      "line": 359
     }
   ],
   "load_mcp_document": [
@@ -1218,7 +1218,7 @@
   "load_persisted": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 370
+      "line": 376
     }
   ],
   "load_pipeline_config": [
@@ -1304,7 +1304,7 @@
   "next_for_rejection": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 421
+      "line": 427
     }
   ],
   "normalize": [
@@ -1328,7 +1328,7 @@
   "open_samples": [
     {
       "file": "src/k3dge/engine/markers.py",
-      "line": 235
+      "line": 245
     }
   ],
   "parse_doc_schema": [
@@ -1370,13 +1370,13 @@
   "parse_sidecar": [
     {
       "file": "src/k3dge/engine/markers.py",
-      "line": 152
+      "line": 162
     }
   ],
   "parse_text": [
     {
       "file": "src/k3dge/engine/markers.py",
-      "line": 115
+      "line": 124
     }
   ],
   "parse_version": [
@@ -1394,7 +1394,7 @@
   "persist": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 283
+      "line": 289
     }
   ],
   "persist_external_audit_report": [
@@ -1442,7 +1442,7 @@
   "projection": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 639
+      "line": 645
     }
   ],
   "prune": [
@@ -1460,7 +1460,7 @@
   "question_text": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 452
+      "line": 458
     }
   ],
   "read_checklist": [
@@ -1532,7 +1532,7 @@
   "render": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 610
+      "line": 616
     }
   ],
   "render_checklist": [
@@ -1640,7 +1640,7 @@
   "run_audit_flow": [
     {
       "file": "src/k3dge/engine/milestone_audit.py",
-      "line": 549
+      "line": 559
     }
   ],
   "run_milestone_alignment": [
@@ -1754,7 +1754,7 @@
   "seal_ready_for": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 390
+      "line": 396
     }
   ],
   "seal_record": [
@@ -1790,7 +1790,13 @@
   "severity": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 588
+      "line": 594
+    }
+  ],
+  "severity_tag": [
+    {
+      "file": "src/k3dge/engine/gate_facts.py",
+      "line": 35
     }
   ],
   "sign_missing": [
@@ -1890,7 +1896,7 @@
   "tasks_after_boundary": [
     {
       "file": "src/k3dge/engine/milestone_files.py",
-      "line": 86
+      "line": 89
     }
   ],
   "token": [
@@ -1938,7 +1944,7 @@
   "validate": [
     {
       "file": "src/k3dge/engine/markers.py",
-      "line": 207
+      "line": 217
     }
   ],
   "validate_docs": [
