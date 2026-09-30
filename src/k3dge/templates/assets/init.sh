@@ -29,8 +29,18 @@ if ! command -v python3 >/dev/null 2>&1; then
   echo "python3 (>=3.10) is required" >&2
   exit 1
 fi
+# 只验存在不验版本 ⇒ 3.9 会先建 venv/git 再在 install 阶段以难懂的形态失败（ocr-170）。
+if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)' >/dev/null 2>&1; then
+  echo "python3 >= 3.10 is required (found: $(python3 -V 2>&1))" >&2
+  exit 1
+fi
 
-if [ ! -d .git ]; then
+if ! command -v git >/dev/null 2>&1; then
+  echo "git is required" >&2
+  exit 1
+fi
+# `.git` 在 worktree/submodule 下是**文件**：只判目录会对已在库内的目录重复 `git init`（ocr-171）。
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "[k3dge] git init -b main  ($TARGET)"
   git init -b main
 fi
@@ -39,10 +49,18 @@ if [ ! -x .venv/bin/python ]; then
   echo "[k3dge] python3 -m venv .venv"
   python3 -m venv .venv
 fi
+# 只看 .venv/bin/python 可执行不够：坏 pip / 无 pip / 过期 shebang 会在下一步才炸（ocr-172）。
+if ! .venv/bin/python -m pip --version >/dev/null 2>&1; then
+  echo "[k3dge] venv 内无可用 pip ⇒ ensurepip"
+  .venv/bin/python -m ensurepip --upgrade >/dev/null 2>&1 || {
+    echo "[k3dge] FAIL: .venv 里没有可用的 pip（删 .venv 重建，或修 python 安装）" >&2
+    exit 1
+  }
+fi
 
 if [ "$K3DGE_HOME" -ef "$TARGET" ]; then
   echo "[k3dge] pip install -e '.[dev]' (self)"
-  .venv/bin/pip install -q -e ".[dev]"
+  .venv/bin/python -m pip install -q -e ".[dev]"
 else
   INSTALL_FLAGS=()
   if [ -z "${K3DGE_SOURCE:-}" ] || [ "${K3DGE_SOURCE:-}" = "pypi" ]; then
@@ -69,13 +87,17 @@ else
     -*) echo "[k3dge] 非法 INSTALL_TARGET（不得以 - 开头，防 pip 选项注入）：$INSTALL_TARGET" >&2; exit 1 ;;
   esac
   # 数组 + `--` 终止选项解析：INSTALL_TARGET 来自 K3DGE_SOURCE（外部输入），不得被 pip 当选项（ocr-024）。
-  .venv/bin/pip install -q ${INSTALL_FLAGS[@]+"${INSTALL_FLAGS[@]}"} -- "$INSTALL_TARGET" pre-commit pytest
+  .venv/bin/python -m pip install -q ${INSTALL_FLAGS[@]+"${INSTALL_FLAGS[@]}"} -- "$INSTALL_TARGET" pre-commit pytest
   # 统管落盘：唯一值 = 解析后的源。运行时只读它。
   case "$INSTALL_TARGET" in
     "k3dge[mcp]") _SRC_RECORDED="pypi" ;;
     "k3dge[mcp] @ "*) _SRC_RECORDED="${INSTALL_TARGET#k3dge\[mcp\] @ }" ;;
     *) _SRC_RECORDED="${INSTALL_TARGET%\[mcp\]}" ;;
   esac
+  # 目录型源 ⇒ 落**物理路径**：写相对/尾斜杠/软链，会让 gate 侧在不同 cwd 下得出不同结论（ocr-174）。
+  if [ -d "$_SRC_RECORDED" ]; then
+    _SRC_RECORDED="$(cd "$_SRC_RECORDED" && pwd -P)"
+  fi
   printf '%s\n' "$_SRC_RECORDED" > .venv/k3dge-source.txt
 fi
 

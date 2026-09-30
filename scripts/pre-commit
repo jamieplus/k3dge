@@ -61,12 +61,24 @@ def _run_consistency_gate(ws: Path, relevant) -> int:
     if relevant is False:
         print("[k3dge check] skipped (no code/spec/agent changes in this commit)")
         return 0
+    gate = ws / "scripts" / "gate.py"
+    if not gate.is_file():      # 治理件缺失：出声 + 修复指引；工具坏不得阻断所有提交（ocr-177）
+        print(f"[k3dge check] WARN: {gate} 缺失 → 跳过一致性闸；请先 ./k3dge-init.sh", file=sys.stderr)
+        return 0
     print("[k3dge check] running consistency gate...", flush=True)
     try:
-        return subprocess.call([sys.executable, str(ws / "scripts" / "gate.py")])
+        # 固定 cwd=ws（闸的判据不该随 hook 调用者的 cwd 漂移）+ timeout（挂住＝提交永久卡死，ocr-177）。
+        r = subprocess.run([sys.executable, str(gate)], cwd=str(ws), timeout=1800)
+    except subprocess.TimeoutExpired:
+        print("[k3dge check] FAIL: 一致性闸超时（>1800s）", file=sys.stderr)
+        return 1
     except OSError as exc:      # 连 gate.py 都跑不动 ⇒ 工具坏，放行（不阻断提交）
         print(f"[k3dge check] WARN: consistency gate 不可执行（{exc}）→ 放行", file=sys.stderr)
         return 0
+    if r.returncode < 0:        # 被信号杀掉：把负码转成可读的红，而不是"不透明失败"
+        print(f"[k3dge check] FAIL: 一致性闸被信号终止（signal {-r.returncode}）", file=sys.stderr)
+        return 1
+    return r.returncode
 
 
 def main() -> int:

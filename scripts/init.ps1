@@ -34,6 +34,12 @@ if (-not (Test-Path $VenvPy)) {
   if (-not (Test-Path $VenvPyUnix)) {
     Write-Host "[k3dge] $Py -m venv .venv"
     & $Py -m venv .venv
+    # Windows 上 `python3` 常是 Microsoft Store 的 App Execution Alias：开商店、非零退出、**什么都不建**，
+    # 只看文件存在会继续往下走（半初始化）。判退出码 + 事后验解释器（ocr-167）。
+    if ($LASTEXITCODE -ne 0) {
+      [Console]::Error.WriteLine("[k3dge] 建 venv 失败 (exit $LASTEXITCODE)；`python3` 可能是商店占位符 ⇒ 装真 Python 或先跑：Set-Alias python3 python")
+      exit 1
+    }
   }
 }
 
@@ -46,6 +52,16 @@ $PyVenv = if (Test-Path (Join-Path $Target ".venv/Scripts/python.exe")) {
   Join-Path $Target ".venv/Scripts/python.exe"
 } else {
   Join-Path $Target ".venv/bin/python"
+}
+# venv 解释器必须真的在（.venv 目录残留会骗过 `Test-Path .venv`），且 pip 可用（坏 venv 的报错最难查，ocr-167）。
+if (-not (Test-Path $PyVenv -PathType Leaf)) {
+  [Console]::Error.WriteLine("[k3dge] 无可用的 venv 解释器：$PyVenv（删 .venv 重跑 init）"); exit 1
+}
+& $PyVenv -m pip --version *> $null
+if ($LASTEXITCODE -ne 0) {
+  & $PyVenv -m ensurepip --upgrade *> $null
+  & $PyVenv -m pip --version *> $null
+  if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] .venv 里没有可用的 pip（删 .venv 重跑 init）"); exit 1 }
 }
 
 # K3DGE_SOURCE 可能是 pypi / git+https URL（非路径）⇒ 只在确为目录时才 Resolve（ocr-021）。
@@ -70,6 +86,12 @@ if ($self) {
     $InstallTarget = "k3dge[mcp] @ $($env:K3DGE_SOURCE)"
     Write-Host "[k3dge] Installing from VCS source (non-editable): $env:K3DGE_SOURCE"
   } else {
+    # 兜底把 K3DGE_SOURCE 当**包名**交给默认索引：路径打错/typosquat 会静默从 PyPI 拉同名片段（供应链面，ocr-168）。
+    # 只接受合法 PEP 508 名字（不含 `/`、空格、`[`、`=`），其余直接拒。
+    if ($env:K3DGE_SOURCE -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+      [Console]::Error.WriteLine("[k3dge] K3DGE_SOURCE='$($env:K3DGE_SOURCE)'：既不是已存在目录、也不是 VCS URL、也不是合法包名（PEP 508）——拒绝交给默认索引")
+      exit 1
+    }
     $InstallTarget = "$($env:K3DGE_SOURCE)[mcp]"
     Write-Host "[k3dge] Installing from source/package: $env:K3DGE_SOURCE"
   }

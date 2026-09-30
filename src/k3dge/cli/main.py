@@ -325,7 +325,10 @@ def cmd_version(args: argparse.Namespace) -> int:
             _append(workspace, new_v, notes=changelog_notes)
             print(f"[VERSION] bumped to {new_v} and updated CHANGELOG.md")
         except Exception as exc:
+            # 版号已前进、CHANGELOG 没写 ⇒ 漂移态不得记成"成功"（CI/hook/`k3dge commit` 看到 0 会以为同步完成，ocr-178）。
             print(f"[VERSION] bumped to {new_v} but changelog failed: {exc}", file=sys.stderr)
+            print(f"[VERSION] 需人工补 CHANGELOG 段 {new_v}（或回退 bump）", file=sys.stderr)
+            return 1
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] version bump -> {new_v} part={part}")
         return 0
     return 1
