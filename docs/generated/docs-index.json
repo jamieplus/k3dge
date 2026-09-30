@@ -433,6 +433,14 @@
       "tokens": "审计：open-code-review 全文件扫描（M11）"
     },
     {
+      "path": "docs/reviews/2026-09-30-M11-ocr-tests-scan.md",
+      "type": "reviews",
+      "id": "2026-09-30-M11-ocr-tests-scan",
+      "title": "审计：open-code-review 单元测试全文件扫描（M11）",
+      "status": "",
+      "tokens": "审计：open-code-review 单元测试全文件扫描（M11）"
+    },
+    {
       "path": "docs/specs/_template/spec.md",
       "type": "specs",
       "id": "spec",
