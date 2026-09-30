@@ -18,7 +18,7 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 
 ## Docs — locate, then load
 
-- **Write** `docs/<type>/…` (not README / AUTHORING.md): open `docs/<type>/AUTHORING.md`; copy `docs/<type>/_template.md` if it exists. `<type>` is the first path segment under `docs/` (`docs/tasks/archive/x.md` → `docs/tasks/`).
+- **Write** `docs/<type>/…` (not `docs/<type>/README.md` / `docs/<type>/AUTHORING.md`): open `docs/<type>/AUTHORING.md`; copy `docs/<type>/_template.md` if it exists. `<type>` is the first path segment under `docs/` (`docs/tasks/archive/x.md` → `docs/tasks/`).
 - **Find** a document: default `k3dge doc list` / `k3dge doc where <id>` (or `k3dge task list --json` for tasks), then `read` the path. Body scan only via `k3dge doc grep <word>` (paths, or `--line` for `path:line`). Never return snippets. Do not raw-grep `docs/`.
 - k3dge structure gate is `docs/<type>/.schema.json` (hidden). Do not self-audit document *merit*.
 

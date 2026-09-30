@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | `manifest.json` | 机器（`k3dge check` / `sync` / MCP `spec://manifest`） | 域路由：哪段 `src/` 对应哪份 `docs/specs/` 和测试。不可省。 |
 | `rules/*.md` | 被 `AGENTS.md` **点名路径**读到时 | 协议切片（ADR-0010）。尤其 Rule 02。不靠浏览本目录发现。 |
-| `docs.toml` | `./scripts/generate-docs.sh` | 人读文档生成配方。门禁不读。 |
+| `.agent/docs.toml` | `./scripts/generate-docs.sh`（读的就是 `.agent/docs.toml`） | 人读文档生成配方。门禁不读。 |
 | `README.md` | 已经打开本目录的人/工具 | 本文件。说明「不要把这里当成 Agent 入口」。 |
 
 Agent 入口是仓库根 `AGENTS.md`。需要读 manifest / Rule 02 时，由那份文件给出具体路径。

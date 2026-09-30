@@ -5,7 +5,8 @@
 
 Immutable, machine-gated invariants. These are enforced by `k3dge check`, not by reading.
 
-1. Every code change under `src/<domain>/` that alters a public interface MUST update
+1. Every code change under `<package_root>/<domain>/`（本仓 `package_root` 见 `.agent/manifest.json`，
+   ＝ `src/k3dge` ⇒ 实际路径 `src/k3dge/<domain>/`）that alters a public interface MUST update
    `docs/specs/<domain>/spec.md` via `k3dge sync` in the same task.
 2. Every registered domain MUST have a spec with the three required sections:
    Domain Boundary, Public Interfaces, Verification Matrix.

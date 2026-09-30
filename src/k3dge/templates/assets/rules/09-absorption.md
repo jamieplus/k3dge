@@ -1,5 +1,8 @@
 # Rule 09 — External Pattern Absorption
 
+> Protocol slice for tools that look under `.agent/rules/` (ADR-0010).
+> Live agent protocol is repo-root `AGENTS.md`. If this file disagrees, `AGENTS.md` wins; fix this file in the same task.
+
 Read when introducing external patterns, prompts, or architectures.
 
 ## 1. Four Invariants

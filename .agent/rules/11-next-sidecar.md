@@ -1,5 +1,8 @@
 ## 11. Next-step sidecar
 
+> Protocol slice for tools that look under `.agent/rules/` (ADR-0010).
+> Live agent protocol is repo-root `AGENTS.md`. If this file disagrees, `AGENTS.md` wins; fix this file in the same task.
+
 每次操作完（改代码/关票/写文档），读 `.k3dge/next.json`，按 `state` 行事。
 
 - `state=normal` 或文件不存在时静默（不输出、不提示）

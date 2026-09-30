@@ -86,7 +86,7 @@ curl -X POST "http://100.82.98.101:9090/v1/completions" \
 - 或联系 pi 维护者报告该兼容性问题
 
 ### 4.3 配置确认
-- `models.json` 已正确更新
+- `models.json` 已正确更新（产物在仓外：`/Users/jamie/.pi/agent/models.json`，见下表「产物」行；本仓不含该文件，故本窗内不可复核）
 - API Key 已验证有效
 - 服务器端点已就绪
 - 仅剩 `pi` 工具层面的兼容性次要问题

@@ -1,5 +1,8 @@
 # Rule 10: Structure Over Prose — 教训编进机制，不编进文字
 
+> Protocol slice for tools that look under `.agent/rules/` (ADR-0010).
+> Live agent protocol is repo-root `AGENTS.md`. If this file disagrees, `AGENTS.md` wins; fix this file in the same task.
+
 Read when: 你发现同一条叮嘱要写第二遍，或同一类纠正/失败重复出现。
 
 ## 1. 核心律

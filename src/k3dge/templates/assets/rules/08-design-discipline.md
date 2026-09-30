@@ -1,5 +1,8 @@
 # 08 · 设计纪律：先拆分，后方案
 
+> Protocol slice for tools that look under `.agent/rules/` (ADR-0010).
+> Live agent protocol is repo-root `AGENTS.md`. If this file disagrees, `AGENTS.md` wins; fix this file in the same task.
+
 做任何设计（新功能、新命令、新传输、跨仓协作）前，先写三行，再谈实现：
 
 1. **事实归属**：涉及的数据、状态、判定分别属于哪个模块？逐条列出。
