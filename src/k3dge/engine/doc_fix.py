@@ -134,12 +134,15 @@ def _fix(rel: str, text: str, codes: List[str]) -> Tuple[str, List[str]]:
     if "ADR_FOOTNOTE_LINE" in codes:
         out = _fix_footnote_line(out)
         applied.append("ADR_FOOTNOTE_LINE")
-    if "ADR_FOOTNOTE_SEQ" in codes:
-        out = _fix_footnote_seq(out)
-        applied.append("ADR_FOOTNOTE_SEQ")
+    # marker_text 会在正文里**新增/改写脚注引用** ⇒ 改变出现序，而 footnote_seq 的小标号是按
+    # 正文首现序算的：seq 先跑、marker_text 后跑 ⇒ 修完又不服从 seq（不幂等，需再跑一遍）。
+    # 所以顺序必须是 marker_text 在前、seq 在后（ocr-232）。
     if "ADR_AMEND_MARKER_TEXT" in codes:
         out = _fix_marker_text(out)
         applied.append("ADR_AMEND_MARKER_TEXT")
+    if "ADR_FOOTNOTE_SEQ" in codes:
+        out = _fix_footnote_seq(out)
+        applied.append("ADR_FOOTNOTE_SEQ")
     if "MD_NO_FINAL_NEWLINE" in codes:
         out = out.rstrip("\n") + "\n"
         applied.append("MD_NO_FINAL_NEWLINE")

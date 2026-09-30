@@ -292,12 +292,15 @@ def grep_docs(
     types = [typ] if typ else iter_doc_types(workspace)
     hits: List[dict] = []
     files_used = 0
-    for t in types:
-        if files_used >= max_files:
+    scanned = 0
+    scan_cap = max(max_files * 8, max_files)   # 只按**命中**数封顶 ⇒ 不命中的查询会把全类型文件读一遍
+    for t in types:                            # 与 docstring "Caps files and per-file line hits" 不符（ocr-231）
+        if files_used >= max_files or scanned >= scan_cap:
             break
         for path in iter_managed_files(workspace, t, include_archive=include_archive):
-            if files_used >= max_files:
+            if files_used >= max_files or scanned >= scan_cap:
                 break
+            scanned += 1
             try:
                 text = path.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):

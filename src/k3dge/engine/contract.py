@@ -486,16 +486,23 @@ def _parse_symbols(interface: str) -> "dict[str, str]":
     """
     syms: dict[str, str] = {}
     current: Optional[str] = None
+    pending: List[str] = []          # 顶层装饰器行：属于**下一个**符号
     for raw in interface.split("\n"):
         collapsed = " ".join(raw.split())
         if not collapsed:
             continue
         indent = len(raw) - len(raw.lstrip())
         name = _symbol_name(collapsed)
+        if indent == 0 and collapsed.startswith("@") and not name:
+            # `@final` / `@property` 这类行 `_symbol_name` 认不出 ⇒ 旧实现把它并到**上一个**符号的
+            # 值里，改一个装饰器就假报 changed；没有上一个符号时又整行丢失（ocr-226）。
+            pending.append(collapsed)
+            continue
         if indent == 0 and name:
             current = name
-            syms[name] = collapsed
-        elif current is not None:
+            syms[name] = "\n".join(pending + [collapsed]) if pending else collapsed
+            pending = []
+        elif current is not None and not pending:
             syms[current] += "\n" + collapsed
     return syms
 
