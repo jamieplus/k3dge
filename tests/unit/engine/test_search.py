@@ -48,8 +48,6 @@ class TestSearch(unittest.TestCase):
             self.assertEqual(idx["top_level"][0]["line"], 1)
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 def test_python_search_honors_gitignore():
@@ -199,3 +197,7 @@ class TestIndexUnavailableAndFallback(unittest.TestCase):
         self.assertEqual(_split_hit_line("a:b/c.py:12:code"), ("a:b/c.py", 12))
         self.assertEqual(_split_hit_line("plain.py:3:"), ("plain.py", 3))
         self.assertEqual(_split_hit_line("no hit line")[1], None)
+
+
+if __name__ == "__main__":
+    unittest.main()

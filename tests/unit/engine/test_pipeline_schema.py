@@ -272,8 +272,6 @@ class TestPipelineSchema(unittest.TestCase):
 
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class TestLegacyConfigGuard(unittest.TestCase):
@@ -389,8 +387,6 @@ class TestLegacyConfigGuard(unittest.TestCase):
 
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class TestLegacyConfigGuard(unittest.TestCase):
@@ -458,3 +454,7 @@ def _mk(d: str, body: str):
     (root / ".agent").mkdir(parents=True, exist_ok=True)
     _write(root, ".agent/pipeline.toml", body)
     return root
+
+
+if __name__ == "__main__":
+    unittest.main()

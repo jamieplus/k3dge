@@ -391,8 +391,6 @@ class TestPointerAndClosureShape(unittest.TestCase):
         self.assertIn("空的", out[0][1])
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class TestRepoTaskSingleSource(unittest.TestCase):
@@ -761,3 +759,7 @@ class TestIncidentIdSingleSource(unittest.TestCase):
             rel = f"docs/incidents/{p.name}"
             offenders += [m for _c, m in pure_refs.check_incident_id_redundant(rel, p.read_text(encoding="utf-8"))]
         self.assertEqual(offenders, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

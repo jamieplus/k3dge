@@ -133,11 +133,27 @@ def test_atomic_write_does_not_truncate_target_on_failure() -> None:
     ws = Path(tempfile.mkdtemp())
     target = ws / "spec.md"
     target.write_text("原文\n", encoding="utf-8")
+
+    # 只桩"写目标本身"是不够的：真实现根本不碰 target，所以原地实现的截断也不会被暴露。
+    # 这里核的是**性质**：载荷先写进同目录的兄弟临时件，再 os.replace 顶上。
+    written: list = []
+    real = Path.write_text
+
+    def spy(self, data, *a, **k):
+        written.append(self.name)
+        return real(self, data, *a, **k)
+
+    with mock.patch.object(Path, "write_text", spy):
+        atomic_write_text(target, "新内容\n")
+    assert written and all(n != target.name for n in written), written   # 从不就地写 target
+    assert target.read_text(encoding="utf-8") == "新内容\n"
+    assert not [p for p in ws.iterdir() if p.name.endswith(".tmp")] or \
+        all(p.name != target.name for p in ws.iterdir())
+
     with mock.patch.object(Path, "write_text", side_effect=OSError("disk full")):
         with self_raises(OSError):
             atomic_write_text(target, "半截")
-    assert target.read_text(encoding="utf-8") == "原文\n"
-    assert not [p for p in ws.iterdir() if p.name.endswith(".tmp")]
+    assert target.read_text(encoding="utf-8") == "新内容\n"
 
 
 class self_raises:

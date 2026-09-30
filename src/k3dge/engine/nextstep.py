@@ -455,11 +455,16 @@ def next_for_rejection(milestone: str, message, gate_id: Optional[str] = None) -
         fact = STATE_OPTIONS.get(state, {}).get("fact", "").replace("<id>", milestone)
     if text and text not in fact:
         fact = f"{text}\n  {fact}" if fact else text
+    opt = STATE_OPTIONS.get(state, {})
     return NextStep(
         state=state,
         milestone=milestone,
         fact=fact,
-        options=list(STATE_OPTIONS.get(state, {}).get("options") or []) or None,
+        options=list(opt.get("options") or []) or None,
+        # 路由分支以前只带 options：`priority`/`pointers` 留在声明表里没读 ⇒ 一张被拒的卡
+        # 掉回默认 priority 5（决策点之后），排序就骗人（t-206；与 ocr-277 同一族的另一半）
+        priority=int(opt.get("priority", 3)),
+        pointers=list(opt.get("pointers") or []) or None,
     )
 
 

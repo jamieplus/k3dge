@@ -596,6 +596,16 @@ class TestSidecarAndRejectionShape(TestCase):
             nextstep.STATE_OPTIONS["seal_ready"]["fact_blocked"].replace("<id>", "M7")), ns.fact)
         self.assertTrue(any("tasks_all_done" in r for r in ns.reasons), ns.reasons)
 
+    def test_routed_rejection_also_carries_declared_priority(self) -> None:
+        """路由分支以前只带 options ⇒ priority/pointers 留在声明表里没读（t-206）。"""
+        gid = next(iter(nextstep.GATE_NEXT))
+        state = nextstep.GATE_NEXT[gid][0]
+        opt = nextstep.STATE_OPTIONS[state]
+        ns = nextstep.next_for_rejection("M7", "被拒", gate_id=gid)
+        assert ns.state == state
+        assert ns.priority == int(opt.get("priority", 3)), (ns.priority, opt)
+        assert ns.pointers == (list(opt.get("pointers") or []) or None), ns.pointers
+
     def test_rejected_keeps_declared_priority_and_pointers(self) -> None:
         opt = nextstep.STATE_OPTIONS["rejected"]
         ns = nextstep.next_for_rejection("M7", "某种没登记 gate_id 的拒绝")

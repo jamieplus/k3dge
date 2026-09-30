@@ -21,14 +21,45 @@ def _ws(tmp_path: Path, preconditions: str) -> Path:
 
 
 def test_all_green_exits_zero(tmp_path, monkeypatch):
+    """必须**真有一项通过**才算验过"全绿"：空 preconditions 一条 ✅ 都不生成，
+    而 `"✅" not in out or "❌" not in out` 只要少一个符号就成立 ⇒ 绿色项转红也抓不到（t-002）。"""
+    ws = _ws(tmp_path, '"guides_filled"')          # 空仓里这条真会过（无 docs/guides ⇒ 无未填桩）
+    monkeypatch.chdir(ws)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = main(["milestone", "seal-check", "M10"])
+    out = buf.getvalue()
+    assert rc == 0, out
+    assert "封板前置清单（M10）" in out
+    assert "✅ guides_filled" in out, out         # 阳性面：声明的闸确实被判过
+    assert "❌" not in out, out                   # 阴性面：没有任何未过项
+
+
+def test_failing_gate_shows_red_and_exits_1(tmp_path, monkeypatch):
+    """挑一条**真需要人办**的闸：`align_pass` 会被 `satisfies` 标成 ⚙️（seal 自己会跑），
+    不是 ❌ ⇒ 用它当"红样例"只会测到自动档。`guides_filled` 有未填桩才是人办红。"""
+    ws = _ws(tmp_path, '"guides_filled"')
+    (ws / "docs" / "guides").mkdir(parents=True)
+    (ws / "docs" / "guides" / "g.md").write_text("# G\n<!-- k3dge:guide-stub -->\n", encoding="utf-8")
+    monkeypatch.chdir(ws)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = main(["milestone", "seal-check", "M10"])
+    out = buf.getvalue()
+    assert rc == 1, out
+    assert "❌ guides_filled" in out, out
+    assert "✅" not in out, out
+
+
+def test_empty_precondition_list_renders_zero_of_zero(tmp_path, monkeypatch):
+    """空声明＝0/0：形状单独钉住，别再让它冒充"全绿"。"""
     ws = _ws(tmp_path, "")
     monkeypatch.chdir(ws)
     buf = io.StringIO()
     with redirect_stdout(buf):
         rc = main(["milestone", "seal-check", "M10"])
-    assert rc == 0
-    assert "封板前置清单（M10）" in buf.getvalue()
-    assert "✅" not in buf.getvalue() or "❌" not in buf.getvalue()   # 无失败项
+    out = buf.getvalue()
+    assert rc == 0 and "✅" not in out and "0/0 通过" in out, out
 
 
 def test_unmet_exits_one_and_lists_reason(tmp_path, monkeypatch):

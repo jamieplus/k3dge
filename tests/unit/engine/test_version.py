@@ -85,18 +85,24 @@ class TestVersion(unittest.TestCase):
 
         # 失效点打在写原语上（而非 `Path.write_text`：`_atomic_write` 走 fdopen，
         # 桩错层就会把"注入失败"变成"把目标写成空文件"的假象）。
-        # 顺序＝[pyproject 成功, manifest 失败] ⇒ 回滚再写 pyproject（第三个 None）。
-        with mock.patch.object(version, "_atomic_write",
-                               side_effect=[None, OSError("disk full"), None]) as w:
-            try:
+        # 顺序＝[pyproject 成功, manifest 失败] ⇒ 回滚重写 pyproject。
+        # 关键：**其余调用走真实写盘**。整桩会把盘上也什么都不写，"回滚成 0.1.0"就成了
+        # 恒真（回滚写错内容、写成新值、干脆不滚都测不出来，t-289）。
+        real = version._atomic_write
+        seen: list = []
+
+        def flaky(path, text):
+            seen.append(str(path))
+            if len(seen) == 2:                      # 第二件＝manifest ⇒ 真失败
+                raise OSError("disk full")
+            real(Path(path), text)                  # 首写与回滚都落真盘
+
+        with mock.patch.object(version, "_atomic_write", side_effect=flaky):
+            with self.assertRaises(OSError):
                 version.bump_version(self.ws, part="patch")
-            except OSError:
-                pass
-            self.assertGreaterEqual(w.call_count, 3, "失败后必须回滚已写者")
-            rolled = [str(c.args[0]) for c in w.call_args_list[2:]]
-            self.assertTrue([x for x in rolled if x.endswith("pyproject.toml")], rolled)
-            # pyproject 应被回滚成 0.1.0
-            self.assertEqual(version.get_pyproject_version(self.ws), "0.1.0")
+        self.assertTrue([x for x in seen[2:] if x.endswith("pyproject.toml")], seen)
+        self.assertEqual(version.get_pyproject_version(self.ws), "0.1.0",
+                         "回滚必须把**盘上内容**改回旧版（不是靠桩没写盘蒙对）")
 
     def test_append_changelog(self) -> None:
         _write_pyproject(self.ws, "0.1.0")

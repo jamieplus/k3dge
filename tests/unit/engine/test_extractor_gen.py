@@ -222,6 +222,8 @@ class TestSync(unittest.TestCase):
             spec = importlib.util.spec_from_file_location("gen_ts_fidelity", p)
             assert spec is not None and spec.loader is not None
             mod = importlib.util.module_from_spec(spec)
+            from k3dge.engine import contract as _contract
+            snapshot = list(_contract._EXTRACTORS)
             sys.modules["gen_ts_fidelity"] = mod
             try:
                 spec.loader.exec_module(mod)
@@ -249,6 +251,11 @@ class TestSync(unittest.TestCase):
                 )
             finally:
                 sys.modules.pop("gen_ts_fidelity", None)
+                # 渲染出的模块体在 import 时就 `register_extractor(...)`，只 pop sys.modules
+                # 会把一个后端文件已删的提取器留在进程注册表里；`collect_domain_interface`
+                # 取首个匹配 ⇒ 其它测试变成顺序相关（t-140）
+                from k3dge.engine import contract as _c
+                _c._EXTRACTORS[:] = snapshot
 
 
 class TestGeneratedPluginSurfaceGuards(unittest.TestCase):

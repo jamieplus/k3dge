@@ -459,8 +459,6 @@ class TestCli(unittest.TestCase):
             self.assertEqual(cli[k], mcp[k])
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 def test_find_workspace_confines_to_mcp_root():
@@ -580,3 +578,7 @@ def test_audit_bundle_manual_entry_fails_clear_when_landing_fails():
             assert rc == 1 and "落报告/提交失败" in err.getvalue()
     finally:
         ab.consume, ab.land_report = orig_consume, orig_land
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -27,8 +27,6 @@ class TestSpecSchema(unittest.TestCase):
         self.assertIsNone(spec_schema.extract_contract_hash("no hash here"))
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 def test_only_canonical_headings_satisfy_sections() -> None:
@@ -52,3 +50,7 @@ def test_hash_case_normalized_to_lowercase() -> None:
     # 正则 IGNORECASE，但下游全与小写 hexdigest 比（ocr-324）
     assert spec_schema.extract_contract_hash(
         f"- **Contract Hash**: sha256:{'A'*64}") == "a" * 64
+
+
+if __name__ == "__main__":
+    unittest.main()

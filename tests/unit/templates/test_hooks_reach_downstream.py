@@ -123,8 +123,6 @@ class TestHooksReachDownstream(unittest.TestCase):
         self.assertIn("AUTHORING.md", r.stdout)
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 ASSETS = K3DGE_SRC / "k3dge" / "templates" / "assets"
@@ -249,3 +247,7 @@ class TestTrackHygiene(unittest.TestCase):
         hook = (K3DGE_SRC.parent / "scripts" / "commit-msg").read_text(encoding="utf-8")
         self.assertIn("commit-attest --rewrite-file", hook)
         self.assertNotIn("$1.k3dge-tmp", hook, "hook 自己 grep+mv 的实现已退休（374）")
+
+
+if __name__ == "__main__":
+    unittest.main()

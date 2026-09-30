@@ -121,8 +121,6 @@ class TestSchemaGateWiring(unittest.TestCase):
         self.assertTrue(hasattr(pure_refs, "check_dangling_adr"))
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class TestScreenGateWiring(unittest.TestCase):
@@ -197,3 +195,7 @@ class TestDeclaredFactsSelfCheck(unittest.TestCase):
         from k3dge.engine import gate_facts
 
         self.assertEqual(hook.missing_declared_facts("SOMETHING_NEW", {}, gate_facts), [])
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -42,15 +42,31 @@ _LIFECYCLE = frozenset({
 })
 
 
-def _imported_modules(path: Path) -> set[str]:
+def _imported_modules(path: Path, package: str = "k3dge.engine") -> set[str]:
+    """解析出**被导入的完整模块名**。
+
+    旧实现只记 `node.module`，于是本仓最主流的两种写法全部漏判（t-127）：
+    `from k3dge.engine import milestone` 记成 `"k3dge.engine"`（不是生命周期模块），
+    `from . import milestone` / `from .milestone import x` 因为 `node.module` 为 None/裸名而不匹配。
+    """
     tree = ast.parse(path.read_text(encoding="utf-8"))
     found: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 found.add(alias.name)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:                                   # 相对导入 ⇒ 按本模块所在包展开
+                base = package if not node.module else f"{package}.{node.module}"
+                found.add(base)
+                for alias in node.names:
+                    if alias.name != "*":
+                        found.add(f"{base}.{alias.name}")
+            elif node.module:
+                found.add(node.module)                        # `from k3dge.engine import milestone`
+                for alias in node.names:
+                    if alias.name != "*":
+                        found.add(f"{node.module}.{alias.name}")
     return found
 
 

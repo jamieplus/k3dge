@@ -17,7 +17,12 @@ SPECS_DIR = ROOT / "docs" / "specs"
 class TestManifestSpecsFullSync(unittest.TestCase):
     def setUp(self) -> None:
         self.manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-        self.domains = self.manifest.get("domains", {})
+        # `domains` 缺失/被改名/被清空时旧写法静默回落 `{}` ⇒ 三条逐域断言全部空转仍报绿，
+        # 而本文件的存在理由恰恰是抓"没人动的域漂了"（t-029）。空集必须是**红**。
+        dom = self.manifest.get("domains")
+        self.assertIsInstance(dom, dict, f"manifest.domains 不是对象：{type(dom).__name__}")
+        self.assertTrue(dom, ".agent/manifest.json 的 domains 为空 ⇒ 本文件的 1:1 一致性核判空转")
+        self.domains = dom
 
     def test_manifest_is_present(self) -> None:
         self.assertTrue(MANIFEST.exists(), ".agent/manifest.json missing")

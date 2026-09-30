@@ -201,8 +201,6 @@ class ContractSurface(unittest.TestCase):
             self.assertEqual(tools, ["k3dit_run_audit"])
 
 
-if __name__ == "__main__":  # pragma: no cover
-    unittest.main()
 
 
 class TestPayloadChannel(unittest.TestCase):
@@ -276,3 +274,7 @@ class CliTransportShape(unittest.TestCase):
             self.assertFalse(res.ok)
             time.sleep(2.5)
             self.assertFalse(marker.exists(), "超时后孙进程仍在跑 ⇒ 进程组没被终止")
+
+
+if __name__ == "__main__":  # pragma: no cover
+    unittest.main()
