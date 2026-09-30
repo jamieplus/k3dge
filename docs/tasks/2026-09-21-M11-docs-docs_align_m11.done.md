@@ -36,3 +36,21 @@ docs/guides/downstream.md:39 激活只写 `pre-commit install`（与本仓/下�
 - 落地：`docs/guides/downstream.md`（三处）+ 资产镜像；`docs/adr/0004-milestone-lifecycle-governance.md`（🅰3 + footnote `[^🅰3.1]`）；`docs/adr/0018-doc-readme-anchor-governance.md`（🅰1 + 第 13 项 + footnote `[^🅰1.1]`）。
 - 验证：`k3dge check --force-full --with-tests` 绿（四域，含 `adr_gate` 对 `Amended-by`/`Landed-by` 的解析）；`pytest -q` 734 passed, 2 skipped；`TEMPLATE_DRIFT` 通过（downstream 资产字节一致）。
 - 有意留：`docs/guides/*` 其余篇章与 `mcp-bridge` 的工具表**今天没有行为变更**，未动（避免无因编辑）。
+
+## 回填 — 2026-09-30（k3dit 09-29 审计 code-21）
+
+- 本票「取证」块第 3 行的命令 **写错了**：`grep -l "A｜B｜C"` 既没 `-E`、分隔符又是全角 `｜`，
+  于是它匹配的是一个字面串 ⇒ 对任何输入都"零命中"。**当时的结论（这些标记不在 ADR 里）不成立**，
+  是一条恒真证据（写下来就必然"通过"，等于没验）。
+- 重跑正确形状并记真实结果：
+
+  ```bash
+  grep -lE "ARCH_TABLE_DRIFT|ARCH_STATE_DOC_DRIFT|_refresh_projections|doc_gate|INIT_DELIVERED_DOCS" docs/adr/*.md
+  # docs/adr/0004-milestone-lifecycle-governance.md
+  # docs/adr/0018-doc-readme-anchor-governance.md   → **两条命中**，不是零命中
+  ```
+
+- 影响面判定：本票的**落地内容本身仍然成立**（`docs/guides/downstream.md` 三处 + 两份 ADR 的
+  Amend/footnote 都在盘上，`check`/`pytest` 当时也真绿）；错的只是这一行取证证据。故**不改写上面
+  的历史正文**，在此追加更正；教训沉到 `docs/incidents/INC-20260930-DOCS-always-true-evidence-command.md`。
+

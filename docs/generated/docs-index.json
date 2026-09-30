@@ -297,6 +297,14 @@
       "tokens": "Incident: 旧报告充闭环——ratchet 的「已闭环」只看本地账，M10 因此被封板"
     },
     {
+      "path": "docs/incidents/INC-20260930-DOCS-always-true-evidence-command.md",
+      "type": "incidents",
+      "id": "INC-20260930-DOCS-always-true-evidence-command",
+      "title": "Incident: 恒真的取证命令——`grep` 漏 `-E` 且用全角分隔符，\"零命中\"被当成已验证",
+      "status": "closed",
+      "tokens": "Incident: 恒真的取证命令——`grep` 漏 `-E` 且用全角分隔符，\"零命中\"被当成已验证"
+    },
+    {
       "path": "docs/memo/2026-09-21-sync-docs-updated-flag.md",
       "type": "memo",
       "id": "2026-09-21-sync-docs-updated-flag",

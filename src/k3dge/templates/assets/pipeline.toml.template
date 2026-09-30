@@ -160,8 +160,7 @@ satisfies = ["align_pass"]   # 本动作跑 align 并写 align-pass marker ⇒ �
 # ── bundle 审计腿（ADR-0025 §2.9.6 / k3dit 仓 0028 消费方）─────────────────────────
 # 形状切换＝改一行（role 的 mode）：`bundle`（本地命令行工具，推荐）/`oneshot`（显式声明的外部
 # produce/verify 步，给真正的对等 harness）。`ratchet` 已退休（声明它会被显式拒绝）。
-#   [roles.audit]
-#   bind = "k3dit"
-#   mode = "bundle"      # k3dge 冻结基线 → 调 k3dit 路径入口产包 → 验包 → 按 apply_order 落补丁
+#   活配置在本文件上面那节 `[roles.audit]`（**这里不再抄一遍**：抄了就成了"活配置 + 死副本"
+#   两种坐标，改一处必漏另一处）。语义：k3dge 冻结基线 → 调 k3dit 产包 → 验包 → 按 apply_order 落补丁。
 # cli 传输支持已知占位：`command = "k3dit audit --verify {bundle}"`（`{bundle}`/`{milestone_id}`/`{path}`）。
 # 翻转前须知：bundle 腿需要 k3dit 在场（`K3DIT_BIN` 或 PATH/兄弟仓），且会真跑一次完整审计（分钟级、付费）。
