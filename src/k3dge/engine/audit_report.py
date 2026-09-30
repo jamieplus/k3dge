@@ -20,12 +20,27 @@ _AUDIT_HEADER = report_table.TABLE_HEADER
 _QUALITY_MARKER_RE = re.compile(r"k3dge:kind:\s*quality", re.IGNORECASE)
 
 
+#: 外部扫描件的类名（`-scan.md` 后缀或正文标记），与"里程碑审计报告"分开认。
+_SCAN_MARKER_RE = re.compile(r"k3dge:kind:\s*scan", re.IGNORECASE)
+
+
 def _report_kind(name: str, text: str) -> str:
-    """Classify a 12-col report as 'quality' (legacy kind marker / filename) or 'audit'."""
-    # 文件名判据**收到后缀**：`-quality` 作全文子串会把 `2026-09-29-M11-quality-audit.md`
-    # 之类的普通审计报告错分进 quality 桶 ⇒ 审计面找不到报告（假阴，403）
-    if _QUALITY_MARKER_RE.search(text) or name.lower().endswith("-quality.md"):
+    """分类 12 列报告：`quality`（legacy 标记/文件名）、`scan`（外部全文件扫描）、否则 `audit`。
+
+    文件名的判据一律**收到后缀**：`-quality`/`-scan` 作全文子串会把普通审计报告
+    （如 `2026-09-29-M11-quality-audit.md`）错分进别的桶 ⇒ 审计面找不到报告（假阴，403）。
+
+    `scan` 这一类是必需的：`_find_report(..., kind="audit")` 以前只看"文件名带 M11 + 有 12 列表 +
+    取最新 mtime"，于是一份**外部扫描**会冒充本轮 k3dit 审计报告被 6 个消费者读走——包括
+    `seal_flow._report_seat`（封版提交 trailer 的 `Audit-seat` 会写成扫描器名）与
+    `audit_closed`/`audit_checklist`（把扫描计数当"本轮审计闭环"）。外部扫描 ≠ 里程碑审计
+    （ADR-0004 §2.1.10、ADR-0006 sidecar）。
+    """
+    low = name.lower()
+    if _QUALITY_MARKER_RE.search(text) or low.endswith("-quality.md"):
         return "quality"
+    if _SCAN_MARKER_RE.search(text) or low.endswith("-scan.md"):
+        return "scan"
     return "audit"
 
 

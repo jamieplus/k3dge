@@ -56,3 +56,33 @@ def test_has_table_shares_find_table_normalization() -> None:
     shuffled = "| " + " | ".join(reversed(cells)) + " |"
     assert not rt.has_table("# r\n" + shuffled), "列序仍须严格（12 列契约）"
     assert rt.has_table(_TBL)
+
+def test_external_scan_report_is_not_the_audit_report() -> None:
+    """外部全文件扫描（`-scan.md`）不得被当成本轮 k3dit 审计报告消费。
+
+    以前 `_find_report(kind="audit")` 只按"M11 + 12 列 + 最新 mtime"认，扫描件一旦比真审新，
+    `seal_flow._report_seat` 会把封版提交的 `Audit-seat` 写成扫描器名，`audit_closed` 也会拿
+    扫描计数当闭环证据（ADR-0004 §2.1.10 / ADR-0006）。
+    """
+    import tempfile
+    from pathlib import Path as _P
+
+    from k3dge.engine.audit_report import _find_report, _report_kind
+
+    assert _report_kind("2026-09-30-M11-ocr-tests-scan.md", "") == "scan"
+    assert _report_kind("2026-09-29-M11-quality-audit.md", "") == "audit"
+    assert _report_kind("2026-09-29-M11-k3dit-bundle-audit.md", "") == "audit"
+
+    ws = _P(tempfile.mkdtemp())
+    (ws / "docs" / "reviews").mkdir(parents=True)
+    tbl = _TBL
+    (ws / "docs" / "reviews" / "2026-09-29-M11-k3dit-bundle-audit.md").write_text(
+        "# 审计\n- **审计人**: k3dit\n- **透镜来源**: k3dit\n- **基线**: " + "0" * 40 + "\n" + tbl,
+        encoding="utf-8")
+    newer = ws / "docs" / "reviews" / "2026-09-30-M11-ocr-scan.md"
+    newer.write_text("# 扫描\n- **审计人**: open-code-review\n" + tbl, encoding="utf-8")
+    import os, time
+    os.utime(newer, (time.time() + 60, time.time() + 60))          # 让扫描件"更新"
+    found = _find_report(ws, "M11", "audit")
+    assert found is not None and found[0].name.endswith("k3dit-bundle-audit.md"), found[0].name
+    assert _find_report(ws, "M11", "scan")[0].name.endswith("-ocr-scan.md")
