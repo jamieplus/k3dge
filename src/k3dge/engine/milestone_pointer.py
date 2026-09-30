@@ -42,7 +42,11 @@ def set_current_milestone(workspace: Path, milestone_id: str) -> None:
         raise ValueError(err)
     p = _milestone_file(workspace)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(milestone_id + "\n", encoding="utf-8")
+    # 原子写：游标留下半行（`M1`→`M`）会让下次读走"内容非法"分支，与 bump 的读-改-写
+    # 叠加成不可恢复的回退（ocr-270）。
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text(milestone_id + "\n", encoding="utf-8")
+    tmp.replace(p)
 
 
 def bump_milestone(workspace: Path) -> str:

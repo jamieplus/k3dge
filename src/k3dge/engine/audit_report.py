@@ -49,7 +49,7 @@ def _find_report(workspace: Path, milestone_id: str, kind: str = "audit"):
         if milestone_id:
             fn_ms = _filename_milestone(f.name)
             if fn_ms:
-                if fn_ms != milestone_id:
+                if fn_ms.lower() != milestone_id.lower():   # 正则 IGNORECASE ⇒ 比较也得大小写不敏感（ocr-267）
                     continue
             elif not _has_milestone_token(text, milestone_id):
                 # 报告既无里程碑文件名、正文也无该里程碑 token（如跨里程碑的通用稿）：

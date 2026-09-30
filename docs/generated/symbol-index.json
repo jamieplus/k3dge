@@ -68,7 +68,7 @@
   "NextStep": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 164
+      "line": 165
     }
   ],
   "Prompt": [
@@ -242,7 +242,7 @@
   "begin_run": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 262
+      "line": 268
     }
   ],
   "blocking_cycles": [
@@ -320,7 +320,7 @@
   "bump_milestone": [
     {
       "file": "src/k3dge/engine/milestone_pointer.py",
-      "line": 48
+      "line": 52
     }
   ],
   "bump_verify_attempt": [
@@ -768,13 +768,13 @@
     },
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 290
+      "line": 306
     }
   ],
   "emit_all": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 302
+      "line": 318
     }
   ],
   "ensure": [
@@ -1170,7 +1170,7 @@
   "load_all": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 326
+      "line": 342
     }
   ],
   "load_mcp_document": [
@@ -1188,7 +1188,7 @@
   "load_persisted": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 343
+      "line": 359
     }
   ],
   "load_pipeline_config": [
@@ -1256,7 +1256,7 @@
   "milestone_tags": [
     {
       "file": "src/k3dge/engine/milestone_files.py",
-      "line": 59
+      "line": 70
     }
   ],
   "missing_declared_facts": [
@@ -1268,7 +1268,7 @@
   "next_for_rejection": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 390
+      "line": 406
     }
   ],
   "normalize": [
@@ -1358,7 +1358,7 @@
   "persist": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 274
+      "line": 280
     }
   ],
   "persist_external_audit_report": [
@@ -1394,7 +1394,7 @@
   "probe_peer_mcp": [
     {
       "file": "src/k3dge/engine/mcp_json.py",
-      "line": 47
+      "line": 58
     }
   ],
   "probe_servers": [
@@ -1424,7 +1424,7 @@
   "question_text": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 415
+      "line": 431
     }
   ],
   "read_checklist": [
@@ -1604,7 +1604,7 @@
   "run_audit_flow": [
     {
       "file": "src/k3dge/engine/milestone_audit.py",
-      "line": 543
+      "line": 549
     }
   ],
   "run_milestone_alignment": [
@@ -1718,7 +1718,7 @@
   "seal_ready_for": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 363
+      "line": 379
     }
   ],
   "seal_record": [
@@ -1848,7 +1848,7 @@
   "tasks_after_boundary": [
     {
       "file": "src/k3dge/engine/milestone_files.py",
-      "line": 75
+      "line": 86
     }
   ],
   "token": [

@@ -41,7 +41,7 @@ def _is_review_aux(name: str) -> bool:
 
 def _filename_milestone(name: str) -> str | None:
     m = _FILENAME_MILESTONE_RE.search(name)
-    return m.group(1) if m else None
+    return m.group(1) if m else None      # 原样返回；比较侧负责大小写（见 267 的两处调用方）
 
 def _git(workspace: Path, *args: str) -> tuple:
     import subprocess
@@ -51,6 +51,17 @@ def _git(workspace: Path, *args: str) -> tuple:
     except OSError as exc:  # pragma: no cover - 环境异常
         return 127, str(exc)
     return r.returncode, (r.stdout or "").strip()
+
+
+def _git_err(workspace: Path, *args: str) -> tuple:
+    """同上但回 stderr（`cat-file -e` 的失败原因写在这里）。"""
+    import subprocess
+
+    try:
+        r = subprocess.run(["git", "-C", str(workspace), *args], capture_output=True, text=True)
+    except OSError as exc:  # pragma: no cover
+        return 127, str(exc)
+    return r.returncode, (r.stderr or "").strip()
 
 
 _SAFE_MILESTONE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -95,7 +106,7 @@ def tasks_after_boundary(workspace: Path) -> List[Tuple[str, str, str]]:
         return []
     out: List[Tuple[str, str, str]] = []
     for path in sorted(tasks_dir.glob("*.md")):
-        if path.name in _DOC_AUX_NAMES or path.name.startswith("_"):
+        if _is_doc_aux(path.name):   # 复用单源，别在这里再写一份排除规则（ocr-268）
             continue
         try:
             fm = dict(pure_refs.parse_frontmatter_pairs(path.read_text(encoding="utf-8")))
@@ -105,8 +116,16 @@ def tasks_after_boundary(workspace: Path) -> List[Tuple[str, str, str]]:
         if not ms or ms not in tags:
             continue
         rel = path.relative_to(workspace).as_posix()
-        if _git(workspace, "cat-file", "-e", f"{ms}:{rel}")[0] == 0:
+        rc, err = _git_err(workspace, "cat-file", "-e", f"{ms}:{rel}")   # 判据在 stderr，不是 stdout
+        if rc == 0:
             continue                      # 边界那一版已有它 ⇒ 属该里程碑，正常
+        _absent = ("invalid object name" in err.lower() or "but not in" in err.lower())
+        if rc != 1 and not _absent:   # rc=1 / "rev 不存在" / "该 rev 里没有此路径" 都是"那一版没有它"
+            # rc=1（或 rev 本身不存在的 128）＝"那一版没有这个路径" ⇒ 该报；
+            # 其余 128/127（仓损坏、并发 lock、git 不可用）不得当成"没有"（ocr-269）。
+            print(f"[milestone_files] WARN: cat-file 探测失败（rc={rc}: {err.strip()[:120]}）"
+                  f"⇒ {rel} 的边界判定跳过", file=__import__("sys").stderr)
+            continue
         out.append((rel, ms, (
             f"{rel}: 这张票在 {ms} 的边界（tag {ms}）那一版里**还不存在**，却挂在 {ms} 上"
             f"——按 ADR-0004 §2.1.9，边界之后的改动归下一个里程碑")))

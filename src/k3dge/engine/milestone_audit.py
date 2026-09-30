@@ -362,8 +362,11 @@ def _oneshot_audit_leg(
             verify_args["path"] = str(found[0].relative_to(workspace).as_posix())
         try:
             run_action(workspace, verify_action, io=prompt.out_stream, arguments=verify_args)
-        except Exception:
-            pass
+        except Exception as exc:
+            # verify（"待修==0 的二次核对"）失败被吞 ⇒ 仍按已核对返回 closed，等于把未核对当已核对（ocr-265）。
+            degraded = True
+            _vmsg = f"verify 步异常（{type(exc).__name__}: {exc}）⇒ 记为 degraded-manual，不作独立核对"
+            print(f"[AUDIT] WARN: {_vmsg}", file=__import__("sys").stderr)
     ac.reset_verify_attempts(workspace)
     result = "degraded-manual" if degraded else "closed"
     status = "audited_degraded" if degraded else "audited"
@@ -407,6 +410,9 @@ def _bundle_audit_leg(
 
     # 包落在**仓外**（缓存目录）：k3dit 是命令行工具，它的中间产物理应与 `git` 的对象库一样不进被审树
     #（旧位置 `<workspace>/.k3dit/bundle-*` 会在被审仓里留未跟踪目录 ⇒ 消费方 status/gate 变脏）。
+    id_err = _validate_milestone_id(milestone_id)     # 下游会把它拼进路径（MCP audit 也走这里，ocr-266）
+    if id_err:
+        return _reject_step(workspace, milestone_id, "milestone_id_invalid", id_err), ""
     cache_root = ab.audit_cache_root()
     out = cache_root / f"{milestone_id}-{(fresh_baseline or 'head')[:12]}"
     k3dit_mode = _role_opt(workspace, "audit", "k3dit_mode", "full")
@@ -573,6 +579,14 @@ def run_audit_flow(
 
         fresh_baseline = head_commit(workspace)
 
+    # `mode` 写错（"bundel"、拼成别的词）以前会被 `_audit_mode` 静默当 oneshot 跑 ⇒ 声明面
+    # 与实现面悄悄不一致，未跑的 produce 步看起来像审计过（ocr-264）。未知取值显式拒绝。
+    _mode_decl = _role_opt(workspace, "audit", "mode", "").strip().lower()
+    if _mode_decl not in ("", "oneshot", "bundle", "ratchet"):
+        return _reject_step(
+            workspace, milestone_id, "audit_bad_mode",
+            f'`[roles.audit] mode` 取值 {_mode_decl!r} 不认识'
+            '（应为 "bundle"（本地 k3dit）或 "oneshot"（外部 produce/verify 步）；"ratchet" 已退休）。')
     _mode = _audit_mode(workspace)
     if _mode == "bundle":
         # bundle 审计腿：k3dit 是**本地命令行工具**（与 `git` 同层）⇒ 按 argv 调用、读包、落树、落账。

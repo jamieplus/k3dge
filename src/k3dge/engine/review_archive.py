@@ -30,7 +30,7 @@ def _reviews_to_archive(reviews_dir: Path, milestone_id: str, pass_mark: str) ->
     out: List[Path] = []
     for path in _living_review_files(reviews_dir):
         named = _filename_milestone(path.name)
-        if named and named != milestone_id:
+        if named and named.lower() != milestone_id.lower():   # 同上：大小写不敏感（ocr-267）
             continue
         if _has_milestone_token(path.name, milestone_id):
             out.append(path)

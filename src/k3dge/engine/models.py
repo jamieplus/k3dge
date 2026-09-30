@@ -50,14 +50,21 @@ class GateReport:
 
     def render(self) -> str:
         if self.violations:
+            from k3dge.engine import gate_facts
+
+            # `warn`/`observe` 不拦提交（gate_facts 的语义），横幅却写死 "Commit Blocked"、
+            # 页脚写死 "Fix violations" ⇒ 全 warn 的一轮也长得像被拦（消费方按文案决定动作，ocr-271）。
+            blocking = [x for x in self.violations if gate_facts.severity(x.rule_id) == "block"]
             lines = []
             lines.append("=" * 60)
-            lines.append(" AGENT GATE VIOLATION: Commit Blocked by Policy")
+            lines.append(" AGENT GATE VIOLATION: Commit Blocked by Policy" if blocking
+                         else " AGENT GATE NOTICE: 非阻断提示（warn/observe），本次不拦提交")
             lines.append("=" * 60)
             for violation in self.violations:
                 lines.append(violation.format())
             lines.append("")
-            lines.append("Fix violations or run 'k3dge sync' to regenerate specs.")
+            lines.append("Fix violations or run 'k3dge sync' to regenerate specs." if blocking
+                         else "以上为提示项（warn/observe）；不阻断提交。")
             return "\n".join(lines)
         if not self.changed_files:
             return "[GATE] Workspace is clean. No validation needed."

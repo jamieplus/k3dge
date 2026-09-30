@@ -607,7 +607,7 @@ load_mcp_document(workspace: Path) -> Optional[Dict[str, Any]]
 load_mcp_endpoints(workspace: Path) -> Dict[str, Any]
     # doc: `mcpServers` map; `{}` when absent or broken.
 mcp_server_names(workspace: Path) -> Optional[Set[str]]
-    # doc: Declared server names. None if the file is absent or unreadable (schema skip).
+    # doc: Declared server names.
 probe_peer_mcp(workspace: Path, pid: str) -> Tuple[Optional[Path], Optional[str], Optional[str]]
     # doc: Locate a sibling peer MCP module + the PYTHONPATH that can import it.
 # milestone_audit.py

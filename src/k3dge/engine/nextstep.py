@@ -31,6 +31,7 @@ Constraints (design review):
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, TextIO
@@ -254,9 +255,14 @@ def _write_cards(workspace: Path, cards: list, primary: Optional[str]) -> None:
         path = workspace / _SIDECAR_REL
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {"next": list(cards), "primary": primary}
-        path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
-    except OSError:
-        pass
+        # 侧车被 CLI（含 git hook 进程）与 MCP server 共享：`write_text` 先截断 ⇒ 并发读者
+        # 可能读到空/半个 JSON，`load_all` 又把解析失败当"本轮无处理点"（ocr-272）。原子替换。
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
+        tmp.replace(path)
+    except OSError as exc:
+        # 静默吞 ⇒ 操作者与 harness 读到的是上一轮遗留的提示，且没有任何信号（ocr-273）
+        print(f"[nextstep] WARN: 侧车写入失败（{exc}）⇒ 本轮提示未持久化", file=sys.stderr)
 
 
 def begin_run(workspace: Path) -> None:
@@ -267,8 +273,8 @@ def begin_run(workspace: Path) -> None:
     """
     try:
         (Path(workspace) / _SIDECAR_REL).unlink(missing_ok=True)
-    except OSError:
-        pass
+    except OSError as exc:      # 清不掉 ⇒ 本轮会接着上一轮的提示，必须出声（ocr-273）
+        print(f"[nextstep] WARN: 侧车清理失败（{exc}）⇒ 可能残留上一轮提示", file=sys.stderr)
 
 
 def persist(workspace: Path, ns: NextStep) -> None:
@@ -282,7 +288,17 @@ def _upsert(workspace: Path, ns: NextStep) -> list:
     """本轮内 upsert：同 state 去重（后到的合并 reasons），返回本轮全部 card（按 priority 稳定排序）。"""
     existing = load_all(workspace) or []
     by_state = {c.get("state"): c for c in existing if isinstance(c, dict)}
-    by_state[ns.state] = _card(ns)
+    prev = by_state.get(ns.state) or {}
+    card = _card(ns)
+    if isinstance(prev.get("reasons"), list) and prev["reasons"]:
+        # docstring 承诺"同 state 去重（后到的合并 reasons）"，旧实现是整条替换 ⇒
+        # 前一条同 state 的 reasons/pending 被静默丢（ocr-274）。
+        merged = list(prev["reasons"])
+        for r_ in (card.get("reasons") or []):
+            if r_ not in merged:
+                merged.append(r_)
+        card["reasons"] = merged
+    by_state[ns.state] = card
     cards = sorted(by_state.values(), key=lambda c: c.get("priority", 5))
     return cards
 
