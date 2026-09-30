@@ -12,6 +12,7 @@ raises `ImportError`, which `engine/contract.py` treats as a skip signal
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import List, Optional
 
@@ -20,7 +21,8 @@ from k3dge.engine.contract import ContractExtractor, register_extractor
 _IGNORED_DIRS = {".git", ".mypy_cache", ".next", ".pytest_cache", ".venv", "__pycache__", "build", "coverage", "dist", "node_modules", "out", "vendor", "venv"}
 _GENERATED_MARKERS = (".generated.", ".min.")
 _GENERATED_SUFFIXES = (".d.ts",)
-_PARSER = None
+_LANGUAGE = None
+_LANGUAGE_LOCK = threading.Lock()
 
 
 def _is_generated(path: Path) -> bool:
@@ -86,32 +88,51 @@ def _decl_signature(source: bytes, node, exported: bool = False) -> Optional[str
     return text
 
 
-def extract_typescript_interface(path: Path) -> str:
-    global _PARSER
+def _load_language():
+    """Construct + cache the grammar Language (immutable ⇒ shareable across threads).
+    A construction failure is re-raised as `ImportError` — `engine/contract.py` treats that
+    as a skip signal, so a broken grammar never reds the whole gate (never fatal)."""
+    global _LANGUAGE
+    if _LANGUAGE is not None:
+        return _LANGUAGE
+    import importlib
     try:
-        from tree_sitter import Language, Parser
-        import importlib
+        from tree_sitter import Language
         _grammar = importlib.import_module("tree_sitter_typescript")
     except ImportError as exc:
         raise ImportError("tree-sitter-typescript not installed; pip install tree-sitter-typescript") from exc
-    if _PARSER is None:
-        try:
-            language = Language(_grammar.language_typescript())
-        except TypeError:
-            language = Language(_grammar.language_typescript(), "typescript")  # type: ignore[call-arg]
-        try:
-            parser = Parser(language)  # 0.21+
-        except TypeError:
-            parser = Parser()
-            parser.language = language  # type: ignore[attr-defined]
-        _PARSER = parser
-    parser = _PARSER
+    with _LANGUAGE_LOCK:
+        if _LANGUAGE is None:
+            try:
+                lang = Language(_grammar.language_typescript())
+            except TypeError:
+                lang = Language(_grammar.language_typescript(), "typescript")  # type: ignore[call-arg]
+            except (ValueError, RuntimeError) as exc:
+                raise ImportError("tree-sitter-typescript grammar unusable: " + str(exc)) from exc
+            _LANGUAGE = lang
+    return _LANGUAGE
+
+
+def extract_typescript_interface(path: Path, include_doc: bool = False) -> str:
+    from tree_sitter import Parser
+    language = _load_language()
+    try:
+        parser = Parser(language)  # 0.21+（每次新建：Parser 非线程安全）
+    except TypeError:
+        parser = Parser()
+        parser.language = language  # type: ignore[attr-defined]
     source = path.read_bytes()
     tree = parser.parse(source)
     lines = []
     for node in tree.root_node.children:
         text = _decl_signature(source, node)
         if text:
+            if include_doc:
+                prev = node.prev_sibling
+                if prev is not None and prev.type == "comment":
+                    doc = _slice(source, prev).strip()
+                    if doc:
+                        text = doc + "\n" + text
             lines.append(text)
     return "\n".join(lines)
 
@@ -121,7 +142,7 @@ class TypescriptExtractor(ContractExtractor):
         return (path.suffix in (".ts", ".tsx", ".js") and not _IGNORED_DIRS.intersection(path.parts) and not _is_generated(path))
 
     def extract(self, path: Path, include_doc: bool = False) -> str:
-        return extract_typescript_interface(path)
+        return extract_typescript_interface(path, include_doc=include_doc)
 
 
 register_extractor(TypescriptExtractor())

@@ -52,6 +52,15 @@ class TestRender(unittest.TestCase):
         self.assertIn("except ImportError", src)
         self.assertIn("never fatal", src)
 
+    def test_thread_safe_language_and_include_doc(self):
+        """code-1/2/6：缓存不可变 Language（带锁）、Parser 每次新建；include_doc 透传。"""
+        src = g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"])
+        self.assertIn("_LANGUAGE = None", src)
+        self.assertIn("_LANGUAGE_LOCK = threading.Lock()", src)
+        self.assertIn("parser = Parser(language)", src)
+        self.assertNotIn("_PARSER", src)
+        self.assertIn("extract_typescript_interface(path, include_doc=include_doc)", src)
+
 
 class TestGeneratedFiltering(unittest.TestCase):
     """code-6/code-9: 生成的插件在**没有 grammar 时也能测**的路径逻辑——加载模块、直接调
