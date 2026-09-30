@@ -100,7 +100,9 @@ def _fmt_func(
     decs = _fmt_decorators(node, indent=indent)
     args = _fmt_args(node.args)
     ret = f" -> {_ann(node.returns)}" if node.returns else ""
-    func_line = f"{decs}{indent}{node.name}({args}){ret}"
+    # 保留 `async` 前缀：否则 `async def` ↔ `def` 的接口漂移在 L1 哈希上不可见（ocr-059）。
+    prefix = "async " if isinstance(node, ast.AsyncFunctionDef) else ""
+    func_line = f"{decs}{indent}{prefix}{node.name}({args}){ret}"
     if include_doc:
         first = _doc_first_line(node)
         if first:

@@ -84,15 +84,36 @@ def _parse_porcelain(status: str) -> List[str]:
     return files
 
 
+def _parse_porcelain_z(status: str) -> List[str]:
+    """`git status --porcelain -z` 的解析（NUL 分隔、不 quote）⇒ 非 ASCII 路径不丢（ocr-061）。"""
+    toks = status.split("\0")
+    files: List[str] = []
+    i = 0
+    while i < len(toks):
+        e = toks[i]
+        i += 1
+        if not e:
+            continue
+        xy, path = e[:2], e[3:]
+        if "R" in xy or "C" in xy:
+            if i < len(toks):      # rename/copy：下一 token 是原路径，跳过，取新路径
+                i += 1
+        if path.strip():
+            files.append(path.strip())
+    return files
+
+
 def get_changed_files(workspace: Path) -> List[str]:
     """Return all files changed relative to merge-base, including uncommitted work."""
     files: List[str] = []
     seen = set()
 
+    # `-z` + `core.quotePath=false`：非 ASCII 文件名不再被引号/八进制转义 ⇒ 中文路径不静默漏检（ocr-061）。
     status = _run(
-        ["git", "status", "--porcelain", "--untracked-files=all"], workspace
+        ["git", "-c", "core.quotePath=false", "status", "--porcelain", "-z", "--untracked-files=all"],
+        workspace,
     )
-    for path in _parse_porcelain(status):
+    for path in _parse_porcelain_z(status):
         if path not in seen:
             seen.add(path)
             files.append(path)
@@ -101,9 +122,12 @@ def get_changed_files(workspace: Path) -> List[str]:
     if not base:
         base = resolve_base(workspace)
     if base != "HEAD":
-        committed = _run(["git", "diff", "--name-only", f"{base}...HEAD"], workspace).splitlines()
+        committed = _run(
+            ["git", "-c", "core.quotePath=false", "diff", "--name-only", "-z", f"{base}...HEAD"],
+            workspace,
+        ).split("\0")
         for path in committed:
-            path = _strip_quotes(path.strip())
+            path = path.strip()
             if path and path not in seen:
                 seen.add(path)
                 files.append(path)

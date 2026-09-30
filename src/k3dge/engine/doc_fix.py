@@ -61,7 +61,24 @@ BY_COMMAND: Dict[str, str] = {
 #: 不扫的目录：派生面/历史面/退役面（各有其权威源，改它们没意义或有害）
 _SKIP_PARTS = frozenset({"archive", "generated", "obsolete"})
 
+_BODY_META_LINE_RE = re.compile(r"^-\s+\*\*(Status|Milestone|Priority|Date|Report)\*\*:")
 _BODY_META_RE = re.compile(r"^-\s+\*\*(Status|Milestone|Priority|Date|Report)\*\*:.*$\n?", re.MULTILINE)
+
+
+def _strip_body_meta(text: str) -> str:
+    """删正文元数据副本行——**跳过围栏代码块**（``` / ~~~ 内的示例是正文，不是副本；ocr-064）。"""
+    out: List[str] = []
+    fence = False
+    for ln in text.splitlines(keepends=True):
+        stripped = ln.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            fence = not fence
+            out.append(ln)
+            continue
+        if not fence and _BODY_META_LINE_RE.match(ln):
+            continue
+        out.append(ln)
+    return "".join(out)
 
 
 def managed_docs(workspace: Path) -> List[Path]:
@@ -82,6 +99,9 @@ def managed_docs(workspace: Path) -> List[Path]:
 def _codes(rel: str, text: str) -> List[str]:
     codes = [c for c, _ in pure_refs.check_markdown_text(text, rel)]
     codes += [c for c, _ in pure_refs.check_task_body_meta_redundant(rel, text)]
+    if rel.startswith("docs/incidents/"):
+        # 此前漏接 ⇒ `INCIDENT_ID_REDUNDANT` 分支是死代码（检测在 doc_gate/doc_catalog，修复器在这，ocr-066）。
+        codes += [c for c, _ in pure_refs.check_incident_id_redundant(rel, text)]
     if rel.startswith("docs/adr/"):
         from k3dge.engine.pure_schema import check_amend
 
@@ -100,7 +120,7 @@ def _fix(rel: str, text: str, codes: List[str]) -> Tuple[str, List[str]]:
         out = re.sub(r"[ \t]+$", "", out, flags=re.MULTILINE)
         applied.append("MD_TRAILING_WS")
     if "TASK_BODY_META_REDUNDANT" in codes:
-        out = _BODY_META_RE.sub("", out)
+        out = _strip_body_meta(out)
         applied.append("TASK_BODY_META_REDUNDANT")
     if "INCIDENT_ID_REDUNDANT" in codes:
         out = _fix_incident_id(out)
@@ -242,10 +262,14 @@ def scan(workspace: Path) -> List[Dict[str, str]]:
     for p in managed_docs(workspace):
         rel = p.relative_to(workspace).as_posix()
         try:
-            text = p.read_text(encoding="utf-8")
+            with open(p, encoding="utf-8", newline="") as fh:   # newline="" 保留 CRLF 以便检测/修 MD_CRLF
+                text = fh.read()
         except (OSError, UnicodeDecodeError):
             continue          # 编码问题属判断类，不在本集
-        for code in _codes(rel, text):
+        codes = _codes(rel, text.replace("\r\n", "\n").replace("\r", "\n"))
+        if "\r" in text and "MD_CRLF" in FIXABLE_RULES:        # MD_CRLF 只在字节层可见（ocr-065）
+            codes = list(dict.fromkeys(codes + ["MD_CRLF"]))
+        for code in codes:
             out.append({"path": rel, "rule": code})
     return out
 
@@ -257,10 +281,13 @@ def apply(workspace: Path, *, dry_run: bool = False) -> Dict[str, object]:
     for p in managed_docs(workspace):
         rel = p.relative_to(workspace).as_posix()
         try:
-            text = p.read_text(encoding="utf-8")
+            with open(p, encoding="utf-8", newline="") as fh:
+                text = fh.read()
         except (OSError, UnicodeDecodeError):
             continue
-        codes = _codes(rel, text)
+        codes = _codes(rel, text.replace("\r\n", "\n").replace("\r", "\n"))
+        if "\r" in text and "MD_CRLF" in FIXABLE_RULES:
+            codes = list(dict.fromkeys(codes + ["MD_CRLF"]))
         if not codes:
             continue
         new, applied = _fix(rel, text, codes)

@@ -379,8 +379,18 @@ def _validate_file(workspace: Path, typ: str, path: Path, schema: dict, seen: di
     seen.setdefault(ident, []).append(path.name)
     index_rel = schema.get("index")
     if index_rel:
-        idx_path = _type_dir(workspace, typ) / index_rel
-        idx_text = idx_path.read_text(encoding="utf-8") if idx_path.is_file() else ""
+        # containment + 读保护：schema 的 `index` 若为绝对路径/含 `..` 会读仓外；坏编码/TOCTOU 会让
+        # 整个 `validate_docs` 崩栈（其它读取都包了 try，唯此处漏，ocr-063）。
+        try:
+            type_dir = _type_dir(workspace, typ)
+            root = type_dir.resolve()
+            rp = (type_dir / str(index_rel)).resolve()
+            if rp != root and root not in rp.parents:
+                idx_text = ""
+            else:
+                idx_text = rp.read_text(encoding="utf-8") if rp.is_file() else ""
+        except (OSError, UnicodeDecodeError, ValueError):
+            idx_text = ""
         for code, msg, _scope in _pure_check_index_ref(idx_text, ident, codes, index_rel, path.name):
             out.append(Violation(code, msg, file_path=rel))
     # 编号退役账本（baseline 之前的物理删除也在账上）：复用号 + 引用退役号

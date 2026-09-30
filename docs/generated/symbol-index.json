@@ -8,7 +8,7 @@
   "ContractExtractor": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 144
+      "line": 146
     }
   ],
   "ExtractorConfigError": [
@@ -74,7 +74,7 @@
   "PythonExtractor": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 157
+      "line": 159
     }
   ],
   "Rejection": [
@@ -164,7 +164,7 @@
   "analyze_adr_coverage": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 511
+      "line": 521
     }
   ],
   "append_changelog": [
@@ -182,7 +182,7 @@
   "apply": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 253
+      "line": 277
     }
   ],
   "apply_bundle": [
@@ -470,7 +470,7 @@
   "check_one": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 88
+      "line": 92
     }
   ],
   "check_report_pointer": [
@@ -680,7 +680,7 @@
   "collect_domain_interface": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 372
+      "line": 374
     }
   ],
   "commit_applied": [
@@ -704,7 +704,7 @@
   "compute_hash": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 368
+      "line": 370
     }
   ],
   "consume": [
@@ -804,7 +804,7 @@
   "extract_python_interface": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 338
+      "line": 340
     }
   ],
   "facts_of": [
@@ -888,7 +888,7 @@
   "get_changed_files": [
     {
       "file": "src/k3dge/engine/diff.py",
-      "line": 87
+      "line": 106
     }
   ],
   "get_current_milestone": [
@@ -1194,7 +1194,7 @@
   "main": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 326
+      "line": 330
     },
     {
       "file": "src/k3dge/cli/main.py",
@@ -1208,7 +1208,7 @@
   "managed_docs": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 67
+      "line": 84
     }
   ],
   "mark_task_done": [
@@ -1256,7 +1256,7 @@
   "missing_declared_facts": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 147
+      "line": 151
     }
   ],
   "next_for_rejection": [
@@ -1268,7 +1268,7 @@
   "normalize": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 362
+      "line": 364
     }
   ],
   "old_name_warnings": [
@@ -1466,7 +1466,7 @@
   "register_extractor": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 170
+      "line": 172
     }
   ],
   "rejection": [
@@ -1478,7 +1478,7 @@
   "relevant_for_check": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 82
+      "line": 86
     }
   ],
   "remove": [
@@ -1622,13 +1622,13 @@
   "run_schema_gate": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 158
+      "line": 162
     }
   ],
   "run_screen_gate": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 266
+      "line": 270
     }
   ],
   "run_seal_flow": [
@@ -1658,7 +1658,7 @@
   "scan": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 239
+      "line": 259
     }
   ],
   "scan_milestone_tasks": [
@@ -1760,13 +1760,13 @@
   "staged_added": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 68
+      "line": 76
     }
   ],
   "staged_files": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 60
+      "line": 72
     }
   ],
   "stages": [
@@ -1812,7 +1812,7 @@
   "symbol_diff": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 495
+      "line": 497
     }
   ],
   "sync_all": [
@@ -1896,13 +1896,13 @@
   "validate_docs": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 422
+      "line": 432
     }
   ],
   "validate_docs_index": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 469
+      "line": 479
     }
   ],
   "validate_pipeline_config": [
@@ -1944,7 +1944,7 @@
   "verify_contract": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 422
+      "line": 424
     }
   ],
   "where": [

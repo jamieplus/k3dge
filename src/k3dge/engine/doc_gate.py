@@ -57,21 +57,25 @@ _AUX_FALLBACK = frozenset({
 })
 
 
-def staged_files() -> list[str]:
+def _git_names(*filters: str) -> list[str]:
+    """`git diff --cached --name-only` 的稳解析：`-z`（NUL 分隔）+ `core.quotePath=false`（非 ASCII 路径
+    不再被引号/八进制转义 ⇒ 不会被 `startswith("docs/")` 漏检）；git 失败**抛错**，不当"无文件"放行（ocr-067/068）。"""
     out = subprocess.run(
-        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+        ["git", "-c", "core.quotePath=false", "diff", "--cached", "--name-only", "-z", *filters],
         cwd=WS, capture_output=True, text=True,
     )
-    return [p for p in out.stdout.splitlines()]
+    if out.returncode != 0:
+        raise RuntimeError(f"git diff --cached 失败：{(out.stderr or '').strip()[:200]}")
+    return [p for p in out.stdout.split("\0") if p.strip()]
+
+
+def staged_files() -> list[str]:
+    return _git_names("--diff-filter=ACM")
 
 
 def staged_added() -> list[str]:
     """本次提交**新增**的文件（`--no-renames`：改名算 A+D，新路径须重新排查）。"""
-    out = subprocess.run(
-        ["git", "diff", "--cached", "--name-only", "--diff-filter=A", "--no-renames"],
-        cwd=WS, capture_output=True, text=True,
-    )
-    return [p for p in out.stdout.splitlines() if p.strip()]
+    return _git_names("--diff-filter=A", "--no-renames")
 
 
 # k3dge check only matters when code / spec / agent-config / templates change.
@@ -341,7 +345,11 @@ def main() -> int:
         return 0
 
     rc = 0
-    files = staged_files()
+    try:
+        files = staged_files()
+    except RuntimeError as exc:   # git 失败 ⇒ fail-closed（旧行为把空 stdout 当"无文件"整层放行，ocr-067）
+        print(f"[k3dge doc-gate] FAIL: {exc}", file=sys.stderr)
+        return 1
     doc_files = [f for f in files if f.startswith("docs/") and f.endswith(".md") and not f.endswith("/README.md")]
 
     # doc-gate: only when docs actually changed
