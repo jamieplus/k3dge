@@ -139,10 +139,18 @@ def replay_to_baseline(bundle: Path, dest: Optional[Path] = None,
         replay = [p for p in order if p == "fix.patch"]
         if pins_in_code:
             replay = list(reversed([p for p in order if p in ("fix.patch", "pins.patch")]))
+    _ALLOWED_PATCHES = {"fix.patch", "pins.patch"}
     for name in replay:
+        # 补丁名来自**不可信**的 `manifest.json`（外部包）⇒ 白名单 + 不得含路径分隔/`..`，
+        # 否则 `bundle / "../../x"` 会让本进程读/应用包外的文件（ocr-054）。
+        if name not in _ALLOWED_PATCHES or Path(name).name != name:
+            shutil.rmtree(work, ignore_errors=True)
+            return {"ok": False, "root": "", "replay": replay,
+                    "detail": f"非法补丁名（路径穿越？）：{name!r}"}
         rc = subprocess.run(["git", "apply", "-R", "-p1", str(Path(bundle) / name)],
                             cwd=work, capture_output=True, env=env)
         if rc.returncode != 0:
+            shutil.rmtree(work, ignore_errors=True)
             return {"ok": False, "root": "", "replay": replay,
                     "detail": f"反向应用 {name} 失败：{(rc.stderr or b'').decode('utf-8', 'replace')[:200]}"}
     return {"ok": True, "root": str(work), "replay": replay, "detail": ""}
@@ -164,9 +172,16 @@ def _replay_hashes(bundle: Path) -> Dict[str, Any]:
     work = Path(rep["root"])
     try:
         mismatched, with_pins, checked = [], [], 0
+        work_root = work.resolve()
         for rel, digest in sorted(want.items()):
-            f = work / rel
-            if not f.is_file():
+            # `rel` 来自**不可信**的 `baseline.json`（外部包）：绝对路径/`..` 会逃出重放树、读任意文件
+            # （内容 oracle）⇒ containment 校验，越界计入 mismatched（ocr-055）。
+            try:
+                f = (work / rel).resolve()
+                inside = f.is_relative_to(work_root)
+            except (OSError, ValueError):
+                inside = False
+            if not inside or not f.is_file():
                 mismatched.append(rel)
                 continue
             raw = f.read_text(encoding="utf-8", errors="replace")
@@ -178,7 +193,8 @@ def _replay_hashes(bundle: Path) -> Dict[str, Any]:
                 checked += 1
             else:
                 mismatched.append(rel)             # 含钉文件**不豁免**：篡改一样抓得到
-        return {"ok": not mismatched, "checked": checked, "mismatched": mismatched[:10],
+        return {"ok": not mismatched, "checked": checked, "mismatched": mismatched,
+                "mismatched_preview": mismatched[:10],
                 "files_with_markers": with_pins[:10], "skipped_pin_files": [], "detail": ""}
     finally:
         shutil.rmtree(work, ignore_errors=True)
@@ -292,7 +308,7 @@ def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed:
         else:
             why = "" if not accept_baseline_drift else "（漂移文件与补丁触及面相交，不接受）"
             errors.append("内容哈希链不通过" + why + "：" +
-                          (hash_res.get("detail") or f"不匹配 {hash_res.get('mismatched')}"))
+                          (hash_res.get("detail") or f"不匹配 {hash_res.get('mismatched_preview')}"))
 
     return {"ok": not errors, "errors": errors, "facts": facts, "report_rows": report_rows,
             "unclosed": unclosed, "hash": hash_res, "cross_check": cross,

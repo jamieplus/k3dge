@@ -38,7 +38,11 @@ def _find_report(workspace: Path, milestone_id: str, kind: str = "audit"):
             text = f.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        if _AUDIT_HEADER.replace(" ", "") not in text.replace(" ", ""):
+        # 必须含**真表格**（`|` 起头的 12 列表头行），不能只是正文里抄了表头串——
+        # 否则说明稿会被当成本里程碑审计报告、count_statuses 解析 0 行 ⇒ 假闭环（ocr-051）。
+        from k3dge.engine import report_table
+
+        if report_table.find_table(text, required=("ID", "状态"))[0] < 0:
             continue
         if _report_kind(f.name, text) != kind:
             continue

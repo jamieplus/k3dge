@@ -36,11 +36,15 @@ def _tag_number(tag: str) -> tuple:
 def _git(workspace: Path, *args: str) -> str:
     import subprocess
 
+    # **失败要出声**：把"区间内没有提交"（rc=0、空输出）与"previous_tag 不存在/git 故障"（rc≠0）分开。
+    # 旧行为把两者都压成 "" ⇒ 边界 tag 误删时封版写一条通用行、静默丢掉整段 CHANGELOG（ocr-057）。
     try:
         r = subprocess.run(["git", "-C", str(workspace), *args], capture_output=True, text=True)
-    except OSError:
-        return ""
-    return r.stdout.strip() if r.returncode == 0 else ""
+    except OSError as exc:
+        raise RuntimeError(f"git 不可用：{exc}") from exc
+    if r.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)} 失败：{(r.stderr or '').strip()[:200]}")
+    return r.stdout.strip()
 
 
 def mechanical_commit(sha: str, subject: str, body: str) -> bool:

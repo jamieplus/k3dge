@@ -17,23 +17,18 @@ class _ExtractError(RuntimeError):
 
 
 def _ann(node: Optional[ast.AST]) -> str:
-    return ast.unparse(node) if node is not None else ""
-
-
-def _fmt_value(node: Optional[ast.AST]) -> str:
-    """Rendered constant value with interface delimiters escaped.
-
-    A module constant can hold the literal `INTERFACE_START`/`INTERFACE_END` text
-    (contract.py itself does); verbatim it would truncate the spec interface block on
-    the next `sync`/`symbol_diff`. Escaping is deterministic, so the hash stays stable.
-    """
-    if node is None:
-        return ""
-    text = _ann(node)
+    text = ast.unparse(node) if node is not None else ""
+    # 接口分隔符转义放在**公共渲染处**：注释/默认值/返回类型/装饰器里若含字面量标记
+    # （如 `Literal["<!-- k3dge:interfaces-start -->"]`）也会截断 spec 接口块（ocr-058）。
     for marker in (INTERFACE_START, INTERFACE_END):
         if marker in text:
             text = text.replace(marker, marker.replace("-", "\\x2d"))
     return text
+
+
+def _fmt_value(node: Optional[ast.AST]) -> str:
+    """Rendered constant value with interface delimiters escaped（转义现由 `_ann` 统一负责）。"""
+    return _ann(node)
 
 
 def _fmt_arg(arg: ast.arg) -> str:

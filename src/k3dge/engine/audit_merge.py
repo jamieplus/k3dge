@@ -135,7 +135,13 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
     if not rep.get("ok"):
         return {"ok": False, "merged": {}, "conflicts": [], "excluded": sorted(excluded),
                 "detail": rep.get("detail") or "无法重放基线"}
-    facts = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    try:
+        facts = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        # 包缺/坏 manifest（外部交付包完全可能）⇒ fail-clear 且**清掉**刚建的重放树（ocr-049）。
+        shutil.rmtree(Path(rep["root"]), ignore_errors=True)
+        return {"ok": False, "merged": {}, "conflicts": [], "excluded": sorted(excluded),
+                "detail": f"manifest.json 不可读/不可解析：{exc}"}
     order = [str(x) for x in (facts.get("apply_order") or [])]
     pins_in_code = bool((facts.get("pins") or {}).get("in_code"))
     # "修复后树"（fix 合并的 theirs）怎么取：
@@ -143,14 +149,17 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
     #   否则（artifact，或无 pins.patch）⇒ `code/` 本身就是"基线+修复" ⇒ **直接用它**。
     # （此前无 pins.patch 时错取 base ⇒ theirs==base ⇒ 修复根本没进合并 ⇒ 后面对它剔 hunk 必然失败。）
     need_pins_replay = bool(pins_in_code and (bundle / "pins.patch").is_file())
-    mid = replay_to_baseline(bundle, only=["pins.patch"]) if need_pins_replay else {"ok": False}
     base_root = Path(rep["root"])
     theirs_root = Path(bundle) / "code"
-    if need_pins_replay and mid.get("ok"):
-        mid_root = Path(str(mid["root"]))
-        tmp_mid = str(mid_root)
-    else:
-        mid_root, tmp_mid = theirs_root, ""      # 复用包的 `code/`（**别 rmtree 它**）
+    mid = replay_to_baseline(bundle, only=["pins.patch"]) if need_pins_replay else {"ok": False}
+    if need_pins_replay and not mid.get("ok"):
+        # 重放不成还回落含钉的 `code/` 会把钉当"修复侧改动"合进来、再正向 apply pins.patch ⇒
+        # `--union` 对同位置两侧新增都保留 ⇒ 同一枚钉写两遍（ocr-050）。如实报错，不静默降级。
+        shutil.rmtree(base_root, ignore_errors=True)
+        return {"ok": False, "merged": {}, "conflicts": [], "excluded": sorted(excluded),
+                "detail": f"pins 重放失败：{mid.get('detail') or '?'}（拒绝用含钉的 code/ 当修复侧）"}
+    mid_root = Path(str(mid["root"])) if mid.get("ok") else theirs_root
+    tmp_mid = str(mid_root) if mid.get("ok") else ""      # 复用包的 `code/`（**别 rmtree 它**）
     try:
         # code-4（报告）：原 `... or True` 是**恒真谓词** ⇒ 过滤完全失效。改成显式语义：
         # `fix_only`＝fix.patch 声明的文件（有则只合它）；`fix_rels`＝无 fix.patch 时的回落集合。

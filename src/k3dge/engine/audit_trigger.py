@@ -71,7 +71,8 @@ def compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]:
     reasons: List[str] = []
     tasks = scan_milestone_tasks(workspace, mid)
     n = len(tasks)
-    if n > 0 and not any(t.status in ("in-progress", "idea") for t in tasks):
+    if n > 0 and all(t.status == "done" for t in tasks):
+        # 正向判"全 done"：`deferred`/`unknown`（状态写错）不得被当成"账齐"（ocr-053）。
         reasons.append(f"账齐：本里程碑 {n} 个任务全 done，建议过一遍透镜")
 
     c2_max = int(gates.get(workspace, "audit_trigger", "c2_nesting_max"))
