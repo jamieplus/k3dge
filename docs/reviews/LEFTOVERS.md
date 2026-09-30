@@ -393,3 +393,18 @@ freshness 判定**不能跨决策缓存**：内容编辑不改索引 mtime，mem
 
 **reopen 条件**：下一次动 `.schema.json` / `doc_gate` 回执面的批次，或有人报"这码我只看到裸消息"。
 
+---
+
+## `verify-attest` 的进程成本（2026-09-30，OCR 低批 ocr-392 有意留）
+
+**事实**：`attest.verify_commit` 每验一个提交要起 3 个 git 进程（`rev-parse <h>^{tree}` /
+`show -s --format=%aI` / `log -1 --format=%B`）；CI「全量验」（模块 docstring 声明）对 N 个提交
+就是 3N 次进程启动。
+
+**为什么本轮不修**：三条命令的输出各有各的用途（tree 进 token、作者时间进窗口、正文取署名行），
+**合并成一条**要先定"一次取 tree+时间+正文"的 `--format` 形状（可做到，但要重算 token 口径并
+重放测试）；而**批量**（一次验 N 个提交）要改 `k3dge verify-attest` 的 CLI 契约（现在收单 `--commit`）。
+两者都属接口设计，P3 性能项按规则 12 需要"实测正向作用"才动。
+
+**reopen 条件**：CI/hook 出现可测量的 `verify-attest` 墙钟占比（先量再改）。
+
