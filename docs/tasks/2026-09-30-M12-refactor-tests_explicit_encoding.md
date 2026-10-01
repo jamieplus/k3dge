@@ -17,7 +17,23 @@ date: 2026-09-30
 ## 上下文/切入点
 测试面的显式编码：read_text/write_text 缺 encoding 的 271 处统一收口（连同一次性 helper）
 
-## 事实（本轮实测，非估算）
+
+## 事实更正（本轮自查，AST 实测）
+
+先前登记的两个数是**错的**：`271`（tests）与 `23`（src）来自一条按行粗扫的正则——它对
+`write_text(json.dumps(...), encoding="utf-8")` 这类"编码关键字出现在第一个右括号之后"的写法
+误判成缺 encoding。AST 复核后的真值：
+
+- `tests/**.py`：**75 处** 真缺 `encoding`；
+- `src/**.py`：**0 处**（生产侧本来就是干净的，先前那条"更正"把 0 改成了 23 反而是我把错数坐实了）。
+
+## 本轮进展
+
+- 已收口 **36/75**（AST 定位到调用自身的右括号后插 `encoding="utf-8"`；逐文件语法自校验＋全量 pytest 绿）。
+- 剩 **39 处**（test_evaluator 30 / test_generator 6 / test_scaffold 3）：这几处的插入点会撞已有尾逗号或链式调用，脚本改坏语法即被自校验挡下 ⇒ 留人工。
+- 已落防退化闸 `tests/unit/templates/test_test_explicit_encoding.py`：**棘轮**式（DEBT 记当前 3 文件的数量，只许降不许升；降了不改 DEBT 就红）。全部收口后删 DEBT ⇒ 零容忍。
+
+## 事实（首版登记，含错数，见上「事实更正」）
 
 - `tests/**.py`：`read_text()` / `write_text(...)` 未带 `encoding=` 的站点 **271 处**。
 - `src/**.py`：同形 **23 处**（生产侧并未收干净；先例见已归档票 `docs/tasks/archive/M2/2026-08-26-M2-audit-N1_06_sync_domain_unicode.done.md`）。

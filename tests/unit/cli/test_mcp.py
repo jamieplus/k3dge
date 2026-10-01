@@ -27,7 +27,7 @@ class TestMcp(unittest.TestCase):
             (root / ".agent").mkdir()
             (root / ".agent" / "manifest.json").write_text(
                 json.dumps({"package_root": "src", "domains": {}})
-            )
+            , encoding="utf-8")
             payload = json.loads(mcp.get_domain_spec_resource_for("nope", Path(d)))
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"], "DomainNotRegistered")
@@ -52,10 +52,10 @@ class TestMcp(unittest.TestCase):
                         },
                     }
                 )
-            )
+            , encoding="utf-8")
             (root / "src/core").mkdir(parents=True)
             (root / "docs/specs/core").mkdir(parents=True)
-            (root / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n")
+            (root / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n", encoding="utf-8")
             iface = contract_mod.collect_domain_interface(root / "src/core")
             h = contract_mod.compute_hash(iface)
             (root / "docs/specs/core/spec.md").write_text(
@@ -83,7 +83,7 @@ class TestMcp(unittest.TestCase):
             (root / ".agent").mkdir()
             (root / ".agent" / "manifest.json").write_text(
                 json.dumps({"package_root": "src", "domains": {}})
-            )
+            , encoding="utf-8")
             (root / "docs" / "tasks").mkdir(parents=True)
             (root / "docs" / "tasks" / "open.md").write_text(
                 "# Open item\n- **Status**: deferred\n- **Priority**: P3\n",
@@ -103,7 +103,7 @@ class TestMcp(unittest.TestCase):
             (root / ".agent").mkdir()
             (root / ".agent" / "manifest.json").write_text(
                 json.dumps({"package_root": "src", "domains": {}, "name": "t", "version": "0.1.0"})
-            )
+            , encoding="utf-8")
             (root / "docs" / "tasks").mkdir(parents=True)
             sync_payload = json.loads(mcp.k3dge_sync(workspace_path=d))
             self.assertTrue(sync_payload["ok"])
@@ -128,10 +128,10 @@ class TestMcp(unittest.TestCase):
             (root / ".agent").mkdir()
             (root / ".agent" / "manifest.json").write_text(
                 json.dumps({"package_root": "src", "domains": {"k": {"src": "src/k", "spec": "docs/specs/k/spec.md", "tests": "tests/unit/k"}}}),
-            )
+            encoding="utf-8")
             (root / "src/k").mkdir(parents=True)
             (root / "docs/specs/k").mkdir(parents=True)
-            (root / "src/k/mod.py").write_text("def foo() -> int:\n    return 1\n")
+            (root / "src/k/mod.py").write_text("def foo() -> int:\n    return 1\n", encoding="utf-8")
             from k3dge.engine import contract
 
             iface = contract.collect_domain_interface(root / "src/k")
@@ -144,7 +144,7 @@ class TestMcp(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / "tests/unit/k").mkdir(parents=True)
-            (root / "tests/unit/k/test_foo.py").write_text("def test_foo():\n    assert True\n")
+            (root / "tests/unit/k/test_foo.py").write_text("def test_foo():\n    assert True\n", encoding="utf-8")
             (root / "docs" / "tasks").mkdir(parents=True)
             (root / "docs" / "tasks" / "2026-08-25-M9-audit-foo.md").write_text(
                 "# Foo\n- **Status**: done\n- **Milestone**: M9\n", encoding="utf-8"
@@ -216,7 +216,7 @@ class TestMcpExitIsomorphism(unittest.TestCase):
             (root / ".agent").mkdir()
             (root / ".agent" / "manifest.json").write_text(
                 json.dumps({"package_root": "src", "domains": {}})
-            )
+            , encoding="utf-8")
             with mock.patch.object(status_mod, "lifecycle_next", return_value=ns):
                 chk = json.loads(mcp.k3dge_check(workspace_path=d))
                 tl = json.loads(mcp.k3dge_task_list(workspace_path=d))

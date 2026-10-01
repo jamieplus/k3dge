@@ -46,7 +46,7 @@ class TestContract(unittest.TestCase):
     def test_verify_contract_matches(self):
         with tempfile.TemporaryDirectory() as d:
             src = Path(d)
-            (src / "mod.py").write_text("def foo(x: int) -> str:\n    return ''\n")
+            (src / "mod.py").write_text("def foo(x: int) -> str:\n    return ''\n", encoding="utf-8")
             iface = contract.collect_domain_interface(src)
             h = contract.compute_hash(iface)
             spec = f"**Contract Hash**: `sha256:{h}`"
@@ -58,7 +58,7 @@ class TestContract(unittest.TestCase):
     def test_verify_contract_drift(self):
         with tempfile.TemporaryDirectory() as d:
             src = Path(d)
-            (src / "mod.py").write_text("def foo(x: int) -> str:\n    return ''\n")
+            (src / "mod.py").write_text("def foo(x: int) -> str:\n    return ''\n", encoding="utf-8")
             spec = "**Contract Hash**: `sha256:" + "0" * 64 + "`"
             ok, expected, actual = contract.verify_contract(src, spec)
             self.assertFalse(ok)
@@ -69,7 +69,7 @@ class TestContract(unittest.TestCase):
             src = Path(d) / "src"
             src.mkdir()
             mod = src / "mod.py"
-            mod.write_text("def foo(x: int) -> str:\n    return ''\n\ndef bar() -> None:\n    return None\n")
+            mod.write_text("def foo(x: int) -> str:\n    return ''\n\ndef bar() -> None:\n    return None\n", encoding="utf-8")
             iface = contract.collect_domain_interface(src)
             h = contract.compute_hash(iface)
             spec = (
@@ -83,7 +83,7 @@ class TestContract(unittest.TestCase):
             mod.write_text(
                 "def foo(x: int, y: int) -> str:\n    return ''\n\n"
                 "def baz() -> int:\n    return 1\n"
-            )
+            , encoding="utf-8")
             diff = contract.symbol_diff(spec, src)
             self.assertIn("foo", diff["changed"])
             self.assertIn("bar", diff["removed"])
@@ -103,9 +103,9 @@ class TestContract(unittest.TestCase):
     def test_syntax_error_is_visible(self):
         with tempfile.TemporaryDirectory() as d:
             src = Path(d)
-            (src / "ok.py").write_text("def foo() -> int:\n    return 1\n")
+            (src / "ok.py").write_text("def foo() -> int:\n    return 1\n", encoding="utf-8")
             h1 = contract.compute_hash(contract.collect_domain_interface(src))
-            (src / "broken.py").write_text("def bar( ->\n")
+            (src / "broken.py").write_text("def bar( ->\n", encoding="utf-8")
             from k3dge.engine.contract import _ExtractError
 
             with self.assertRaises(_ExtractError):
@@ -139,7 +139,7 @@ class TestContract(unittest.TestCase):
             try:
                 spec_obj.loader.exec_module(mod)
                 path = Path(d) / "mod.ts"
-                path.write_text("export function foo(x: number): number {\n  return x + 1;\n}\nconst skipped = 1;\n")
+                path.write_text("export function foo(x: number): number {\n  return x + 1;\n}\nconst skipped = 1;\n", encoding="utf-8")
                 iface = mod.extract_typescript_interface(path) or ""
                 self.assertIn("foo", iface)
                 self.assertNotIn("return x", iface)
@@ -184,7 +184,7 @@ class TestContract(unittest.TestCase):
     def test_verify_contract_missing_hash(self):
         with tempfile.TemporaryDirectory() as d:
             src = Path(d)
-            (src / "mod.py").write_text("def foo(x: int) -> str:\n    return ''\n")
+            (src / "mod.py").write_text("def foo(x: int) -> str:\n    return ''\n", encoding="utf-8")
             ok, expected, actual = contract.verify_contract(src, "no hash here")
             self.assertFalse(ok)
             self.assertIsNone(expected)

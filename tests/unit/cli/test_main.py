@@ -167,10 +167,10 @@ class TestCli(unittest.TestCase):
                         "ignore": [],
                     }
                 )
-            )
+            , encoding="utf-8")
             (repo / "src" / "core").mkdir(parents=True)
             (repo / "docs" / "specs" / "core").mkdir(parents=True)
-            (repo / "src/core/mod.py").write_text("def foo(x: int) -> int:\n    return x\n")
+            (repo / "src/core/mod.py").write_text("def foo(x: int) -> int:\n    return x\n", encoding="utf-8")
             (repo / "docs/specs/core/spec.md").write_text(
                 "# Domain Specification: core\n"
                 "- **Status**: Active\n"
@@ -182,10 +182,10 @@ class TestCli(unittest.TestCase):
                 "<!-- k3dge:interfaces-start -->\n```python\n```\n<!-- k3dge:interfaces-end -->\n"
                 "## 3. State Machine & Invariants\n"
                 "## 4. Verification Matrix\n"
-            )
+            , encoding="utf-8")
             subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
             subprocess.run(["git", "commit", "-m", "init"], cwd=repo, check=True, capture_output=True)
-            (repo / "src/core/mod.py").write_text("def foo(x: int, y: str) -> int:\n    return x\n")
+            (repo / "src/core/mod.py").write_text("def foo(x: int, y: str) -> int:\n    return x\n", encoding="utf-8")
             # run check via ConsistencyEngine directly to avoid cwd side effects
             report = ConsistencyEngine(repo).evaluate()
             self.assertFalse(report.passed)
@@ -220,7 +220,7 @@ class TestCli(unittest.TestCase):
             repo.mkdir()
             subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
             (repo / ".agent").mkdir()
-            (repo / ".agent" / "manifest.json").write_text(json.dumps({"package_root": "src", "domains": {}}))
+            (repo / ".agent" / "manifest.json").write_text(json.dumps({"package_root": "src", "domains": {}}), encoding="utf-8")
             (repo / "docs" / "tasks").mkdir(parents=True)
             old = Path.cwd()
             try:
@@ -334,7 +334,7 @@ class TestCli(unittest.TestCase):
             (repo / ".agent").mkdir()
             (repo / ".agent" / "manifest.json").write_text(
                 json.dumps({"package_root": "src", "domains": {}})
-            )
+            , encoding="utf-8")
             (repo / "docs" / "tasks").mkdir(parents=True)
             (repo / "docs" / "tasks" / "2026-08-25-fix-foo.md").write_text(
                 "# Do foo\n\n- **Status**: idea\n- **Milestone**: M2\n- **Priority**: P1\n",
@@ -384,12 +384,12 @@ class TestCli(unittest.TestCase):
             peer = root / "k3che"
             ws.mkdir()
             (ws / ".agent").mkdir()
-            (ws / ".agent" / "manifest.json").write_text(json.dumps({"package_root": "src", "domains": {}}))
+            (ws / ".agent" / "manifest.json").write_text(json.dumps({"package_root": "src", "domains": {}}), encoding="utf-8")
             (ws / ".agent" / "pipeline.toml").write_text(
                 "[peers.k3che]\nscope = \"cache\"\ntransports = [{ provider = \"mcp\", tool = \"k3che_search\" }]\n"
-            )
+            , encoding="utf-8")
             (peer / "src" / "k3che").mkdir(parents=True)
-            (peer / "src" / "k3che" / "mcp.py").write_text("def main():\n    pass\n")
+            (peer / "src" / "k3che" / "mcp.py").write_text("def main():\n    pass\n", encoding="utf-8")
             subprocess.run(["git", "init", "-b", "main"], cwd=ws, check=True, capture_output=True)
             old = Path.cwd()
             try:
@@ -417,15 +417,15 @@ class TestCli(unittest.TestCase):
             peer = root / "k3che"
             ws.mkdir()
             (ws / ".agent").mkdir()
-            (ws / ".agent" / "manifest.json").write_text(json.dumps({"package_root": "src", "domains": {}}))
+            (ws / ".agent" / "manifest.json").write_text(json.dumps({"package_root": "src", "domains": {}}), encoding="utf-8")
             (ws / ".agent" / "pipeline.toml").write_text(
                 "[peers.k3che]\nscope = \"cache\"\ntransports = [{ provider = \"mcp\", tool = \"k3che_search\" }]\n"
-            )
+            , encoding="utf-8")
             (ws / ".mcp.json").write_text(
                 json.dumps({"mcpServers": {"k3che": {"command": "python", "args": ["-m", "k3che.mcp"]}}})
-            )
+            , encoding="utf-8")
             (peer / "src" / "k3che").mkdir(parents=True)
-            (peer / "src" / "k3che" / "mcp.py").write_text("def main():\n    pass\n")
+            (peer / "src" / "k3che" / "mcp.py").write_text("def main():\n    pass\n", encoding="utf-8")
             subprocess.run(["git", "init", "-b", "main"], cwd=ws, check=True, capture_output=True)
             old = Path.cwd()
             try:

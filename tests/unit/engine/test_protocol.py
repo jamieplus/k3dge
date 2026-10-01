@@ -12,7 +12,7 @@ class TestWriteIncident(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / ".agent").mkdir()
-            (root / ".agent" / "manifest.json").write_text("{}")
+            (root / ".agent" / "manifest.json").write_text("{}", encoding="utf-8")
             path = write_incident(
                 root,
                 target="docs/reviews/x.md",
@@ -33,7 +33,7 @@ class TestWriteIncident(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / ".agent").mkdir()
-            (root / ".agent" / "manifest.json").write_text("{}")
+            (root / ".agent" / "manifest.json").write_text("{}", encoding="utf-8")
             write_incident(root, target="x.md", task_type="audit", task_id="T1", detail="boom")
             TestIncidentGovernance()._schema(root)
             vs = validate_docs(root, types=["incidents"])

@@ -25,13 +25,13 @@ class TestDiff(unittest.TestCase):
             subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
             subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=repo, check=True, capture_output=True)
             subprocess.run(["git", "config", "user.name", "t"], cwd=repo, check=True, capture_output=True)
-            (repo / "a.txt").write_text("1\n")
+            (repo / "a.txt").write_text("1\n", encoding="utf-8")
             subprocess.run(["git", "add", "a.txt"], cwd=repo, check=True, capture_output=True)
             subprocess.run(["git", "commit", "-m", "one"], cwd=repo, check=True, capture_output=True)
             first = subprocess.run(
                 ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
             ).stdout.strip()
-            (repo / "b.txt").write_text("2\n")
+            (repo / "b.txt").write_text("2\n", encoding="utf-8")
             subprocess.run(["git", "add", "b.txt"], cwd=repo, check=True, capture_output=True)
             subprocess.run(["git", "commit", "-m", "two"], cwd=repo, check=True, capture_output=True)
             with mock.patch.dict(os.environ, {"K3DGE_BASE_SHA": first}):
@@ -45,7 +45,7 @@ class TestDiff(unittest.TestCase):
             subprocess.run(["git", "init", "-b", "dev"], cwd=repo, check=True, capture_output=True)
             subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=repo, check=True, capture_output=True)
             subprocess.run(["git", "config", "user.name", "t"], cwd=repo, check=True, capture_output=True)
-            (repo / "a.txt").write_text("1\n")
+            (repo / "a.txt").write_text("1\n", encoding="utf-8")
             subprocess.run(["git", "add", "a.txt"], cwd=repo, check=True, capture_output=True)
             subprocess.run(["git", "commit", "-m", "one"], cwd=repo, check=True, capture_output=True)
             self.assertEqual(resolve_base(repo), "HEAD")

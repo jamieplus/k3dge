@@ -237,7 +237,7 @@ class TestSync(unittest.TestCase):
                     "export const g = (a: number): number => {\n  return a;\n};\n"
                     "export const V = 5;\n"
                     "const hidden = 1;\n",
-                )
+                encoding="utf-8")
                 self.assertEqual(
                     mod.extract_typescript_interface(f),
                     "export function foo(x: number): number\n"
