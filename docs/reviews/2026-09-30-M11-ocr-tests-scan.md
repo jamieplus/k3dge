@@ -13,6 +13,14 @@
 ## 发现
 
 | ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |
+
+## 续作口径（下一次接手读这段就够）
+
+- **账**：待修 262／已修 81／部分修 6／有意留 1（基线 `456dda9` 起，本轮推进到 `1c0a3cc`+；`rg -c '^\| t-' ` 与状态列自证）。
+- **读表只用这套索引**：`c=[x.strip() for x in ln.split('|')[1:-1]]` ⇒ `ID=c[0] 严重度=c[2] 类型=c[4] 描述=c[5] 位置=c[6] 状态=c[7] 处置=c[8] 验证=c[9]`。单元格内**一律不出现裸 `|`**（写全角 `｜`），守卫 `tests/unit/engine/test_audit_report_shape.py`（格数=12 + 状态闭集）会红。我本轮因违反这条写错过两次列。
+- **已吃掉的机械簇**（别再吃第二遍）：隐式编码 75 处（零容忍守卫 `test_test_explicit_encoding`）、死导入/重复局部导入（守卫 `test_test_file_hygiene::test_no_dead_or_duplicate_imports_in_tests`）、45 个裸 `mkdtemp`（守卫 `…::test_every_mkdtemp_site_has_a_cleanup_handle`，负控测用 `hygiene:keep-no-cleanup` 豁免）。
+- **下一刀的形状**：剩余多为"断言弱但非字面恒真"（例：`assertTrue(len(x) >= 1)` 不查内容、`assertIn(sub, joined)` 反了方向）——逐行读代码才知道，没有可批量化的签名；`skip` 过宽与 fixture 泄漏是另外两簇。
+- **不要碰**：`docs/tasks/archive/**`、`docs/branches/**`（不改写史）；`src/k3dge/engine/assert_tautology.py` 是另一会话刚落的字面恒真闸（`severity=block`，当前全量 0 违例），比它宽的那类"弱断言"仍归人判。
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | t-001 | 2026-09-30 | 低 | P3 | 可维护 | Dead code: `import os` is never referenced anywhere in this module (paths are handled via `pathlib`, cwd via `monkeypatch.chdir`). Remove it. | tests/unit/cli/test_seal_check.py:7 | 已修 | 死导入删除（AST 复扫该文件零绑定）：os | AST 判据 tests/ 全域零残留；961 passed（ea43390） | 待复审 |  |
 | t-002 | 2026-09-30 | 高 | P1 | 测试 | This assertion does not check what its comment claims. `"✅" not in out or "❌" not in out` is satisfied as soon as *either* symbol is missing, so a run that emits ten `❌` failure rows passes as long as no `✅` row exists — it can never catch a regression that turns a green item red. Worse, with `preconditions = []` the declared gate list is empty (`gates.preconditions()` returns `[]`), so `render_checklist()` emits no `✅`/`❌` rows at all and the assertion is vacuous: the "all green" scenario is never actually exercised, and the header assertion reduces to `...：0/0 通过`. Declare real gates that pass in an empty workspace and assert both presence of `✅` and absence of failures. | tests/unit/cli/test_seal_check.py:23 | 已修 | 改核两侧（✅ 有、❌ 无）＋空 preconditions 单列 0/0 形状；补人办闸红样例 | tests/unit/cli/test_seal_check.py（c173a5e） | 待复审 |  |
