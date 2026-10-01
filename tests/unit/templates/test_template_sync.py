@@ -13,8 +13,10 @@ class TestTemplateSync(unittest.TestCase):
     def test_templates_match_repo_scripts(self) -> None:
         for asset, rel in PAIRS:
             with self.subTest(asset=asset):
-                tpl = (ASSETS / asset).read_text().rstrip("\n")
-                act = (ROOT / rel).read_text().rstrip("\n")
+                # 字节锁的比较必须比**字节**：`read_text()` 无 encoding ⇒ 按 locale 解码，
+                # 跨平台/CI locale 不同时同一对文件会被判"漂移"或掩盖真漂移（t-326）
+                tpl = (ASSETS / asset).read_text(encoding="utf-8").rstrip("\n")
+                act = (ROOT / rel).read_text(encoding="utf-8").rstrip("\n")
                 self.assertEqual(tpl, act, f"{asset} drifted from {rel}")
 
     def test_all_expected_assets_exist(self) -> None:

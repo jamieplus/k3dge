@@ -14,22 +14,27 @@ def _stdlib_only(mod_path: Path) -> None:
     tree = ast.parse(mod_path.read_text(encoding="utf-8"))
     allowed_prefixes = ("k3dge.engine.pure_",)
     stdlib = set(sys.stdlib_module_names)
+    def _fail(msg: str) -> None:
+        # 守卫**不能用 assert**：`python -O` 下 assert 被整条剥掉，纯度检查静默失效（t-242）
+        raise AssertionError(msg)
+
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for a in node.names:
                 top = a.name.split(".")[0]
-                assert top in stdlib, f"{mod_path.name} imports non-stdlib {a.name}"
+                if top not in stdlib and not a.name.startswith(allowed_prefixes):
+                    # `import k3dge.engine.pure_refs` 这种写法以前一律判违规（t-243）
+                    _fail(f"{mod_path.name} imports non-stdlib {a.name}")
         elif isinstance(node, ast.ImportFrom):
             if node.level and node.level > 0:
-                raise AssertionError(f"{mod_path.name} uses relative import")
+                _fail(f"{mod_path.name} uses relative import")
             if node.module:
                 top = node.module.split(".")[0]
                 if top == "k3dge":
-                    assert node.module.startswith(allowed_prefixes), (
-                        f"{mod_path.name} imports non-pure k3dge module {node.module}"
-                    )
-                else:
-                    assert top in stdlib, f"{mod_path.name} imports non-stdlib {node.module}"
+                    if not node.module.startswith(allowed_prefixes):
+                        _fail(f"{mod_path.name} imports non-pure k3dge module {node.module}")
+                elif top not in stdlib:
+                    _fail(f"{mod_path.name} imports non-stdlib {node.module}")
 
 
 class TestPurity(unittest.TestCase):
@@ -156,3 +161,54 @@ class TestLiteralVsRegex(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+_CHILD_BAD = """
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("tps", MOD_PATH)
+m = importlib.util.module_from_spec(spec)
+sys.modules["tps"] = m
+spec.loader.exec_module(m)
+from pathlib import Path
+try:
+    m._stdlib_only(Path(BAD_PATH))
+except AssertionError as exc:
+    print("RAISED"); raise SystemExit(0)
+print("SILENT"); raise SystemExit(1)
+"""
+
+_CHILD_GOOD = """
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("tps", MOD_PATH)
+m = importlib.util.module_from_spec(spec)
+sys.modules["tps"] = m
+spec.loader.exec_module(m)
+from pathlib import Path
+m._stdlib_only(Path(GOOD_PATH))          # `import k3dge.engine.pure_*` 必须放行（t-243）
+print("OK")
+"""
+
+
+def _run_optimized(tmp_path: Path, flags: list, body: str, bad: Path, good: Path) -> tuple:
+    import subprocess
+    import sys
+
+    script = (f"MOD_PATH = {str(Path(__file__))!r}\n"
+              f"BAD_PATH = {str(bad)!r}\nGOOD_PATH = {str(good)!r}\n" + body)
+    f = tmp_path / ("child" + "".join(flags).replace("-", "_") + ".py")
+    f.write_text(script, encoding="utf-8")
+    r = subprocess.run([sys.executable, *flags, str(f)], capture_output=True, text=True)
+    return r.returncode, r.stdout, r.stderr
+
+
+def test_purity_guard_raises_even_under_optimized_mode(tmp_path) -> None:
+    """守卫不得用 `assert`：`python -O` 会把它整条剥掉 ⇒ 纯度检查静默失效（t-242）。"""
+    bad = tmp_path / "bad_mod.py"
+    bad.write_text("import sys\nimport requests\n", encoding="utf-8")
+    good = tmp_path / "good_mod.py"
+    good.write_text("import k3dge.engine.pure_refs\nimport sys\n", encoding="utf-8")
+    for flags in ([], ["-O"], ["-OO"]):
+        rc, out, err = _run_optimized(tmp_path, flags, _CHILD_BAD, bad, good)
+        assert rc == 0 and "RAISED" in out, (flags, out, err[-300:])
+        rc2, out2, err2 = _run_optimized(tmp_path, flags, _CHILD_GOOD, bad, good)
+        assert rc2 == 0 and "OK" in out2, (flags, out2, err2[-300:])

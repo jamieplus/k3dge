@@ -170,7 +170,8 @@ class TestSectionOrder(unittest.TestCase):
     def test_gate_emits_violation(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Path(d)
-            schema = dict(ADR_SCHEMA)
+            import copy as _copy
+            schema = _copy.deepcopy(ADR_SCHEMA)   # 浅拷贝会让 schema["codes"] 与全局同一个 dict
             schema["section_order"] = True
             schema.setdefault("codes", {})["section_order"] = "ADR_SECTION_ORDER"
             _write_schema(ws, "adr", schema)

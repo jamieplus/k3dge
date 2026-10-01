@@ -218,7 +218,8 @@ class TestSync(unittest.TestCase):
             self.skipTest("tree-sitter-typescript not installed")
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "typescript.py"
-            p.write_text(g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"]))
+            p.write_text(g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"]),
+                       encoding="utf-8")     # 生成头含非 ASCII（"— do not edit"）⇒ 缺 encoding 随 locale 崩
             spec = importlib.util.spec_from_file_location("gen_ts_fidelity", p)
             assert spec is not None and spec.loader is not None
             mod = importlib.util.module_from_spec(spec)

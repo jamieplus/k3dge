@@ -118,9 +118,10 @@ class TestScaffold(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertGreater(len(text.strip()), 80, name)
             self.assertIn("ADR-0010", text)
-        two = (self.target / ".agent" / "rules" / "02-simplification.md").read_text()
+        two = (self.target / ".agent" / "rules" / "02-simplification.md").read_text(encoding="utf-8")
         self.assertIn("procedural discipline", two)
-        zero = (self.target / ".agent" / "rules" / "00-core-discipline.md").read_text().strip()
+        zero = (self.target / ".agent" / "rules" / "00-core-discipline.md").read_text(
+            encoding="utf-8").strip()
         self.assertNotEqual(zero, "# Rule 00: Core Discipline")
 
     def test_scripts_are_executable(self) -> None:
