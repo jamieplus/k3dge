@@ -31,7 +31,23 @@ mcp = FastMCP("dummy")
 import tempfile as _tempfile
 from pathlib import Path as _Path
 
-_STATE_FILE = _Path(_tempfile.gettempdir()) / "k3dge_dummy_peer_jobs.json"
+#: 仓根派生的**每检出**独立路径 + 可显式覆盖：以前写死 `/tmp/k3dge_dummy_peer_jobs.json`
+#: ⇒ (a) 任何本机用户可抢先创建/换成符号链接（我们随后 os.replace 会跟着把内容写到它指向的
+#: 地方，等于任意文件覆写/DoS），(b) 两个并发检出/工作树共用一份账，互相看见对方的 job（t-013）。
+_REPO_ROOT = _Path(__file__).resolve().parents[2]
+
+
+def _state_path() -> _Path:
+    import hashlib
+
+    override = os.environ.get("DUMMY_PEER_STATE", "").strip()
+    if override:
+        return _Path(override)
+    key = hashlib.sha1(str(_REPO_ROOT).encode("utf-8")).hexdigest()[:10]
+    return _Path(_tempfile.gettempdir()) / f"k3dge_dummy_peer_jobs-{key}.json"
+
+
+_STATE_FILE = _state_path()
 _LOCK_FILE = _Path(str(_STATE_FILE) + ".lock")
 _MAX_JOBS = 200                      # 桩也被跨进程反复跑；不回收就无界增长
 
@@ -44,6 +60,9 @@ def _load_jobs() -> dict:
     之后它们的 collect 永远 NOT_FOUND（t-010）。形状也必须校：合法 JSON 但不是对象
     （`[]`/`null`/`42`）此前原样返回，`jobs[job_id] = {...}` 当场 TypeError。
     """
+    if _STATE_FILE.is_symlink():
+        # 符号链接＝有人把账本指到别处（或被抢注）：宁可拒跑也不顺着它读写
+        raise RuntimeError(f"dummy peer: 状态文件是符号链接，拒用（{_STATE_FILE}）")
     try:
         raw = _STATE_FILE.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -64,7 +83,9 @@ def _save_jobs(jobs: dict) -> None:
     """
     items = list(jobs.items())[-_MAX_JOBS:]
     tmp = _Path(str(_STATE_FILE) + f".{os.getpid()}.tmp")
-    tmp.write_text(_json_dumps(dict(items), ensure_ascii=False), encoding="utf-8")
+    fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(_json_dumps(dict(items), ensure_ascii=False))
     os.replace(tmp, _STATE_FILE)
 
 
@@ -128,7 +149,18 @@ def dummy_collect(job_id: str) -> str:
             {"ok": False, "error": "NOT_FOUND", "message": f"no such job: {job_id!r}"},
             ensure_ascii=False,
         )
-    pending = int(os.environ.get("DUMMY_PENDING", "0"))
+    raw_pending = os.environ.get("DUMMY_PENDING", "")
+    try:
+        # 文档说"默认 0"，但旧实现只在**变量缺失**时回落：`DUMMY_PENDING=""` 或 `"3 "` 这类
+        # 畸形值会当场 ValueError，报错发生在工具内部而不是入口（t-014）
+        pending = int(raw_pending.strip() or "0")
+    except ValueError:
+        return json.dumps({"ok": False, "error": "BAD_CONFIG",
+                           "message": f"DUMMY_PENDING 必须是整数，收到 {raw_pending!r}"},
+                          ensure_ascii=False)
+    if pending < 0:
+        return json.dumps({"ok": False, "error": "BAD_CONFIG",
+                           "message": f"DUMMY_PENDING 不得为负，收到 {pending}"}, ensure_ascii=False)
     today = datetime.date.today().isoformat()
     ms = job.get("milestone_id") or "M0"
     rows = []
@@ -140,7 +172,9 @@ def dummy_collect(job_id: str) -> str:
         f"# 审计：{job.get('scope') or 'target'}（milestone {ms}）\n\n"
         f"- **基线**: {job.get('baseline') or '-'}\n"
         f"- **审计人**: dummy+test-seat\n"
-        f"- **透镜来源**: dummy（peer contract 桩）\n"        f"- **基线**: {'0' * 40}\n"   # 桩：格式闸只验可解析
+        f"- **透镜来源**: dummy（peer contract 桩）\n"
+        # 这里原本又拼了**第二条** `- **基线**: 0000…`（40 个 0）⇒ 同一份报告两个互相矛盾的
+        # 基线事实，消费侧读到的第一条恰好是 job 的真基线才没炸；契约上仍是自相矛盾件（t-015）
         f"- **范围**: {job.get('scope') or '-'}\n\n"
         f"{_HEADER}\n{_SEP}\n" + ("\n".join(rows) + "\n" if rows else "")
     )

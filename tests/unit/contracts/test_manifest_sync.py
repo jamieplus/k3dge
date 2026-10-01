@@ -43,8 +43,16 @@ class TestManifestSpecsFullSync(unittest.TestCase):
             )
 
     def test_no_orphan_spec_dirs(self) -> None:
-        registered = {(ROOT / cfg["spec"]).parent.name for cfg in self.domains.values()}
-        actual = {p.name for p in SPECS_DIR.iterdir() if p.is_dir() and p.name != "_template"}
+        # 旧写法在 `docs/specs` 缺失/被改名时抛裸 FileNotFoundError：契约测试"崩"而不是"红"，
+        # CI 里只看到 traceback，看不出是域路由漂了（t-031）。
+        self.assertTrue(SPECS_DIR.is_dir(), f"spec 根目录不存在：{SPECS_DIR}")
+        registered = set()
+        for domain, cfg in self.domains.items():
+            spec = cfg.get("spec")
+            self.assertIsInstance(spec, str, f"domain '{domain}' 的 spec 不是字符串：{spec!r}")
+            registered.add((ROOT / spec).parent.name)
+        actual = {p.name for p in sorted(SPECS_DIR.iterdir())
+                  if p.is_dir() and p.name != "_template"}
         orphans = actual - registered
         self.assertEqual(orphans, set(), f"spec dirs without manifest domain: {sorted(orphans)}")
 

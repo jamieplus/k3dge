@@ -841,3 +841,52 @@ def test_repo_gitignore_covers_both_runtime_projections():
             r = subprocess.run(["git", "-C", str(repo), "check-ignore", "-q", "--", rel],
                                capture_output=True, text=True)
             assert r.returncode == 0, f"{rel} 未被 .gitignore 覆盖 ⇒ 审计一跑就会弄脏工作树"
+def test_dummy_peer_state_and_report_shape(tmp_path, monkeypatch) -> None:
+    """dummy peer 桩自身的三条不变量（t-013/014/015）——它是"对端契约"的替身，桩不可信则开环/闭环两态的验证全无意义。"""
+    import importlib.util
+    import json as _json
+    import sys
+
+    import pytest
+
+    src = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "dummy_peer.py"
+
+    def load(tag: str):
+        spec = importlib.util.spec_from_file_location(f"dummy_peer_{tag}", src)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[f"dummy_peer_{tag}"] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
+    # ① 状态路径可显式覆盖；缺省时按**检出**派生（不再全机共用一个固定名）
+    monkeypatch.setenv("DUMMY_PEER_STATE", str(tmp_path / "jobs.json"))
+    m = load("a")
+    assert str(m._STATE_FILE) == str(tmp_path / "jobs.json")
+    monkeypatch.delenv("DUMMY_PEER_STATE")
+    m2 = load("b")
+    assert m2._STATE_FILE.name.startswith("k3dge_dummy_peer_jobs-") and m2._STATE_FILE != m._STATE_FILE
+
+    # ② 畸形 DUMMY_PENDING ⇒ 入口式 BAD_CONFIG（旧写法在工具内部抛 ValueError，
+    #    而文档说的"默认 0"只在变量缺失时生效）
+    monkeypatch.setenv("DUMMY_PENDING", " ")          # 空/纯空白＝视作未设（回落 0）
+    assert _json.loads(m2.dummy_submit(baseline="b" * 40))["ok"]
+    monkeypatch.setenv("DUMMY_PENDING", "abc")
+    job = _json.loads(m2.dummy_submit(baseline="a" * 40, milestone_id="M9"))
+    assert job["ok"]
+    bad = _json.loads(m2.dummy_collect(job["payload"]["job_id"]))
+    assert bad["ok"] is False and bad["error"] == "BAD_CONFIG", bad
+
+    # ③ 报告里**只有一条** `- **基线**:`，且值＝submit 传真值（旧桩又拼一条 40 个 0）
+    monkeypatch.setenv("DUMMY_PENDING", "1")
+    ok = _json.loads(m2.dummy_collect(job["payload"]["job_id"]))
+    md = ok["payload"]["report_markdown"]
+    assert ok["ok"] and md.count("- **基线**:") == 1, md
+    assert "aaaa" in md and "0000" not in md.split("- **基线**:")[1].splitlines()[0]
+    assert md.count("| D1 ") == 1                       # 开环态真产出一条待修
+
+    # ④ 状态文件是符号链接 ⇒ 拒用（不顺着它把账本写到别处）
+    link = tmp_path / "linked.json"
+    link.symlink_to(tmp_path / "elsewhere.json")
+    monkeypatch.setenv("DUMMY_PEER_STATE", str(link))
+    with pytest.raises(RuntimeError, match="符号链接"):
+        load("c")._load_jobs()

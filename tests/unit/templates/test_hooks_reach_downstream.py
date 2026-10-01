@@ -46,10 +46,17 @@ class TestHooksReachDownstream(unittest.TestCase):
         shim_dir = Path(self._tmp.name) / "bin"
         shim_dir.mkdir(exist_ok=True)
         shim = shim_dir / "k3dge"
+        import shlex
+
+        # 旧写法把解释器与仓路径直接插进 `-c '...'` 的单引号里：路径含 `"`/`'`/空格
+        # （venv 建在带引号的目录下并不罕见）就把脚本结构改了，等于测试自己在示范注入面（t-319）。
+        # ⇒ 值走 shlex.quote 成 shell 词，路径改由**环境变量**传给被 exec 的程序。
+        prog = ('import os, sys; sys.path.insert(0, os.environ["K3DGE_SRC"]); '
+                "from k3dge.cli.main import main; sys.exit(main())")
         shim.write_text(
             "#!/bin/sh\n"
-            f'exec "{sys.executable}" -c \'import sys; sys.path.insert(0, "{K3DGE_SRC}")\n'
-            "from k3dge.cli.main import main; sys.exit(main())\' \"$@\"\n",
+            "K3DGE_SRC=" + shlex.quote(str(K3DGE_SRC)) + "; export K3DGE_SRC\n"
+            "exec " + shlex.quote(sys.executable) + " -c " + shlex.quote(prog) + ' "$@"\n',
             encoding="utf-8",
         )
         shim.chmod(0o755)
