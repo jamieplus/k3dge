@@ -28,3 +28,49 @@ def test_main_guard_is_last_statement_in_every_test_file() -> None:
         if late:
             offenders.append(f"{p.relative_to(REPO)}: 守卫之后还有 {len(late)} 个定义（首个＝{late[0]}）")
     assert not offenders, "测试文件的 __main__ 守卫不在末尾：" + "; ".join(offenders)
+def test_no_dead_or_duplicate_imports_in_tests() -> None:
+    """`tests/**` 不留死导入，也不在函数里重复导入模块作用域已有的名字。
+
+    判据用 AST（按行正则会把多行 `from X import (` 的续行误当独立语句）。
+    `from __future__ import annotations` 是编译器特性，不算未使用。
+    """
+    import ast as _ast
+
+    bad: list[str] = []
+    for path in sorted((REPO / "tests").rglob("*.py")):
+        tree = _ast.parse(path.read_text(encoding="utf-8"))
+        used: set[str] = set()
+        for node in _ast.walk(tree):
+            if isinstance(node, _ast.Name):
+                used.add(node.id)
+            elif isinstance(node, _ast.Attribute):
+                base = node
+                while isinstance(base, _ast.Attribute):
+                    base = base.value
+                if isinstance(base, _ast.Name):
+                    used.add(base.id)
+
+        def _bound(node) -> list[str]:
+            if isinstance(node, _ast.ImportFrom) and node.module == "__future__":
+                return []          # 编译器特性，不是可使用的名字
+            out = []
+            for a in node.names:
+                if isinstance(node, _ast.Import):
+                    out.append(a.asname or a.name.split(".")[0])
+                else:
+                    out.append(a.asname or a.name)
+            return out
+
+        module_bound = {n for node in tree.body if isinstance(node, (_ast.Import, _ast.ImportFrom)) for n in _bound(node)}
+        for node in tree.body:
+            if isinstance(node, (_ast.Import, _ast.ImportFrom)):
+                for name in _bound(node):
+                    if name not in used:
+                        bad.append(f"{path}:{node.lineno} 死导入 {name}")
+        for fn in [n for n in _ast.walk(tree) if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef))]:
+            for stmt in fn.body:
+                if isinstance(stmt, (_ast.Import, _ast.ImportFrom)):
+                    for name in _bound(stmt):
+                        if name in module_bound:
+                            bad.append(f"{path}:{stmt.lineno} 函数内重复导入 {name}")
+    assert not bad, "tests/ 里的死导入或重复局部导入：" + "; ".join(bad)
