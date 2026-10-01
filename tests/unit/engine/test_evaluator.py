@@ -48,7 +48,7 @@ def _make_repo(tmp: Path) -> Path:
                 "ignore": [],
             }
         )
-    )
+    , encoding="utf-8")
     (repo / "src" / "core").mkdir(parents=True)
     (repo / "docs" / "specs" / "core").mkdir(parents=True)
     return repo
@@ -69,16 +69,16 @@ class TestEvaluator(unittest.TestCase):
     def test_contract_drift_detected(self) -> None:
         (self.repo / "src/core/mod.py").write_text(
             "def foo(x: int) -> int:\n    return x\n"
-        )
+        , encoding="utf-8")
         (self.repo / "docs/specs/core/spec.md").write_text(
             SPEC.format(hash="sha256:" + "0" * 64)
-        )
+        , encoding="utf-8")
         _git(self.repo, "add", "-A")
         _git(self.repo, "commit", "-m", "init")
 
         (self.repo / "src/core/mod.py").write_text(
             "def foo(x: int, y: str) -> int:\n    return x\n"
-        )
+        , encoding="utf-8")
         report = ConsistencyEngine(self.repo).evaluate()
         self.assertFalse(report.passed)
         self.assertTrue(
@@ -107,15 +107,15 @@ class TestEvaluator(unittest.TestCase):
                     "ignore": [],
                 }
             )
-        )
-        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n")
+        , encoding="utf-8")
+        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n", encoding="utf-8")
         (self.repo / "tests/unit/core").mkdir(parents=True)
         (self.repo / "tests/unit/core/test_mod.py").write_text(
             "def test_fail():\n    assert False\n"
-        )
+        , encoding="utf-8")
         _git(self.repo, "add", "-A")
         _git(self.repo, "commit", "-m", "init")
-        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 2\n")
+        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 2\n", encoding="utf-8")
         report = ConsistencyEngine(self.repo).evaluate(run_tests=True)
         self.assertFalse(report.passed)
         self.assertTrue(
@@ -138,30 +138,30 @@ class TestEvaluator(unittest.TestCase):
                     "ignore": [],
                 }
             )
-        )
+        , encoding="utf-8")
         from k3dge.engine import contract
 
-        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n")
+        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n", encoding="utf-8")
         iface = contract.collect_domain_interface(self.repo / "src/core")
         h = contract.compute_hash(iface)
-        (self.repo / "docs/specs/core/spec.md").write_text(SPEC.format(hash=f"sha256:{h}"))
+        (self.repo / "docs/specs/core/spec.md").write_text(SPEC.format(hash=f"sha256:{h}"), encoding="utf-8")
         (self.repo / "tests/unit/core").mkdir(parents=True)
-        (self.repo / "tests/unit/core/test_mod.py").write_text("def test_ok():\n    assert True\n")
+        (self.repo / "tests/unit/core/test_mod.py").write_text("def test_ok():\n    assert True\n", encoding="utf-8")
         _git(self.repo, "add", "-A")
         _git(self.repo, "commit", "-m", "init")
-        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 99\n")
+        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 99\n", encoding="utf-8")
         report = ConsistencyEngine(self.repo).evaluate(run_tests=True)
         self.assertFalse(report.passed)
         self.assertTrue(any(v.rule_id == "MANIFEST_INVALID" for v in report.violations))
 
     def test_syntax_error_is_extract_failure(self) -> None:
-        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n")
+        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n", encoding="utf-8")
         (self.repo / "docs/specs/core/spec.md").write_text(
             SPEC.format(hash="sha256:" + "0" * 64)
-        )
+        , encoding="utf-8")
         _git(self.repo, "add", "-A")
         _git(self.repo, "commit", "-m", "init")
-        (self.repo / "src/core/broken.py").write_text("def bar( ->\n")
+        (self.repo / "src/core/broken.py").write_text("def bar( ->\n", encoding="utf-8")
         report = ConsistencyEngine(self.repo).evaluate()
         self.assertFalse(report.passed)
         self.assertTrue(
@@ -169,26 +169,26 @@ class TestEvaluator(unittest.TestCase):
         )
 
     def test_force_full_checks_untouched_domain(self) -> None:
-        data = json.loads((self.repo / ".agent" / "manifest.json").read_text())
+        data = json.loads((self.repo / ".agent" / "manifest.json").read_text(encoding="utf-8"))
         data["domains"]["other"] = {
             "src": "src/other",
             "spec": "docs/specs/other/spec.md",
         }
-        (self.repo / ".agent" / "manifest.json").write_text(json.dumps(data))
-        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n")
+        (self.repo / ".agent" / "manifest.json").write_text(json.dumps(data), encoding="utf-8")
+        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n", encoding="utf-8")
         (self.repo / "docs/specs/core/spec.md").write_text(
             SPEC.format(hash="sha256:" + "0" * 64)
-        )
+        , encoding="utf-8")
         (self.repo / "src/other").mkdir(parents=True)
         (self.repo / "docs/specs/other").mkdir(parents=True)
-        (self.repo / "src/other/mod.py").write_text("def bar() -> int:\n    return 1\n")
+        (self.repo / "src/other/mod.py").write_text("def bar() -> int:\n    return 1\n", encoding="utf-8")
         (self.repo / "docs/specs/other/spec.md").write_text(
             SPEC.replace("core", "other").format(hash="sha256:" + "0" * 64)
-        )
+        , encoding="utf-8")
         _git(self.repo, "add", "-A")
         _git(self.repo, "commit", "-m", "init")
         # touch only core
-        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 2\n")
+        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 2\n", encoding="utf-8")
         selective = ConsistencyEngine(self.repo).evaluate()
         full = ConsistencyEngine(self.repo).evaluate(force_full=True)
         self.assertIn("core", selective.modified_domains)
@@ -196,7 +196,7 @@ class TestEvaluator(unittest.TestCase):
         self.assertTrue(any(v.domain == "other" for v in full.violations))
 
     def test_non_utf8_spec_is_violation(self) -> None:
-        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n")
+        (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n", encoding="utf-8")
         (self.repo / "docs/specs/core/spec.md").write_bytes(b"\xff\xfe not utf-8")
         _git(self.repo, "add", "-A")
         _git(self.repo, "commit", "-m", "init")
@@ -231,7 +231,7 @@ class TestEvaluator(unittest.TestCase):
 
     def test_unregistered_domain_detected(self) -> None:
         (self.repo / "src" / "other").mkdir()
-        (self.repo / "src" / "other" / "mod.py").write_text("def f() -> None:\n    pass\n")
+        (self.repo / "src" / "other" / "mod.py").write_text("def f() -> None:\n    pass\n", encoding="utf-8")
         report = ConsistencyEngine(self.repo).evaluate()
         self.assertTrue(
             any(v.rule_id == "UNREGISTERED_DOMAIN" for v in report.violations)
@@ -240,9 +240,9 @@ class TestEvaluator(unittest.TestCase):
     def _make_workspace(self, depends_a_on_b: bool) -> Path:
         root = Path(tempfile.mkdtemp())
         (root / "src" / "k3dge" / "a").mkdir(parents=True)
-        (root / "src" / "k3dge" / "a" / "mod.py").write_text("from k3dge.b import x\n")
+        (root / "src" / "k3dge" / "a" / "mod.py").write_text("from k3dge.b import x\n", encoding="utf-8")
         (root / "src" / "k3dge" / "b").mkdir(parents=True)
-        (root / "src" / "k3dge" / "b" / "mod.py").write_text("x = 1\n")
+        (root / "src" / "k3dge" / "b" / "mod.py").write_text("x = 1\n", encoding="utf-8")
         (root / "docs" / "specs" / "a").mkdir(parents=True)
         spec = (
             "# Spec\n\n"
@@ -253,9 +253,9 @@ class TestEvaluator(unittest.TestCase):
             "| --- | --- | --- | --- | --- |\n"
             "| TC-01 | L1 | a | b | `tests/unit/a/test_a.py` |\n"
         )
-        (root / "docs" / "specs" / "a" / "spec.md").write_text(spec)
+        (root / "docs" / "specs" / "a" / "spec.md").write_text(spec, encoding="utf-8")
         (root / "tests" / "unit" / "a").mkdir(parents=True)
-        (root / "tests" / "unit" / "a" / "test_a.py").write_text("def test_a(): pass\n")
+        (root / "tests" / "unit" / "a" / "test_a.py").write_text("def test_a(): pass\n", encoding="utf-8")
         domains = {
             "a": {"src": "src/k3dge/a", "spec": "docs/specs/a/spec.md", "tests": "tests/unit/a"},
             "b": {"src": "src/k3dge/b", "spec": "docs/specs/a/spec.md", "tests": "tests/unit/a"},
@@ -264,7 +264,7 @@ class TestEvaluator(unittest.TestCase):
             domains["a"]["depends_on"] = ["b"]
         manifest = {"name": "t", "package_root": "src/k3dge", "domains": domains, "ignore": []}
         (root / ".agent").mkdir()
-        (root / ".agent" / "manifest.json").write_text(json.dumps(manifest))
+        (root / ".agent" / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         return root
 
     def test_domain_import_violation_detected(self) -> None:

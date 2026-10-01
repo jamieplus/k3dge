@@ -38,14 +38,14 @@ class TestGenerator(unittest.TestCase):
                         "ignore": [],
                     }
                 )
-            )
+            , encoding="utf-8")
             (root / "src" / "core").mkdir(parents=True)
             (root / "src" / "core" / "mod.py").write_text(
                 "def foo(x: int) -> int:\n    return x\n"
-            )
+            , encoding="utf-8")
             (root / "docs" / "specs" / "core").mkdir(parents=True)
             spec = root / "docs" / "specs" / "core" / "spec.md"
-            spec.write_text(SPEC)
+            spec.write_text(SPEC, encoding="utf-8")
 
             changed, docs_updated = sync_all(root)
             self.assertEqual(changed, ["core"])
@@ -54,13 +54,13 @@ class TestGenerator(unittest.TestCase):
             self.assertTrue((root / "docs/generated/api.md").exists())
             self.assertTrue((root / "docs/generated/domains.md").exists())
 
-            content = spec.read_text()
+            content = spec.read_text(encoding="utf-8")
             iface = contract.collect_domain_interface(root / "src" / "core")
             h = contract.compute_hash(iface)
             self.assertIn(f"sha256:{h}", content)
             self.assertNotIn("# mod.py", content)
             self.assertIn("foo(x: int) -> int", content)
-            api = (root / "docs/generated/api.md").read_text()
+            api = (root / "docs/generated/api.md").read_text(encoding="utf-8")
             self.assertIn("# mod.py", api)
 
     def test_render_readme_layout(self) -> None:
@@ -81,7 +81,7 @@ class TestGenerator(unittest.TestCase):
                         "ignore": [],
                     }
                 )
-            )
+            , encoding="utf-8")
             readme = root / "README.md"
             readme.write_text(
                 "# T\n\n## 布局\n\n<!-- k3dge:layout-start -->\nold content\n<!-- k3dge:layout-end -->\n",

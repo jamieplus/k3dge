@@ -6,9 +6,10 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
 
-#: 仍未收口的文件（债登记：这些文件里的裸读写数量只许降不许升）。
-#: 收口完成后删掉本表，让守卫变成零容忍。
-DEBT: dict[str, int] = {'tests/unit/engine/test_evaluator.py': 30, 'tests/unit/sync/test_generator.py': 6, 'tests/unit/templates/test_scaffold.py': 3}
+#: 债已清空 ⇒ **零容忍**：任何隐式编码的 read_text/write_text 都红。
+#: （2026-09-30：75 处全部收口，AST 定位调用自身右括号后插 encoding，含 `read_text()` 无参
+#: 与撞尾逗号两种形状。）
+DEBT: dict[str, int] = {}
 
 
 def _offenders(path: Path) -> list:

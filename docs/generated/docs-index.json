@@ -657,11 +657,11 @@
       "tokens": "拆 ConsistencyEngine：检查组各自成模块，只共享 workspace_root"
     },
     {
-      "path": "docs/tasks/2026-09-30-M12-refactor-tests_explicit_encoding.md",
+      "path": "docs/tasks/2026-09-30-M12-refactor-tests_explicit_encoding.done.md",
       "type": "tasks",
-      "id": "2026-09-30-M12-refactor-tests_explicit_encoding",
+      "id": "2026-09-30-M12-refactor-tests_explicit_encoding.done",
       "title": "测试面的显式编码：read_text/write_text 缺 encoding 的 271 处统一收口（连同一次性 helper）",
-      "status": "idea",
+      "status": "done",
       "tokens": "测试面的显式编码：read_text/write_text 缺 encoding 的 271 处统一收口（连同一次性 helper）"
     }
   ]

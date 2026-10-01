@@ -1,5 +1,5 @@
 ---
-status: idea
+status: done
 milestone: M12
 priority: P3
 date: 2026-09-30
@@ -44,4 +44,13 @@ date: 2026-09-30
 1. 一次性收口：`tests/**` 全部 `read_text()` / `write_text()` 补 `encoding="utf-8"`（**逐文件**改，多行调用要人工确认括号边界，不能一把 sed）。
 2. 若嫌 271 处重复：给测试侧一个 `tests/helpers.py::write_ws(path, text)` / `read_ws(path)` helper，夹具统一走它——但 helper 本身要配"不得裸 read_text"的反向机检，否则只是把约定换个地方漂。
 3. 反退化机检归 `k3dge check` 的 `test_pure_*` 同族守卫（AST 扫 `tests/**`，发现 `.read_text()/.write_text()` 无 `encoding` 关键字即 warn 档起步），别用散文叮嘱。
+
+## 结案
+
+- 落地：75 处全部收口（AST 定位每个调用**自身**的右括号后插 `encoding="utf-8"`；三种形状分别处理——
+  有参/无参 `read_text()`、前一行已是尾逗号的多行调用）。反向机检以**测试内棘轮**落地
+  （`tests/unit/templates/test_test_explicit_encoding.py`，DEBT 清空后为零容忍），没有新增 `check` 违规码：
+  这条只约束测试树，进硬闸会把"新增违规码需三件套"的规矩用在没有消费者的地方。
+- 验证：AST 复扫 `tests/**`＋`src/**` 隐式编码读写均为 **0**；`pytest -q` 922 passed, 2 skipped。
+- 有意不做：切入点 2 的 `tests/helpers.py` 包一层——helper 只是把同一约定挪个地方漂，零容忍守卫已经覆盖。
 

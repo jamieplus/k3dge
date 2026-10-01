@@ -88,7 +88,7 @@ class TestScaffold(unittest.TestCase):
         self.assertTrue((self.target / "docs" / "memo" / ".schema.json").is_file())
         self.assertTrue((self.target / "docs" / "branches" / ".schema.json").is_file())
 
-        manifest = json.loads((self.target / ".agent" / "manifest.json").read_text())
+        manifest = json.loads((self.target / ".agent" / "manifest.json").read_text(encoding="utf-8"))
         self.assertIn("domains", manifest)
         self.assertIn("project", manifest["domains"])
         self.assertTrue((self.target / "src" / "project" / "__init__.py").is_file())
@@ -134,9 +134,9 @@ class TestScaffold(unittest.TestCase):
     def test_idempotent(self) -> None:
         scaffold(self.target)
         agents = self.target / "AGENTS.md"
-        agents.write_text("custom")
+        agents.write_text("custom", encoding="utf-8")
         scaffold(self.target)
-        self.assertEqual(agents.read_text(), "custom")
+        self.assertEqual(agents.read_text(encoding="utf-8"), "custom")
 
     def test_empty_manifest_upgraded_to_first_domain(self) -> None:
         (self.target / ".agent").mkdir(parents=True)
