@@ -9,6 +9,7 @@ ENGINE = Path(__file__).resolve().parents[3] / "src" / "k3dge" / "engine"
 # Form-gate cluster: disk → Violation / hash. Must not pull writers or the facade.
 _GATE = frozenset({
     "evaluator.py",
+    "assert_tautology.py",
     "contract.py",
     "diff.py",
     "spec_schema.py",

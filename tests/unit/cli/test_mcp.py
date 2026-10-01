@@ -144,7 +144,9 @@ class TestMcp(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / "tests/unit/k").mkdir(parents=True)
-            (root / "tests/unit/k/test_foo.py").write_text("def test_foo():\n    assert True\n", encoding="utf-8")
+            (root / "tests/unit/k/test_foo.py").write_text(
+                "def test_foo():\n    assert 1 + 1 == 2\n", encoding="utf-8"
+            )
             (root / "docs" / "tasks").mkdir(parents=True)
             (root / "docs" / "tasks" / "2026-08-25-M9-audit-foo.md").write_text(
                 "# Foo\n- **Status**: done\n- **Milestone**: M9\n", encoding="utf-8"

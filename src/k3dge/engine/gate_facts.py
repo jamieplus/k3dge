@@ -496,6 +496,15 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "options": ["把矩阵行细化到真实存在的测试（文件::用例）", "补上缺的那个测试场景", "跨域引用是有意为之 → 标注清楚，别让它冒充本域验证面"],
         "pointers": ["docs/specs/<domain>/spec.md", "k3dge ADR-0001 §2"],
     },
+    "ASSERT_TAUTOLOGY": {
+        "fix": "judgment", "severity": "block",
+        "fact": "`{path}` 第 {line} 行的断言，真值已经写在表达式里——被测代码无论怎么改，这一行都过",
+        "options": [
+            "改成被测代码能让它失败的断言",
+            "这里没有可失败的检查 → 删掉这个测试",
+        ],
+        "pointers": ["tests/"],
+    },
     "CONTRACT_EXTRACT_FAILED": {
         "fix": "judgment", "severity": "block",
         "fact": "域 {domain} 的公有符号抽取失败（{reason}）——抽不出接口就算不出契约哈希",

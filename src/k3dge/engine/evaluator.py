@@ -9,7 +9,7 @@ import ast
 import json
 import re
 
-from k3dge.engine import contract, diff, spec_schema
+from k3dge.engine import assert_tautology, contract, diff, spec_schema
 from k3dge.engine.contract import _ExtractError
 from k3dge.engine.diff import GitError
 from k3dge.engine.manifest import Manifest, ManifestError
@@ -398,6 +398,8 @@ class ConsistencyEngine:
 
         violations.extend(self._check_state_doc_coverage())
 
+        violations.extend(self._check_assert_tautology(files, force_full))
+
         report = GateReport(
             passed=not violations,
             changed_files=tuple(files),
@@ -641,6 +643,14 @@ class ConsistencyEngine:
             if cls._logs_literal(target) and wr:
                 return "对 logs/ 的 open(...,'w') 覆写：审计痕迹只可追加（ADR-0008），改用 'a'。"
         return ""
+
+    def _check_assert_tautology(self, files, force_full: bool) -> List[Violation]:
+        """真值已写死的测试断言。全量扫 `tests/`；增量只扫本批里的测试路径。"""
+        if force_full:
+            rels = assert_tautology.test_files(self.workspace_root)
+        else:
+            rels = [str(p).replace("\\", "/") for p in files if assert_tautology.is_test_path(str(p))]
+        return assert_tautology.check(self.workspace_root, rels)
 
     def _check_docs(self, files, force_full: bool) -> List[Violation]:
         """docs 目录结构/索引校验（force_full 或本批触 docs 时）。"""

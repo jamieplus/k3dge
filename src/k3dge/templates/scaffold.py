@@ -309,7 +309,9 @@ def _ensure_first_domain(target: Path, name: str, today: str) -> list:
     _write_if_missing(target / "docs" / "specs" / name / "spec.md", spec)
     _write_if_missing(
         target / "tests" / "unit" / name / "test_smoke.py",
-        'def test_smoke() -> None:\n    assert True\n',
+        "def test_smoke() -> None:\n"
+        f"    import {name}\n"
+        f"    assert {name}.__version__\n",
     )
     return []
 

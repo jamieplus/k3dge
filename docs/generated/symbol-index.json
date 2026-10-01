@@ -377,6 +377,12 @@
       "line": 185
     }
   ],
+  "check": [
+    {
+      "file": "src/k3dge/engine/assert_tautology.py",
+      "line": 404
+    }
+  ],
   "check_adr_consistency": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
@@ -828,13 +834,13 @@
   "facts_of": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 655
+      "line": 664
     }
   ],
   "fill": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 601
+      "line": 610
     }
   ],
   "find_k3dit": [
@@ -882,7 +888,7 @@
   "fix_kind": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 579
+      "line": 588
     }
   ],
   "format_seal_trailers": [
@@ -1038,13 +1044,19 @@
   "is_declared": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 589
+      "line": 598
     }
   ],
   "is_screenable_new_doc": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
       "line": 429
+    }
+  ],
+  "is_test_path": [
+    {
+      "file": "src/k3dge/engine/assert_tautology.py",
+      "line": 43
     }
   ],
   "iter_doc_types": [
@@ -1238,7 +1250,7 @@
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 411
+      "line": 413
     }
   ],
   "managed_docs": [
@@ -1442,7 +1454,7 @@
   "projection": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 645
+      "line": 654
     }
   ],
   "prune": [
@@ -1532,7 +1544,7 @@
   "render": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 616
+      "line": 625
     }
   ],
   "render_checklist": [
@@ -1694,7 +1706,7 @@
   "scaffold": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 317
+      "line": 319
     }
   ],
   "scan": [
@@ -1713,6 +1725,12 @@
     {
       "file": "src/k3dge/engine/milestone_audit.py",
       "line": 25
+    }
+  ],
+  "scan_source": [
+    {
+      "file": "src/k3dge/engine/assert_tautology.py",
+      "line": 359
     }
   ],
   "scan_unfilled_guides": [
@@ -1790,7 +1808,7 @@
   "severity": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 594
+      "line": 603
     }
   ],
   "severity_tag": [
@@ -1899,6 +1917,12 @@
       "line": 89
     }
   ],
+  "test_files": [
+    {
+      "file": "src/k3dge/engine/assert_tautology.py",
+      "line": 386
+    }
+  ],
   "token": [
     {
       "file": "src/k3dge/engine/attest.py",
@@ -1999,6 +2023,12 @@
     {
       "file": "src/k3dge/engine/contract.py",
       "line": 430
+    }
+  ],
+  "violations_for": [
+    {
+      "file": "src/k3dge/engine/assert_tautology.py",
+      "line": 370
     }
   ],
   "where": [
