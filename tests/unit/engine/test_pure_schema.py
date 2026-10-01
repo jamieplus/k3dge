@@ -159,8 +159,6 @@ class TestLiteralVsRegex(unittest.TestCase):
         self.assertIn("2.1", got, "末条无尾换行被整条丢弃 ⇒ 退役/拆分判据静默失效")
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 _CHILD_BAD = """
@@ -212,3 +210,7 @@ def test_purity_guard_raises_even_under_optimized_mode(tmp_path) -> None:
         assert rc == 0 and "RAISED" in out, (flags, out, err[-300:])
         rc2, out2, err2 = _run_optimized(tmp_path, flags, _CHILD_GOOD, bad, good)
         assert rc2 == 0 and "OK" in out2, (flags, out2, err2[-300:])
+
+
+if __name__ == "__main__":
+    unittest.main()
