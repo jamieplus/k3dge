@@ -17,7 +17,7 @@ def test_task_fsm_is_complete() -> None:
 def test_resolve_is_table_driven() -> None:
     assert sm.resolve(S.IDEA, M.START) == S.IN_PROGRESS
     assert sm.resolve(S.IN_PROGRESS, M.FINISH) == S.DONE
-    assert sm.resolve(S.DONE, M.START) is None  # 终态：
+    assert sm.resolve(S.DONE, M.START) is None  # 终态没有出边 ⇒ resolve 返回 None（DONE 行不在表里）
     assert sm.resolve(S.IDEA, M.DEFER) == S.DEFERRED
 
 

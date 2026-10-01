@@ -189,6 +189,7 @@ class TestInitEntrypoints(unittest.TestCase):
 
     def test_load_doc_gate_prefers_installed_k3dge(self) -> None:
         """自举兜底不得遮蔽已装那份（367）。"""
+        import importlib.machinery     # 不能靠 importlib.util 顺带把 machinery 挂上（CPython 实现细节，t-324）
         import importlib.util
 
         ws = Path(tempfile.mkdtemp())

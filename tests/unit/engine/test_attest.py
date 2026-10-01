@@ -53,8 +53,12 @@ def test_line_replayed_onto_other_commit_is_refused():
     assert not ok
     assert "timestamp mismatch" in out
 def test_attestation_stays_inside_existing_trailer_block() -> None:
+    """另起一段会把封版四键挤成倒数第二段 ⇒ `%(trailers)` 只读回署名（ocr-308）。
+
+    （原来这行串落在 `ws = _repo()` **之后** ⇒ 只是被丢弃的表达式语句，不是 docstring：
+    `__doc__` 为 None，`pytest -vv`/collect-only 里看不到本测的意图。t-071）
+    """
     ws = _repo()
-    """另起一段会把封版四键挤成倒数第二段 ⇒ `%(trailers)` 只读回署名（ocr-308）。"""
     msg = ("chore: seal\n\n"
            "Seal-milestone: M11\nAudit-baseline: a7259c2\nAudit-seat: k3dit\nAudit-result: closed")
     out = append_to_message(ws, msg, who="k3dge-process")

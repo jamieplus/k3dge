@@ -84,13 +84,14 @@ class TestGenerator(unittest.TestCase):
             )
             readme = root / "README.md"
             readme.write_text(
-                "# T\n\n## 布局\n\n<!-- k3dge:layout-start -->\nold content\n<!-- k3dge:layout-end -->\n"
+                "# T\n\n## 布局\n\n<!-- k3dge:layout-start -->\nold content\n<!-- k3dge:layout-end -->\n",
+                encoding="utf-8",       # 夹具含非 ASCII（"布局"）：不写 encoding 就随 locale 崩/串码（t-303）
             )
 
             manifest = Manifest.load(root)
             result = render_readme_layout(root, manifest)
             self.assertEqual(result, readme)
-            content = readme.read_text()
+            content = readme.read_text(encoding="utf-8")
             self.assertIn("| core | `src/core` | `docs/specs/core/spec.md` | 核心模块 |", content)
             self.assertNotIn("old content", content)
 
