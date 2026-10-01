@@ -131,7 +131,7 @@ class TestIndexUnavailableAndFallback(unittest.TestCase):
 
     def test_corrupt_index_raises_instead_of_no_symbol(self) -> None:
         from k3dge.engine.search import (
-            IndexUnavailable, _is_stale_cheaply, index_meta_path, index_path, where,
+            IndexUnavailable, _is_stale_cheaply, index_meta_path, index_path,
             write_symbol_index,
         )
 

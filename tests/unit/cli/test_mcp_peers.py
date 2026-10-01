@@ -21,7 +21,6 @@ def test_peer_fallback_warn_prints_once_plain_in_non_tty() -> None:
 def test_probe_distinguishes_missing_corrupt_and_empty(tmp_path) -> None:
     """缺失/坏文件/真的没声明 是三种事实，旧都报同一句话（386）。"""
     import argparse
-    import json
 
     from k3dge.cli.mcp_peers import cmd_mcp_probe
 

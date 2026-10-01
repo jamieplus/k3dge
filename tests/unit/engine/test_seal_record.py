@@ -147,7 +147,6 @@ class TestTrailerSanitization(TestCase):
     """外部取来的值不得破坏 trailer 块（ocr-306/307）。"""
 
     def test_newline_and_colon_in_values_keep_four_keys(self) -> None:
-        from k3dge.engine.seal import _same_commit  # noqa: F401  (同测试类下的相邻判据)
 
         block = format_seal_trailers(
             "M11", "a7259c26", "k3dit\nAudit-extra: injected", "closed: with colon")

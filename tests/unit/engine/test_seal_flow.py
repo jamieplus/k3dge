@@ -12,7 +12,6 @@ from k3dge.engine import audit_checklist as ac
 from k3dge.engine.align import run_milestone_alignment
 from k3dge.engine.audit_report import _find_audit_report, _parse_audit_stats
 from k3dge.engine.milestone_audit import (
-    _audit_mode,
     _ensure_leftovers,
     persist_external_audit_report,
     run_audit_flow,

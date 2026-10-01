@@ -287,11 +287,10 @@ def test_shipped_schema_codes_are_declared() -> None:
     未声明码走 `doc_gate._add` 的兜底分支 ⇒ 只输出 `[CODE] 原始消息`，
     拿不到 fact/options/pointers——同一不变量在别处有声明码就是两套回执面。
     """
-    from pathlib import Path as _P
 
     from k3dge.engine.gate_facts import GATE_FACTS, is_declared
 
-    repo = _P(__file__).resolve().parents[3]
+    repo = Path(__file__).resolve().parents[3]
     undeclared = []
     for f in sorted((repo / "docs").glob("*/.schema.json")):
         codes = (json.loads(f.read_text(encoding="utf-8")).get("codes") or {})
