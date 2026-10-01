@@ -7,10 +7,13 @@ import tempfile
 from pathlib import Path
 
 from k3dge.engine.task_index import list_tasks, scan_milestone_tasks, work_pending
+import shutil
+import atexit
 
 
 def _ws() -> Path:
     root = Path(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, root, True)
     (root / "docs" / "tasks").mkdir(parents=True)
     return root
 
@@ -55,6 +58,7 @@ def test_empty_frontmatter_block_does_not_fall_back_to_body() -> None:
     """`---` 空块 ≠ 没有块：正文一行 `- **Status**: done` 不得冒充元数据（ocr-331）。"""
 
     ws = Path(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, ws, True)
     d = ws / "docs" / "tasks"
     d.mkdir(parents=True)
     (d / "2026-09-01-M9-feat-a.md").write_text("---\n---\n\n# A\n\n- **Status**: done\n",

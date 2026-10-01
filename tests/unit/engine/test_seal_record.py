@@ -21,6 +21,8 @@ from k3dge.engine.seal import (
     seal_record,
     tag_audit_baseline,
 )
+import shutil
+import atexit
 
 
 def _git(ws: Path, *args: str) -> str:
@@ -38,6 +40,7 @@ def _repo() -> Path:
     import os
 
     root = Path(tempfile.mkdtemp()).resolve()
+    atexit.register(shutil.rmtree, root, True)
     os.environ["GIT_CEILING_DIRECTORIES"] = str(root.parent)
     ws = root
     _git(ws, "init", "-q")
@@ -138,6 +141,7 @@ class TestTagBoundary(TestCase):
 
     def test_record_fails_when_not_a_repo(self) -> None:
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         ok, msg = seal_record(ws, "M10", baseline="abc1234", result="closed")
         self.assertFalse(ok)
         self.assertIn("git", msg.lower())
@@ -224,6 +228,7 @@ class TestGuideStubScanIgnoresMentions(unittest.TestCase):
     def _ws(self, body: str) -> Path:
 
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / "docs" / "guides").mkdir(parents=True)
         (ws / "docs" / "guides" / "g.md").write_text(body, encoding="utf-8")
         return ws

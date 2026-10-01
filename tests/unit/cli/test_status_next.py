@@ -9,6 +9,8 @@ from unittest import mock
 import pytest
 
 from k3dge.cli import status as st
+import shutil
+import atexit
 
 
 @pytest.fixture()
@@ -50,6 +52,7 @@ def test_seal_ready_for_reuses_precomputed_scans() -> None:
     from k3dge.engine import nextstep
 
     root = Path(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, root, True)
     (root / ".agent").mkdir()
     with mock.patch("k3dge.engine.seal.unmet_seal_preconditions") as unmet, \
             mock.patch("k3dge.engine.task_index.scan_milestone_tasks") as tasks:

@@ -6,6 +6,8 @@ from pathlib import Path
 from unittest import TestCase, mock
 
 from k3dge.engine import audit_trigger, gates, nextstep
+import shutil
+import atexit
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -168,11 +170,13 @@ class TestDecisionSingleSource(TestCase):
 class TestPersistedProjection(TestCase):
     def test_roundtrip(self) -> None:
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         nextstep.persist(ws, nextstep.NextStep.from_state("audit_open", "M7"))
         self.assertEqual(nextstep.load_persisted(ws)["state"], "audit_open")
 
     def test_missing_or_corrupt_is_none(self) -> None:
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         self.assertIsNone(nextstep.load_persisted(ws))
         p = ws / ".k3dge" / "next.json"
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -193,6 +197,7 @@ class TestPersistedProjection(TestCase):
 
 def _base_ws(mid="M7"):
     ws = Path(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, ws, True)
     (ws / ".agent").mkdir()
     (ws / ".agent" / "manifest.json").write_text(
         '{"package_root":"src","domains":{"engine":{"src":"src/k3dge/engine"}}}', encoding="utf-8"
@@ -476,6 +481,7 @@ class TestSealReadyStatesItsBlockers(TestCase):
         """空仓里大部分形式闸都"过"（无 guides/无 ADR 就是没有偏差）；要隔离"未过闸被列出"
         就得放一个**真会失败**的事实：一张未 done 的 M10 票（`tasks_all_done` 会拒）。"""
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / ".agent").mkdir(parents=True)
         body = ", ".join(f'"{p}"' for p in preconditions)
         (ws / ".agent" / "pipeline.toml").write_text(
@@ -576,6 +582,7 @@ class TestSidecarAndRejectionShape(TestCase):
 
     def test_emit_all_upserts_instead_of_overwriting(self) -> None:
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         nextstep.emit(ws, nextstep.NextStep.from_state("doc_fix", "M7"))
         nextstep.emit_all(ws, [nextstep.NextStep.from_state("seal_ready", "M7")])
         states = [c.get("state") for c in (nextstep.load_all(ws) or [])]

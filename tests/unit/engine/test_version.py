@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from k3dge.engine import version
+import shutil
 
 
 def _write_pyproject(ws: Path, ver: str) -> None:
@@ -132,6 +133,7 @@ class TestVersionParsing(unittest.TestCase):
 
     def _ws(self, pyproject: str, manifest: str | None = "{\"version\": \"0.1.0\"}") -> Path:
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / "pyproject.toml").write_text(pyproject, encoding="utf-8")
         if manifest is not None:
             (ws / ".agent").mkdir()

@@ -9,10 +9,13 @@ from pathlib import Path
 from unittest import TestCase
 
 from k3dge.engine.changelog import build_notes_from_range, mechanical_commit
+import shutil
+import atexit
 
 
 def _repo() -> Path:
     ws = Path(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, ws, True)
     subprocess.run(["git", "init", "-q"], cwd=ws, capture_output=True)
     return ws
 
@@ -113,6 +116,7 @@ class TestNoDoubleWrite(TestCase):
         from k3dge.engine.task_write import mark_task_done
 
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / "docs" / "tasks").mkdir(parents=True)
         changelog = ws / "CHANGELOG.md"
         changelog.write_text("# Changelog\n\n## [Unreleased]\n\n## [1.0.0] - 2026-01-01\n",

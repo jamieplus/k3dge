@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from k3dge.engine import pure_refs
+import shutil
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -328,6 +329,7 @@ class TestPointerAndClosureShape(unittest.TestCase):
     def _ws_with_report(self, report: str) -> Path:
 
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / "docs" / "reviews").mkdir(parents=True)
         (ws / "docs" / "reviews" / "r.md").write_text("# r\n", encoding="utf-8")
         self._report = report
@@ -354,9 +356,12 @@ class TestPointerAndClosureShape(unittest.TestCase):
     def test_screen_ack_target_must_be_in_repo(self) -> None:
 
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / "docs").mkdir()
         (ws / "docs" / "a.md").write_text("x", encoding="utf-8")
-        outside = Path(tempfile.mkdtemp()) / "elsewhere.md"
+        outside_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, outside_dir, ignore_errors=True)
+        outside = outside_dir / "elsewhere.md"
         outside.write_text("x", encoding="utf-8")
         self.assertTrue(pure_refs.screen_target_exists(ws, "docs/a.md"))
         self.assertFalse(pure_refs.screen_target_exists(ws, str(outside)))
@@ -367,6 +372,7 @@ class TestPointerAndClosureShape(unittest.TestCase):
         import io
 
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         led = ws / "docs" / "adr" / "obsolete"
         led.mkdir(parents=True)
         (led / "README.md").write_text(

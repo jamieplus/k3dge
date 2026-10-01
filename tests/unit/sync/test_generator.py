@@ -6,6 +6,8 @@ from pathlib import Path
 from k3dge.engine import contract
 from k3dge.engine.manifest import Manifest
 from k3dge.sync.generator import render_readme_layout, sync_all
+import shutil
+import atexit
 
 SPEC = """# Domain Specification: core
 - **Status**: Active
@@ -108,6 +110,7 @@ def test_unreadable_spec_warns_instead_of_silent_skip() -> None:
     from k3dge.sync.generator import sync_domain
 
     ws = Path(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, ws, True)
     (ws / ".agent").mkdir()
     (ws / ".agent" / "manifest.json").write_text(
         json.dumps({"package_root": "src", "domains": {
@@ -131,6 +134,7 @@ def test_atomic_write_does_not_truncate_target_on_failure() -> None:
     from k3dge.engine.atomic import atomic_write_text
 
     ws = Path(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, ws, True)
     target = ws / "spec.md"
     target.write_text("原文\n", encoding="utf-8")
 

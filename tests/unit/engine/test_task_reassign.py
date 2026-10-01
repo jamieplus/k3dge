@@ -11,10 +11,13 @@ from k3dge.engine.task_write import (
     reassign_task_milestone,
     split_task_name,
 )
+import shutil
+import atexit
 
 
 def _ws() -> Path:
     ws = Path(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, ws, True)
     (ws / "docs" / "tasks").mkdir(parents=True)
     (ws / ".agent").mkdir()
     (ws / ".agent" / "milestone").write_text("M10\n", encoding="utf-8")
@@ -121,6 +124,7 @@ class TestBoundaryNudge(TestCase):
         import subprocess
 
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / "docs" / "tasks").mkdir(parents=True)
         (ws / ".agent").mkdir()
         (ws / ".agent" / "milestone").write_text("M10\n", encoding="utf-8")
@@ -171,6 +175,7 @@ class TestBoundaryNudge(TestCase):
         from unittest import mock
 
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         d = ws / "docs" / "tasks"
         d.mkdir(parents=True)
         (d / "2026-09-01-M10-feat-a.md").write_text(

@@ -796,7 +796,10 @@ def test_cli_command_quotes_substituted_values():
 
 
 def test_dry_run_worktree_failure_cleans_tempdir(tmp_path, monkeypatch) -> None:
-    """`worktree add` 失败的早退发生在 try/finally 之前 ⇒ mkdtemp 的目录永久残留（395）。"""
+    """`worktree add` 失败的早退发生在 try/finally 之前 ⇒ mkdtemp 的目录永久残留（395）。
+
+    hygiene:keep-no-cleanup —— 本测断言的是**被测代码**清干净了，测试件故意不注册句柄。
+    """
     import tempfile as _tf
 
 

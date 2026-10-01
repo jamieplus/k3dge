@@ -74,3 +74,40 @@ def test_no_dead_or_duplicate_imports_in_tests() -> None:
                         if name in module_bound:
                             bad.append(f"{path}:{stmt.lineno} 函数内重复导入 {name}")
     assert not bad, "tests/ 里的死导入或重复局部导入：" + "; ".join(bad)
+
+
+def test_every_mkdtemp_site_has_a_cleanup_handle() -> None:
+    """`tempfile.mkdtemp()` 的每个站点，所在函数里必须有清理句柄（rmtree/addCleanup/atexit）。
+
+    裸 mkdtemp 的临时目录活到进程结束，CI 上就是磁盘泄漏。
+    """
+    import ast as _ast
+
+    offenders: list[str] = []
+    for path in sorted((REPO / "tests").rglob("*.py")):
+        src = path.read_text(encoding="utf-8")
+        if "mkdtemp" not in src:
+            continue
+        tree = _ast.parse(src)
+        parent: dict = {}
+        for node in _ast.walk(tree):
+            for child in _ast.iter_child_nodes(node):
+                parent[child] = node
+        sites = [
+            n for n in _ast.walk(tree)
+            if isinstance(n, _ast.Call) and isinstance(n.func, _ast.Attribute) and n.func.attr == "mkdtemp"
+        ]
+        for site in sites:
+            chain = []
+            node = site
+            while node is not None:
+                if isinstance(node, _ast.FunctionDef):
+                    chain.append(node)
+                node = parent.get(node)
+            bodies = [_ast.get_source_segment(src, fn) or "" for fn in chain]
+            if any(any(h in b for h in ("addCleanup", "rmtree", "atexit")) or "hygiene:keep-no-cleanup" in b
+                   for b in bodies):
+                continue
+            where = chain[0] if chain else None
+            offenders.append(f"{path}:{site.lineno} {where.name if where else '<module>'}")
+    assert not offenders, "裸 mkdtemp（无清理句柄）的函数：" + "; ".join(offenders)

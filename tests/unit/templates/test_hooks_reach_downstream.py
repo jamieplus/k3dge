@@ -16,6 +16,7 @@ import unittest
 from pathlib import Path
 
 from k3dge.templates.scaffold import scaffold
+import shutil
 
 K3DGE_SRC = Path(__file__).resolve().parents[3] / "src"
 
@@ -153,6 +154,7 @@ class TestInitEntrypoints(unittest.TestCase):
 
     def test_wrapper_refuses_foreign_init_sh(self) -> None:
         (root := Path(tempfile.mkdtemp()))
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
         (root / "scripts").mkdir()
         (root / "scripts" / "init.sh").write_text("#!/usr/bin/env bash\necho 外来脚本\n", encoding="utf-8")
         w = self._wrapper(root)
@@ -163,6 +165,7 @@ class TestInitEntrypoints(unittest.TestCase):
 
     def test_wrapper_rejects_positional_args_with_the_right_hint(self) -> None:
         root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
         (root / "scripts").mkdir()
         (root / "scripts" / "init.sh").write_text(
             "#!/usr/bin/env bash\n# k3dge init\ntrue\n", encoding="utf-8")
@@ -192,6 +195,7 @@ class TestInitEntrypoints(unittest.TestCase):
         import importlib.util
 
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / "src" / "k3dge" / "engine").mkdir(parents=True)
         (ws / "src" / "k3dge" / "engine" / "__init__.py").write_text("", encoding="utf-8")
         spec = importlib.util.spec_from_loader(

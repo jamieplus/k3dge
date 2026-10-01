@@ -10,6 +10,7 @@ from pathlib import Path
 import json
 
 from k3dge.engine import doc_fix, gate_facts
+import shutil
 
 
 def _ws(d: Path) -> Path:
@@ -59,6 +60,7 @@ class TestRuleSetConsistency(unittest.TestCase):
 class TestApplyRules(unittest.TestCase):
     def _scan_and_fix(self, rel: str, body: str, **kw) -> tuple:
         d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
         _ws(d)
         p = d / rel
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -104,6 +106,7 @@ class TestApplyRules(unittest.TestCase):
 
     def test_dry_run_writes_nothing(self):
         d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
         _ws(d)
         p = d / "docs" / "memo" / "a.md"
         p.write_text("# t\n\n正文   \n", encoding="utf-8")
@@ -121,6 +124,7 @@ class TestApplyRules(unittest.TestCase):
 class TestScope(unittest.TestCase):
     def test_skips_aux_archive_generated_obsolete(self):
         d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
         _ws(d)
         for rel in ("docs/memo/README.md", "docs/memo/archive/old.md",
                     "docs/generated/api.md", "docs/adr/obsolete/0001-x.md"):
@@ -135,6 +139,7 @@ class TestNextHint(unittest.TestCase):
 
     def _ws_with_deviation(self) -> Path:
         d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
         (d / ".agent").mkdir(parents=True)
         (d / ".agent" / "manifest.json").write_text('{"package_root":"src","domains":{}}', encoding="utf-8")
         (d / ".agent" / "milestone").write_text("M10\n", encoding="utf-8")

@@ -5,9 +5,12 @@ import tempfile
 
 from k3dge.engine import markers as K
 from k3dge.engine.milestone_audit import scan_pending_findings
+import shutil
+import atexit
 
 def _ws(files: dict) -> pathlib.Path:
     root = pathlib.Path(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, root, True)
     for rel, body in files.items():
         f = root / rel
         f.parent.mkdir(parents=True, exist_ok=True)

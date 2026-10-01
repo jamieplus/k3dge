@@ -7,6 +7,8 @@ import tempfile
 from pathlib import Path
 
 from k3dge.engine import gates
+import shutil
+import atexit
 
 
 def _ws(d, body=None):
@@ -93,7 +95,9 @@ def test_repo_declares_the_same_values_as_defaults():
     """
     repo = Path(__file__).resolve().parents[3]
     declared = {k: v for k, v in gates.load(repo).items() if k != "nodes"}
-    fresh = {k: v for k, v in gates.load(Path(tempfile.mkdtemp())).items() if k != "nodes"}
+    fresh_ws = Path(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, fresh_ws, True)
+    fresh = {k: v for k, v in gates.load(fresh_ws).items() if k != "nodes"}
     # `[nodes.*]` 覆盖的是 nodes.NODE_DEFAULTS（另一张表）⇒ 由 test_nodes 的自举断言管，不在此比
     assert declared == fresh, {
         k: (declared.get(k), fresh.get(k)) for k in set(declared) | set(fresh)

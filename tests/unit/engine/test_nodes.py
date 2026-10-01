@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 
 from k3dge.engine import gates, nodes
+import shutil
 
 
 def _ws(d: Path) -> Path:
@@ -51,6 +52,7 @@ class TestRunPhase(unittest.TestCase):
 
     def _ws_with(self, body: str) -> Path:
         d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
         _ws(d)
         (d / ".agent" / "pipeline.toml").write_text(body, encoding="utf-8")
         return d
@@ -138,6 +140,7 @@ class TestSatisfiesAndRejectionShape(unittest.TestCase):
 
     def _ws_with(self, body: str) -> Path:
         ws = _ws(Path(tempfile.mkdtemp()))
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / ".agent" / "pipeline.toml").write_text(body, encoding="utf-8")
         return ws
 

@@ -26,6 +26,8 @@ from k3dge.engine.pipeline_runner import (
     resolve_action,
     run_action,
 )
+import shutil
+import atexit
 
 #: 真透镜（mcp/cli）跑通：审计结果 `closed`（ADR-0004 §2.1.11）。
 _OK_MCP = TransportResult(True, "mcp", "ok")
@@ -56,6 +58,7 @@ def _mk_task(ws, mid="M1"):
 
 def _ws() -> Path:
     d = Path(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, d, True)
     (d / ".agent").mkdir()
     (d / ".agent" / "milestone").write_text("M1\n", encoding="utf-8")
     (d / "docs" / "reviews").mkdir(parents=True)
@@ -286,6 +289,7 @@ class TestSealFlow(TestCase):
         from k3dge.engine.seal_flow import _milestone_already_sealed
 
         root = Path(_tf.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
         for cmd in (["init", "-q", "-b", "main"], ["config", "user.email", "t@t"], ["config", "user.name", "t"]):
             subprocess.run(["git", "-C", str(root), *cmd], check=True, capture_output=True)
         (root / "a.txt").write_text("x", encoding="utf-8")
@@ -850,6 +854,7 @@ class TestSealFlowEdges(TestCase):
 
     def _ws(self) -> Path:
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / ".agent").mkdir()
         (ws / "docs" / "reviews").mkdir(parents=True)
         return ws

@@ -1,5 +1,7 @@
 """value-2：12 列报告单一解析器。"""
 from k3dge.engine import report_table as rt
+import shutil
+import atexit
 
 _TBL = """# 报告
 | ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |
@@ -74,6 +76,7 @@ def test_external_scan_report_is_not_the_audit_report() -> None:
     assert _report_kind("2026-09-29-M11-k3dit-bundle-audit.md", "") == "audit"
 
     ws = _P(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, ws, True)
     (ws / "docs" / "reviews").mkdir(parents=True)
     tbl = _TBL
     (ws / "docs" / "reviews" / "2026-09-29-M11-k3dit-bundle-audit.md").write_text(

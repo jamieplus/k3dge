@@ -8,6 +8,7 @@ from pathlib import Path
 
 from k3dge.cli.main import build_parser, main
 from k3dge.engine.evaluator import ConsistencyEngine
+import shutil
 
 
 class TestEvidenceAndPorcelain(unittest.TestCase):
@@ -18,6 +19,7 @@ class TestEvidenceAndPorcelain(unittest.TestCase):
         from k3dge.cli.main import _append_log
 
         ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / "logs").mkdir()
         (ws / "logs" / "k3dge.log").write_text("", encoding="utf-8")
         (ws / "logs" / "k3dge.log").chmod(0o000)

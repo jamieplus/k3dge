@@ -10,6 +10,8 @@ from k3dge.engine.align import (
 from k3dge.engine.seal import seal_milestone, seal_preconditions_error
 from k3dge.engine.task_index import list_tasks, scan_milestone_tasks
 from k3dge.engine.task_write import create_task, mark_task_done
+import shutil
+import atexit
 
 
 def _write_task(path: pathlib.Path, status: str, milestone: str) -> None:
@@ -298,7 +300,9 @@ class TestMilestone(unittest.TestCase):
 
         banned = {"audit_closed", "evidence_chain", "audit_fresh"}
         repo = pathlib.Path(__file__).resolve().parents[3]
-        for ws in (pathlib.Path(tempfile.mkdtemp()), repo):
+        scratch = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, scratch, ignore_errors=True)
+        for ws in (scratch, repo):
             declared = gates.DEFAULTS if ws != repo else gates.load(ws)
             for kind, unit in (declared.get("checks") or {}).items():
                 hit = banned & set(unit.get("preconditions") or [])
@@ -422,6 +426,7 @@ def test_report_pointer_outside_workspace_is_ignored() -> None:
     from k3dge.engine.task_write import _report_open_findings
 
     ws = _P(_tf.mkdtemp())
+    atexit.register(shutil.rmtree, ws, True)
     outside = ws.parent / "leak.md"
     outside.write_text("# x\n\n| ID | 状态 |\n| A-1 | 待修 |\n", encoding="utf-8")
     buf = io.StringIO()
@@ -452,6 +457,7 @@ class TestDocsNormalizedGate(unittest.TestCase):
 
     def setUp(self) -> None:
         self.ws = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
         (self.ws / ".agent").mkdir(parents=True, exist_ok=True)
         (self.ws / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
         (self.ws / "docs" / "reviews").mkdir(parents=True, exist_ok=True)
@@ -496,6 +502,7 @@ class TestSealChecklist(unittest.TestCase):
 
     def setUp(self) -> None:
         self.ws = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
         (self.ws / ".agent").mkdir(parents=True, exist_ok=True)
         (self.ws / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
         (self.ws / "docs" / "reviews").mkdir(parents=True, exist_ok=True)

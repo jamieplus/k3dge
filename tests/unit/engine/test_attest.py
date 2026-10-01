@@ -5,10 +5,13 @@ import tempfile
 from pathlib import Path
 
 from k3dge.engine.attest import PREFIX, append_to_message, verify_commit
+import shutil
+import atexit
 
 
 def _repo() -> Path:
     ws = Path(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, ws, True)
     subprocess.run(["git", "init", "-q"], cwd=ws, check=True, capture_output=True)
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
                     "commit", "-q", "--allow-empty", "--no-verify", "-m", "chore: init"],

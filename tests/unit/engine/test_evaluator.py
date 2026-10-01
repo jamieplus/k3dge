@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from k3dge.engine.evaluator import ConsistencyEngine
+import shutil
 
 SPEC = """# Domain Specification: core
 - **Status**: Active
@@ -239,6 +240,7 @@ class TestEvaluator(unittest.TestCase):
 
     def _make_workspace(self, depends_a_on_b: bool) -> Path:
         root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
         (root / "src" / "k3dge" / "a").mkdir(parents=True)
         (root / "src" / "k3dge" / "a" / "mod.py").write_text("from k3dge.b import x\n", encoding="utf-8")
         (root / "src" / "k3dge" / "b").mkdir(parents=True)
