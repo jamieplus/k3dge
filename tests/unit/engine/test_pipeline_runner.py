@@ -133,8 +133,9 @@ class DowngradeIsLoud(unittest.TestCase):
             self.assertIn("PRE-EXISTING LINE", logged)  # the trail is appended, not overwritten
             self.assertIn("WARN[DOWNGRADE]", logged)
             self.assertTrue(res.ok)  # manual is a legal landing spot
-            self.assertEqual(res.downgrades, [r for r in res.downgrades])
-            self.assertTrue(len(res.downgrades) >= 1)
+            self.assertEqual(len(res.downgrades), 1)        # mcp 失败降级一次，不重复记
+            self.assertIn("mcp", res.downgrades[0])
+            self.assertIn("manual", res.downgrades[0])
 
     def test_skip_is_recorded(self) -> None:
         pipe = """
