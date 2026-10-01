@@ -8,7 +8,6 @@
 - `dummy_collect` → {ok, kind:"report", payload:{report_markdown}} 或 NOT_FOUND
 - 报告里「待修」行数由环境变量 `DUMMY_PENDING`（默认 0）控制 —— 用来测开环/闭环两态。
 """
-from __future__ import annotations
 
 import datetime
 import json

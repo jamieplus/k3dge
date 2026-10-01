@@ -1,5 +1,4 @@
 """cache 角色的第一消费者：doc-audit 相关文档前路由（service 语义，不进判定）。"""
-from __future__ import annotations
 
 import json
 import pathlib

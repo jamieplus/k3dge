@@ -4,7 +4,6 @@
 左数索引（含 `状态`）全部落进描述文本 —— 回填会写错列，统计会少算待修。
 单元格内的竖线一律写全角 `｜`，本守卫保证这条约定不被悄悄破坏。
 """
-from __future__ import annotations
 
 import re
 from pathlib import Path

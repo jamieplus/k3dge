@@ -1,5 +1,4 @@
 """`Prompt.ask` 的两条边界：`countdown=0` 是有效值、读输入失败不得当作确认（ocr-289/290）。"""
-from __future__ import annotations
 
 import io
 import unittest

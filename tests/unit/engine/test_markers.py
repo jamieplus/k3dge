@@ -1,9 +1,7 @@
 """标记语法 v1：解析/scope 校验/边车/单主锚/结项判据/scan 兼容。"""
-from __future__ import annotations
 
 import pathlib
 import tempfile
-from tempfile import TemporaryDirectory
 
 from k3dge.engine import markers as K
 from k3dge.engine.milestone_audit import scan_pending_findings

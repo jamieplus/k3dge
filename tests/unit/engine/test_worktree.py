@@ -1,5 +1,4 @@
 """⑦ 进程件：ensure 幂等 / present 抽取 / advance 提交 / 非 ff 拒绝。"""
-from __future__ import annotations
 
 import subprocess
 from pathlib import Path
@@ -68,7 +67,6 @@ def test_non_ff_rejected(tmp_path):
 
 
 def _commit_on_branch(ws, path, content):
-    import subprocess
     wt = W.worktree_path(ws, "J1")
     (wt / path).parent.mkdir(parents=True, exist_ok=True)
     (wt / path).write_text(content, encoding="utf-8")
@@ -84,7 +82,6 @@ def test_merge_back_ff_and_conflict(tmp_path):
     assert (ws / "extra.py").exists()                          # 修的东西回到主干
     # 冲突：双方修改共同祖先里同一文件（真 merge 冲突路径）
     (ws / "clash.py").write_text("main = 1\n", encoding="utf-8")
-    import subprocess
     subprocess.run(["git", "add", "-A"], cwd=ws, check=True, capture_output=True)
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "main side"],
                    cwd=ws, check=True, capture_output=True)
@@ -189,7 +186,6 @@ def test_merge_back_strips_before_ff(tmp_path):
 
 
 def test_present_reattaches_branch(tmp_path):
-    import subprocess
 
     ws = _repo(tmp_path)
     wt = W.ensure(ws, "J9")
@@ -201,7 +197,6 @@ def test_present_reattaches_branch(tmp_path):
 
 
 def test_merge_back_after_detached_present(tmp_path):
-    import subprocess
 
     ws = _repo(tmp_path)
     wt = W.ensure(ws, "J9")

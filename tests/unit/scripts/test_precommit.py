@@ -1,5 +1,4 @@
 """pre-commit 三层闸的接线测试（2026-09-21 起实现归 `k3dge.engine.doc_gate`，脚本只是薄壳）。"""
-import sys
 import unittest
 from pathlib import Path
 

@@ -4,7 +4,6 @@
 非空），不存在不卡流程。故本文件只测 `_field`/`_SIGN_KEYS` 这层；"缺报告 / 未入库 ⇒ 拒"的
 旧判据（`evidence_chain_error`）已随报告降级一并删除，不再有对应测试。
 """
-from __future__ import annotations
 
 from pathlib import Path
 

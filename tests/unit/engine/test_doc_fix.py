@@ -2,7 +2,6 @@
 
 范围守 ADR-0022 §2.2 🅰1.3：只做**无歧义**的文件级改写；散文、编码猜测不在内。
 """
-from __future__ import annotations
 
 import tempfile
 import unittest
@@ -166,7 +165,6 @@ class TestNextHint(unittest.TestCase):
 
 def test_adr_amend_rules_are_deterministically_fixable(tmp_path, monkeypatch):
     """ADR 三规则（顺序/占位括号/脚注位置）都能**确定性修**并幂等——不需要 agent 参与。"""
-    from k3dge.engine import doc_fix
 
     d = tmp_path / "docs" / "adr"
     d.mkdir(parents=True)

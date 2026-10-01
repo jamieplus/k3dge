@@ -32,7 +32,6 @@ class TestScaffoldProblemsChannel(unittest.TestCase):
         self.assertEqual(f.read_text(encoding="utf-8"), "#!/usr/bin/env bash\n")   # 内容仍不动
 
     def test_manifest_problems_come_back_in_the_channel(self) -> None:
-        from k3dge.templates.scaffold import scaffold
 
         (self.target / ".agent").mkdir(parents=True)
         (self.target / ".agent" / "manifest.json").write_text("{ 坏 json", encoding="utf-8")
@@ -40,7 +39,6 @@ class TestScaffoldProblemsChannel(unittest.TestCase):
         self.assertTrue([m for m in problems if "manifest.json" in m], problems)
 
     def test_user_keys_survive_domain_upgrade(self) -> None:
-        from k3dge.templates.scaffold import scaffold
 
         (self.target / ".agent").mkdir(parents=True)
         (self.target / ".agent" / "manifest.json").write_text(json.dumps({
@@ -55,7 +53,6 @@ class TestScaffoldProblemsChannel(unittest.TestCase):
         self.assertIn("p", data["domains"])
 
     def test_corrupt_mcp_json_is_a_problem(self) -> None:
-        from k3dge.templates.scaffold import scaffold
 
         self.target.mkdir(parents=True)
         (self.target / ".mcp.json").write_text("{ nope", encoding="utf-8")

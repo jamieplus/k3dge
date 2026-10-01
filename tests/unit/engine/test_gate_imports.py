@@ -1,5 +1,4 @@
 """闸核不得 import 生命周期（T-02 依赖方向：evaluate 及其检查只出 Violation）。"""
-from __future__ import annotations
 
 import ast
 import unittest

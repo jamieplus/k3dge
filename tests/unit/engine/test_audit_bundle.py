@@ -4,7 +4,6 @@
 契约面（`bundle_version`/`status`/`apply_order`）、fail-clear（异版/未闭环/脏树）、
 以及对历史**零改动**的 dry-run。
 """
-from __future__ import annotations
 
 import json
 import os
@@ -213,7 +212,6 @@ def test_bundle_audit_leg_routes_and_fails_clear(tmp_path, monkeypatch):
     assert found, "包里的 12 列报告必须落到 docs/reviews（否则 checklist/judged 看不到审计产物）"
     assert "docs/reviews" in found[0].as_posix() and "k3dit-bundle" in found[0].name
     # ② 包在**仓外**：k3dit 的中间产物不该进被审树（旧位置 <ws>/.k3dit/... 会留未跟踪目录）
-    import subprocess
 
     status = subprocess.run(["git", "-C", str(ws), "status", "--porcelain"],
                             capture_output=True, text=True).stdout
@@ -801,7 +799,6 @@ def test_dry_run_worktree_failure_cleans_tempdir(tmp_path, monkeypatch) -> None:
     """`worktree add` 失败的早退发生在 try/finally 之前 ⇒ mkdtemp 的目录永久残留（395）。"""
     import tempfile as _tf
 
-    from k3dge.engine import audit_bundle as ab
 
     real_mkdtemp = _tf.mkdtemp
     made: list = []
@@ -830,7 +827,6 @@ def test_audit_flow_has_no_dead_audit_surface() -> None:
 
 def test_repo_gitignore_covers_both_runtime_projections():
     """决策的钉子：`audit_jobs.json` 与 `audit_checklist.json` 都不许再入库（ADR-0004 §2.1.10）。"""
-    import subprocess
     import tempfile
 
     repo = Path(__file__).resolve().parents[3]

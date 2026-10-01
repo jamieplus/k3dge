@@ -8,7 +8,7 @@ from k3dge.engine.align import (
     run_milestone_alignment,
 )
 from k3dge.engine.seal import seal_milestone, seal_preconditions_error
-from k3dge.engine.task_index import MilestoneTask, list_tasks, scan_milestone_tasks
+from k3dge.engine.task_index import list_tasks, scan_milestone_tasks
 from k3dge.engine.task_write import create_task, mark_task_done
 
 

@@ -1,5 +1,4 @@
 """测试面的读写必须显式 `encoding="utf-8"`（M12 票 `tests_explicit_encoding` 的推进闸）。"""
-from __future__ import annotations
 
 import ast
 from pathlib import Path

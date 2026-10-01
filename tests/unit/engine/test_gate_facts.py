@@ -5,7 +5,6 @@
 与 `test_nextstep.TestProjectionInvariants` 同口径——两个投影面（[NEXT] 与闸红）
 必须同形，否则判断主体会收到两种形状。
 """
-from __future__ import annotations
 
 import unittest
 from pathlib import Path

@@ -429,7 +429,6 @@ class TestTransportShapeRobustness(unittest.TestCase):
 
 
 def _mk(d: str, body: str):
-    import pathlib
     root = pathlib.Path(d)
     (root / ".agent").mkdir(parents=True, exist_ok=True)
     _write(root, ".agent/pipeline.toml", body)

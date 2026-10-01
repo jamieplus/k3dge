@@ -1,6 +1,5 @@
 """Tests for the single-source [NEXT] hints and the audit-first lifecycle wiring."""
 
-from __future__ import annotations
 
 import tempfile
 from pathlib import Path
@@ -349,7 +348,6 @@ class TestLifecycleNext(TestCase):
 class TestIncompleteReport(TestCase):
     def test_incomplete_report_never_closes(self) -> None:
         """未尽项报告（`<!-- k3dge:incomplete -->`）即便 待修=0 也不构成闭环。"""
-        from k3dge.engine import audit_trigger
 
         ws = _base_ws()
         _clean = (

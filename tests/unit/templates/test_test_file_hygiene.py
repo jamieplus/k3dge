@@ -1,5 +1,4 @@
 """测试件自身的两条不变量（OCR 测试扫描 t-247/265/292/318 的防退化）。"""
-from __future__ import annotations
 
 import re
 from pathlib import Path

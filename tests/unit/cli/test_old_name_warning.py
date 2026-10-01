@@ -3,7 +3,6 @@
 `k3ge` 不是历史名（不存在这个仓），纯属错写；唯一合法出现是**在引用这个错写本身**（反引号跨度）——
 检测器/测试/文档必须能写它。危害实测：2026-09-26 一天内被写进 4 条提交信息。
 """
-from __future__ import annotations
 
 from k3dge.cli.main import old_name_warnings
 

@@ -1,10 +1,8 @@
 """Outbound MCP client semantics: endpoint from .mcp.json only, peer isolation,
 explicit downgrade (ADR-0006 §2.2 / §2.3.3 / §2.4)."""
-from __future__ import annotations
 
 import io
 import json
-import os
 import sys
 import unittest
 from pathlib import Path

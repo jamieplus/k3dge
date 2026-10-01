@@ -326,7 +326,6 @@ class TestPointerAndClosureShape(unittest.TestCase):
     REL = "docs/tasks/2026-09-16-M10-feat-x.md"
 
     def _ws_with_report(self, report: str) -> Path:
-        import tempfile
 
         ws = Path(tempfile.mkdtemp())
         (ws / "docs" / "reviews").mkdir(parents=True)
@@ -353,7 +352,6 @@ class TestPointerAndClosureShape(unittest.TestCase):
         self.assertEqual(pure_refs.check_task_body_meta_redundant(self.REL, text), [])
 
     def test_screen_ack_target_must_be_in_repo(self) -> None:
-        import tempfile
 
         ws = Path(tempfile.mkdtemp())
         (ws / "docs").mkdir()
@@ -367,7 +365,6 @@ class TestPointerAndClosureShape(unittest.TestCase):
     def test_retired_ledger_warns_when_marker_drifted(self) -> None:
         import contextlib
         import io
-        import tempfile
 
         ws = Path(tempfile.mkdtemp())
         led = ws / "docs" / "adr" / "obsolete"
@@ -685,7 +682,6 @@ class TestRetiredDestRepoWideWiring(unittest.TestCase):
     所以 `k3dge check` 必须**显式扫**它，否则这条闸在仓库级永远不跑。"""
 
     def test_validate_docs_reports_obsolete_without_dest(self):
-        import tempfile
 
         from k3dge.engine.doc_catalog import validate_docs
 

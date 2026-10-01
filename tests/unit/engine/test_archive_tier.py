@@ -1,8 +1,6 @@
 """归档契约：增量去向提醒（ADR-0023 §2.2）+ CLI --include-archive 低权威头。"""
-from __future__ import annotations
 
 import io
-import json
 import subprocess
 from contextlib import redirect_stdout
 from pathlib import Path

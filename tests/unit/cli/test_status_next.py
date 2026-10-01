@@ -1,5 +1,4 @@
 """`cli/status` 的观测面：展示用遥测不得按缺省预算跑传输链；路由坏了不得说成"没待办"（ocr-387/389）。"""
-from __future__ import annotations
 
 import contextlib
 import io

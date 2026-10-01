@@ -1,5 +1,4 @@
 """审计痕迹只可追加（AUDIT_TRAIL_APPEND_ONLY）静态闸。"""
-from __future__ import annotations
 
 from pathlib import Path
 

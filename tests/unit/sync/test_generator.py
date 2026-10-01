@@ -105,7 +105,6 @@ def test_unreadable_spec_warns_instead_of_silent_skip() -> None:
     import contextlib
     import io
 
-    from k3dge.engine.manifest import Manifest
     from k3dge.sync.generator import sync_domain
 
     ws = Path(tempfile.mkdtemp())

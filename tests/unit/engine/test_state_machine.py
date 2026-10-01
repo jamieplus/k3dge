@@ -1,5 +1,4 @@
 """状态机：表驱动 + CI 完备性检查（ADR-0001 §2 第 9 条：建模用 3.10 stdlib，执行靠 CI）。"""
-from __future__ import annotations
 
 from k3dge.engine import state_machine as sm
 

@@ -14,8 +14,6 @@ class TestEvidenceAndPorcelain(unittest.TestCase):
     """日志写不进必须出声；porcelain 的重命名行不得当成路径（ocr-380/381/384）。"""
 
     def test_append_log_failure_is_loud(self) -> None:
-        import contextlib
-        import io
 
         from k3dge.cli.main import _append_log
 
@@ -236,8 +234,6 @@ class TestCli(unittest.TestCase):
         [NEXT] but `status --json` and MCP `k3dge_status` had no `next` field at all,
         so machine consumers could not see the routing at all.
         """
-        import contextlib
-        import io
         import os
 
         from k3dge.cli.mcp import k3dge_status
@@ -282,8 +278,6 @@ class TestCli(unittest.TestCase):
         command (NEXT + hints) raised NameError and `status` never finished cleanly.
         Also asserts docs/tasks/AUTHORING.md is not reported as an unfinished task.
         """
-        import contextlib
-        import io
         import os
 
         with tempfile.TemporaryDirectory() as d:
@@ -324,8 +318,6 @@ class TestCli(unittest.TestCase):
 
     def test_task_list_json(self):
         import os
-        import contextlib
-        import io
 
         with tempfile.TemporaryDirectory() as d:
             repo = Path(d) / "repo"
@@ -375,8 +367,6 @@ class TestCli(unittest.TestCase):
 
     def test_mcp_sync_adds_peer_pythonpath(self):
         import os
-        import contextlib
-        import io
 
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -408,8 +398,6 @@ class TestCli(unittest.TestCase):
 
     def test_mcp_sync_repairs_peer_pythonpath(self):
         import os
-        import contextlib
-        import io
 
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -464,8 +452,6 @@ class TestCli(unittest.TestCase):
 def test_find_workspace_confines_to_mcp_root():
     """ADR-0026：MCP 服务根存在时 workspace_path 越界报错；显式 opt-in 才放行。"""
     import os
-    import tempfile
-    from pathlib import Path
 
     from k3dge.cli.main import _find_workspace
 

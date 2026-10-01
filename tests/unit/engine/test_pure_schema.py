@@ -189,7 +189,6 @@ print("OK")
 
 def _run_optimized(tmp_path: Path, flags: list, body: str, bad: Path, good: Path) -> tuple:
     import subprocess
-    import sys
 
     script = (f"MOD_PATH = {str(Path(__file__))!r}\n"
               f"BAD_PATH = {str(bad)!r}\nGOOD_PATH = {str(good)!r}\n" + body)

@@ -4,7 +4,6 @@
 只会 `git apply` 时整包落不下、24 条修复全废。合并要能：① 钉与修复不重叠时自动合；② 真重叠时**如实报冲突**；
 ③ 显式排除某些文件（不做猜测）。
 """
-from __future__ import annotations
 
 from pathlib import Path
 
@@ -90,7 +89,6 @@ def test_merge_file_rc_is_conflict_count_not_error(tmp_path):
 
 def test_hunks_multi_file_boundary():
     """`_hunks` 不得把下一文件的 `--- a/` 头吞进上一 hunk（ocr-048）。"""
-    from k3dge.engine import audit_merge as am
 
     patch = (
         "diff --git a/x.py b/x.py\n"
@@ -126,7 +124,6 @@ def test_fail_channel_matches_success_shape() -> None:
 
 def test_missing_files_reach_the_detail(tmp_path, monkeypatch) -> None:
     """主干缺文件过去只在 `missing` 里、detail 空串 ⇒ 落盘方一句话都拼不出（400）。"""
-    from k3dge.engine import audit_merge as am
 
     bundle = tmp_path / "bundle"
     (bundle / "pins").mkdir(parents=True)

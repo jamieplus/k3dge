@@ -1,5 +1,4 @@
 """受管路径必须能验；缺行必须红。不开豁免。"""
-from __future__ import annotations
 
 import subprocess
 import tempfile

@@ -3,7 +3,6 @@
 为何要这一层：此前 seal 动作 / seal 前置闸 / align 两相各写一套循环与失败语义
 ⇒ "未知 id 怎么办""失败停不停""重跑安不安全"三处各答一次（票 orch_node_table）。
 """
-from __future__ import annotations
 
 import tempfile
 import unittest

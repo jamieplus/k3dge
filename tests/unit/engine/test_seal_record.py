@@ -7,7 +7,6 @@
 ⇒ 无新提交），报告只落在工作树里 ⇒ 把记录挂在"审计的提交"上没有载体。修法＝挂在**封版提交**
 （封版动作必然产生改动）。
 """
-from __future__ import annotations
 
 import subprocess
 import tempfile
@@ -224,7 +223,6 @@ class TestGuideStubScanIgnoresMentions(unittest.TestCase):
     """桩判定只认真桩：代码块/行内代码里**提到**标记不得把已写好的文档判成未填（guides_filled）。"""
 
     def _ws(self, body: str) -> Path:
-        import tempfile
 
         ws = Path(tempfile.mkdtemp())
         (ws / "docs" / "guides").mkdir(parents=True)

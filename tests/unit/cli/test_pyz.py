@@ -1,5 +1,4 @@
 """分发冒烟：stdlib zipapp 单件可构建、可从任意目录运行（无需 venv/第三方）。"""
-from __future__ import annotations
 
 import subprocess
 import sys

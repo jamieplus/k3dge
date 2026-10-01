@@ -2,10 +2,8 @@
 
 判据：全绿 ⇒ 退 0；有未过项 ⇒ 退 1（供 CI/脚本问"现在能封吗"）。不执行任何动作。
 """
-from __future__ import annotations
 
 import io
-import os
 from contextlib import redirect_stdout
 from pathlib import Path
 

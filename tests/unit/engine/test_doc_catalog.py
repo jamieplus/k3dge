@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import json
 import tempfile
@@ -288,7 +287,6 @@ def test_shipped_schema_codes_are_declared() -> None:
     未声明码走 `doc_gate._add` 的兜底分支 ⇒ 只输出 `[CODE] 原始消息`，
     拿不到 fact/options/pointers——同一不变量在别处有声明码就是两套回执面。
     """
-    import json
     from pathlib import Path as _P
 
     from k3dge.engine.gate_facts import GATE_FACTS, is_declared

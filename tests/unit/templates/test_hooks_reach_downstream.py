@@ -7,7 +7,6 @@ doc-gate/schema/引用/排查闸全不生效）；同时 `docs/{specs,guides,pro
 
 本测试把这条"到达"钉成机检：init → hook 可执行 → 真跑三层闸 → 缺治理件时必须红。
 """
-from __future__ import annotations
 
 import os
 import subprocess

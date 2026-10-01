@@ -1,5 +1,4 @@
 """里程碑重挂（ADR-0004 §2.1.9）：票的里程碑事实＝frontmatter + 文件名两处，必须同改。"""
-from __future__ import annotations
 
 import tempfile
 from pathlib import Path
@@ -170,7 +169,6 @@ class TestBoundaryNudge(TestCase):
     def test_unreadable_ticket_does_not_half_migrate(self) -> None:
         """坏文件让整批在循环中途抛异常 ⇒ 前面的票已改、后面的没改（334）。"""
         from unittest import mock
-        from k3dge.engine.task_write import reassign_milestone
 
         ws = Path(tempfile.mkdtemp())
         d = ws / "docs" / "tasks"

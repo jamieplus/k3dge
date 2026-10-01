@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import tempfile
 import unittest
@@ -44,7 +43,6 @@ class TestIncidentSlugAndSanitize(unittest.TestCase):
     """`write_incident` 的文件名与外部文本净化（ocr-291/292/293）。"""
 
     def _inc(self, **kw):
-        from k3dge.engine.protocol import write_incident
 
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

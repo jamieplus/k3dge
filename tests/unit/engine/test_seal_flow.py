@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import io
 import json
-import re
 import tempfile
 from pathlib import Path
 from unittest import TestCase, mock
@@ -282,7 +281,6 @@ class TestSealFlow(TestCase):
     def test_already_sealed_reads_only_git_facts(self) -> None:
         """判据＝边界 tag；证据读不出 ⇒ 出声并按"未封"处理（保守：可见的多余提版 > 静默跳过）。"""
         import contextlib
-        import io
         import subprocess
         import tempfile as _tf
 
@@ -588,7 +586,6 @@ class TestRatchetRetired(TestCase):
     """棘轮形状已退休（2026-09-26）：声明它必须**显式拒绝**，不得静默换成别的形状。"""
 
     def test_ratchet_mode_is_refused_with_guidance(self):
-        import tempfile
 
         from k3dge.engine import nextstep  # noqa: F401  （拒绝分支会 persist [NEXT]）
 
@@ -646,7 +643,6 @@ class TestGateIdDispatch(TestCase):
         self.assertIn("转人工干预", self._sidecar(ws)["fact"])
 
     def test_seal_preconditions_rejection_carries_declared_gate_id(self) -> None:
-        from k3dge.engine import gates
         from k3dge.engine.seal import seal_preconditions_error
 
         ws = _ws()
@@ -716,7 +712,6 @@ class TestStagesAreDeclaredNotHardcoded(TestCase):
     """
 
     def test_executor_reads_declared_stages(self):
-        from k3dge.engine import gates
 
         # 缺省＝无外部步（审计是本地工具调用，2026-09-26）：要外部步的仓**显式**声明（见下一条用例与
         # `_ws_oneshot`）——"缺省声明一个解析不到的 action"才是要避免的。
@@ -726,7 +721,6 @@ class TestStagesAreDeclaredNotHardcoded(TestCase):
 
     def test_downstream_can_rebind_stages(self):
         """下游可配（用户裁定）：改声明面 .agent/pipeline.toml 就换实现，只有一处。"""
-        from k3dge.engine import gates
 
         ws = _ws()
         (ws / ".agent" / "pipeline.toml").write_text(

@@ -2,7 +2,6 @@
 
 为何用真 git 仓：这一条的保证就是"区间内每个非机械提交都有条目"——桩掉 git 只剩同义反复。
 """
-from __future__ import annotations
 
 import subprocess
 import tempfile

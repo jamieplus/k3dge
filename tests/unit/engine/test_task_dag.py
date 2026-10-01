@@ -1,5 +1,4 @@
 """任务 DAG 透镜：blocking 环 + CPM 关键路径。"""
-from __future__ import annotations
 
 import tempfile
 import unittest

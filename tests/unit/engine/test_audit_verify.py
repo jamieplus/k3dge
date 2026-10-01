@@ -3,7 +3,6 @@
 判据是"**k3dge 自己从包的文件夹里算**"，不调产出方——所以这些用例全部用**合成包**，
 并且刻意做出各类**不合格**的包（缺行、必需格空、表头顺序错、ID 重复、状态自报与事实不符、内容被篡改）。
 """
-from __future__ import annotations
 
 import difflib
 import hashlib

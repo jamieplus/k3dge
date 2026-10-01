@@ -1,5 +1,4 @@
 """ADR amend/footnote 形态闸（2026-09-24）：k3dit 0001/0007 漂移的判据。"""
-from __future__ import annotations
 
 from pathlib import Path
 

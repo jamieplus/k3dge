@@ -1,5 +1,4 @@
 """peer 面（mcp_peers）：降级告警与 `.mcp.json` 状态区分。"""
-from __future__ import annotations
 
 from pathlib import Path
 

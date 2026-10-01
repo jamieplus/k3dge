@@ -7,7 +7,6 @@
 修法：协议文本里的裸 ADR 引用自限定为 `k3dge ADR-NNNN`；scaffold 在写入时转换。
 例外：`where ADR-NNNN` 是「如何访问本仓 ADR」的示例，不限定。
 """
-from __future__ import annotations
 
 import re
 import tempfile

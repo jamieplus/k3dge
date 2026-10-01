@@ -1,5 +1,4 @@
 """票索引的两条边界：账本豁免认**指针路径**（非 basename），读不出的票**出声跳过**（ocr-329/330）。"""
-from __future__ import annotations
 
 import contextlib
 import io
@@ -54,7 +53,6 @@ def test_unreadable_ticket_is_skipped_loudly() -> None:
 
 def test_empty_frontmatter_block_does_not_fall_back_to_body() -> None:
     """`---` 空块 ≠ 没有块：正文一行 `- **Status**: done` 不得冒充元数据（ocr-331）。"""
-    from k3dge.engine.task_index import list_tasks
 
     ws = Path(tempfile.mkdtemp())
     d = ws / "docs" / "tasks"
