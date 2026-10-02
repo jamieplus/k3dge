@@ -49,15 +49,17 @@ def test_failing_gate_shows_red_and_exits_1(tmp_path, monkeypatch):
     assert "✅" not in out, out
 
 
-def test_empty_precondition_list_renders_zero_of_zero(tmp_path, monkeypatch):
-    """空声明＝0/0：形状单独钉住，别再让它冒充"全绿"。"""
+def test_empty_precondition_list_is_refused(tmp_path, monkeypatch):
+    """空声明不得冒充"全绿"（ocr2-309）：报未过项并退 1。"""
     ws = _ws(tmp_path, "")
     monkeypatch.chdir(ws)
     buf = io.StringIO()
     with redirect_stdout(buf):
         rc = main(["milestone", "seal-check", "M10"])
     out = buf.getvalue()
-    assert rc == 0 and "✅" not in out and "0/0 通过" in out, out
+    assert rc == 1, out
+    assert "no_seal_preconditions" in out, out
+    assert "✅" not in out, out
 
 
 def test_unmet_exits_one_and_lists_reason(tmp_path, monkeypatch):

@@ -25,6 +25,7 @@ def _sealed_root(test: unittest.TestCase, receipt: "str | None", *,
     root = Path(tempfile.mkdtemp())
     test.addCleanup(shutil.rmtree, root, True)
     (root / "scripts").mkdir()
+    (root / ".agent").mkdir()          # gate.py 的验根标记（ocr2-349）
     for f in ("gate.sh", "gate.py"):
         shutil.copy2(ROOT / "scripts" / f, root / "scripts" / f)
     py = '[project]\nname = "x"\nversion = "0.1.0"\n'
@@ -84,6 +85,59 @@ class TestGateSource(unittest.TestCase):
         r = _run_gate("py", root, env)
         self.assertEqual(r.returncode, 2, r.stderr[-300:])
         self.assertIn("MISMATCH", r.stderr)
+
+class TestGateShLayoutAndPolicyShape(unittest.TestCase):
+    """gate.sh 的验根与政策读取失败面（ocr2-353/356）。sh 轨需要 bash。"""
+
+    @unittest.skipUnless(shutil.which("bash"), "gate.sh 轨需要 bash")
+    def test_missing_agent_marker_refuses(self) -> None:
+        root = _sealed_root(self, None)
+        shutil.rmtree(root / ".agent")
+        env = dict(os.environ)
+        env.pop("K3DGE_SOURCE", None)
+        r = subprocess.run(["bash", "scripts/gate.sh", "version"], cwd=root,
+                           capture_output=True, text=True, env=env, timeout=60)
+        self.assertEqual(r.returncode, 1, r.stderr[-300:])
+        self.assertIn(".agent", r.stderr)
+
+    @unittest.skipUnless(shutil.which("bash"), "gate.sh 轨需要 bash")
+    def test_refuses_source_line_that_yields_no_value(self) -> None:
+        # 强制走无 tomllib 的文本回退：段里有 `source =` 却解析不出值 ⇒ exit 2，不静默当 legacy（ocr2-356）。
+        root = _sealed_root(self, None)
+        (root / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0.1.0"\n\n[tool.k3dge]\nsource = x\n', encoding="utf-8")
+        fake = root / "fakelib"
+        fake.mkdir()
+        (fake / "tomllib.py").write_text("raise ModuleNotFoundError('forced')\n", encoding="utf-8")
+        env = dict(os.environ)
+        env.pop("K3DGE_SOURCE", None)
+        env["PYTHONPATH"] = str(fake)
+        r = subprocess.run(["bash", "scripts/gate.sh", "version"], cwd=root,
+                           capture_output=True, text=True, env=env, timeout=60)
+        self.assertEqual(r.returncode, 2, r.stderr[-300:])
+        self.assertIn("source", r.stderr)
+
+
+    @unittest.skipUnless(shutil.which("bash"), "gate.sh 轨需要 bash")
+    def test_declared_policy_refuses_unverified_global_fallback(self) -> None:
+        # 政策已声明、收据一致，但 .venv 判定核缺失 ⇒ 默认拒跑，不静默用来源未校验的全局 k3dge（ocr2-357）。
+        root = _sealed_root(self, "git+x", policy_source="git+x")
+        (root / ".venv" / "bin" / "k3dge").unlink()
+        win = root / ".venv" / "Scripts" / "k3dge.exe"
+        if win.exists():
+            win.unlink()
+        shim = root / "globalshim"
+        shim.mkdir()
+        g = shim / "k3dge"
+        g.write_text("#!/bin/sh\nexit 41\n", encoding="utf-8")
+        g.chmod(0o755)
+        env = dict(os.environ)
+        env.pop("K3DGE_SOURCE", None)
+        env["PATH"] = f"{shim}{os.pathsep}{env.get('PATH', '')}"
+        r = subprocess.run(["bash", "scripts/gate.sh", "version"], cwd=root,
+                           capture_output=True, text=True, env=env, timeout=60)
+        self.assertEqual(r.returncode, 2, r.stderr[-300:])
+
 
 class TestPyprojectOnlyPolicy(unittest.TestCase):
     """政策只写在 pyproject（env 未设）这条路——三轨都得判同一件事（ocr-347 的 (b)）。"""
@@ -180,3 +234,66 @@ class TestPyprojectOnlyPolicy(unittest.TestCase):
         import re as _re
         self.assertIsNone(_re.search(r"(?<![a-z])-ne\b", code),
                           "gate.ps1 代码行出现大小写不敏感 -ne 比较")
+
+
+class TestGatePyLayoutAndPolicyShape(unittest.TestCase):
+    """gate.py 的验根、政策形状与路径归一（ocr2-349/350/352）。py 轨恒可跑。"""
+
+    def _run_py(self, root: Path, extra_env: dict | None = None):
+        env = dict(os.environ)
+        env.pop("K3DGE_SOURCE", None)
+        if extra_env:
+            env.update(extra_env)
+        return subprocess.run([sys.executable, "scripts/gate.py", "version"],
+                              cwd=root, capture_output=True, text=True, env=env, timeout=60)
+
+    def test_missing_agent_marker_refuses(self) -> None:
+        # 复制到没有 .agent/ 的树里 ⇒ ROOT 假设不成立，拒跑而不是静默当"没政策"放行（ocr2-349）。
+        root = _sealed_root(self, None)
+        shutil.rmtree(root / ".agent")
+        r = self._run_py(root)
+        self.assertEqual(r.returncode, 1, r.stderr[-300:])
+        self.assertIn(".agent", r.stderr)
+
+    def test_non_table_policy_shapes_refuse(self) -> None:
+        # [tool] / [tool.k3dge] 形状异常或 source 非串 ⇒ 出声 exit 1，不静默关掉政策校验（ocr2-350）。
+        bodies = ('[tool]\nk3dge = "x"\n', "[tool]\nk3dge = 5\n", "[tool.k3dge]\nsource = 5\n")
+        for body in bodies:
+            with self.subTest(body=body):
+                root = _sealed_root(self, None)
+                (root / "pyproject.toml").write_text(
+                    '[project]\nname = "x"\nversion = "0.1.0"\n\n' + body, encoding="utf-8")
+                r = self._run_py(root)
+                self.assertEqual(r.returncode, 1, r.stderr[-300:])
+
+    def test_path_dotdot_normalized_for_nonexistent(self) -> None:
+        # 尚不存在的路径也要 realpath 归一：`a/b/../b` 与 `a/b` 是同一源，不得假 MISMATCH（ocr2-352）。
+        root = _sealed_root(self, None)
+        ghost = root / "ghost"
+        (root / ".venv" / "k3dge-source.txt").write_text(str(ghost) + "\n", encoding="utf-8")
+        r = self._run_py(root, {"K3DGE_SOURCE": str(ghost / ".." / "ghost")})
+        self.assertEqual(r.returncode, 41, (r.stdout + r.stderr)[-300:])
+        self.assertNotIn("MISMATCH", r.stdout + r.stderr)
+
+    def _force_text_fallback(self, root: Path) -> dict:
+        fake = root / "fakelib"
+        fake.mkdir()
+        (fake / "tomllib.py").write_text("raise ModuleNotFoundError('forced')\n", encoding="utf-8")
+        return {"PYTHONPATH": str(fake)}
+
+    def test_text_fallback_parses_header_comment_and_spacing(self) -> None:
+        # 无 tomllib 时，`[ tool.k3dge ] # 注释` 与带行尾注释的 source 也要取到值（ocr2-351）。
+        root = _sealed_root(self, "git+x")
+        (root / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0.1.0"\n\n[ tool.k3dge ] # policy\nsource = "git+x"  # checkout\n',
+            encoding="utf-8")
+        r = self._run_py(root, self._force_text_fallback(root))
+        self.assertEqual(r.returncode, 41, (r.stdout + r.stderr)[-300:])
+
+    def test_text_fallback_refuses_section_without_source(self) -> None:
+        # 段存在但取不到值 ⇒ 出声 exit 1，不静默当 legacy（ocr2-351，与 ocr-148 同口径）。
+        root = _sealed_root(self, None)
+        (root / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0.1.0"\n\n[tool.k3dge]\nother = 1\n', encoding="utf-8")
+        r = self._run_py(root, self._force_text_fallback(root))
+        self.assertEqual(r.returncode, 1, (r.stdout + r.stderr)[-300:])

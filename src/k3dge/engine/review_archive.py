@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -64,6 +65,12 @@ def _rewrite_leftover_links(workspace: Path, filename: str, new_href: str) -> Tu
     updated = text.replace(f"]({filename})", f"]({new_href})")
     updated = updated.replace(f"](./{filename})", f"]({new_href})")
     if updated == text:
+        # 文件已先被移走（seal 先 move 再改链）：别的链接写法（`#section`/title/
+        # `<...>`/`../`、HTML href）不命中就被静默报成功 ⇒ LEFTOVERS 留死链（ocr2-305）。
+        if re.search(rf"\]\([^)\n]*{re.escape(filename)}|href=[\"'][^\"'\n]*{re.escape(filename)}",
+                     updated):
+            return False, (f"LEFTOVERS.md 里指向 {filename} 的链接未改写"
+                           f"（形态非 `]({filename})`，请人工修正）")
         return True, ""
     try:
         tmp = leftovers.with_name(leftovers.name + ".tmp")

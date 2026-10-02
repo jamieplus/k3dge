@@ -27,6 +27,8 @@ _MAX_CONTEXT = 3
 #: 兜底扫描（rg 缺席）的遍历预算与单行探测上限（320）
 _FALLBACK_BUDGET_SEC = 20.0
 _FALLBACK_LINE_CAP = 4000
+#: 结果上限：`. ` 这类查询会把整仓每行收进内存；封顶并出声（ocr2-316）。
+_FALLBACK_MAX_HITS = 1000
 
 
 @dataclass(frozen=True)
@@ -156,8 +158,10 @@ def write_index_meta(workspace: Path) -> None:
         meta.parent.mkdir(parents=True, exist_ok=True)
         meta.write_text(json.dumps(_tree_signature(workspace), sort_keys=True) + "\n",
                         encoding="utf-8")
-    except OSError:
-        pass
+    except OSError as exc:
+        # 吞掉 ⇒ `.k3dge/` 不可写时每次 where 都全树重建且零诊断（ocr2-314）。
+        print(f"[search] WARN: 符号索引签名写不进 {meta}（{exc}）"
+              "⇒ 每次 where 都会重建（性能下降）", file=sys.stderr)
 
 
 def _is_stale_cheaply(workspace: Path, index: Path) -> bool:
@@ -204,6 +208,12 @@ def _load_index(workspace: Path) -> Dict[str, List[dict]]:
         raise IndexUnavailable(f"符号索引读不出（{p}：{type(exc).__name__}: {exc}）") from exc
     if not isinstance(data, dict):
         raise IndexUnavailable(f"符号索引顶层不是对象（{p}）")
+    for sym, entries in data.items():
+        # 形状坏的条目（dict/str 而非 [{file,line}]）会让 `where` 静默回 []，与
+        # "查无此符号"不可分（ocr2-315）⇒ 当索引不可用（与 IndexUnavailable 的立意一致）。
+        if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+            raise IndexUnavailable(
+                f"符号索引条目形状不对（{sym}: {type(entries).__name__}，应为 list[dict]）")
     return data
 
 
@@ -263,8 +273,8 @@ def _gitignored_prefixes(workspace: Path) -> set:
         r = subprocess.run(
             ["git", "-C", str(workspace), "ls-files", "--others", "--ignored",
              "--exclude-standard", "--directory"],
-            capture_output=True, text=True)
-    except OSError:
+            capture_output=True, text=True, timeout=30)   # rg 那条有 30s，这条也得有（ocr2-316）
+    except (OSError, subprocess.TimeoutExpired):
         return set()
     if r.returncode != 0:
         return set()
@@ -310,12 +320,21 @@ def _python_search(workspace: Path, query: str) -> List[str]:
         except OSError:
             continue
         for i, line in enumerate(text.splitlines(), 1):
+            # 预算也要管**行循环**：灾难性回溯查询/单文件海量行会让"每路径查一次"失控（ocr2-316）。
+            if (i & 0xFF) == 0 and time.monotonic() > deadline:
+                truncated = True
+                break
             probe = line if len(line) <= _FALLBACK_LINE_CAP else line[:_FALLBACK_LINE_CAP]
             if (rx.search(probe) if rx is not None else query in probe):
                 out.append(f"{rel}:{i}:{line}")
+                if len(out) >= _FALLBACK_MAX_HITS:
+                    truncated = True
+                    break
+        if truncated:
+            break
     if truncated:
-        print(f"[SEARCH] WARN: 兜底扫描到 {_FALLBACK_BUDGET_SEC}s 预算上限即停 ⇒ 结果可能不完整",
-              file=sys.stderr)
+        print(f"[SEARCH] WARN: 兜底扫描触到 {_FALLBACK_BUDGET_SEC}s 预算或 {_FALLBACK_MAX_HITS} 条上限"
+              "即停 ⇒ 结果可能不完整", file=sys.stderr)
     return out
 
 

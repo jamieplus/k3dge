@@ -79,5 +79,24 @@ def test_hash_case_normalized_to_lowercase() -> None:
         f"- **Contract Hash**: sha256:{'A'*64}") == "a" * 64
 
 
+def test_hash_rejects_trailing_garbage() -> None:
+    """尾部非 hex 垃圾也不得当合法摘要（ocr2-318）：整值锚到行尾。"""
+    base = "- **Contract Hash**: `sha256:" + "a" * 64
+    for bad in (base + "zz`", base + "g`", base + "-stale`"):
+        assert spec_schema.extract_contract_hash(bad) is None, bad
+    assert spec_schema.extract_contract_hash(base + "`") == "a" * 64
+
+
+def test_headings_inside_fences_do_not_satisfy_sections() -> None:
+    """围栏里的示例 `## …` 不是真实小节（ocr2-319）：先剥围栏再判。"""
+    fenced = (
+        "# Spec\n\n```\n"
+        "## 1. Domain Boundary & Responsibilities\n"
+        "## 2. Public Interfaces & Type Contracts\n"
+        "## 4. Verification Matrix\n```\n"
+    )
+    assert len(spec_schema.validate_structure(fenced)) == 3
+
+
 if __name__ == "__main__":
     unittest.main()

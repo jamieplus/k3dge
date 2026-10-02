@@ -74,3 +74,21 @@ def test_empty_frontmatter_block_does_not_fall_back_to_body() -> None:
                                                encoding="utf-8")
     rows = list_tasks(ws)
     assert [r.status for r in rows] == ["unknown"], rows
+
+
+def test_bom_prefixed_frontmatter_wins_over_body() -> None:
+    """带 BOM 的票：frontmatter 仍须是唯一源（ocr2-321）。"""
+    ws = _ws()
+    p = ws / "docs" / "tasks" / "2026-09-01-M9-feat-a.md"
+    p.write_bytes(b"\xef\xbb\xbf---\nstatus: idea\nmilestone: M9\n---\n\n# A\n- **Status**: done\n")
+    rows = list_tasks(ws)
+    assert [r.status for r in rows] == ["idea"], rows
+
+
+def test_unclosed_frontmatter_does_not_fall_back_to_body() -> None:
+    """首行 `---` 但块未闭合 ⇒ 元数据损坏，正文正则不得顶替（ocr2-321）。"""
+    ws = _ws()
+    p = ws / "docs" / "tasks" / "2026-09-01-M9-feat-b.md"
+    p.write_text("---\nstatus: idea\n\n# B\n- **Status**: done\n", encoding="utf-8")
+    rows = list_tasks(ws)
+    assert [r.status for r in rows] == ["unknown"], rows

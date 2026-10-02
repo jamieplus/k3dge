@@ -114,15 +114,24 @@ def _pyproject_version(text: str) -> str | None:
         # `project` 是合法 TOML 但非表（标量/数组）时 `(.. or {}).get` 抛 AttributeError（ocr2-085）。
         v = _proj.get("version") if isinstance(_proj, dict) else None
         return str(v) if isinstance(v, str) else None
+    return _pyproject_version_relaxed(text)
+
+
+def _pyproject_version_relaxed(text: str) -> str | None:
+    """无 tomllib（3.10）的回退解析：单引号/缩进都认，从 `[project]` 段取 version。
+
+    段界与段头用**同一遍** `finditer` 求（ocr2-327）：`re.split`（段头须独占一行）与
+    `re.findall`（无行尾锚、会匹配 `[[array]]`）两套判据混用会让 `zip` 错位、从错的段取版本。
+    """
     m = _VERSION_INLINE_RE.search(text)
     if m:
         return m.group(1) or m.group(2)
-    seg = re.split(r"(?m)^\s*\[[^\]]*\]\s*$", text)
-    heads = re.findall(r"(?m)^\s*\[([^\]]*)\]", text)
-    for body, head in zip(seg[1:], heads):
-        if head.strip() != "project":
+    heads = list(re.finditer(r"(?m)^\s*\[([^\]]*)\]\s*$", text))
+    for i, hm in enumerate(heads):
+        if hm.group(1).strip() != "project":
             continue
-        lm = _VERSION_LINE_RELAXED.search(body)
+        end = heads[i + 1].start() if i + 1 < len(heads) else len(text)
+        lm = _VERSION_LINE_RELAXED.search(text[hm.end():end])
         if lm:
             return lm.group(1) or lm.group(2)
     return None
@@ -183,10 +192,19 @@ def get_version(workspace: Path) -> str | None:
 
 def validate_versions(workspace: Path) -> list[Violation]:
     """Ensure pyproject.toml (if present) ↔ .agent/manifest.json ↔ src/k3dge/__init__.py 必须同值."""
-    py_v = get_pyproject_version(workspace)
-    mf_v = get_manifest_version(workspace)
-    init_v = get_init_version(workspace)
     violations: list[Violation] = []
+    # 非 UTF-8 / 不可读的版本文件不得让闸裸抛（ocr2-328）：降成一条"无法判定"违规。
+    try:
+        py_v = get_pyproject_version(workspace)
+    except (OSError, ValueError) as exc:
+        return [Violation("VERSION_MISMATCH", f"版本闸无法判定：pyproject.toml {exc}",
+                          file_path=str(_pyproject_path(workspace)), detail={"drift": str(exc)})]
+    try:
+        init_v = get_init_version(workspace)
+    except (OSError, ValueError) as exc:
+        return [Violation("VERSION_MISMATCH", f"版本闸无法判定：__init__.py {exc}",
+                          file_path=str(_init_path(workspace)), detail={"drift": str(exc)})]
+    mf_v = get_manifest_version(workspace)
     err = manifest_read_error(workspace)
     if err:
         violations.append(Violation(
@@ -265,7 +283,11 @@ def _collect_version_updates(workspace: Path, new_version: str) -> list:
             updates.append((p, new_text))
     mp = _manifest_path(workspace)
     if mp.is_file():
-        data = json.loads(mp.read_text(encoding="utf-8"))
+        # 与 manifest 读侧同口径：`_read_utf8`（非 UTF-8 ⇒ ValueError）+ 顶层须是对象；
+        # 裸 `read_text`/item assignment 会以 UnicodeDecodeError/TypeError 半途崩（ocr2-329）。
+        data = json.loads(_read_utf8(mp))
+        if not isinstance(data, dict):
+            raise ValueError(f"{mp.name} 顶层不是对象（{type(data).__name__}）⇒ 版本闸无法判定")
         data["version"] = new_version
         updates.append((mp, json.dumps(data, indent=2, ensure_ascii=False) + "\n"))
     ip = _init_path(workspace)

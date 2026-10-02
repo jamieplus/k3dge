@@ -83,6 +83,23 @@ class TestScaffoldProblemsChannel(unittest.TestCase):
         # 只断"有 problem"的话，"从空 dict 重写 `.mcp.json`"的回归同样有 problem 照样绿。
         self.assertEqual((self.target / ".mcp.json").read_bytes(), b"{ nope",
                          "坏文件被重写＝用户的对端配置没了")
+
+    def test_non_dict_mcp_servers_is_a_problem(self) -> None:
+        """`mcpServers` 是数组/null 等非对象形状 ⇒ 出声且不改写，别静默重写成 `{}`（ocr2-388）。"""
+        self.target.mkdir(parents=True)
+        original = '{\n  "mcpServers": [\n    "peer-a"\n  ]\n}\n'
+        (self.target / ".mcp.json").write_text(original, encoding="utf-8")
+        problems = scaffold(self.target, name="p")
+        self.assertTrue([m for m in problems if ".mcp.json" in m], problems)
+        self.assertEqual((self.target / ".mcp.json").read_text(encoding="utf-8"), original,
+                         "非对象 mcpServers 被重写＝对端 peers 没了")
+
+    def test_write_failure_is_reported_not_raised(self) -> None:
+        """写入侧 OSError 不得裸抛中止整棵脚手架（ocr2-387）。"""
+        self.target.mkdir(parents=True)
+        (self.target / "scripts").write_text("not a dir", encoding="utf-8")
+        scaffold(self.target, name="p")     # 旧实现抛 FileExistsError 到此
+        self.assertTrue((self.target / "AGENTS.md").is_file())
 class TestScaffold(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
@@ -113,6 +130,11 @@ class TestScaffold(unittest.TestCase):
         self.assertTrue((self.target / "docs" / "tasks" / "AUTHORING.md").is_file())
         self.assertTrue((self.target / "docs" / "memo" / ".schema.json").is_file())
         self.assertTrue((self.target / "docs" / "branches" / ".schema.json").is_file())
+        # incidents 治理件必须随 init 下发（此前只打包不进树，首份 INC-*.md 即被 doc_gate 拦死，ocr2-389）
+        self.assertTrue((self.target / "docs" / "incidents" / "README.md").is_file())
+        self.assertTrue((self.target / "docs" / "incidents" / "AUTHORING.md").is_file())
+        self.assertTrue((self.target / "docs" / "incidents" / ".schema.json").is_file())
+        self.assertTrue((self.target / "docs" / "incidents" / "_template.md").is_file())
 
         manifest = json.loads((self.target / ".agent" / "manifest.json").read_text(encoding="utf-8"))
         self.assertIn("domains", manifest)
@@ -225,6 +247,62 @@ class TestSlugAndPackageRoot(unittest.TestCase):
                 self.assertEqual(data["domains"]["p"]["src"], "src/p")
                 self.assertFalse((target / "evil").exists())
                 self.assertFalse((target.parent / "evil").exists())
+
+
+class TestTemplateSchemas(unittest.TestCase):
+    """下发 schema 的判据必须是**真闸**：坏路径要红（ocr2-363/364/381/385）。"""
+
+    ASSETS = Path(__file__).resolve().parents[3] / "src" / "k3dge" / "templates" / "assets"
+
+    def _schema(self, rel: str) -> dict:
+        return json.loads((self.ASSETS / rel).read_text(encoding="utf-8"))
+
+    def test_incidents_h1_requires_title_colon(self) -> None:
+        from k3dge.engine import pure_schema
+
+        schema = self._schema("incidents/.schema.json")
+        codes = schema["codes"]
+        f = "INC-20260101-REG-x.md"
+        for good in ("# Incident: x\n", "# INCIDENT REPORT: x\n"):
+            self.assertEqual(pure_schema.check_h1(schema["h1"], codes, good, f, f), [], good)
+        for bad in ("# Incidents\n", "# incident without colon\n", "# INCIDENT\n"):
+            self.assertTrue(pure_schema.check_h1(schema["h1"], codes, bad, f, f), bad)
+
+    def test_incidents_sections_are_ordered(self) -> None:
+        from k3dge.engine import pure_schema
+
+        schema = self._schema("incidents/.schema.json")
+        self.assertTrue(schema.get("section_order"), "incidents 必须启用 section_order")
+        codes = schema["codes"]
+        f = "INC-20260101-REG-x.md"
+        self.assertEqual(pure_schema.check_section_ordering(True, codes, f, "## 1. a\n## 2. b\n"), [])
+        scrambled = pure_schema.check_section_ordering(True, codes, f, "## 2. b\n## 1. a\n")
+        self.assertTrue(scrambled)
+        duplicate = pure_schema.check_section_ordering(True, codes, f, "## 1. a\n## 1. b\n")
+        self.assertTrue(duplicate)
+
+    def test_memo_filename_is_ascii_date_and_anchored(self) -> None:
+        from k3dge.engine import pure_schema
+
+        schema = self._schema("memo/.schema.json")
+        f = lambda name: pure_schema.check_filename(schema["filename"], {}, "docs/memo/.schema.json", name)
+        self.assertEqual(f("2026-09-21-sync.md")[0], [])
+        for bad in ("２０２６-０９-２１-note.md", "2026-99-99-x.md", "2026-9-9-x.md", "2026-09-21-note.md\n"):
+            with self.subTest(bad=bad):
+                self.assertTrue(f(bad)[0], f"memo 文件名应被拒：{bad!r}")
+
+    def test_tasks_priority_is_enforced(self) -> None:
+        from k3dge.engine import pure_schema
+
+        schema = self._schema("tasks/.schema.json")
+        self.assertIn("priority", schema["frontmatter"])
+        codes = schema["codes"]
+        f = "2026-01-01-M1-feat-x.md"
+        good = "---\nstatus: idea\npriority: P2\n---\n# T\n\n## 边界与拆分\n"
+        self.assertEqual(pure_schema.check_frontmatter(schema["frontmatter"], codes, f, good), [])
+        for bad in ("---\nstatus: idea\npriority: p2\n---\n", "---\nstatus: idea\n---\n"):
+            with self.subTest(bad=bad):
+                self.assertTrue(pure_schema.check_frontmatter(schema["frontmatter"], codes, f, bad), bad)
 
 
 if __name__ == "__main__":

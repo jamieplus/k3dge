@@ -148,6 +148,30 @@ class TestReassignBulk(TestCase):
         self.assertEqual(rr.call_args_list[0].args[1], good,
                          f"被迁移的必须是好票：{rr.call_args_list}")
 
+    def test_apply_failure_does_not_abort_batch(self) -> None:
+        """apply 阶段某张抛异常只记 FAIL，不中止整批（ocr2-326）。"""
+        from unittest import mock
+
+        ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
+        d = ws / "docs" / "tasks"
+        d.mkdir(parents=True)
+        (d / "2026-09-01-M10-feat-a.md").write_text(
+            "---\nmilestone: M10\nstatus: idea\n---\n\n# a\n", encoding="utf-8")
+        (d / "2026-09-02-M10-feat-b.md").write_text(
+            "---\nmilestone: M10\nstatus: idea\n---\n\n# b\n", encoding="utf-8")
+
+        def _fake(_ws, p, _ms, dry_run=False):
+            if p.name.endswith("a.md"):
+                raise OSError("boom")
+            return True, "moved", None
+
+        with mock.patch("k3dge.engine.task_write.reassign_task_milestone", side_effect=_fake) as rr:
+            ok, lines = reassign_milestone(ws, "M10", "M11")
+        self.assertFalse(ok)
+        self.assertTrue(any("应用失败" in l for l in lines), lines)
+        self.assertEqual(rr.call_count, 2, "坏的不挡后面的票")
+
 
 class TestBoundaryNudge(TestCase):
     """`TASK_MILESTONE_AFTER_BOUNDARY`（advisory）：边界之后新增的票仍挂在边界那一版。"""
@@ -245,3 +269,40 @@ class TestTaskWriteGuards(TestCase):
         self.assertFalse(ok)
         # 原文未动：内容仍是 M10（ocr2-084 的腐票形态不得出现）
         self.assertIn("milestone: M10", a.read_text(encoding="utf-8"))
+
+    def test_row_match_requires_min_length(self) -> None:
+        """短描述/短标题不得让模糊配对近乎无条件命中（ocr2-322）。"""
+        from k3dge.engine.task_write import _row_hits_task
+
+        self.assertFalse(_row_hits_task({"问题描述": "无", "ID": "X"}, "这是一条很长的任务标题", "stem"))
+        self.assertFalse(_row_hits_task({"问题描述": "路径错", "ID": "X"}, "修复路径错误的任务", "stem"))
+        self.assertTrue(_row_hits_task({"问题描述": "修复登录超时的竞态问题", "ID": "X"},
+                                       "修复登录超时", "stem"))
+
+    def test_backfill_added_even_when_name_appears_elsewhere(self) -> None:
+        """票名已在 `处置` 格出现，也必须在回填段新增一行（ocr2-323）。"""
+        from k3dge.engine.task_write import _ensure_backfill_section
+
+        lines = ["# 报告", "", "| A | 已修 → 2026-10-02-M10-fix-x.md |", "",
+                 "## 回填 — 自动", "", "> | old |"]
+        _ensure_backfill_section(lines, "\n".join(lines), "2026-10-02-M10-fix-x.md", "A")
+        self.assertIn("> | 2026-10-02-M10-fix-x.md | 已修 | 自动回填 |", "\n".join(lines))
+
+    def test_body_status_cannot_bypass_report_gate(self) -> None:
+        """有 frontmatter 时正文游离的 `Status: done` 不得绕过报告闸（ocr2-324）。"""
+        from k3dge.engine.task_write import mark_task_done
+
+        ws = self._ws()
+        rep = ws / "docs" / "reviews" / "r.md"
+        rep.write_text(
+            "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+            "| A | 2026-10-02 | 中 | P2 | 缺陷 | d | f:1 | 待修 |  |  |  |  |\n",
+            encoding="utf-8")
+        tp = ws / "docs" / "tasks" / "2026-10-02-M10-fix-x.md"
+        tp.write_text(
+            "---\nstatus: idea\nmilestone: M10\npriority: P2\ndate: 2026-10-02\n"
+            "report: docs/reviews/r.md\n---\n\n# X\n- **Status**: done\n", encoding="utf-8")
+        ok, msg = mark_task_done(ws, str(tp))[:2]
+        self.assertFalse(ok)
+        self.assertIn("待修", msg)

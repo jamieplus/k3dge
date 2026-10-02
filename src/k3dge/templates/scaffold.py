@@ -22,13 +22,34 @@ AGENTS_TEMPLATE = _asset("agents.md")
 
 # 协议文本里的裸 `ADR-NNNN` → 自限定为 `k3dge ADR-NNNN`。
 # 这些文本会原样进入下游仓；裸引在那里会指向下游【自己的】同名 ADR（错靶）
-# 或不存在（悬空）。例外：`where ADR-NNNN` 是「如何访问本仓 ADR」的示例，不限定。
-_QUALIFY_ADR_RE = re.compile(r"(?<!k3dge )(?<!where )ADR([ -])(\d{4})")
+# 或不存在（悬空）。例外：`k3dge ADR-NNNN`（已限定）与 `where ADR-NNNN`
+# （「如何访问本仓 ADR」的示例）不限定。前缀判定在 **词边界** 上做：旧后顾
+# `(?<!where )` 会把 `elsewhere ADR-0001` 误当 `where`，`\d{4}` 无尾界会把
+# `ADR-00261` 截成 `ADR-0026`+`1`，且 `(?<!k3dge )` 对双空格不幂等（ocr2-386）。
+_QUALIFY_ADR_RE = re.compile(r"(?<![A-Za-z0-9])ADR([ -])(\d{4})(?!\d)")
+_QUALIFY_ADR_SKIP = ("k3dge", "where")
+
+
+def _adr_prefix(text: str, start: int) -> str:
+    """紧邻 `ADR` 之前的整词（小写）；识别 `k3dge`/`where` 前缀用（词边界，不受空格数影响）。"""
+    head = re.search(r"([A-Za-z0-9_]+)\s*$", text[:start])
+    return head.group(1).lower() if head else ""
 
 
 def _qualify_adr_refs(text: str) -> str:
     """把协议文本里的裸 ADR 引用自限定为 k3dge 的（下游不自带 k3dge 的 ADR）。"""
-    return _QUALIFY_ADR_RE.sub(lambda m: f"k3dge ADR{m.group(1)}{m.group(2)}", text)
+    def _replace(m: "re.Match[str]") -> str:
+        if _adr_prefix(text, m.start()) in _QUALIFY_ADR_SKIP:
+            return m.group(0)
+        return f"k3dge ADR{m.group(1)}{m.group(2)}"
+
+    return _QUALIFY_ADR_RE.sub(_replace, text)
+
+
+def _bare_adr_matches(text: str) -> list:
+    """只交出 `_qualify_adr_refs` 会真正改写的引用（已限定/`where` 例不算裸引）。"""
+    return [m for m in _QUALIFY_ADR_RE.finditer(text)
+            if _adr_prefix(text, m.start()) not in _QUALIFY_ADR_SKIP]
 
 SPEC_TEMPLATE = _asset("spec.md.template")
 
@@ -143,10 +164,15 @@ def _write_if_missing(path: Path, content: str, executable: bool = False) -> boo
             except OSError as exc:
                 print(f"[k3dge scaffold] WARN: 补执行位失败 {path}（{exc}）", file=sys.stderr)
         return False
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
-    if executable:
-        path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        if executable:
+            path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    except OSError as exc:
+        # 写入侧无护栏会裸抛 ⇒ 整棵脚手架中止、半铺且不报哪件失败（ocr2-387）。
+        print(f"[k3dge scaffold] FAIL: 写 {path} 失败（{exc}）⇒ 该件未落", file=sys.stderr)
+        return False
     return True
 
 
@@ -175,7 +201,13 @@ def ensure_mcp_config(target: Path) -> bool:
         except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             print(f"[WARN] .mcp.json corrupted ({mcp_path}): {exc}, skipped to avoid overwriting peers", file=sys.stderr)
             return False
-    if "mcpServers" not in data or not isinstance(data["mcpServers"], dict):
+    if "mcpServers" in data and not isinstance(data["mcpServers"], dict):
+        # 非对象形状（数组/null/占位）不得被重写成 `{}`——那会静默抹掉对端 peers，
+        # 与上面"损坏就拒写"的契约自相矛盾（ocr2-388）。
+        print(f"[WARN] .mcp.json 的 mcpServers 不是对象 ({mcp_path}), skipped to avoid overwriting peers",
+              file=sys.stderr)
+        return False
+    if "mcpServers" not in data:
         data["mcpServers"] = {}
     # k3dge is always present (framework); peers from pipeline.toml are merged
     # on demand via `k3dge mcp sync` (not scaffold time).
@@ -259,6 +291,8 @@ def _ensure_peer_stubs(target: Path) -> None:
             return
     else:
         data = {"mcpServers": {}}
+    if not isinstance(data.get("mcpServers", {}), dict):
+        return              # 非对象形状 ⇒ 不覆盖（写 stub 会撞 TypeError 并抹掉 peers，ocr2-388）
     servers = data.setdefault("mcpServers", {})
     changed = False
     for name in sorted(names):
@@ -401,6 +435,13 @@ def scaffold(target: Path, name: str | None = None) -> list:
     _write_if_missing(target / "docs" / "branches" / "README.md", BRANCHES_README_TEMPLATE)
     _write_if_missing(target / "docs" / "branches" / "AUTHORING.md", _asset("branches/AUTHORING.md"))
     _write_if_missing(target / "docs" / "branches" / ".schema.json", _asset("branches/.schema.json"))
+    # incidents 此前只打包了 AUTHORING/schema，却从不铺 ⇒ 下游第一份 INC-*.md 就被
+    # doc_gate 以 "docs/incidents/README.md: missing" 拦死且无下发补救（ocr2-389）。
+    (target / "docs" / "incidents").mkdir(parents=True, exist_ok=True)
+    _write_if_missing(target / "docs" / "incidents" / "README.md", _asset("incidents/README.md"))
+    _write_if_missing(target / "docs" / "incidents" / "AUTHORING.md", _asset("incidents/AUTHORING.md"))
+    _write_if_missing(target / "docs" / "incidents" / "_template.md", _asset("incidents/_template.md"))
+    _write_if_missing(target / "docs" / "incidents" / ".schema.json", _asset("incidents/.schema.json"))
     (target / "logs").mkdir(parents=True, exist_ok=True)
     (target / "docs" / "reviews").mkdir(parents=True, exist_ok=True)
     _write_if_missing(target / "docs" / "reviews" / "README.md", REVIEWS_README_TEMPLATE)

@@ -236,6 +236,67 @@ class TestIndexUnavailableAndFallback(unittest.TestCase):
 
 
 
+    def test_wrong_shaped_symbol_entry_raises(self) -> None:
+        """条目不是 list[dict] ⇒ IndexUnavailable，而非静默"查无此符号"（ocr2-315）。"""
+        from k3dge.engine.search import IndexUnavailable, write_symbol_index
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._ws(root)
+            idx = write_symbol_index(root)
+            idx.write_text('{"alpha": {"file": "x.py", "line": 1}}', encoding="utf-8")
+            with self.assertRaises(IndexUnavailable):
+                where(root, "alpha")
+
+    def test_index_meta_write_failure_warns(self) -> None:
+        """索引签名写不进要出声，不能静默变成绩效悬崖（ocr2-314）。"""
+        import contextlib
+
+        from k3dge.engine import search as search_mod
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._ws(root)
+            err = io.StringIO()
+            with mock.patch.object(Path, "write_text", side_effect=OSError("EIO")), \
+                    contextlib.redirect_stderr(err):
+                search_mod.write_index_meta(root)
+            self.assertIn("签名写不进", err.getvalue())
+
+    def test_gitignored_prefixes_has_timeout(self) -> None:
+        """git 列举忽略项也要有超时（ocr2-316）。"""
+        from k3dge.engine import search as search_mod
+
+        seen = {}
+
+        class R:
+            returncode, stdout = 0, ""
+
+        def fake_run(cmd, **kw):
+            seen.update(kw)
+            return R()
+
+        with tempfile.TemporaryDirectory() as d:
+            with mock.patch.object(search_mod.subprocess, "run", fake_run):
+                search_mod._gitignored_prefixes(Path(d))
+        self.assertIn("timeout", seen)
+
+    def test_fallback_caps_results(self) -> None:
+        """命中数封顶并出声，避免整仓行进内存（ocr2-316）。"""
+        import contextlib
+
+        from k3dge.engine import search as search_mod
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for i in range(search_mod._FALLBACK_MAX_HITS + 10):
+                (root / f"f{i}.py").write_text("needle\n", encoding="utf-8")
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                got = search_mod._python_search(root, "needle")
+            self.assertLessEqual(len(got), search_mod._FALLBACK_MAX_HITS)
+            self.assertIn("不完整", err.getvalue())
+
     def test_content_colon_digits_do_not_steal_line_number(self) -> None:
         from k3dge.engine.search import _split_hit_line
 

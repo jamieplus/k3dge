@@ -5,6 +5,8 @@ Tiny, dependency-free; testable via `answers` injection. `milestone` re-imports 
 """
 from __future__ import annotations
 
+import sys
+
 
 def _has_countdown(countdown) -> bool:
     """`countdown=0` 是**有效值**（"不等输入，立刻取默认"），真值判断会把它当"没设"⇒ 永久阻塞（ocr-289）。"""
@@ -55,11 +57,13 @@ class Prompt:
         self._write(question + suffix + ": ")
         if self.answers is not None:
             if self._ai >= len(self.answers):
-                # 注入答案耗尽还继续"按默认走" ⇒ 问题数多于答案数的测试会**假通过**（451）
-                import sys
-
-                print(f"[PROMPT] WARN: 注入答案已用尽（第 {self._ai + 1} 问）⇒ 按默认 "
-                      f"{'Y' if default_yes else 'N'} 继续；测试需补齐 answers", file=sys.stderr)
+                # 注入答案耗尽还继续"按默认走" ⇒ 问题数多于答案数的测试会**假通过**（451）。
+                # `answers=[]` 是 MCP 的"恒取默认"非交互通道（cli/mcp.py），不是漏配：
+                # 只有"给了答案又用尽"才报警，否则每条 MCP 提示都喷冤枉 WARN（ocr2-295）。
+                if self.answers:
+                    print(f"[PROMPT] WARN: 注入答案已用尽（第 {self._ai + 1} 问）⇒ 按默认 "
+                          f"{'Y' if default_yes else 'N'} 继续；测试需补齐 answers",
+                          file=self.out_stream or sys.stderr)
                 ans = "y" if default_yes else "n"
             else:
                 ans = self.answers[self._ai]

@@ -40,6 +40,17 @@ class TestDupCheck(unittest.TestCase):
                 hints2 = _similar_task_hints(ws, "whatever", exclude=ex)
             self.assertEqual([h[0] for h in hints2], ["docs/x.md"])
 
+    def test_malformed_results_and_foreign_exclude_do_not_raise(self):
+        """对端信封元素非对象 / exclude 不在 workspace 下：只提示、永不抛（ocr2-325）。"""
+        with TemporaryDirectory() as d:
+            ws = pathlib.Path(d)
+            payload = json.dumps({"ok": True, "results": [
+                "oops", None, {"path": "docs/x.md", "title": "keep"}]})
+            hit = TransportResult(True, "mcp", "x", payload=payload)
+            with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=hit):
+                hints = _similar_task_hints(ws, "t", exclude=ws.parent / "outside.md")
+            self.assertEqual([h[0] for h in hints], ["docs/x.md"], hints)
+
     def test_engine_helper_degrades_silently(self):
         with TemporaryDirectory() as d:
             ws = pathlib.Path(d)

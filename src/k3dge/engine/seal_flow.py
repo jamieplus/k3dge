@@ -141,7 +141,14 @@ def _refresh_projections(workspace: Path, failures: Optional[list] = None) -> li
     failures = failures if failures is not None else []
 
     def _track(path: Path, fn) -> None:
-        before = path.read_bytes() if path.is_file() else None
+        # 读前后字节也必须**逐件**兜异常：某件不可读不得穿透到外层 try 而中止其余投影（ocr2-312）。
+        try:
+            before = path.read_bytes() if path.is_file() else None
+        except Exception as exc:
+            failures.append(f"{path.name}: {type(exc).__name__}: {exc}")
+            print(f"[seal_flow] WARN: 投影读前失败 {path}（{type(exc).__name__}: {exc}）",
+                  file=sys.stderr)
+            return
         try:
             fn()
         except Exception as exc:
@@ -150,7 +157,13 @@ def _refresh_projections(workspace: Path, failures: Optional[list] = None) -> li
             print(f"[seal_flow] WARN: 投影刷新失败 {path}（{type(exc).__name__}: {exc}）",
                   file=sys.stderr)
             return
-        after = path.read_bytes() if path.is_file() else None
+        try:
+            after = path.read_bytes() if path.is_file() else None
+        except Exception as exc:
+            failures.append(f"{path.name}: {type(exc).__name__}: {exc}")
+            print(f"[seal_flow] WARN: 投影读后失败 {path}（{type(exc).__name__}: {exc}）",
+                  file=sys.stderr)
+            return
         if after != before and after is not None:
             try:
                 changed.append(str(path.relative_to(workspace)))
@@ -245,8 +258,11 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
     if p.is_file():
         try:
             keep = bool(p.read_text(encoding="utf-8").strip())
-        except (OSError, UnicodeDecodeError):
-            keep = False
+        except (OSError, UnicodeDecodeError) as exc:
+            # 读不出 ≠ 空：不能把可能的人改内容当空桩覆盖掉（ocr2-313）。
+            print(f"[seal_flow] WARN: 收摊清单 {p} 读不出（{type(exc).__name__}: {exc}）"
+                  "⇒ 保留原文件，不覆盖", file=sys.stderr)
+            return p
         if keep:
             return p          # 幂等重入：人勾过的清单不擦（旧实现无条件 write_text 覆盖）
     p.write_text(body + "\n", encoding="utf-8")

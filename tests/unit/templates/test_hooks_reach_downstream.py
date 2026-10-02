@@ -177,6 +177,47 @@ class TestInitEntrypoints(unittest.TestCase):
         r = subprocess.run([str(w), "/some/other/repo"], capture_output=True, text=True, cwd=root)
         self.assertIn("K3DGE_SOURCE", r.stderr)      # 365：不接受位置参数，别再给"生效"假象
 
+    def test_wrapper_accepts_genuine_init_without_pipefail_false_alarm(self) -> None:
+        """`head|grep -q` + pipefail 会把真 k3dge 脚本 SIGPIPE 误判成外来（ocr2-380）。"""
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        (root / "scripts").mkdir()
+        body = "#!/usr/bin/env bash\n# k3dge-governed project\n" + "true\n" * 20000 + "exit 0\n"
+        (root / "scripts" / "init.sh").write_text(body, encoding="utf-8")
+        w = self._wrapper(root)
+        r = subprocess.run([str(w)], capture_output=True, text=True, cwd=root)
+        self.assertNotIn("不是 k3dge 下发", r.stderr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_wrapper_follows_symlinked_invocation(self) -> None:
+        """经符号链接调用要解析到**真实**所在目录，而不是链接目录（ocr2-378）。"""
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        real = root / "real"
+        (real / "scripts").mkdir(parents=True)
+        (real / "scripts" / "init.sh").write_text(
+            "#!/usr/bin/env bash\n# k3dge-governed project\nexit 0\n", encoding="utf-8")
+        target = self._wrapper(real)
+        bindir = root / "bin"
+        bindir.mkdir()
+        link = bindir / "k3dge-init.sh"
+        link.symlink_to(target)
+        r = subprocess.run([str(link)], capture_output=True, text=True, cwd=bindir)
+        self.assertNotIn("找不到", r.stderr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_wrapper_runs_without_exec_bit(self) -> None:
+        """init.sh 丢了执行位（归档/Windows checkout 常丢）仍应可跑（ocr2-379）。"""
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        (root / "scripts").mkdir()
+        init = root / "scripts" / "init.sh"
+        init.write_text("#!/usr/bin/env bash\n# k3dge-governed project\nexit 0\n", encoding="utf-8")
+        init.chmod(0o644)
+        w = self._wrapper(root)
+        r = subprocess.run([str(w)], capture_output=True, text=True, cwd=root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
     def test_doc_gate_scan_takes_explicit_argv(self) -> None:
         """`--scan` 由调用方传参，不再靠引擎偷读 sys.argv（366）。"""
         import io
@@ -224,6 +265,74 @@ class TestInitEntrypoints(unittest.TestCase):
             self.assertNotIn(str(ws / "src"), sys.path, "已能 import 时不得再塞仓内路径")
         finally:
             _restore_path()
+
+    def test_load_doc_gate_reraises_meaningful_import_error(self) -> None:
+        """没有仓内兜底时，`_load_doc_gate` 必须重抛**真实** ImportError（ocr2-383）。"""
+        import builtins
+        import importlib.machinery
+        import importlib.util
+        from unittest import mock
+
+        ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
+        spec = importlib.util.spec_from_loader(
+            "pc_mod2", importlib.machinery.SourceFileLoader(
+                "pc_mod2", str(K3DGE_SRC.parent / "scripts" / "pre-commit")))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        real_import = builtins.__import__
+
+        def _fake(name, *args, **kwargs):
+            if name.startswith("k3dge"):
+                raise ImportError(f"forced missing {name}")
+            return real_import(name, *args, **kwargs)
+
+        with mock.patch("builtins.__import__", side_effect=_fake):
+            with self.assertRaises(ImportError) as cm:
+                mod._load_doc_gate(ws)
+        self.assertIn("forced missing", str(cm.exception))
+
+    def test_precommit_workspace_falls_back_to_hook_dir_on_git_timeout(self) -> None:
+        """git 探测超时不得无声用 cwd，应回落 hook 所在仓并出声（ocr2-382）。"""
+        import importlib.machinery
+        import importlib.util
+        import io
+        from contextlib import redirect_stderr
+        from unittest import mock
+
+        spec = importlib.util.spec_from_loader(
+            "pc_ws", importlib.machinery.SourceFileLoader(
+                "pc_ws", str(K3DGE_SRC.parent / "scripts" / "pre-commit")))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        with mock.patch.object(mod.subprocess, "run",
+                               side_effect=mod.subprocess.TimeoutExpired("git", 10)):
+            with redirect_stderr(io.StringIO()) as buf:
+                ws = mod._workspace()
+        self.assertEqual(ws, Path(mod.__file__).resolve().parents[1])
+        self.assertIn("WARN", buf.getvalue())
+
+    def test_precommit_env_probe_failure_still_runs_consistency_gate(self) -> None:
+        """环境探测失败也要跑到一致性闸，不能 return 0 静默旁路（ocr2-384）。"""
+        import importlib.machinery
+        import importlib.util
+        import io
+        from contextlib import redirect_stderr
+        from unittest import mock
+
+        spec = importlib.util.spec_from_loader(
+            "pc_main", importlib.machinery.SourceFileLoader(
+                "pc_main", str(K3DGE_SRC.parent / "scripts" / "pre-commit")))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        with mock.patch.object(mod, "_workspace", side_effect=RuntimeError("boom")), \
+                mock.patch.object(mod, "_reexec_into_venv"), \
+                mock.patch.object(mod, "_load_doc_gate", side_effect=ImportError("nope")), \
+                mock.patch.object(mod, "_run_consistency_gate", return_value=7) as gate:
+            with redirect_stderr(io.StringIO()):
+                rc = mod.main()
+        self.assertEqual(rc, 7)
+        gate.assert_called_once()
 
     def test_ps1_init_gates_are_declared(self) -> None:
         """`init.ps1` 在本机（无 pwsh）不可跑，但四条判据必须在文本里成对存在（358/359/360/361/362）。"""
@@ -278,6 +387,48 @@ class TestTrackHygiene(unittest.TestCase):
         hook = (K3DGE_SRC.parent / "scripts" / "commit-msg").read_text(encoding="utf-8")
         self.assertIn("commit-attest --rewrite-file", hook)
         self.assertNotIn("$1.k3dge-tmp", hook, "hook 自己 grep+mv 的实现已退休（374）")
+
+    def _generate_docs_root(self) -> Path:
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        (root / "scripts").mkdir()
+        shutil.copy2(K3DGE_SRC.parent / "scripts" / "generate-docs.sh",
+                     root / "scripts" / "generate-docs.sh")
+        (root / ".agent").mkdir()
+        (root / ".agent" / "manifest.json").write_text("{}\n", encoding="utf-8")
+        return root
+
+    def test_generate_docs_creates_enabled_skips_disabled(self) -> None:
+        """行为级覆盖：跑真脚本，启用键建件、禁用键不建（ocr2-362）。"""
+        root = self._generate_docs_root()
+        (root / ".agent" / "docs.toml").write_text(
+            "[docs]\nuser_guide = true\nfaq = false\nreadme = false\n", encoding="utf-8")
+        r = subprocess.run(["bash", "scripts/generate-docs.sh"], cwd=root,
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue((root / "docs" / "guides" / "user_guide.md").is_file())
+        self.assertFalse((root / "docs" / "guides" / "faq.md").exists())
+
+    def test_generate_docs_readme_created_when_enabled(self) -> None:
+        root = self._generate_docs_root()
+        (root / ".agent" / "docs.toml").write_text("[docs]\nreadme = true\n", encoding="utf-8")
+        r = subprocess.run(["bash", "scripts/generate-docs.sh"], cwd=root,
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue((root / "README.md").is_file())
+
+    def test_generate_docs_refuses_wrong_root(self) -> None:
+        """缺 `.agent/manifest.json` 的目录不得被写进 docs/（ocr2-358）。"""
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        (root / "scripts").mkdir()
+        shutil.copy2(K3DGE_SRC.parent / "scripts" / "generate-docs.sh",
+                     root / "scripts" / "generate-docs.sh")
+        (root / "docs").mkdir()                 # 只碰巧有 docs/ 不足以过验根
+        r = subprocess.run(["bash", "scripts/generate-docs.sh"], cwd=root,
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("manifest.json", r.stderr)
 
 
 if __name__ == "__main__":

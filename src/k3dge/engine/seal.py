@@ -212,7 +212,16 @@ def _seal_archive(workspace: Path, milestone_id: str, tasks: List[MilestoneTask]
         nxt = bump_milestone(workspace)
         return True, f"{sealed} Next milestone: {nxt}"
     except Exception as exc:
-        # 指针没前进是**事实**：吞掉异常 ⇒ 调用方（seal_flow._archive 只看 ok）无从得知原因（461）
+        # 指针没前进是**事实**：吞掉异常 ⇒ 调用方（seal_flow._archive 只看 ok）无从得知原因（461）。
+        # 保持 ADR-0004 §2.3（bump 失败不回滚归档、不判失败），但给一个**机器可读**信号——
+        # 只靠文案里的 emoji，断言"封板成功 ⇒ 指针前进"的消费者无从区分（ocr2-308）。
+        try:
+            from k3dge.engine import events
+
+            events.emit(workspace, "milestone_pointer_stale",
+                        error=f"{type(exc).__name__}: {exc}")
+        except Exception:
+            pass
         return True, f"{sealed} ⚠️ 里程碑指针未前进（{type(exc).__name__}: {exc}）⇒ 手工 'k3dge milestone' 查因"
 
 
@@ -244,6 +253,12 @@ def seal_preconditions_error(workspace: Path, milestone_id: str) -> Optional[gat
     """
     from k3dge.engine import nodes
 
+    if not gates.preconditions(workspace, "seal"):
+        # 空/未声明的前置闸 ⇒ run_phase 显式 no-op 返回 (True, "")，封板将**无闸通过**
+        # （ocr2-309）。与"未实现的 id 视为配置错"同口径：不让声明空转。
+        return gates.Rejection(
+            "no_seal_preconditions",
+            "封板前置闸声明为空（[checks.seal].preconditions）：不放行空声明，先修配置。")
     refs = _seal_gate_registry(workspace, milestone_id)
     ok, out = nodes.run_phase(workspace, "seal", "preconditions", refs["fns"], refs["ctx"])
     return None if ok else out
@@ -287,12 +302,22 @@ def seal_checklist(workspace: Path, milestone_id: str) -> list:
     refs = _seal_gate_registry(workspace, milestone_id)
     auto = nodes.satisfied_ids(workspace, "seal")
     out = []
-    for gid in gates.preconditions(workspace, "seal"):
+    declared = gates.preconditions(workspace, "seal")
+    if not declared:
+        # 空声明不得被清单渲染成"0/0 全绿"（ocr2-309）：作为一条未过项暴露。
+        out.append(("no_seal_preconditions", False,
+                    "封板前置闸声明为空（[checks.seal].preconditions）：不放行空声明", False))
+    for gid in declared:
         fn = refs["fns"].get(gid)
         if fn is None:
             out.append((gid, False, f"gate contract references unknown gate id: '{gid}'", False))
             continue
-        err = fn(refs["ctx"])
+        try:
+            err = fn(refs["ctx"])
+        except Exception as exc:
+            # 与 `seal_preconditions_error`（走 nodes.run_phase 的异常正规化）同口径：
+            # 闸异常不得裸穿 seal-check / [NEXT] blocker 计算（ocr2-310）。
+            err = f"{type(exc).__name__}: {exc}"
         # `auto`：现在不过，但 seal 自己的动作会先跑它（如 `full_matrix` → 写 align-pass marker）
         out.append((gid, not err, "" if not err else str(err), bool(err) and gid in auto))
     return out
@@ -489,6 +514,10 @@ def seal_record(
     ⇒ 把记录挂在"审计的提交"上会没有载体（本会话实测）。封版动作本身必然产生改动，
     所以这里一定有载体。
     """
+    id_err = _validate_milestone_id(milestone_id)
+    if id_err:
+        # 先验 id 再提交：否则封版提交已进历史、tag 才拒，留下悬空记录且重入可能二次提版（ocr2-311）。
+        return False, id_err
     trailers = format_seal_trailers(milestone_id, baseline, seat, result)
     msg = (subject or f"chore(seal): seal milestone {milestone_id} "
                        f"(audit {result or '?'}; baseline {(baseline or '?')[:12]})")

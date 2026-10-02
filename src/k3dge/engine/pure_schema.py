@@ -356,7 +356,11 @@ def check_amend(block: Any, codes: Dict[str, Any], filename: str, text: str) -> 
     ⑥ 同一修订号的小标号按正文出现序从 1 连续；⑦ `Draft`/`Proposed` 不带修订留痕；
     ⑧ 多条修订都只写同一个节（同一天两条，或先后三条及以上）＝拆主题。
     """
+    # 声明即判据：schema 写 `{"amend": {"enabled": false}}` 就必须真的关掉（ocr2-344）。
+    # 以前只问 `block` 的真假，嵌套的 `enabled` 从不被读 ⇒ 声明是死的、关不掉的。
     if not block:
+        return []
+    if isinstance(block, dict) and not block.get("enabled", True):
         return []
     c_order = code_for((codes or {}), "amend_order", "ADR_AMEND_ORDER")
     c_tail = code_for((codes or {}), "footnote_tail", "ADR_FOOTNOTE_TAIL")

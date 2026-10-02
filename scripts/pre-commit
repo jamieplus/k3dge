@@ -18,12 +18,23 @@ from pathlib import Path
 
 
 def _workspace() -> Path:
-    # git 不在 PATH / rev-parse 失败 / 空 stdout ⇒ 回落 cwd；subprocess 本身也不许抛（ocr-025）。
+    # git 不在 PATH / 超时 / rev-parse 失败 / 空 stdout ⇒ 回落 **hook 自身所在仓**
+    # （`<ws>/scripts/pre-commit`，比 cwd 可靠）并出声，避免对可能不是提交仓的 cwd 跑闸（ocr2-382）。
+    # timeout 必须有，且 `TimeoutExpired` 不是 `OSError`，要一并接住。
+    fallback = Path(__file__).resolve().parents[1]
     try:
-        r = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
-    except OSError:
-        return Path.cwd().resolve()
-    return Path(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip() else Path.cwd().resolve()
+        r = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"[k3dge] WARN: git 定位工作区失败（{exc}）→ 回落 hook 所在目录 {fallback}", file=sys.stderr)
+        return fallback
+    if r.returncode == 0 and r.stdout.strip():
+        return Path(r.stdout.strip())
+    print(f"[k3dge] WARN: git rev-parse 未给出仓根（rc={r.returncode}）→ 回落 hook 所在目录 {fallback}",
+          file=sys.stderr)
+    return fallback
 
 
 def _reexec_into_venv(ws: Path) -> None:
@@ -57,13 +68,15 @@ def _load_doc_gate(ws: Path):
 
         return doc_gate
     except ImportError:
-        pass
-    if (ws / "src" / "k3dge" / "engine" / "__init__.py").is_file():
+        if not (ws / "src" / "k3dge" / "engine" / "__init__.py").is_file():
+            # 没有仓内兜底 ⇒ **在 except 内裸 raise** 重抛原 ImportError（含真实模块名/原因）。
+            # 旧实现把 `raise` 留在 except 块之后，异常已被清除 ⇒ 只剩
+            # `RuntimeError: No active exception to re-raise`，真实原因丢失（ocr2-383）。
+            raise
         sys.path.append(str(ws / "src"))   # 追加（不是插到 [0]）：自举仓兜底，不遮蔽已装版本
         from k3dge.engine import doc_gate  # noqa: PLC0415
 
         return doc_gate
-    raise
 
 
 def _run_consistency_gate(ws: Path, relevant) -> int:
@@ -94,12 +107,12 @@ def _run_consistency_gate(ws: Path, relevant) -> int:
 
 
 def main() -> int:
+    ws = Path(__file__).resolve().parents[1]
     try:
         ws = _workspace()
         _reexec_into_venv(ws)
-    except Exception as exc:      # 环境探测失败不得阻断提交
-        print(f"[k3dge] WARN: 环境探测失败（{exc}）→ 跳过钩子", file=sys.stderr)
-        return 0
+    except Exception as exc:      # 环境探测失败不得阻断提交，但**也不能连带跳过一致性闸**（ocr2-384）
+        print(f"[k3dge] WARN: 环境探测失败（{exc}）→ 用 {ws} 继续（一致性闸仍跑）", file=sys.stderr)
     try:
         doc_gate = _load_doc_gate(ws)
     except Exception as exc:      # k3dge 不可导入 ⇒ 文档/结构闸降级，但**一致性闸仍跑**

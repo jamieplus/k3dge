@@ -103,6 +103,14 @@ def test_has_table_shares_find_table_normalization() -> None:
     assert not rt.has_table("# r\n" + shuffled), "列序仍须严格（12 列契约）"
     assert rt.has_table(_TBL)
 
+def test_count_statuses_exposes_contract_check() -> None:
+    """命中的表是否真 12 列审计表要暴露给消费方（ocr2-304）；辅助表在前时不得冒充。"""
+    aux = "| ID | 状态 |\n| --- | --- |\n| X-1 | 待修 |\n\n" + _TBL
+    assert rt.count_statuses(aux)["contract_ok"] is False
+    assert rt.count_statuses(_TBL)["contract_ok"] is True
+    assert rt.count_statuses("nothing")["contract_ok"] is False
+
+
 def test_external_scan_report_is_not_the_audit_report() -> None:
     """外部全文件扫描（`-scan.md`）不得被当成本轮 k3dit 审计报告消费。
 

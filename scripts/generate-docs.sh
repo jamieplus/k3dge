@@ -9,8 +9,10 @@ set -euo pipefail
 # ROOT 由"本脚本在 <root>/scripts/ 下"推出：`pwd`（逻辑路径）经符号链接/复制会指错根，
 # 而且从不验根 ⇒ 政策、配置、docs 全在错根上算（355）。取物理路径 + 布局校验。
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-if [ ! -d "$ROOT/.agent" ] && [ ! -d "$ROOT/docs" ]; then
-  echo "[k3dge] generate-docs.sh: 推断的仓根 '$ROOT' 既无 .agent/ 也无 docs/ ⇒ 布局假设不成立，拒跑" >&2
+# 验根要**正向标记**：旧 `[ ! -d .agent ] && [ ! -d docs ]` 只在两者都缺时才拒，
+# 任何碰巧有 docs/ 的目录都放行，然后往里写 .agent/docs.toml 与 docs/guides/*.md（ocr2-358）。
+if [ ! -f "$ROOT/.agent/manifest.json" ]; then
+  echo "[k3dge] generate-docs.sh: 推断的仓根 '$ROOT' 缺 .agent/manifest.json ⇒ 不是 k3dge 治理仓，拒跑" >&2
   exit 1
 fi
 cd "$ROOT"
@@ -44,7 +46,10 @@ mkdir -p docs/guides
 if grep -Eq "^[[:space:]]*readme[[:space:]]*=[[:space:]]*true" "$CONFIG"; then
   if [ ! -f "README.md" ]; then
     echo "[k3dge] README.md not found, creating base version..."
-    cat > README.md << 'EOF'
+    # 与 gen() 同法：先写同目录临时件再原子落盘，避免中途失败留下半成品 README.md
+    # 被 `[ ! -f ]` 永久跳过（ocr2-360）。
+    _readme_tmp="$(mktemp "README.md.XXXXXX")"
+    cat > "$_readme_tmp" << 'EOF'
 # Project
 
 Spec-gate harness：为 vibecoding agent 提供确定性的契约漂移检测与 git 硬门禁。
@@ -66,6 +71,18 @@ Spec-gate harness：为 vibecoding agent 提供确定性的契约漂移检测与
 
 另见：`docs/specs/<domain>/spec.md`（各域契约事实源）。
 EOF
+    # 独占落盘：生成期间若 README.md 已被（另一进程/agent）创建，`mv -n` 不覆盖，
+    # 临时件仍在 ⇒ 检测到而非清掉用户的文件（ocr2-360/361）。
+    mv -n "$_readme_tmp" README.md 2>/dev/null || true
+    if [ -e "$_readme_tmp" ]; then
+      rm -f "$_readme_tmp"
+      if [ -e "README.md" ]; then
+        echo "[k3dge] README.md 生成期间已出现，保留既有文件" >&2
+      else
+        echo "[k3dge] 落盘失败：README.md" >&2
+        exit 1
+      fi
+    fi
   fi
   echo '[k3dge] README layout: 归 `k3dge sync`（本脚本不再触碰）'
 else
@@ -109,10 +126,17 @@ gen() {
 <!-- k3dge:guide-stub -->
 
 EOT
-      if ! mv "$tmp" "$file"; then
+      # 独占落盘：check-then-act 窗口里目标若被另一进程/agent 建出，`mv -n` 不覆盖。
+      # 残留临时件＝未落盘：目标在则"已出现、跳过"，否则真失败（ocr2-361）。
+      mv -n "$tmp" "$file" 2>/dev/null || true
+      if [ -e "$tmp" ]; then
         rm -f "$tmp"
-        echo "[k3dge] 落盘失败：$file" >&2
-        exit 1
+        if [ -e "$file" ]; then
+          echo "[k3dge] exists, skip: $file（生成期间已出现，未覆盖）"
+        else
+          echo "[k3dge] 落盘失败：$file" >&2
+          exit 1
+        fi
       fi
     fi
   else

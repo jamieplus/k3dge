@@ -98,5 +98,24 @@ class TestReadFailureIsNotConfirmation(unittest.TestCase):
         self.assertIn("not supported on this platform", err.getvalue())
 
 
+class TestAnswerExhaustion(unittest.TestCase):
+    """`answers=[]` 是 MCP 的恒取默认通道，不该喷冤枉 WARN；真用尽仍要出声（ocr2-295）。"""
+
+    def test_empty_answers_is_silent_default_channel(self) -> None:
+        err = io.StringIO()
+        p = Prompt(out_stream=err, answers=[])
+        with contextlib.redirect_stderr(err):
+            self.assertTrue(p.ask("q", default_yes=True))
+        self.assertNotIn("WARN", err.getvalue())
+
+    def test_used_up_answers_still_warn(self) -> None:
+        err = io.StringIO()
+        p = Prompt(out_stream=err, answers=["y"])
+        with contextlib.redirect_stderr(err):
+            p.ask("q1", default_yes=True)
+            p.ask("q2", default_yes=True)
+        self.assertIn("用尽", err.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

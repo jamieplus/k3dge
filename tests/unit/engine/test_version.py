@@ -212,5 +212,34 @@ class TestVersionParsing(unittest.TestCase):
         text = (ws / "pyproject.toml").read_text(encoding="utf-8")
         self.assertIn('version = "0.1.1"', text)
         self.assertIn('[tool.x]\nversion = "9.9.9"', text)
+
+    def test_relaxed_fallback_pairs_project_table(self) -> None:
+        """无 tomllib 的 3.10 回退：`[[array]]`/行尾注释不得让段对错位（ocr2-327）。"""
+        self.assertEqual(
+            version._pyproject_version_relaxed(
+                '[tool.pytest.ini_options]\naddopts = "-q"\n\n'
+                '[project]\nname = "x"\nversion = "1.2.3"\n'),
+            "1.2.3")
+        self.assertEqual(
+            version._pyproject_version_relaxed(
+                '[[tool.pytest.ini_options]]\nfoo = 1\n\n[project]\nversion = "9.9.9"\n'),
+            "9.9.9")
+
+    def test_non_utf8_pyproject_is_a_violation_not_traceback(self) -> None:
+        """非 UTF-8 的 pyproject 不得让版本闸裸抛（ocr2-328）。"""
+        ws = self._ws('[project]\nname = "x"\nversion = "0.1.0"\n')
+        (ws / "pyproject.toml").write_bytes(b"\xff\xfe[project]\nversion = \"0.1.0\"\n")
+        vs = version.validate_versions(ws)
+        self.assertTrue(vs)
+        self.assertEqual(vs[0].rule_id, "VERSION_MISMATCH")
+
+    def test_non_utf8_manifest_bump_raises_loudly(self) -> None:
+        """非 UTF-8 manifest 提版要带明确 ValueError，而非 TypeError/半途（ocr2-329）。"""
+        ws = self._ws('[project]\nname = "x"\nversion = "0.1.0"\n')
+        (ws / ".agent" / "manifest.json").write_bytes(b"\xff\xfe{}")
+        with self.assertRaises(ValueError):
+            version.bump_version(ws, part="patch")
+
+
 if __name__ == "__main__":
     unittest.main()

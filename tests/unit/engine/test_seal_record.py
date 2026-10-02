@@ -134,6 +134,16 @@ class TestSealRecord(TestCase):
         self.assertEqual(int(_git(ws, "rev-list", "--count", "HEAD")), commits_after_first)  # 无第二提交
         self.assertEqual(_git(ws, "rev-parse", "M12^{commit}"), baseline)  # 边界未动
 
+    def test_invalid_id_refuses_before_any_commit(self) -> None:
+        """非法里程碑 id 在提交**之前**被拒：不留悬空封版提交（ocr2-311）。"""
+        ws = _repo()
+        (ws / "f.md").write_text("x\n", encoding="utf-8")     # 脏树 ⇒ 否则无提交可观察
+        before = _git(ws, "rev-list", "--count", "HEAD")
+        ok, _msg = seal_record(ws, "M 10", baseline=_git(ws, "rev-parse", "HEAD"),
+                               result="closed")
+        self.assertFalse(ok)
+        self.assertEqual(_git(ws, "rev-list", "--count", "HEAD"), before)   # 无封版提交
+
 
 class TestTagBoundary(TestCase):
     def test_idempotent_same_target_and_refuses_move(self) -> None:

@@ -39,6 +39,22 @@ def test_unknown_blocking_ignored(tmp_path: Path) -> None:
     assert task_dag.blocking_graph(tmp_path)["a"] == []
 
 
+def test_summary_scans_graph_once() -> None:
+    """summary 从**同一份图**派生环与关键路径（ocr2-320）：只读一次盘。"""
+    g = {"a": ["b"], "b": []}
+    calls = []
+
+    def _fake(_ws):
+        calls.append(1)
+        return g
+
+    with mock.patch.object(task_dag, "blocking_graph", _fake):
+        s = task_dag.summary(Path("/nonexistent"))
+    assert len(calls) == 1, calls
+    assert s["critical_path"] == ["a", "b"]
+    assert s["blocking_cycles"] == {"cyclic": False}
+
+
 class TestBlockingDangling(unittest.TestCase):
     """`blocking:` 指向已关/不存在的票 ⇒ **报事实**（票一关，边被静默丢弃）。
 

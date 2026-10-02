@@ -61,6 +61,8 @@ PAIRS: list[tuple[str, str]] = [
     ("memo/AUTHORING.md", "docs/memo/AUTHORING.md"),
     ("branches/AUTHORING.md", "docs/branches/AUTHORING.md"),
     ("incidents/AUTHORING.md", "docs/incidents/AUTHORING.md"),
+    ("incidents/README.md", "docs/incidents/README.md"),
+    ("incidents/_template.md", "docs/incidents/_template.md"),
     ("tasks/.schema.json", "docs/tasks/.schema.json"),
     ("memo/.schema.json", "docs/memo/.schema.json"),
     ("branches/.schema.json", "docs/branches/.schema.json"),

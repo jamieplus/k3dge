@@ -43,11 +43,26 @@ fi
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "[k3dge] git init -b main  ($TARGET)"
   git init -b main
+else
+  # 只在"本目录是仓根"时才算已受管：TARGET 是别的仓的子目录时，旧判据会跳过 init，
+  # 让 hooks 装进祖先仓（改到无关仓）——比嵌套更糟（ocr2-369）。取 toplevel 与物理 cwd 比。
+  _TOP="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  _PWD="$(cd "$TARGET" && pwd -P)"
+  if [ -n "$_TOP" ] && [ "$_TOP" != "$_PWD" ]; then
+    echo "[k3dge] TARGET 不是 git 仓根（toplevel='$_TOP'）⇒ 拒跑：请 cd 到仓根，或换一个不在别的仓内的空目录" >&2
+    exit 1
+  fi
 fi
 
 if [ ! -x .venv/bin/python ]; then
   echo "[k3dge] python3 -m venv .venv"
   python3 -m venv .venv
+fi
+# 已存在的 venv 也要验解释器版本：3.9/uv/降级遗留的 .venv 会溜过，随后 install/sync
+# 以 SyntaxError/tomllib 形态失败（ocr2-370）。与建 venv 前对 python3 的判据同口径。
+if ! .venv/bin/python -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)' >/dev/null 2>&1; then
+  echo "[k3dge] .venv/bin/python 不可用或 < 3.10；请删除 .venv 后在 Python >= 3.10 下重跑 init" >&2
+  exit 1
 fi
 # 只看 .venv/bin/python 可执行不够：坏 pip / 无 pip / 过期 shebang 会在下一步才炸（ocr-172）。
 if ! .venv/bin/python -m pip --version >/dev/null 2>&1; then
@@ -61,6 +76,9 @@ fi
 if [ "$K3DGE_HOME" -ef "$TARGET" ]; then
   echo "[k3dge] pip install -e '.[dev]' (self)"
   .venv/bin/python -m pip install -q -e ".[dev]"
+  # 自举分支也必须落盘收据：否则一旦声明政策（env 或 pyproject），三轨读不到收据就永久
+  # exit 2，重跑 init 也修不回（ocr2-371）。存**物理路径**，与目录型源同口径。
+  printf '%s\n' "$(cd "$TARGET" && pwd -P)" > .venv/k3dge-source.txt
 else
   INSTALL_FLAGS=()
   if [ -z "${K3DGE_SOURCE:-}" ] || [ "${K3DGE_SOURCE:-}" = "pypi" ]; then
@@ -68,26 +86,31 @@ else
   elif [ -d "${K3DGE_SOURCE:-}" ]; then
     INSTALL_TARGET="${K3DGE_SOURCE}[mcp]"
     INSTALL_FLAGS=("-e")
-    echo "[k3dge] Installing editable from local path: $K3DGE_SOURCE"
   # 子串匹配 `https://*github.com*` 会放行 `https://github.com.evil.tld/`，`https://*/*` 放行任意主机（ocr2-022）。
   # 与 init.ps1 同口径：只认 `git+` 前缀、三家已知托管商路径前缀、`.git` 后缀。
   elif case "$K3DGE_SOURCE" in git+*|https://github.com/*|https://gitlab.com/*|https://bitbucket.org/*|*.git) true ;; *) false ;; esac; then
     INSTALL_TARGET="k3dge[mcp] @ ${K3DGE_SOURCE}"
-    echo "[k3dge] Installing from VCS source (non-editable): $K3DGE_SOURCE"
   else
     INSTALL_TARGET="${K3DGE_SOURCE}[mcp]"
-    echo "[k3dge] Installing from source/package: $K3DGE_SOURCE"
   fi
   # Fallback: downstream via /path/to/k3dge/k3dge-init.sh without K3DGE_SOURCE
   if [ -z "${K3DGE_SOURCE:-}" ] && [ -n "${K3DGE_HOME:-}" ] && [ -d "$K3DGE_HOME/src/k3dge" ]; then
     INSTALL_TARGET="${K3DGE_HOME}[mcp]"
     INSTALL_FLAGS=("-e")
   fi
-  # 回声放在**分类之后**：以前 PyPI 那行先印、随后又被改写成 K3DGE_HOME editable ⇒ 诊断信息自相矛盾（481）
+  # 分类后**只印一次**：旧实现各分支先印，再被 catch-all 无条件印成"editable"⇒ 同一次安装
+  # 出矛盾诊断（481/ocr2-374）。按 INSTALL_FLAGS 判 editable，别硬编码。
   case "$INSTALL_TARGET" in
     *" @ "*) echo "[k3dge] Installing from VCS source (non-editable): ${K3DGE_SOURCE}" ;;
     "k3dge[mcp]") echo "[k3dge] Installing from package index (PyPI)..." ;;
-    *) echo "[k3dge] Installing editable from local path: ${INSTALL_TARGET%[mcp]}" ;;
+    *)
+      if [ "${INSTALL_FLAGS[*]:-}" = "-e" ]; then
+        # `%\[mcp\]` 是转义后的 glob；旧 `${INSTALL_TARGET%[mcp]}` 把 `[mcp]` 当 m/c/p 字符集，什么都没剥掉（ocr2-374）。
+        echo "[k3dge] Installing editable from local path: ${INSTALL_TARGET%\[mcp\]}"
+      else
+        echo "[k3dge] Installing from source/package: ${INSTALL_TARGET%\[mcp\]}"
+      fi
+      ;;
   esac
   case "$INSTALL_TARGET" in
     -*) echo "[k3dge] 非法 INSTALL_TARGET（不得以 - 开头，防 pip 选项注入）：$INSTALL_TARGET" >&2; exit 1 ;;

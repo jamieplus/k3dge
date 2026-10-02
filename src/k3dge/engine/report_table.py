@@ -126,6 +126,11 @@ def count_statuses(text: str) -> Dict[str, object]:
     """
     counts: Dict[str, object] = {s: 0 for s in STATUSES}
     counts["total"] = 0
+    # 命中的是否真是 12 列审计表（顺序敏感）：`find_table` 宽松、只认 ID+状态，
+    # 前面的辅助表可能被当审计表整段解析（ocr2-304 / ocr-106 有意留的暴露面）。
+    # 消费方可据此区分"这张表的数字可信"与"只是碰巧有这两列"。
+    _hidx, _header = find_table(text)
+    counts["contract_ok"] = (_header == [c.strip() for c in TABLE_HEADER.split("|")])
     # `_ids_*` 键**无论命中与否都存在**：调用方按 `counts["_ids_待修"]` 取值时，
     # "这一态没出现过"与"键不存在"是两种形状，前者安全后者让新代码 KeyError（456）
     for s in list(STATUSES) + list(_OPEN_ALIASES) + ["待修", "未知状态", "畸形"]:

@@ -269,3 +269,129 @@ def test_present_raise_when_restore_fails(tmp_path, monkeypatch):
         W.present(ws, "J1", commit="HEAD")
     assert forced, "复位 checkout 从没发生——本测钉的形状已变"
     assert all(a[-1] == W.branch_name("J1") for a in forced), forced
+
+
+def test_present_surfaces_extract_problems(tmp_path, monkeypatch, capsys):
+    """present 抽取问题不得被吞（ocr2-331）。"""
+    ws = _repo(tmp_path)
+    W.ensure(ws, "J1")
+    monkeypatch.setattr(W, "extract", lambda wt: ([], ["src/m.py: 读取失败"]))
+    assert W.present(ws, "J1") == []
+    assert "抽取有问题" in capsys.readouterr().err
+
+
+def test_advance_checks_add_returncode(tmp_path, monkeypatch):
+    """`git add` 部分失败后不得继续 commit（ocr2-332）。"""
+    ws = _repo(tmp_path)
+    wt = W.ensure(ws, "J1")
+    (wt / "n.py").write_text("x = 1\n", encoding="utf-8")
+    real = W._git
+
+    def wrap(workspace, *args, **kw):
+        if args[:2] == ("add", "-A"):
+            return subprocess.CompletedProcess(list(args), 1, "", "fatal: simulated")
+        return real(workspace, *args, **kw)
+
+    monkeypatch.setattr(W, "_git", wrap)
+    with pytest.raises(RuntimeError, match="add failed"):
+        W.advance(ws, "J1")
+
+
+def test_strip_pins_preserves_line_endings(tmp_path):
+    """去钉只删整行，不改行尾/不加结尾换行（ocr2-333）。"""
+    ws = _repo(tmp_path)
+    wt = W.ensure(ws, "J9")
+    crlf = wt / "crlf.py"
+    crlf.write_bytes(b"# k3dit:pending A-1 x\r\nkeep = 1\r\n")
+    nonl = wt / "nonl.py"
+    nonl.write_bytes(b"# k3dit:pending B-1 x\nkeep2 = 2")
+    only = wt / "only.py"
+    only.write_bytes(b"# k3dit:pending C-1 x\n")
+    W.strip_pins(ws, "J9")
+    assert crlf.read_bytes() == b"keep = 1\r\n", crlf.read_bytes()
+    assert nonl.read_bytes() == b"keep2 = 2", nonl.read_bytes()
+    assert only.read_bytes() == b"", only.read_bytes()
+
+
+def test_landing_gate_skips_tests_when_pytest_missing(tmp_path, monkeypatch):
+    """解释器没装 pytest 不得被当落点闸红（ocr2-334）。"""
+    import importlib.util as iu
+
+    (tmp_path / "tests").mkdir()
+    monkeypatch.setattr(iu, "find_spec", lambda name: None)
+    assert W._run_landing_gate(tmp_path) == {"ok": True, "skipped": True}
+
+
+def test_landing_gate_env_is_isolated(tmp_path, monkeypatch):
+    """落点闸剥 GIT_* 与 PYTEST_ADDOPTS（ocr2-335）。"""
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "gate.py").write_text("pass\n", encoding="utf-8")
+    seen = {}
+
+    class R:
+        returncode, stdout, stderr = 0, "", ""
+
+    def fake_run(cmd, **kw):
+        seen.update(kw.get("env") or {})
+        return R()
+
+    monkeypatch.setenv("PYTEST_ADDOPTS", "-x")
+    monkeypatch.setenv("GIT_DIR", "/evil")
+    monkeypatch.setattr(W.subprocess, "run", fake_run)
+    W._run_landing_gate(tmp_path)
+    assert "PYTEST_ADDOPTS" not in seen
+    assert "GIT_DIR" not in seen
+
+
+def test_accept_dirty_requires_path_component_boundary(tmp_path):
+    """白名单前缀无目录边界不得覆盖人的未跟踪子树（ocr2-336）。"""
+    ws = _repo(tmp_path)
+    W.ensure(ws, "J1")
+    _commit_on_branch(ws, "b.py", "x = 1\n")
+    (ws / "notes").mkdir()
+    (ws / "notes" / "todo.md").write_text("human\n", encoding="utf-8")
+    r = W.merge_back(ws, "J1", accept_dirty=("note",))
+    assert not r["ok"] and r["mode"] == "dirty", r
+
+
+def test_prune_reports_remove_failure(tmp_path, monkeypatch):
+    """`worktree remove` 失败不得上报成功、也不得删分支（ocr2-338）。"""
+    ws = _repo(tmp_path)
+    W.ensure(ws, "J1")
+    real = W._git
+
+    def wrap(workspace, *args, **kw):
+        if args[:2] == ("worktree", "remove"):
+            return subprocess.CompletedProcess(list(args), 1, "", "fatal: locked")
+        return real(workspace, *args, **kw)
+
+    monkeypatch.setattr(W, "_git", wrap)
+    out = W.prune(ws, "J1")
+    assert out["removed"] == [], out
+    assert _grc(ws, "rev-parse", "--verify", "-q", "refs/heads/k3dit/J1") == 0
+
+
+def test_pin_baseline_rejects_bad_oid_without_git(tmp_path, monkeypatch):
+    """前导 `-` 的 oid/非法 name 不得下发 git（ocr2-339）。"""
+    ws = _repo(tmp_path)
+    called = []
+
+    def spy(*a, **k):
+        called.append(a)
+        return subprocess.CompletedProcess(list(a), 1, "", "")
+
+    monkeypatch.setattr(W, "_git", spy)
+    assert W.pin_baseline(ws, "ok", "--batch-all-objects") is False
+    assert W.pin_baseline(ws, "../evil", "a" * 40) is False
+    assert called == []
+
+
+def test_materialize_refuses_nonempty_dest(tmp_path):
+    """物化目标非空 ⇒ 拒绝，避免两版并集（ocr2-341）。"""
+    ws = _repo(tmp_path)
+    head = _g(ws, "rev-parse", "HEAD").strip()
+    dest = tmp_path / "mat"
+    dest.mkdir()
+    (dest / "junk").write_text("x\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="非空"):
+        W.materialize(ws, head, dest)

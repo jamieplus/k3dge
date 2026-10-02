@@ -627,6 +627,59 @@ class TestSealChecklist(unittest.TestCase):
         self.assertIn("封板前置清单（M10）", msg)
         self.assertIn("✅ tasks_all_done", msg)
 
+    def test_empty_preconditions_is_exposed_not_all_green(self) -> None:
+        """空声明不得被读成"全绿放行"（ocr2-309）：拒绝 + 清单里显式一项。"""
+        from k3dge.engine import gates
+        from k3dge.engine.seal import seal_checklist, unmet_seal_preconditions
+
+        _set_seal_gates(self.ws)
+        self.assertEqual(gates.preconditions(self.ws, "seal"), [])
+        err = seal_preconditions_error(self.ws, "M10")
+        self.assertIsNotNone(err)
+        self.assertEqual(getattr(err, "gate_id", None), "no_seal_preconditions")
+        rows = seal_checklist(self.ws, "M10")
+        self.assertEqual([r[0] for r in rows], ["no_seal_preconditions"])
+        self.assertFalse(rows[0][1])
+        self.assertEqual([g for g, _m in unmet_seal_preconditions(self.ws, "M10")],
+                         ["no_seal_preconditions"])
+
+    def test_pointer_stall_emits_machine_readable_event(self) -> None:
+        """提版失败（指针停滞）除文案外要有机器可读信号（ocr2-308）。"""
+        from unittest import mock
+
+        from k3dge.engine import seal as seal_mod
+        from k3dge.engine.events import read_events
+        from k3dge.engine.task_index import MilestoneTask
+
+        t = self.ws / "docs" / "tasks" / "2026-09-01-M10-feat-x.done.md"
+        t.write_text("---\nstatus: done\nmilestone: M10\n---\n\n# X\n", encoding="utf-8")
+        task = MilestoneTask(path=t, slug=t.stem, status="done", milestone="M10")
+        with mock.patch.object(seal_mod, "bump_milestone", side_effect=RuntimeError("no pointer")):
+            ok, msg = seal_mod._seal_archive(self.ws, "M10", [task])
+        self.assertTrue(ok)                      # ADR-0004 §2.3：提版失败不判失败
+        self.assertIn("未前进", msg)
+        evs = [e for e in read_events(self.ws, last=50)
+               if e.get("evt") == "milestone_pointer_stale"]
+        self.assertTrue(evs, "指针停滞缺机器可读信号（只有文案 emoji）")
+
+    def test_gate_exception_is_normalized_in_checklist(self) -> None:
+        """闸函数抛异常不得裸穿 seal-check / [NEXT] blocker 计算（ocr2-310）。"""
+        from unittest import mock
+
+        from k3dge.engine.seal import seal_checklist
+
+        _set_seal_gates(self.ws, "boom")
+
+        def _boom(_ctx):
+            raise RuntimeError("kaboom")
+
+        with mock.patch("k3dge.engine.seal._seal_gate_registry",
+                        return_value={"fns": {"boom": _boom}, "ctx": {}}):
+            rows = seal_checklist(self.ws, "M10")
+        self.assertEqual(rows[0][0], "boom")
+        self.assertFalse(rows[0][1])
+        self.assertIn("kaboom", rows[0][2])
+
 
 if __name__ == "__main__":
     unittest.main()

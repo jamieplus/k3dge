@@ -5,6 +5,12 @@
       "deferred",
       "in-progress",
       "done"
+    ],
+    "priority": [
+      "P0",
+      "P1",
+      "P2",
+      "P3"
     ]
   },
   "sections_when": {

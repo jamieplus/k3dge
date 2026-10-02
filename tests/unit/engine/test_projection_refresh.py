@@ -83,6 +83,27 @@ class TestProjectionRefresh(unittest.TestCase):
         _refresh_projections(self.repo)
         self.assertTrue(search.index_path(self.repo).is_file())
 
+    def test_one_unreadable_projection_does_not_abort_the_rest(self) -> None:
+        """某件读前失败只跳过它，其余投影照刷（ocr2-312）。"""
+        from unittest import mock
+
+        gen = self.repo / "docs" / "generated"
+        gen.mkdir(parents=True)
+        target = gen / "api.md"
+        target.write_text("old\n", encoding="utf-8")
+        real_read_bytes = Path.read_bytes
+
+        def _fake_read_bytes(self):
+            if self == target:
+                raise OSError("EIO")
+            return real_read_bytes(self)
+
+        f: list = []
+        with mock.patch.object(Path, "read_bytes", _fake_read_bytes):
+            _refresh_projections(self.repo, f)      # 不抛
+        self.assertTrue(any("api.md" in x for x in f), f)
+        self.assertTrue(search.index_path(self.repo).is_file())   # 其余件仍完成
+
 
 class TestWhereSelfHeals(unittest.TestCase):
     def setUp(self) -> None:

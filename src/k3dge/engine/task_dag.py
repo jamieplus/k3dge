@@ -108,7 +108,11 @@ def blocking_cycles(workspace: Path) -> Dict[str, object]:
 
 def critical_path(workspace: Path) -> Dict[str, object]:
     """最长阻塞链（按节点数）。有环 ⇒ 退化为空（由 `blocking_cycles` 报环）。"""
-    g = blocking_graph(workspace)
+    return _critical_path_of(blocking_graph(workspace))
+
+
+def _critical_path_of(g: Dict[str, List[str]]) -> Dict[str, object]:
+    """在**已建好的图**上求最长阻塞链（按节点数）。有环 ⇒ 退化为空。"""
     if _cycles_of(g)["cyclic"]:
         return {"path": [], "length": 0, "cyclic": True}
     memo: Dict[str, List[str]] = {}
@@ -133,10 +137,12 @@ def critical_path(workspace: Path) -> Dict[str, object]:
 
 
 def summary(workspace: Path) -> Dict[str, object]:
-    """观测件：环 + 关键路径（不判定）。"""
-    cp = critical_path(workspace)
+    """观测件：环 + 关键路径（不判定）。**同一份图** ⇒ 单盘扫、自洽（ocr2-320）。"""
+    g = blocking_graph(workspace)
+    cyc = _cycles_of(g)
+    cp = _critical_path_of(g)
     return {
-        "blocking_cycles": blocking_cycles(workspace),
+        "blocking_cycles": cyc,
         "critical_path": cp["path"],
         "critical_length": cp["length"],
         # 观测事实：`blocking:` 指向已关/不存在的票（票一关边就被静默丢弃，得有人报）

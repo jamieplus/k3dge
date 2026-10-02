@@ -602,7 +602,8 @@ class TestSealReadyStatesItsBlockers(TestCase):
         self.assertTrue(ns.reasons and "tasks_all_done" in ns.reasons[0])
 
     def test_says_all_green_when_clean(self) -> None:
-        ws = self._ws([])
+        # 声明一条真会过的闸（空声明现在 fail-closed 报 no_seal_preconditions，ocr2-309）。
+        ws = self._ws(["guides_filled"])
         (ws / "docs" / "tasks").mkdir(parents=True)
         (ws / "docs" / "tasks" / "2026-09-01-M10-feat-x.done.md").write_text(
             "---\nstatus: done\nmilestone: M10\npriority: P2\ndate: 2026-09-01\n---\n\n# X\n\n## 结案\n- x\n",

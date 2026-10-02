@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -33,10 +34,16 @@ def _safe_job(job: str) -> str:
 _CONFIG_ISOLATION_VARS = frozenset({"GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM"})
 
 
+def _clean_env() -> dict:
+    """剥掉调用方继承的 `GIT_*`（保留配置隔离对）——落点闸/物化也须复用同一口径（ocr2-335/341）。"""
+    return {k: v for k, v in os.environ.items()
+            if not k.startswith("GIT_") or k in _CONFIG_ISOLATION_VARS}
+
+
 def _git(workspace: Path, *args: str) -> subprocess.CompletedProcess:
-    env = {k: v for k, v in os.environ.items()
-           if not k.startswith("GIT_") or k in _CONFIG_ISOLATION_VARS}
-    return subprocess.run(["git", *args], cwd=str(workspace), capture_output=True, text=True, env=env)
+    # `stdin=DEVNULL`：`cat-file --batch` 之类的被注入开关不会从继承的交互 stdin 永久阻塞（ocr2-339）。
+    return subprocess.run(["git", *args], cwd=str(workspace), capture_output=True, text=True,
+                          env=_clean_env(), stdin=subprocess.DEVNULL)
 
 
 def branch_name(job: str) -> str:
@@ -99,7 +106,11 @@ def present(workspace: Path, job: str, commit: Optional[str] = None) -> list:
             _git(wt, "checkout", "-q", br)
             raise RuntimeError(f"present checkout {commit[:12]} 失败")
     try:
-        ms, _problems = extract(wt)
+        ms, problems = extract(wt)
+        if problems:
+            # present 是权威口供：抽取问题被吞 ⇒ 少报钉却返回成功（ocr2-331）。出声。
+            print(f"[worktree] WARN: present 抽取有问题（{len(problems)} 条）⇒ 钉可能少报："
+                  f"{problems[:3]}", file=sys.stderr)
         return [
             {"file": m.file, "line": m.line, "kind": m.kind, "id": m.id, "scope": m.scope, "note": m.note}
             for m in ms
@@ -118,8 +129,13 @@ def advance(workspace: Path, job: str) -> Optional[str]:
     """轮次前进：worktree 脏 ⇒ 进程代 commit（席位身份由调用方注入 env 或默认进程名）；
     分支前进只接受祖先关系（含 detached 席位 commit 的合法快进）；真分叉 ⇒ 拒，升级人工（§1.4）。"""
     wt = ensure(workspace, job)
-    if _git(wt, "status", "--porcelain").stdout.strip():
-        _git(wt, "add", "-A")
+    st = _git(wt, "status", "--porcelain")
+    if st.returncode != 0:            # status 失败（rc≠0、stdout 空）不得被当"干净树"（ocr2-332）
+        raise RuntimeError(f"status failed in worktree {wt}: {(st.stderr or st.stdout).strip()[:160]}")
+    if st.stdout.strip():
+        add = _git(wt, "add", "-A")
+        if add.returncode != 0:       # add 部分失败后 commit 会以已入索引子集成功（ocr2-332）
+            raise RuntimeError(f"git add failed in worktree {wt}: {(add.stderr or add.stdout).strip()[:160]}")
         from k3dge.engine.attest import append_to_message
 
         msg = append_to_message(wt, f"round work {job}", who="k3dge-process")
@@ -161,13 +177,16 @@ def strip_pins(workspace: Path, job: str) -> dict:
         if set(p.relative_to(wt).parts) & set(_SKIP_DIR_PARTS):
             continue
         try:
-            text = p.read_text(encoding="utf-8")
+            # `newline=""`：保留原行尾（CRLF/CR 不被 universal-newlines 折成 LF，ocr2-333）
+            # 也不给无结尾换行的文件补换行。
+            with open(p, "r", encoding="utf-8", newline="") as fh:
+                text = fh.read()
         except (UnicodeDecodeError, OSError):
             continue
         ms, _ = parse_text(rel, text, max_note=_mn, max_note_pending=_mnp)
         if not ms:
             continue
-        src = text.splitlines()
+        src = text.splitlines(keepends=True)
         drop = set()
         for m in ms:
             if m.kind == "leftover":        # 长期文献，随文件上主干，不删
@@ -180,7 +199,8 @@ def strip_pins(workspace: Path, job: str) -> dict:
         if drop:
             out = [ln for i, ln in enumerate(src, 1) if i not in drop]
             try:
-                p.write_text("\n".join(out) + "\n", encoding="utf-8")
+                with open(p, "w", encoding="utf-8", newline="") as fh:
+                    fh.write("".join(out))     # 逐字节保留其余行尾；全删则成空文件而非 "\n"
             except OSError as exc:
                 # 写回失败 ⇒ 钉还在盘上，但调用方拿到的是"剥离成功"计数，后续 advance 会把未剥离的
                 # pending 钉带进主干（ocr2-088）。进 `suspicious`（人审面），不静默 `continue`。
@@ -210,12 +230,22 @@ def _run_landing_gate(workspace: Path) -> dict:
     if doc.is_file():
         steps.append(("doc-gate", [sys.executable, str(doc), "--scan"]))
     if (workspace / "tests").is_dir():
-        steps.append(("tests", [sys.executable, "-m", "pytest", "-q"]))
+        import importlib.util
+
+        # 环境不具备（解释器没装 pytest）不得报成"落点机械闸红"（ocr2-334）：探测可用性，
+        # 不可用则跳过该件（与"缺哪件跳哪件"同口径），不拿 rc≠1 回滚已 ff 的主干。
+        if importlib.util.find_spec("pytest") is not None:
+            steps.append(("tests", [sys.executable, "-m", "pytest", "-q"]))
     if not steps:
         return {"ok": True, "skipped": True}
+    # 落点闸也是被审仓的机械件：复用 `_git` 的环境隔离（GIT_*），并去掉宿主
+    # `PYTEST_ADDOPTS`，否则同一份 diff 可因调用方环境假绿/假红（ocr2-335）。
+    gate_env = _clean_env()
+    gate_env.pop("PYTEST_ADDOPTS", None)
     for name, cmd in steps:
         try:
-            r = subprocess.run(cmd, cwd=str(workspace), capture_output=True, text=True)
+            r = subprocess.run(cmd, cwd=str(workspace), capture_output=True, text=True,
+                               env=gate_env)
         except OSError as exc:
             return {"ok": False, "step": name, "message": f"执行失败：{exc}"}
         if r.returncode != 0:
@@ -256,10 +286,17 @@ def merge_back(workspace: Path, job: str, accept_dirty: tuple = ()) -> dict:
     if _git(workspace, "rev-parse", "--verify", "-q", f"refs/heads/{br}").returncode != 0:
         return {"ok": True, "mode": "no-branch"}
     dirty = []
-    for line in _git(workspace, "status", "--porcelain").stdout.splitlines():
+
+    def _covered(p: str, a: str) -> bool:
+        # 目录分量边界比较：`notes/todo.md`.startswith("note") 不得被放行（ocr2-336）。
+        p, a = p.rstrip("/"), a.rstrip("/")
+        return bool(a) and (p == a or p.startswith(a + "/") or a.startswith(p + "/"))
+
+    # `core.quotePath=false`：非 ASCII 路径不被八进制转义，白名单才比得上（ocr2-336）。
+    for line in _git(workspace, "-c", "core.quotePath=false", "status", "--porcelain").stdout.splitlines():
         path = line[3:].split(" -> ")[-1].strip().strip('"')
-        # 双向前缀：porcelain 会把未跟踪目录折成 `docs/`，白名单写的是 `docs/tasks/…`
-        if not any(path.startswith(a) or (a and a.startswith(path.rstrip("/"))) for a in accept_dirty):
+        # 双向：porcelain 会把未跟踪目录折成 `docs/`，白名单写的是 `docs/tasks/…`
+        if not any(_covered(path, a) for a in accept_dirty):
             dirty.append(path)
     if dirty:
         return {"ok": False, "mode": "dirty",
@@ -306,13 +343,15 @@ def prune(workspace: Path, job: str) -> dict:
     未并入（在办/冲突未人工闭环）⇒ 线保留原位，崩溃恢复与幂等重试都靠它。
     """
     removed = []
-    try:
-        remove(workspace, job)
+    # 认返回码：git worktree remove 失败（目录缺失/locked/被外部清）不得被上报成"已删"，
+    # 否则留下 HEAD 指向已删分支的孤立 worktree，后续 ensure 会把它当健康现场（ocr2-338）。
+    rc_remove = _git(workspace, "worktree", "remove", "--force", str(worktree_path(workspace, job)))
+    wt_removed = rc_remove.returncode == 0
+    if wt_removed:
         removed.append(f"wt:{job}")
-    except Exception:
-        pass
     br = branch_name(job)
-    if _git(workspace, "rev-parse", "--verify", "-q", f"refs/heads/{br}").returncode == 0 \
+    if wt_removed \
+            and _git(workspace, "rev-parse", "--verify", "-q", f"refs/heads/{br}").returncode == 0 \
             and _git(workspace, "merge-base", "--is-ancestor", br, "HEAD").returncode == 0:
         d = _git(workspace, "branch", "-D", br)
         if d.returncode == 0:
@@ -327,7 +366,13 @@ def remove(workspace: Path, job: str) -> None:
 def pin_baseline(workspace: Path, name: str, oid: str) -> bool:
     """留存被引用的审计基线（报告引用的 commit 经 rebase 后可能悬空，gc 即不可复验）。
     ref 与审计线共存亡之外的另一条命：只增（每单一条），清理由留存策略定，不在收口删。"""
-    if not oid or _git(workspace, "cat-file", "-t", oid).stdout.strip() != "commit":
+    # `oid` 是外部输入：形状白名单挡住前导 `-` 被当开关（`--batch` 会从 stdin 读对象名，
+    # 未加 DEVNULL 时永久阻塞），`name` 不得带 `..`/控制字符/前导 `-`（ocr2-339）。
+    if not oid or not re.fullmatch(r"[0-9a-fA-F]{7,40}", oid):
+        return False
+    if not name or not _JOB_RE.fullmatch(name):
+        return False
+    if _git(workspace, "cat-file", "-t", oid).stdout.strip() != "commit":
         return False
     return _git(workspace, "update-ref", f"refs/audit-baseline/{name}", oid).returncode == 0
 
@@ -371,9 +416,14 @@ def materialize(workspace: Path, rev: str, dest: Path) -> Path:
     if _git(workspace, "rev-parse", "--verify", "-q", f"{rev}^{{commit}}").returncode != 0:
         raise RuntimeError(f"未知版本（无法物化）: {rev!r}")
     dest = Path(dest)
+    # 覆盖式解包到已有目录会残留上一版被删的文件 ⇒ Hall 拿到两版并集且无提示（ocr2-341）。
+    if dest.exists() and any(dest.iterdir()):
+        raise RuntimeError(f"物化目标非空，拒绝覆盖（先清空或换目录）: {dest}")
     dest.mkdir(parents=True, exist_ok=True)
+    # 与 `_git` 同口径剥 `GIT_*`：否则调用方的 GIT_DIR/GIT_WORK_TREE 会让这里归档另一个仓（ocr2-341）。
     p = subprocess.run(["git", "archive", "--format=tar", rev], cwd=str(workspace),
-                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=_clean_env(),
+                       stdin=subprocess.DEVNULL)
     if p.returncode != 0:
         raise RuntimeError(f"物化失败: {p.stderr.decode('utf-8', 'replace').strip()[:160]}")
     with tarfile.open(fileobj=io.BytesIO(p.stdout)) as tf:

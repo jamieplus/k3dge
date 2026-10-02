@@ -6,8 +6,8 @@ set -euo pipefail
 # 深度都会指错，而后续所有路径（政策/收据/venv）都在错根上算（352）。
 # `pwd -P` 取**物理**路径；再用 gate.py 这个治理件是否存在来验根，验不过就拒跑。
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-if [ ! -f "$ROOT/scripts/gate.py" ]; then
-  echo "[k3dge] gate.sh: 推断的仓根 '$ROOT' 里没有 scripts/gate.py ⇒ 布局假设不成立，拒跑" >&2
+if [ ! -f "$ROOT/scripts/gate.py" ] || [ ! -d "$ROOT/.agent" ]; then
+  echo "[k3dge] gate.sh: 推断的仓根 '$ROOT' 缺 scripts/gate.py 或 .agent/ ⇒ 布局假设不成立，拒跑" >&2
   exit 1
 fi
 cd "$ROOT"
@@ -16,6 +16,8 @@ cd "$ROOT"
 if [ $# -eq 0 ]; then
   set -- check
 fi
+# 用 `${1+"$@"}` 而不是 `"$@"`：bash <4.4（macOS 自带）在 `set -u` 下把空位置列表的
+# `"$@"` 当未定义变量报错，exec 静默死于 126/1（ocr2-355）。
 
 # K3DGE_SOURCE 统管校验：环境声明的源 vs 本 venv 的装时落盘，不一致即拦。
 # （装时真相 vs 现行政策，打架必须出声——重装或 unset 再走。）
@@ -28,6 +30,13 @@ if [ -z "$_WANT" ] && [ -f "$ROOT/pyproject.toml" ]; then
     # 与 gate.py 同口径：允许 tab、单/双引号、行尾注释（原 `s/^source *= *"\(...\)"*/` 只认双引号 + 无 tab）。
     _WANT="$(sed -n '/^\[tool\.k3dge\]$/,/^\[/p' pyproject.toml 2>/dev/null \
              | sed -n "s/^[[:space:]]*source[[:space:]]*=[[:space:]]*[\"']\([^\"']*\)[\"'][[:space:]]*\(#.*\)\?$/\1/p" | head -1)"
+    # 段里写了 `source =` 却没解析出值（值非字符串/写法畸形）≠ 没声明政策：拒跑，别静默当 legacy
+    # 放行一个未校验的判定核（ocr2-356，与 gate.ps1 同口径）。
+    if [ -z "$_WANT" ] && awk '/^\[[[:space:]]*tool\.k3dge[[:space:]]*\]/{f=1;next} /^\[/{f=0} f' \
+        pyproject.toml 2>/dev/null | grep -Eq '^[[:space:]]*source[[:space:]]*='; then
+      echo "[k3dge-source] pyproject 有 [tool.k3dge].source 但没解析出值 ⇒ 拒跑；请检查该行写法" >&2
+      exit 2
+    fi
   fi
 fi
 _SRC_FILE="$ROOT/.venv/k3dge-source.txt"
@@ -60,16 +69,22 @@ fi
 
 # Prefer the project-local venv so no manual activation is required.
 if [ -x "$ROOT/.venv/bin/k3dge" ]; then
-  exec "$ROOT/.venv/bin/k3dge" "$@"
+  exec "$ROOT/.venv/bin/k3dge" ${1+"$@"}
 fi
 
 # Fall back to a globally installed k3dge (pipx / pip)：收据只覆盖 `.venv`，全局那份来源不受政策约束
 # ⇒ 政策存在时至少出声（别让人以为跑的是刚校验过的那个二进制，ocr-158）。
 if command -v k3dge >/dev/null 2>&1; then
+  # 政策已声明却没有 .venv 判定核：全局 k3dge 来源未经收据校验 ⇒ 默认拒跑（与相邻分支
+  # 的 fail-closed 同口径，ocr2-357）；K3DGE_ALLOW_GLOBAL=1 保留便利回落。
+  if [ -n "$_WANT" ] && [ "${K3DGE_ALLOW_GLOBAL:-}" != "1" ]; then
+    echo "[k3dge-source] 政策已声明但 .venv/bin/k3dge 缺失：全局 k3dge 来源未经校验 ⇒ 拒跑（K3DGE_ALLOW_GLOBAL=1 可强制回落）" >&2
+    exit 2
+  fi
   if [ -n "$_WANT" ]; then
     echo "[k3dge-source] WARN: 政策已声明但 .venv/bin/k3dge 缺失 ⇒ 回落全局 k3dge（其来源未经收据校验）：$(command -v k3dge)" >&2
   fi
-  exec k3dge "$@"
+  exec k3dge ${1+"$@"}
 fi
 
 echo "k3dge not found. Run the one-time init first:" >&2

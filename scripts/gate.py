@@ -7,6 +7,12 @@ import sys
 import os
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+# 布局假设校验：ROOT 由"本脚本在 <root>/scripts/ 下"推出，被复制/软链到别的深度会指错根，
+# 于是政策/收据/venv 全在错根上算，且以"没声明政策"收场静默放行（ocr2-349）。与 gate.sh
+# 的验根同口径（`.agent/` 是 k3dge 治理仓的固定标记）。
+if not (ROOT / ".agent").is_dir():
+    print(f"[k3dge] gate.py: 推断的仓根 '{ROOT}' 里没有 .agent/ ⇒ 布局假设不成立，拒跑", file=sys.stderr)
+    sys.exit(1)
 
 args = sys.argv[1:] if len(sys.argv) > 1 else ["check"]
 
@@ -32,30 +38,59 @@ def _source_policy(pyproject: pathlib.Path) -> str:
             # 语法错 ≠ 没有政策：静默 return "" 会让该生效的政策悄悄关掉（ocr-148）。
             print(f"[k3dge-source] pyproject.toml 解析失败（{exc}）——拒绝静默放行", file=sys.stderr)
             sys.exit(1)
-        sec = data.get("tool", {}).get("k3dge", {})
-        return str(sec.get("source", "")).strip() if isinstance(sec, dict) else ""
-    # py3.10 文本回退：锚定 `source = "..."`（两种引号 + 行尾注释），别用 `startswith("source")`
-    # （会先命中 sources=/source-dir= 等相邻键，ocr-149）。
+        tool = data.get("tool", {})
+        if not isinstance(tool, dict):
+            print("[k3dge-source] pyproject 的 [tool] 不是表 ⇒ 拒绝静默放行", file=sys.stderr)
+            sys.exit(1)
+        if "k3dge" not in tool:
+            return ""
+        sec = tool["k3dge"]
+        if not isinstance(sec, dict):
+            print("[k3dge-source] pyproject 的 [tool.k3dge] 不是表 ⇒ 拒绝静默放行", file=sys.stderr)
+            sys.exit(1)
+        src = sec.get("source", "")
+        if not isinstance(src, str):
+            print(f"[k3dge-source] pyproject 的 source 不是字符串（{type(src).__name__}）⇒ 拒绝静默放行",
+                  file=sys.stderr)
+            sys.exit(1)
+        return src.strip()
+    return _source_policy_fallback(text)
+
+
+def _source_policy_fallback(text: str) -> str:
+    """py3.10 文本回退：锚定 `source = "..."`（两种引号 + 缩进 + 行尾注释），别用
+    `startswith("source")`（会先命中 sources=/source-dir= 等相邻键，ocr-149）。表头也先
+    剥注释/空白再比较（`[tool.k3dge] # x` / `[ tool.k3dge ]` 以前被判成"无政策"静默放行，
+    ocr2-351）；段存在却取不到值 ⇒ 拒跑，不静默当 legacy。"""
     inside = False
-    for line in text.splitlines():
-        s = line.strip()
+    saw_section = False
+    for raw in text.splitlines():
+        s = raw.strip()
+        if re.match(r"^\[\s*tool\.k3dge\s*\]\s*(#.*)?$", s):
+            inside = True
+            saw_section = True
+            continue
         if s.startswith("["):
-            inside = s == "[tool.k3dge]"
+            inside = False
             continue
         if inside:
-            m = re.match(r"""^source\s*=\s*["']([^"']+)["']""", s)
+            m = re.match(r"""^source\s*=\s*["']([^"']*)["']\s*(#.*)?$""", s)
             if m:
                 return m.group(1)
+    if saw_section:
+        print("[k3dge-source] pyproject 有 [tool.k3dge] 段但没解析出 source ⇒ 拒跑；请检查该行写法",
+              file=sys.stderr)
+        sys.exit(1)
     return ""
 
 
 def _norm_path(p: str) -> str:
-    """与 gate.sh 的 `cd "$ROOT"` 同口径：相对路径按**仓根**解析（不是调用者 cwd），目录取 realpath（ocr-152）。"""
+    """与 gate.sh 的 `cd "$ROOT"` 同口径：相对路径按**仓根**解析（不是调用者 cwd），无条件
+    realpath（文件/尚不存在路径上的 `..`/符号链接父目录也要归一，ocr2-352）。"""
     pp = pathlib.Path(p)
     if not pp.is_absolute():
         pp = ROOT / pp
-    s = str(pp)
-    return os.path.realpath(s) if os.path.isdir(s) else s.rstrip(os.sep)
+    return os.path.realpath(str(pp))
 
 
 _src_file = ROOT / ".venv" / "k3dge-source.txt"

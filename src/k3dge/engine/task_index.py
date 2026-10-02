@@ -81,7 +81,7 @@ def _frontmatter_pairs(content: str) -> List[tuple]:
     未闭合块一律不算 frontmatter（防正文 `key: value` 被误当元数据）。
     """
     lines = content.splitlines()
-    if len(lines) < 2 or lines[0].strip() != "---":
+    if len(lines) < 2 or lines[0].lstrip("\ufeff").strip() != "---":
         return []
     pairs: List[tuple] = []
     for line in lines[1:]:
@@ -101,9 +101,17 @@ def has_frontmatter(content: str) -> bool:
     冒充 status/milestone（元数据唯一源被绕过，331）。
     """
     lines = content.splitlines()
-    if len(lines) < 2 or lines[0].strip() != "---":
+    if len(lines) < 2 or lines[0].lstrip("\ufeff").strip() != "---":
         return False
     return any(ln.strip() == "---" for ln in lines[1:])
+
+
+def _frontmatter_unclosed(content: str) -> bool:
+    """首行是 `---` 但整块**没闭合**（编辑时删了尾部 `---`）：元数据损坏形态（ocr2-321）。"""
+    lines = content.splitlines()
+    if not lines or lines[0].lstrip("\ufeff").strip() != "---":
+        return False
+    return not any(ln.strip() == "---" for ln in lines[1:])
 
 
 def parse_frontmatter(content: str) -> dict[str, str]:
@@ -189,7 +197,8 @@ def _scan_task_dir(
         if _is_doc_aux(p.name):
             continue
         try:
-            content = p.read_text(encoding="utf-8")
+            # `utf-8-sig`：带 BOM 的票首行不再因 `\ufeff` 被当"无 frontmatter"而回退正文（ocr2-321）。
+            content = p.read_text(encoding="utf-8-sig")
         except (OSError, UnicodeDecodeError) as exc:
             # 权限拒绝/seal 正在批量 move 这些 .md/断链软链接/目录名以 .md 结尾 都会抛 OSError：
             # 旧只捕 UnicodeDecodeError ⇒ 整份扫描中断，align/seal 现场崩而不是跳过一票（330）
@@ -203,6 +212,13 @@ def _scan_task_dir(
             st = fm.get("status", "unknown").lower()
             m_id = fm.get("milestone", "").strip()
             pri = fm.get("priority", "").strip()
+            t_m = TITLE_RE.search(content)
+            title = t_m.group(1).strip() if t_m else p.stem
+        elif _frontmatter_unclosed(content):
+            # 首行 `---` 但块没闭合：元数据损坏，不得让正文正则（最不可信的源）顶替（ocr2-321）。
+            st = "unknown"
+            m_id = ""
+            pri = ""
             t_m = TITLE_RE.search(content)
             title = t_m.group(1).strip() if t_m else p.stem
         else:

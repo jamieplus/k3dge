@@ -205,6 +205,8 @@ def test_schema_block_gates_the_check():
 
     bad = "Amended-by:\n  - 1 | X | 2026-01-01 | a\n"
     assert check_amend(None, {}, "0001-a.md", bad) == []                    # 未声明 ⇒ 不查
+    # 显式关闸：声明 `enabled: false` 必须真的不查（ocr2-344，off-path 回归）。
+    assert check_amend({"enabled": False}, {"amend_order": "X"}, "0001-a.md", bad) == []
     got = check_amend({"enabled": True}, {"amend_order": "ADR_AMEND_ORDER"}, "0001-a.md", bad)
     assert got and got[0][0] == "ADR_AMEND_ORDER" and "前缀" in got[0][1]
     # 码可被 schema 覆盖（数据驱动）

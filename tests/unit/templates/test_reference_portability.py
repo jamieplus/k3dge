@@ -13,13 +13,14 @@ import unittest
 from pathlib import Path
 
 from k3dge.engine.nextstep import GATE_NEXT, STATE_OPTIONS, next_for_rejection
-from k3dge.templates.scaffold import _QUALIFY_ADR_RE, _qualify_adr_refs, scaffold
+from k3dge.templates.scaffold import _bare_adr_matches, _qualify_adr_refs, scaffold
 
-# 裸引用检测与限定转换**共用同一把正则**（t-309）：旧 `BARE_ADR_REF` 是
+# 裸引用检测与限定转换**共用同一套前缀判定**（t-309）：旧 `BARE_ADR_REF` 是
 # `_QUALIFY_ADR_RE` 的手抄副本（同样的 `k3dge `/`where ` 后顾 + `ADR[ -]\d{4}`），
 # 转换一旦放宽（`ADR-\d{4,5}`、容忍 `**k3dge** ADR-`…）副本就是过期定义——要么放过
-# 新该限定的文本、要么把已限定的正文误判违规，双向都可能。直接复用生产常量，永不分叉。
-BARE_ADR_REF = _QUALIFY_ADR_RE
+# 新该限定的文本、要么把已限定的正文误判违规，双向都可能。直接复用生产谓词，永不分叉。
+def _bare(text: str):
+    return _bare_adr_matches(text)
 
 
 class TestScaffoldProtocolPortability(unittest.TestCase):
@@ -54,7 +55,7 @@ class TestScaffoldProtocolPortability(unittest.TestCase):
             assert len(targets) >= 12, f"下发面缩水，本测试失去覆盖：{len(targets)}"
             for f in targets:
                 text = f.read_text(encoding="utf-8")
-                for m in BARE_ADR_REF.finditer(text):
+                for m in _bare(text):
                     seg = text[max(0, m.start() - 30) : m.end() + 10].replace("\n", " ")
                     self.fail(f"{f.relative_to(t)}: 裸 ADR 引用 …{seg}…（下游会指错靶）")
 
@@ -115,8 +116,8 @@ class TestNextStepPointersPortability(unittest.TestCase):
                 items = self._strings(opt.get(field))
                 for s in items:
                     scanned += 1
-                    self.assertIsNone(
-                        BARE_ADR_REF.search(s),
+                    self.assertEqual(
+                        _bare(s), [],
                         f"{state}.{field} 含裸 ADR 引用：{s}",
                     )
         # `[NEXT]` 事实还有一块经 `next_for_rejection()` 从 `REJECTION_FACTS` 投射的同显示面，
@@ -128,7 +129,7 @@ class TestNextStepPointersPortability(unittest.TestCase):
                 continue
             for s in self._strings([_ns.fact, _ns.reasons, _ns.pointers]):
                 scanned += 1
-                self.assertIsNone(BARE_ADR_REF.search(s), f"rejection({_gid}) 含裸 ADR 引用：{s}")
+                self.assertEqual(_bare(s), [], f"rejection({_gid}) 含裸 ADR 引用：{s}")
         self.assertGreater(scanned, 10, f"守卫空转：只扫到 {scanned} 条串")
 
 
@@ -152,6 +153,21 @@ class TestQualifyTransform(unittest.TestCase):
     def test_idempotent(self):
         once = _qualify_adr_refs("a ADR-0001 b ADR 0002 c")
         self.assertEqual(_qualify_adr_refs(once), once)
+
+    def test_elsewhere_is_not_the_where_exception(self):
+        # `(?<!where )` 会把 `elsewhere ADR-0001` 误当命令示例：词边界判定要限定它（ocr2-386）。
+        self.assertEqual(_qualify_adr_refs("elsewhere ADR-0001"), "elsewhere k3dge ADR-0001")
+        self.assertEqual(_qualify_adr_refs("anywhere ADR 0002"), "anywhere k3dge ADR 0002")
+
+    def test_trailing_digit_is_not_truncated(self):
+        # `ADR-00261` 不能被截成 `ADR-0026` + 游离 `1`（ocr2-386）。
+        self.assertEqual(_qualify_adr_refs("见 ADR-00261"), "见 ADR-00261")
+
+    def test_double_space_keeps_idempotent(self):
+        # `(?<!k3dge )` 对双空格不幂等会造出 `k3dge k3dge ADR-…`；词边界判定修掉（ocr2-386）。
+        s = "k3dge  ADR-0006"
+        self.assertEqual(_qualify_adr_refs(s), s)
+        self.assertEqual(_qualify_adr_refs(_qualify_adr_refs(s)), s)
 
 
 if __name__ == "__main__":

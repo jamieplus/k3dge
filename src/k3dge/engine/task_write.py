@@ -36,14 +36,20 @@ def _review_in_scope(text: str, title_token: str, stem_token: str, milestone_tok
     return title_token in text or stem_token[:20] in text
 
 
+#: 模糊配对的前缀子串最小长度：短中文描述（"无"/"路径错"）会让
+#: "短串出现在标题里"退化成近乎无条件命中（ocr2-322）。
+_MIN_MATCH = 6
+
+
 def _row_hits_task(row: dict, title_token: str, stem_token: str) -> bool:
     """模糊配对（遗留启发式，本函数只判不改口径）：标题/描述前 15 字子串，或行 ID 在票名里。"""
-    desc = row.get("问题描述", "")
-    fid = row.get("ID", "")
+    desc = str(row.get("问题描述", "") or "").strip()
+    fid = str(row.get("ID", "") or "")
+    title_token = (title_token or "").strip()
     return bool(
-        (title_token and title_token[:15] and title_token[:15] in desc)
+        (len(title_token) >= _MIN_MATCH and title_token[:15] in desc)
         or (fid and fid in stem_token)
-        or (desc and desc[:15] in title_token)
+        or (len(desc) >= _MIN_MATCH and desc[:15] in title_token)
     )
 
 
@@ -103,9 +109,26 @@ def _insert_into_backfill_block(new_lines: List[str], task_name: str) -> None:
         return
 
 
+def _backfill_block_text(lines: List[str]) -> str:
+    """取 `## 回填` 段正文（到下一个 `## ` 标题为止）；无段 ⇒ 空串。"""
+    out: List[str] = []
+    in_block = False
+    for ln in lines:
+        if ln.strip().startswith("## 回填"):
+            in_block = True
+            continue
+        if in_block and ln.startswith("## "):
+            break
+        if in_block:
+            out.append(ln)
+    return "\n".join(out)
+
+
 def _ensure_backfill_section(new_lines: List[str], text: str, task_name: str, fid: str) -> None:
-    """回填段幂等：票名已出现在正文 ⇒ 什么都不做。"""
-    if task_name in text:
+    """回填段幂等：票名已在**回填段**里 ⇒ 什么都不做。"""
+    # 幂等判据限定在回填段内：整篇搜票名会被 `处置` 单元格 / 别条回填 / 相关票清单命中，
+    # 于是行翻转已做却不写回填（半改，ocr2-323）。
+    if task_name in _backfill_block_text(new_lines):
         return
     # 与 `_insert_into_backfill_block` 用**同一个**判据（整行 startswith）。子串判据会把
     # `### 回填 …` 当成"已有回填段"，于是插入函数找不到锚行、什么都不写 ⇒ 静默漏回填（332）
@@ -358,9 +381,12 @@ def _finalize_task_done(workspace: Path, target: Path, content: str, fm: dict) -
     # ADR-0022: a task bound to an audit report can only close when that report has
     # no open 待修 findings (1 report = 1 task; closing the task == audit closure).
     report_rel = _task_report_pointer(content)
-    already_done = (fm.get("status", "").lower() == "done") or bool(
-        re.search(r"-\s+\*\*Status\*\*:\s*done\b", content, re.IGNORECASE)
-    )
+    # frontmatter 是**唯一源**：有 frontmatter 时不得让正文游离的 `Status: done` 绕过报告闸
+    # （status: idea + 正文 done ⇒ 旧实现跳闸关门，ocr2-324）；正文正则只留给无 frontmatter 的遗留票。
+    if fm:
+        already_done = fm.get("status", "").lower() == "done"
+    else:
+        already_done = bool(re.search(r"-\s+\*\*Status\*\*:\s*done\b", content, re.IGNORECASE))
     if report_rel and not already_done:
         pending = _report_open_findings(workspace, report_rel)
         if pending is None:
@@ -442,9 +468,19 @@ def _similar_task_hints(workspace: Path, title: str, exclude: Optional[Path] = N
         return []
     if not isinstance(env, dict) or not env.get("ok"):
         return []
-    excl = exclude.relative_to(workspace).as_posix() if exclude is not None else None
+    excl = None
+    if exclude is not None:
+        try:
+            # `exclude` 是任意公开参数：不在 workspace 下时 `relative_to` 抛 ValueError，
+            # 会穿透"永不阻断创建"的承诺（ocr2-325）。
+            excl = exclude.relative_to(workspace).as_posix()
+        except ValueError:
+            excl = None
     out: List[Tuple[str, str]] = []
     for r in env.get("results") or []:
+        # 信封元素可能是字符串/None（对端未守约）：裸 `.get` 会 AttributeError（ocr2-325）。
+        if not isinstance(r, dict):
+            continue
         p = str(r.get("path") or "")
         if not p or p == excl:
             continue
@@ -548,7 +584,12 @@ def reassign_milestone(
             continue
         scanned.append(p)
     for p in scanned:
-        ok, msg, _newp = reassign_task_milestone(workspace, p, to_milestone, dry_run=dry_run)
+        # apply 阶段也要逐张兜异常：read/write/rename 在竞态/权限下会抛，不得让整批半途中止
+        # （前面已迁移、后面的没动，ocr2-326）。
+        try:
+            ok, msg, _newp = reassign_task_milestone(workspace, p, to_milestone, dry_run=dry_run)
+        except (OSError, UnicodeDecodeError) as exc:
+            ok, msg = False, f"{p.name}: 应用失败（{type(exc).__name__}: {exc}）⇒ 跳过"
         lines.append(("OK  " if ok else "FAIL") + " " + msg)
         ok_all = ok_all and ok
     if not lines:

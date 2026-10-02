@@ -433,6 +433,25 @@ class TestWriteClosureNote(TestCase):
         self.assertNotIn("1.2.4", text)
         self.assertIn("2026-09-01-M1-audit.md", text)
 
+    def test_unreadable_existing_note_is_preserved(self) -> None:
+        """已存在的清单读不出时不得当空桩覆盖（ocr2-313）：人改内容保留。"""
+        from k3dge.engine.seal_flow import _write_closure_note
+
+        ws = _ws()
+        p = ws / "docs" / "reviews" / "2026-10-02-M1-closure.md"
+        p.write_text("人写的清单内容\n", encoding="utf-8")
+        real_read = Path.read_text
+
+        def _fake_read(self, *a, **k):
+            if self == p:
+                raise OSError("EIO")
+            return real_read(self, *a, **k)
+
+        with mock.patch.object(Path, "read_text", _fake_read):
+            again = _write_closure_note(ws, "M1")
+        self.assertEqual(again, p)
+        self.assertEqual(p.read_text(encoding="utf-8"), "人写的清单内容\n")
+
 
 class TestPrematureArchive(TestCase):
     """M9 实战：任务提前归档 ⇒ align/seal 顶扫不到；提示应可操作（batch archive at seal）。"""
@@ -1041,6 +1060,17 @@ class TestSealFlowEdges(TestCase):
             ok3, note3 = _rewrite_leftover_links(ws, "2026-09-02-M11-audit.md", "archive/M13/c.md")
         self.assertFalse(ok3)
         self.assertIn("写不进", note3)
+
+    def test_leftover_link_other_spelling_surfaces(self) -> None:
+        """非 `](file)` 形态（`#section`/HTML href）不能静默报成功（ocr2-305）。"""
+        from k3dge.engine.review_archive import _rewrite_leftover_links
+
+        ws = self._ws()
+        lo = ws / "docs" / "reviews" / "LEFTOVERS.md"
+        lo.write_text("[x](2026-09-01-M11-audit.md#root-cause)", encoding="utf-8")
+        ok, note = _rewrite_leftover_links(ws, "2026-09-01-M11-audit.md", "archive/M11/a.md")
+        self.assertFalse(ok)
+        self.assertIn("未改写", note)
 
 
 class TestLeftoverNewlineGuard(TestCase):
