@@ -30,15 +30,23 @@ Date: 2026-08-25
 """
 
 
-def _ws(tmp_path: Path, body: str) -> Path:
-    """最小 ADR 仓：**带 .schema.json 且声明 amend**（判据数据驱动，与 `k3dge check` 同一份 schema）。"""
-    import json as _json
+REPO_ADR_SCHEMA = Path(__file__).resolve().parents[3] / "docs" / "adr" / ".schema.json"
 
+
+def _ws(tmp_path: Path, body: str) -> Path:
+    """最小 ADR 仓：**复制仓内权威 `.schema.json`**（t-057）。
+
+    旧夹具手写的 `codes: {"amend": ...}` 根本不是 `check_amend` 读取的槽位名
+    （它按 `amend_order`/`footnote_tail`… 查码，ship 的 schema 用的正是那些）⇒
+    声明无效，且 docstring 说的"与 `k3dge check` 同一份 schema"从未成立——
+    seal 路径从没走过 schema 供码那条支路。手写副本还会漂移（t-229 同课）。
+    """
+    import shutil
+
+    assert REPO_ADR_SCHEMA.is_file(), f"权威 schema 不在：{REPO_ADR_SCHEMA}"
     d = tmp_path / "docs" / "adr"
     d.mkdir(parents=True)
-    (d / ".schema.json").write_text(
-        _json.dumps({"filename": r"^(\d{4})-[\w-]+\.md$", "amend": {"enabled": True},
-                     "codes": {"amend": "ADR_AMEND_FORMAT"}}, ensure_ascii=False), encoding="utf-8")
+    shutil.copyfile(REPO_ADR_SCHEMA, d / ".schema.json")
     (d / "0001-t.md").write_text(body, encoding="utf-8")
     return tmp_path
 
@@ -65,11 +73,24 @@ def test_defined_but_unreferenced_footnote_flagged(tmp_path):
 
 
 def test_footnotes_must_be_in_tail(tmp_path):
+    """穿插定义**同时**是"定义了却没被引用"（t-054/055）：
+
+    旧测一行 `bad.replace(X, X)` 是空操作（半成品注释）；`or "没有定义"` 这支在本
+    fixture 里**不可达**——注入的是"定义无引用"（报"没被引用"），"引用没有定义"要求
+    有引用缺定义，本件没有。两句各钉一条，措辞漂移即红。
+    """
     bad = GOOD.replace("## 2. 决策 (Decision)\n\n又一处[^🅰2.1]\n",
                        "## 2. 决策 (Decision)\n\n又一处[^🅰2.1]\n\n[^🅰9.9]: 修改：穿插\n")
-    bad = bad.replace("[^🅰2.1]: 修改：乙", "[^🅰2.1]: 修改：乙")   # 保持定义存在
     out = amend_format(_ws(tmp_path, bad)) or ""
-    assert "文末" in out or "没有定义" in out
+    assert "文末" in out, out
+    assert "没被引用" in out, out
+
+
+def test_reference_without_definition_is_flagged(tmp_path):
+    """`or` 后支的**正主**（t-055）：引用有、定义无 ⇒ "脚注引用没有定义"。"""
+    bad = GOOD.replace("正文[^🅰1.1]", "正文[^🅰7.7]")
+    out = amend_format(_ws(tmp_path, bad)) or ""
+    assert "引用没有定义" in out, out
 
 
 def test_wrapped_footnote_and_gapped_minor_are_fixed():
@@ -94,9 +115,13 @@ def test_wrapped_footnote_and_gapped_minor_are_fixed():
     again = {c for c, _, _ in check_amend({"enabled": True}, {}, "0001-t.md", fixed)}
     assert "ADR_FOOTNOTE_LINE" not in again
     assert "ADR_FOOTNOTE_SEQ" not in again
-    # 出现序：原 2.4 在前 ⇒ 变成 2.1，原 2.1 变成 2.2
-    assert "[^🅰2.1]" in fixed.split("## 2")[1].split("## 3")[0]
-    assert fixed.count("[^🅰2.4]") == 0
+    # 重编号映射按**出现序**逐个钉死（t-056）：旧断言的 `[^🅰2.1] in 段2` 在
+    # 未重编号的 `bad` 里同样成立（原文就含 `后[^🅰2.1]`），什么都没证明。
+    seg2 = fixed.split("## 2")[1].split("## 3")[0]
+    assert "先[^🅰2.1]后[^🅰2.2]" in seg2, seg2      # 2.4→2.1、2.1→2.2
+    assert "[^🅰2.4]" not in fixed
+    tail = fixed.split("## 3")[1]
+    assert "[^🅰2.1]:" in tail and "[^🅰2.2]:" in tail, tail   # 定义端同步重编号
 
 
 def _accepted(rows: str, marks: str) -> str:
@@ -151,10 +176,14 @@ def test_proposed_adr_must_not_carry_amend_trail():
         "Amended-by:\n  - 🅰1 | Core Maintainer | 2026-09-20 | 第一处\n  - 🅰2 | Core Maintainer | 2026-09-22 | 第二处\n",
         "Amended-by: -\n",
     )
-    # 去掉修订标记，Proposed 才过
+    # 去掉修订标记，Proposed 才过。**先定义行、再行内引用**（t-053）：
+    # 旧顺序下第一条 re.sub 把定义行的 token 也剃掉（`[^🅰1.1]: 修改：甲` 变 `: 修改：甲`），
+    # 第二条定义行模式永不命中——"clean" 样本其实拖着悬挂残渣，断言只因
+    # check_amend 不看明文残渣才绿，样本从没达到它宣称的干净。
     import re
-    clean = re.sub(r"\[\^🅰\d+\.\d+\]", "", clean)
     clean = re.sub(r"(?m)^\[\^🅰\d+\.\d+\]:.*\n", "", clean)
+    clean = re.sub(r"\[\^🅰\d+\.\d+\]", "", clean)
+    assert "[^🅰" not in clean and "修改：" not in clean, repr(clean)
     assert check_amend({"enabled": True}, {}, "0001-t.md", clean) == []
 
 

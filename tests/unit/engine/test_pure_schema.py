@@ -36,6 +36,25 @@ def _stdlib_only(mod_path: Path) -> None:
                 elif top not in stdlib:
                     _fail(f"{mod_path.name} imports non-stdlib {node.module}")
 
+    # 运行期动态导入不产生 ast.Import（t-244）：`importlib.import_module("numpy")`、
+    # `__import__("yaml")` 能整体绕过静态扫描，把"零依赖层"变成"只在 CI 里零依赖"。
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        f = node.func
+        fname = f.id if isinstance(f, ast.Name) else (
+            f"{f.value.id}.{f.attr}" if isinstance(f, ast.Attribute)
+            and isinstance(f.value, ast.Name) else "")
+        if fname in ("__import__", "importlib.import_module", "builtins.__import__"):
+            if not node.args:
+                _fail(f"{mod_path.name} 动态导入无可解析目标，纯度不可证")
+            arg0 = node.args[0]
+            if not isinstance(arg0, ast.Constant) or not isinstance(arg0.value, str):
+                _fail(f"{mod_path.name} 的动态导入目标是运行期值，零依赖层不接受")
+            top = arg0.value.split(".")[0]
+            if top not in stdlib and not arg0.value.startswith(allowed_prefixes):
+                _fail(f"{mod_path.name} 运行期导入非 stdlib：{arg0.value!r}")
+
 
 class TestPurity(unittest.TestCase):
     def test_pure_schema_stdlib_only(self):
@@ -95,12 +114,24 @@ class TestCheckFileParity(unittest.TestCase):
                 except (OSError, UnicodeDecodeError):
                     continue
                 eng = self._engine_results(typ, path, schema)
-                pure, _ok = self._pure_results(typ, path, schema)
-                # engine index check appends extra violations; compare the file-local subset
-                pure_set = set(pure)
-                eng_codes = {(c, m) for c, m, _f in eng}
-                for c, m, _f in pure:
-                    self.assertIn((c, m), eng_codes, f"{path}: pure violation missing in engine: {(c, m)}")
+                pure, ok = self._pure_results(typ, path, schema)
+                rel = str(path.relative_to(REPO)).replace("\\", "/")
+                # **双向**对账（t-245）：单向 `pure ⊆ engine` 按构造恒真——
+                # `_validate_file` 的文件局域检查就是**委托这几个 pure 函数**的，
+                # 任何未来分叉（engine 侧悄悄少调一项、或包装时丢码）都测不出。
+                # 方向①pure→engine；方向②engine 的文件局域输出（file_path 属本件/
+                # schema 件）必须原样来自 pure——引擎独有的跨文件项（索引、ident 台账）
+                # 不在比对集。
+                pure_set = set((c, m) for c, m, _f in pure)
+                eng_set = set((c, m) for c, m, _f in eng)
+                for c, m in pure_set:
+                    self.assertIn((c, m), eng_set,
+                                  f"{path}: pure violation missing in engine: {(c, m)}")
+                for c, m, f in eng:
+                    if f in (rel,):        # 归属本文件的 engine 违例
+                        self.assertIn((c, m), pure_set,
+                                      f"{path}: engine 独有文件局域违例（pure 侧没走）: {(c, m)}")
+                self.assertTrue(ok, f"{path}: 被检文件文件名形状已不合法，本对账失去前提")
                 checked += 1
         self.assertGreater(checked, 20, "parity oracle must cover real files")
 
@@ -109,11 +140,18 @@ class TestUnits(unittest.TestCase):
     def test_filename_invalid_regex(self):
         out, _ident, ok = pure_schema.check_filename("[invalid", {}, "docs/x/.schema.json", "a.md")
         self.assertFalse(ok)
+        # 空表先红在形状上（t-246）：契约变了（不再出违例）时 `out[0]` 的 IndexError
+        # 会伪装成测试崩溃，把真正的信号丢光
+        self.assertTrue(out, "ok=False 却零违例：致命信号丢了")
+        # 钉**码**不只钉 scope（t-246）：两违例同码异 scope，码漂成 FILENAME_* 也要看见
+        self.assertEqual(out[0][0], "DOC_SCHEMA_INVALID")
         self.assertEqual(out[0][2], "schema")
 
     def test_filename_mismatch(self):
         out, _ident, ok = pure_schema.check_filename(r"^(\d{4})-", {}, "s", "nodate.md")
         self.assertFalse(ok)
+        self.assertTrue(out, "ok=False 却零违例")          # 同 t-246：先断非空再索引
+        self.assertEqual(out[0][0], "DOC_SCHEMA_INVALID")   # 码同、scope 才是分流点
         self.assertEqual(out[0][2], "file")
 
     def test_section_order(self):

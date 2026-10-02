@@ -305,6 +305,54 @@
       "tokens": "Incident: 恒真的取证命令——`grep` 漏 `-E` 且用全角分隔符，\"零命中\"被当成已验证"
     },
     {
+      "path": "docs/incidents/INC-20261001-AST-substring-guard-misses-renamed-loop.md",
+      "type": "incidents",
+      "id": "INC-20261001-AST-substring-guard-misses-renamed-loop",
+      "title": "Incident: 子串式结构守卫被变量名绕过——docstring 宣称\"循环只在 nodes.run_phase\"，而 seal.py 的分派循环一直绿着",
+      "status": "closed",
+      "tokens": "Incident: 子串式结构守卫被变量名绕过——docstring 宣称\"循环只在 nodes.run_phase\"，而 seal.py 的分派循环一直绿着"
+    },
+    {
+      "path": "docs/incidents/INC-20261001-REG-adr_gate_prose_lines_and_overwrite.md",
+      "type": "incidents",
+      "id": "INC-20261001-REG-adr_gate_prose_lines_and_overwrite",
+      "title": "Incident: seal 的 ADR 对账闸把**正文顶格示例行**当 frontmatter 判据，且 Rejected 归档撞名静默覆盖",
+      "status": "closed",
+      "tokens": "Incident: seal 的 ADR 对账闸把**正文顶格示例行**当 frontmatter 判据，且 Rejected 归档撞名静默覆盖"
+    },
+    {
+      "path": "docs/incidents/INC-20261001-REG-mcp_json_corrupt_skips_peer_gate.md",
+      "type": "incidents",
+      "id": "INC-20261001-REG-mcp_json_corrupt_skips_peer_gate",
+      "title": "Incident: `.mcp.json` 坏文件走\"跳过 peer 闸\"信号——坏配置把自己的缺失检查关了",
+      "status": "closed",
+      "tokens": "Incident: `.mcp.json` 坏文件走\"跳过 peer 闸\"信号——坏配置把自己的缺失检查关了"
+    },
+    {
+      "path": "docs/incidents/INC-20261001-REG-pin-note-span-line-breaks.md",
+      "type": "incidents",
+      "id": "INC-20261001-REG-pin-note-span-line-breaks",
+      "title": "Incident: 钉正则的行界只认 `\\n`——`\\r`/`\\v`/`\\x85`/`\\u2028` 分隔的文件里，前一枚钉的 note 跨行吞掉下一枚钉",
+      "status": "closed",
+      "tokens": "Incident: 钉正则的行界只认 `\\n`——`\\r`/`\\v`/`\\x85`/`\\u2028` 分隔的文件里，前一枚钉的 note 跨行吞掉下一枚钉"
+    },
+    {
+      "path": "docs/incidents/INC-20261001-REG-zipapp-main-drops-exit-code.md",
+      "type": "incidents",
+      "id": "INC-20261001-REG-zipapp-main-drops-exit-code",
+      "title": "Incident: `.pyz` 分发件吞掉 `main()` 返回码——下游拿单件当闸时恒绿",
+      "status": "closed",
+      "tokens": "Incident: `.pyz` 分发件吞掉 `main()` 返回码——下游拿单件当闸时恒绿"
+    },
+    {
+      "path": "docs/incidents/INC-20261001-SEC-incident_sanitizer_indented_heading.md",
+      "type": "incidents",
+      "id": "INC-20261001-SEC-incident_sanitizer_indented_heading",
+      "title": "Incident: `write_incident` 的 sanitizer 只转义 0 列 `#`——缩进标题穿透，人看到的 B-T-D 结构可被外部文本伪造",
+      "status": "closed",
+      "tokens": "Incident: `write_incident` 的 sanitizer 只转义 0 列 `#`——缩进标题穿透，人看到的 B-T-D 结构可被外部文本伪造"
+    },
+    {
       "path": "docs/memo/2026-09-21-sync-docs-updated-flag.md",
       "type": "memo",
       "id": "2026-09-21-sync-docs-updated-flag",

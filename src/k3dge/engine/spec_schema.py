@@ -5,15 +5,19 @@ from __future__ import annotations
 import re
 from typing import List, Optional, Tuple
 
-#: 必需节：标题**锚定**（只允许可选编号前缀 + 可选尾注）。`.*关键词` 的"任意位置包含"
-#: 会让 `### Sub-domain Boundary Notes` / `## Domain Boundary Draft Notes` 之类的旁节
-#: 顶掉正式节，而 `SPEC_MISSING_SECTION` 是 block 闸 ⇒ 假绿（322）。
-_HEADING_PREFIX = r"^#{2,3}[ \t]+(?:\d+[.)]?[ \t]+)?"
+#: 必需节：标题**锚定到全名**——只允许可选编号前缀，且必须是模板的 `## N. <全名>` 形状。
+#: 旧判据的两个洞（注释承诺过、正则没做到，t-248）：
+#: ①关键词短写让 `## Domain Boundary Draft Notes` 这类"带尾巴的旁节"顶掉正式节
+#:   （`Domain Boundary\b` 在它身上成立）；②`#{2,3}` 让子级 `### 1. …全名…` 也算数，
+#:   而模板/全部现行 spec 的节都是 `## ` 级——子级顶正式节＝同一文件里两套层级打架。
+#: `SPEC_MISSING_SECTION` 是 block 闸 ⇒ 两类都是假绿面（322）。
+#: §3（State Machine & Invariants）**不在机检集**：它是模板约定，内容由人管（t-249 已登记）。
+_HEADING_PREFIX = r"^##[ \t]+(?:\d+[.)]?[ \t]+)?"
 REQUIRED_SECTIONS: List[Tuple[str, "re.Pattern[str]"]] = [
     ("Domain Boundary & Responsibilities",
-     re.compile(_HEADING_PREFIX + r"Domain Boundary\b", re.MULTILINE)),
+     re.compile(_HEADING_PREFIX + r"Domain Boundary & Responsibilities\b", re.MULTILINE)),
     ("Public Interfaces & Type Contracts",
-     re.compile(_HEADING_PREFIX + r"Public Interfaces\b", re.MULTILINE)),
+     re.compile(_HEADING_PREFIX + r"Public Interfaces & Type Contracts\b", re.MULTILINE)),
     ("Verification Matrix",
      re.compile(_HEADING_PREFIX + r"Verification Matrix\b", re.MULTILINE)),
 ]

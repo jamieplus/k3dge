@@ -23,14 +23,21 @@ def _inline(text) -> str:
 
 
 def _block(text) -> str:
-    """正文净化：行首 `#` 转义、去掉会让 `## 2./## 3.` 结构闸误判的裸标题行，长度封顶。"""
+    """正文净化：行首 `#` 转义、去掉会让 `## 2./## 3.` 结构闸误判的裸标题行，长度封顶。
+
+    转义判据是**缩进后**的行首（t-232）：markdown 允许 ≤3 空格的标题缩进，
+    `   ## 2. 我伪造的根因` 若因"不以 `#` 开头"被放过，人在 GitHub 上看到的仍是真 H2——
+    反伪造保证只对"顶格"生效等于没有保证。结构闸同样按 `^\\s*#` 数节，两侧口径一致。
+    """
     if text is None:
         return ""
     out = []
     for ln in str(text).splitlines():
         s = ln.rstrip()
-        if s.startswith("#"):
-            s = "\\" + s           # 行首标题转义：`\## 2.` 不再是标题，B-T-D 结构闸仍数到自己的四节
+        stripped = s.lstrip()
+        if stripped.startswith("#"):
+            indent = s[: len(s) - len(stripped)]
+            s = indent + "\\" + stripped   # 保留缩进，转义 `#`：不再是标题，B-T-D 结构闸仍数到自己的四节
         out.append(s[:2000])
     return "\n".join(out)[:20000]
 

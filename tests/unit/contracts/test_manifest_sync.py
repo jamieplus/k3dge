@@ -16,7 +16,19 @@ SPECS_DIR = ROOT / "docs" / "specs"
 
 class TestManifestSpecsFullSync(unittest.TestCase):
     def setUp(self) -> None:
-        self.manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        # 存在性/可解析性在 setUp 里**出干净的红**（t-028）：旧写法 `json.loads(read_text)`
+        # 裸抛——manifest 缺失时五个用例（含 `test_manifest_is_present` 自己）全数
+        # FileNotFoundError traceback，那句为它准备的消息从没机会说话；ROOT 解错也伪装成
+        # "manifest 没了"。先验根、再验件、坏 JSON 给专消息。
+        self.assertTrue((ROOT / "pyproject.toml").is_file(),
+                        f"仓根解析错误（parents[3] 漂了？）：{ROOT}")
+        self.assertTrue(MANIFEST.is_file(), f".agent/manifest.json 缺失：{MANIFEST}")
+        try:
+            parsed = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            self.fail(f".agent/manifest.json 解析失败：{exc}")
+        self.assertIsInstance(parsed, dict, "manifest 顶层必须是对象")
+        self.manifest = parsed
         # `domains` 缺失/被改名/被清空时旧写法静默回落 `{}` ⇒ 三条逐域断言全部空转仍报绿，
         # 而本文件的存在理由恰恰是抓"没人动的域漂了"（t-029）。空集必须是**红**。
         dom = self.manifest.get("domains")
@@ -25,22 +37,37 @@ class TestManifestSpecsFullSync(unittest.TestCase):
         self.domains = dom
 
     def test_manifest_is_present(self) -> None:
-        self.assertTrue(MANIFEST.exists(), ".agent/manifest.json missing")
+        # 真正的存在性断言已上提进 setUp（t-028）；本用例保留为契约的**登记位**
+        # （报告/审计引用过它），内容对账同一事实、措辞可检索。
+        self.assertTrue(MANIFEST.is_file(), ".agent/manifest.json missing")
 
     def test_every_domain_has_all_registered_paths(self) -> None:
         for domain, cfg in self.domains.items():
             with self.subTest(domain=domain):
+                self.assertIsInstance(cfg, dict,
+                                      f"domain '{domain}' 注册的不是对象：{cfg!r}")
                 for key in ("src", "spec", "tests"):
                     self.assertIn(key, cfg, f"domain '{domain}' missing '{key}'")
+                    self.assertIsInstance(cfg[key], str,
+                                          f"domain '{domain}' 的 {key} 不是字符串：{cfg[key]!r}")
                     path = ROOT / cfg[key]
                     self.assertTrue(path.exists(), f"domain '{domain}' {key} path missing: {cfg[key]}")
 
     def test_every_domain_has_spec_dir(self) -> None:
+        # 本文件的职责是诊断**坏 manifest**，自己就不许先炸（t-030）：缺 spec 键此前
+        # KeyError、cfg 非映射 TypeError——契约测试抛裸错＝CI 只见 traceback；
+        # 且没有 subTest，第一个坏域中断整轮，后面的域从没被看。
         for domain, cfg in self.domains.items():
-            spec_dir = (ROOT / cfg["spec"]).parent
-            self.assertTrue(
-                spec_dir.is_dir(), f"domain '{domain}' spec dir missing: {spec_dir}"
-            )
+            with self.subTest(domain=domain):
+                self.assertIsInstance(cfg, dict,
+                                      f"domain '{domain}' 注册的不是对象：{cfg!r}")
+                self.assertIn("spec", cfg, f"domain '{domain}' 缺 spec 键")
+                self.assertIsInstance(cfg["spec"], str,
+                                      f"domain '{domain}' 的 spec 不是字符串：{cfg['spec']!r}")
+                spec_dir = (ROOT / cfg["spec"]).parent
+                self.assertTrue(
+                    spec_dir.is_dir(), f"domain '{domain}' spec dir missing: {spec_dir}"
+                )
 
     def test_no_orphan_spec_dirs(self) -> None:
         # 旧写法在 `docs/specs` 缺失/被改名时抛裸 FileNotFoundError：契约测试"崩"而不是"红"，
@@ -57,11 +84,19 @@ class TestManifestSpecsFullSync(unittest.TestCase):
         self.assertEqual(orphans, set(), f"spec dirs without manifest domain: {sorted(orphans)}")
 
     def test_spec_files_have_required_sections_and_hash(self) -> None:
-        from k3dge.engine import spec_schema
+        try:
+            from k3dge.engine import spec_schema
+        except ImportError as exc:
+            # 直接跑本文件（`python -m unittest`/`__main__`）没有 pytest 的 pythonpath=src，
+            # 旧写法 ImportError 崩栈看不出是"环境没配"还是"helper 没了"（t-032）。
+            self.skipTest(f"k3dge 不可导入（需 pytest pythonpath=src）：{exc}")
 
         for domain, cfg in self.domains.items():
             with self.subTest(domain=domain):
-                content = (ROOT / cfg["spec"]).read_text(encoding="utf-8")
+                spec_path = ROOT / cfg["spec"]
+                self.assertTrue(spec_path.is_file(),
+                                f"spec 文件缺失：{cfg['spec']}")   # 显式红，不是 read_text 的 FileNotFoundError
+                content = spec_path.read_text(encoding="utf-8")
                 self.assertEqual(
                     spec_schema.validate_structure(content),
                     [],

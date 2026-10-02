@@ -32,13 +32,15 @@ if ! "$PY" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) els
   echo "[build-pyz] PYTHON='$PY' 版本 < 3.10（pyproject 下限）" >&2
   exit 1
 fi
-# 敏感/本地文件不得随单件外发（zipapp 无 exclude ⇒ 打包前守一道；不粗暴排除所有点开头文件，
+# 敏感/本地文件不得随单件外发（zipapp CLI 无 exclude ⇒ 打包前守一道；不粗暴排除所有点开头文件，
 # 模板资产里有 .schema.json 等受版本控制的点文件，ocr-137）。
+# `.DS_Store`/`__pycache__`/`*.pyc` 是**派生垃圾**（Finder/解释器随手重建，拒建＝零收益摩擦、
+# 还把测试绑死在构建机整洁度上）⇒ 从"拒绝"改为"打包时过滤"（见下 create_archive filter）。
 if find src -type f \( -name '.env' -o -name '*.key' -o -name '*.pem' -o -name '*.jsonl' \
-     -o -name '*.db' -o -name '*.sqlite*' -o -name '.DS_Store' \) | grep -q .; then
+     -o -name '*.db' -o -name '*.sqlite*' \) | grep -q .; then
   echo "[build-pyz] src/ 含本地/敏感文件，拒绝打包（见上）" >&2
   find src -type f \( -name '.env' -o -name '*.key' -o -name '*.pem' -o -name '*.jsonl' \
-       -o -name '*.db' -o -name '*.sqlite*' -o -name '.DS_Store' \) >&2
+       -o -name '*.db' -o -name '*.sqlite*' \) >&2
   exit 1
 fi
 # 产物 shebang 可配（缺省 env python3）；与构建解释器不一致时提示——下游无 `python3` 或版本 < 3.10
@@ -47,12 +49,31 @@ SHEBANG="${PYZ_SHEBANG:-/usr/bin/env python3}"
 # 原子写：先写进程唯一临时文件，成功再 mv；中断不留半截"看起来合法"的产物（ocr-139）。
 TMP="dist/.k3dge.pyz.$$"
 trap 'rm -f "$TMP"' EXIT INT TERM
-"$PY" -m zipapp src -m "k3dge.cli.main:main" -p "$SHEBANG" -o "$TMP"
-# 冒烟：产物入口可运行（zipapp 不校验 main 存在，改名/移模块会产出"构建成功、下游一跑就崩"，ocr-140）。
-if ! "$PY" "$TMP" -h >/dev/null 2>&1; then
-  echo "[build-pyz] 冒烟失败：产物入口不可运行（检查 k3dge.cli.main:main）" >&2
+# 入口必须是仓内 `src/__main__.py`：zipapp `--main` 生成的模板不调 `sys.exit(main())`，
+# 返回码被吞 ⇒ 下游用 `.pyz` 跑 `check` 恒 0 退出＝分发件把闸读成常绿（t-023 实测）。
+if [ ! -f src/__main__.py ]; then
+  echo "[build-pyz] 缺 src/__main__.py（入口必须 sys.exit(main())；zipapp --main 模板不包办）" >&2
   exit 1
 fi
+# zipapp CLI 无 exclude ⇒ 派生垃圾（__pycache__/.pyc/.DS_Store）不得随单件外发（t-020：旧产物实测 59 条）。
+"$PY" -c 'import sys, zipapp
+zipapp.create_archive("src", target=sys.argv[1], interpreter=sys.argv[2],
+    filter=lambda p: "__pycache__" not in p.parts and p.suffix != ".pyc" and p.name != ".DS_Store")' "$TMP" "$SHEBANG"
+# 冒烟①：产物入口可运行（zipapp 不校验 main 存在，改名/移模块会产出"构建成功、下游一跑就崩"，ocr-140）。
+if ! "$PY" "$TMP" -h >/dev/null 2>&1; then
+  echo "[build-pyz] 冒烟失败：产物入口不可运行（检查 src/__main__.py）" >&2
+  exit 1
+fi
+# 冒烟②：退出码透传——空目录 `check` 必须**非零**。`-h` 由 argparse 自己 SystemExit(0)，
+# 证明不了 main() 的返回值到达进程；这条才钉得住"入口 sys.exit"（t-023 的回归面）。
+SMOKEY="$(mktemp -d)"
+PYZ_ABS="$(pwd -P)/$TMP"
+if ( cd "$SMOKEY" && "$PY" "$PYZ_ABS" check >/dev/null 2>&1 ); then
+  echo "[build-pyz] 冒烟失败：空目录 check 退出 0——main() 返回码被吞，下游闸会常绿" >&2
+  rm -rf "$SMOKEY"
+  exit 1
+fi
+rm -rf "$SMOKEY"
 chmod +x "$TMP"
 mv "$TMP" dist/k3dge.pyz
 echo "built dist/k3dge.pyz ($(wc -c < dist/k3dge.pyz) bytes)"

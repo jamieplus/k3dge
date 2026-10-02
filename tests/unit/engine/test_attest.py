@@ -1,5 +1,7 @@
 """受管路径必须能验；缺行必须红。不开豁免。"""
 
+import re
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -7,6 +9,17 @@ from pathlib import Path
 from k3dge.engine.attest import PREFIX, append_to_message, verify_commit
 import shutil
 import atexit
+
+
+def _head(ws: Path) -> str:
+    """取 HEAD **必须查返回码**（t-073）：失败回空串时 `verify_commit(ws, "")` 报的是
+    "提交标识不合法"——前置崩了伪装成产品结论，missing/replay 两条测全部误导性红。
+    """
+    r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(ws), check=True,
+                       capture_output=True, text=True)
+    h = r.stdout.strip()
+    assert h, "rev-parse 回了空——本测的前提（有提交）没建立"
+    return h
 
 
 def _repo() -> Path:
@@ -25,17 +38,24 @@ def test_appended_line_verifies():
     subprocess.run(["git", "add", "-A"], cwd=ws, check=True, capture_output=True)
     msg = append_to_message(ws, "feat: x", who="t")
     assert PREFIX in msg
+    # 作者时间**钉在署名行的分钟上**（t-070）：`append_to_message` 内部取 now()，
+    # `git commit` 是稍后的另一个进程——两者之间跨过分界时 author 分钟 = 行分钟+1，
+    # 而 windows() 只容同分钟与更早一分钟 ⇒ 慢 CI 上间歇红。钉死日期，把挂钟运气
+    # 从断言里拿掉。
+    m = re.search(r"@ (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z", msg)
+    assert m, msg
+    env = dict(os.environ, GIT_AUTHOR_DATE=m.group(1) + "Z",
+               GIT_COMMITTER_DATE=m.group(1) + "Z")
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
-                    "commit", "-q", "--no-verify", "-m", msg], cwd=ws, check=True, capture_output=True)
-    h = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True, text=True).stdout.strip()
-    ok, out = verify_commit(ws, h)
+                    "commit", "-q", "--no-verify", "-m", msg], cwd=ws, check=True,
+                   capture_output=True, env=env)
+    ok, out = verify_commit(ws, _head(ws))
     assert ok, out
 
 
 def test_missing_line_is_refused():
     ws = _repo()
-    h = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True, text=True).stdout.strip()
-    ok, out = verify_commit(ws, h)
+    ok, out = verify_commit(ws, _head(ws))
     assert not ok
     assert "missing attestation line" in out
 
@@ -50,8 +70,7 @@ def test_line_replayed_onto_other_commit_is_refused():
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
                     "commit", "-q", "--allow-empty", "--no-verify", "-m", f"feat: x\n\n{ln}"],
                    cwd=ws, check=True, capture_output=True)
-    h = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ws, capture_output=True, text=True).stdout.strip()
-    ok, out = verify_commit(ws, h)
+    ok, out = verify_commit(ws, _head(ws))
     assert not ok
     assert "timestamp mismatch" in out
 def test_attestation_stays_inside_existing_trailer_block() -> None:
@@ -74,14 +93,65 @@ def test_prose_body_still_gets_own_paragraph() -> None:
     assert "\n\nk3dge-commit:" in out
 
 
-def test_verify_commit_rejects_option_shaped_and_blank_ids() -> None:
-    """`h` 来自 CI 参数：以 `-` 开头会被 git 当选项（注入面），空/含空白同样拒（393）。"""
+def test_verify_commit_rejects_option_shaped_and_blank_ids(tmp_path) -> None:
+    """`h` 来自 CI 参数：以 `-` 开头会被 git 当选项（注入面），空/含空白同样拒（393）。
+
+    工作区用**独立临时目录**而不是 `Path(".")`（t-072）：今天靠"校验先短路"侥幸惰性——
+    一旦 attest.py:135-140 的校验被重排/放宽，旧夹具就在**开发者真仓**里起 git 进程，
+    回归表现为环境相关；在空目录里则必然确定性失败。
+    """
+    assert not (tmp_path / ".git").exists()
     for bad in ("", "  ", "--output=cmd", "a b"):
-        ok, msg = verify_commit(Path("."), bad)
+        ok, msg = verify_commit(tmp_path, bad)
         assert not ok and "不合法" in msg, (bad, msg)
 
 
-def test_verify_commit_accepts_head() -> None:
+def test_verify_commit_passes_ref_names_through_validation() -> None:
+    """名字别读反（t-074）：本测验的是**校验放行**——`HEAD`/`main^` 这类 ref 名过得了
+    "非空/不以 - 开头/不含空白"的门，抵达真判据（未署名 ⇒ not ok）。断言本来就是
+    `not ok`，旧名 "accepts" 会让人以为是验签收，将来"顺手改成 assertTrue"即毁测。
+    """
     ws = _repo()
     ok, msg = verify_commit(ws, "HEAD")
     assert not ok and "missing attestation" in msg, msg   # 通过校验，进到真判据（未署名）
+
+
+def test_wrong_token_in_window_is_refused() -> None:
+    """钉住 **token 比对支路**（t-075）：旧"重放"测用 2020 年戳，`timestamp mismatch`
+    先短路，`tok not in expected` 这行从未被执行——删掉整个比对，本文件仍全绿。
+    现在：署名行时间**落在提交作者分钟内**（时间判据放行），token 手改成别的词 ⇒
+    必须红在 `token mismatch`（树/secret 绑定由此可证伪）。
+    """
+
+    from k3dge.engine.attest import token
+
+    ws = _repo()
+    msg = append_to_message(ws, "feat: token case", who="t")
+    m = re.search(r"@ (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z #(\S+)", msg)
+    assert m, msg
+    # token 必须**形状合法但绑定错误**（词表词）——乱写会让 LINE_RE 直接不匹配，
+    # 报 "missing attestation line"，永远走不到比对那一支。
+    # 注意：`token()` 先过 `window()`（截到分钟）——给同分钟的盐会被截成同一个串，
+    # "换盐"全撞是必然。错误绑定要拿**不同分钟**的时间戳产 token：
+    import datetime as _dt
+
+    real = m.group(2)
+    when = _dt.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=_dt.timezone.utc)
+    acceptable = {real, token(ws, (when - _dt.timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ"))}
+    bad = ""
+    for salt in range(1, 20):
+        cand = token(ws, f"2030-01-{salt:02d}T00:0{salt % 10}:00Z")
+        if cand not in acceptable:          # verify 比对**同分钟＋前一分钟**两个窗，都得不撞
+            bad = cand
+            break
+    assert bad, f"错误绑定的候选都撞进可接受窗：{acceptable}"
+    forged = msg.replace("#" + m.group(2), "#" + bad)
+    env = dict(os.environ, GIT_AUTHOR_DATE=m.group(1).replace("T", " ") + " +0000",
+               GIT_COMMITTER_DATE=m.group(1).replace("T", " ") + " +0000")
+    (ws / "b.txt").write_text("2\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=str(ws), check=True, capture_output=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-q", "--no-verify", "-m", forged],
+                   cwd=str(ws), check=True, capture_output=True, env=env)
+    ok, out = verify_commit(ws, _head(ws))
+    assert not ok and "token mismatch" in out, out

@@ -32,7 +32,7 @@ def _adr_files(workspace: Path) -> List[Path]:
 
 
 def _status(text: str) -> str:
-    m = _FM_STATUS.search(text)
+    m = _FM_STATUS.search(_frontmatter(text))   # 字段语法只在 fm 内成立（t-062 同族）
     return (m.group(1) if m else "").strip()
 
 
@@ -107,9 +107,10 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
     fixed: list[str] = []
 
     # 1. Supersedes 声明 → 标记旧 ADR + 移入 obsolete/
-    #    **两遍**：先只读校验全部声明（缺目标 / 自取代），全通过才动盘——否则前半已落盘、后半 `return`
-    #    会把工作区停在"部分生效"（ocr-034）。
-    plan: list[Tuple[Path, Path, str]] = []   # (声明件, 目标件, my_id)
+    #    **两遍**：计划相做**全部只读校验并算好落盘文本**（缺目标/自取代/不可标记/归档撞名），
+    #    写相只剩 tmp+replace——"全通过才动盘"若只覆盖前半截校验，一条晚发现的坏声明仍会把
+    #    工作区停在"部分生效"（ocr-034；t-063 要求校验面与承诺同宽）。
+    plan: list[Tuple[Path, Path, str, str]] = []   # (声明件, 目标件, my_id, 已算好的落盘文本)
     for p in _adr_files(workspace):
         try:
             text = p.read_text(encoding="utf-8", errors="replace")
@@ -135,34 +136,26 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
             if tid == my_id or target == p:
                 return (f"[SEAL REJECTED] {p.name} Supersedes 指向自身（ADR-{my_id}）"
                         "——拒绝自取代（会让生效决策从活跃目录消失）")
-            plan.append((p, target, my_id))
-    for _p, target, my_id in plan:
-        try:
-            old_text = target.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        if _is_superseded(old_text, my_id) and target.parent.name == "obsolete":
-            continue
-        marked = _mark_superseded(old_text, my_id)
-        if marked is None:
-            return (f"[SEAL REJECTED] {target.name} 没有可改的 `Status:` 行（缺/小写/全角冒号）"
-                    "——不能把它当'已 Superseded'归档，请先补规范的 Status 头")
-        old_text = marked
-        obsolete.mkdir(parents=True, exist_ok=True)
-        dest = obsolete / target.name
-        if dest.is_file() and target != dest:
-            # 无条件覆盖 ⇒ 归档件被静默销毁（编号重用/从备份恢复都会撞上），且 glob 不递归根本看不见（ocr-193）。
-            return (f"[SEAL REJECTED] obsolete/{target.name} 已存在且非本次移动产物"
-                    "——拒绝覆盖归档事实源，请人工裁决")
-        # 原子移动：先写 tmp 再 replace，中断不留"两边都没有/只有一半"的状态
-        tmp = dest.with_name(dest.name + ".tmp")
-        tmp.write_text(old_text, encoding="utf-8")
-        tmp.replace(dest)
-        if target.parent != obsolete:
-            target.unlink()
-        fixed.append(f"{target.name} → obsolete/ (Superseded by ADR-{my_id})")
+            try:
+                old_text = target.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if _is_superseded(old_text, my_id) and target.parent.name == "obsolete":
+                continue
+            marked = _mark_superseded(old_text, my_id)
+            if marked is None:
+                return (f"[SEAL REJECTED] {target.name} 没有可改的 `Status:` 行（缺/小写/全角冒号）"
+                        "——不能把它当'已 Superseded'归档，请先补规范的 Status 头")
+            dest = obsolete / target.name
+            if dest.is_file() and dest.resolve() != target.resolve():
+                # 无条件覆盖 ⇒ 归档件被静默销毁（编号重用/从备份恢复都会撞上），且 glob 不递归根本看不见（ocr-193）。
+                return (f"[SEAL REJECTED] obsolete/{target.name} 已存在且非本次移动产物"
+                        "——拒绝覆盖归档事实源，请人工裁决")
+            plan.append((p, target, my_id, marked))
 
-    # 2. Rejected ADR → 直接移入 obsolete/
+    # 2. Rejected ADR → 移入 obsolete/。**校验也在计划相做完**（撞名拒覆盖与 Supersedes 同规则，
+    #    此前这条分支裸 `write_text` 直写，静默销毁同名归档件——t-064 的不对称）。
+    rej_plan: list[Tuple[Path, str]] = []
     for p in _adr_files(workspace):
         try:
             text = p.read_text(encoding="utf-8", errors="replace")
@@ -170,9 +163,29 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
             continue
         if _status(text) != "Rejected":
             continue
-        obsolete.mkdir(parents=True, exist_ok=True)
         dest = obsolete / p.name
-        dest.write_text(text, encoding="utf-8")
+        if dest.is_file() and dest.resolve() != p.resolve():
+            return (f"[SEAL REJECTED] obsolete/{p.name} 已存在——拒绝覆盖归档事实源"
+                    "（Rejected 归档与 Supersedes 同规则，请人工裁决）")
+        rej_plan.append((p, text))
+
+    # 3. 写相：只剩 tmp+replace（计划相把可预见的失败全部拦在动盘之前）。
+    if plan or rej_plan:
+        obsolete.mkdir(parents=True, exist_ok=True)
+    for _p, target, my_id, marked in plan:
+        dest = obsolete / target.name
+        # 原子移动：先写 tmp 再 replace，中断不留"两边都没有/只有一半"的状态
+        tmp = dest.with_name(dest.name + ".tmp")
+        tmp.write_text(marked, encoding="utf-8")
+        tmp.replace(dest)
+        if target.parent != obsolete:
+            target.unlink()
+        fixed.append(f"{target.name} → obsolete/ (Superseded by ADR-{my_id})")
+    for p, text in rej_plan:
+        dest = obsolete / p.name
+        tmp = dest.with_name(dest.name + ".tmp")
+        tmp.write_text(text, encoding="utf-8")
+        tmp.replace(dest)
         p.unlink()
         fixed.append(f"{p.name} → obsolete/ (Rejected)")
 
@@ -193,41 +206,53 @@ def _find_adr_by_id(d: Path, target_id: str) -> Optional[Path]:
     return None
 
 
+def _frontmatter(text: str) -> str:
+    """frontmatter 区（首行 `---` 到下一条 `---` 之间）；无闭合界时取余文（宁严勿宽）。
+
+    字段判据只许在这里找：行锚定的全文搜索仍会命中**正文顶格**的示例/引用行
+    （`superseded_by: ADR-0026` 单独成行贴进文档就是合法 Markdown），假"已标记"⇒
+    reconcile 幂等早退、真字段永不写入（ocr-390 同族；t-062）。
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return ""
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return "\n".join(lines[1:i])
+    return "\n".join(lines[1:])
+
+
 def _is_superseded(text: str, by_id: str) -> bool:
     st = _status(text)
     if st.lower() != "superseded":
         return False
     # 全文子串判据会把正文里"讨论/示例"提到的 `superseded_by:` 与 `ADR-xxxx` 当"已标记"
     # ⇒ 幂等早退，真字段永不写入（390）。锚到 frontmatter 行。
-    return bool(re.search(rf"^superseded_by:[ \t]*ADR-0*{int(by_id)}[ \t]*$", text, re.M))
+    return bool(re.search(rf"^superseded_by:[ \t]*ADR-0*{int(by_id)}[ \t]*$",
+                          _frontmatter(text), re.M))
 
 
 def _mark_superseded(text: str, by_id: str) -> "str | None":
-    """Replace Status line with Superseded + inject superseded_by field.
+    """只在 frontmatter 区内改写：`Status:` 行换成 Superseded，缺则注入 `superseded_by`。
 
-    返回 `None` ＝ 没有可改的 `Status:` 行（缺失/小写/全角冒号）：调用方必须**拒**而不是
-    把没标记的文件当"已 Superseded"移进 obsolete（391）。
+    返回 `None` ＝ **fm 区内没有可改的 `Status:` 行**（整件无 fm/缺失/小写/全角冒号）：
+    调用方必须**拒**，不能把没标记的文件当"已 Superseded"移进 obsolete（391）。
+    正文顶格的示例行既不作判据、也不是写入靶（t-062 同族：字段语法只在 fm 内成立）。
     """
-    text = re.sub(r"^Status[ \t]*[:：]\s*\S+", "Status: Superseded", text, count=1, flags=re.M)
-    if "Status: Superseded" not in text:
+    lines = text.splitlines(keepends=True)
+    if not lines or lines[0].strip() != "---":
         return None
-    # Inject superseded_by after Supersedes line (or after Status if no Supersedes)
-    # 旧写法 `"^superseded_by:" not in text` 把正则锚当纯文本找，永远找不到 ⇒ 守卫恒真，
-    # 对已有该字段的旧 ADR 再注入一行（frontmatter 重复键）。
-    if not re.search(r"^superseded_by:", text, re.M):
-        if re.search(r"^Supersedes:", text, re.M):
-            text = re.sub(
-                r"(^Supersedes:.+$)",
-                r"\1\nsuperseded_by: ADR-" + by_id,
-                text, count=1, flags=re.M,
-            )
-        else:
-            text = re.sub(
-                r"(^Status:\s*Superseded)",
-                r"\1\nsuperseded_by: ADR-" + by_id,
-                text, count=1, flags=re.M,
-            )
-    return text
+    close = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), len(lines))
+    idx = next((i for i in range(1, close)
+                if re.match(r"^Status[ \t]*[:：]\s*\S+", lines[i])), None)
+    if idx is None:
+        return None
+    lines[idx] = "Status: Superseded\n"
+    if not any(re.match(r"^superseded_by:", l) for l in lines[1:close]):
+        anchor = next((i for i in range(1, close)
+                       if re.match(r"^Supersedes:", lines[i])), idx)
+        lines.insert(anchor + 1, "superseded_by: ADR-" + by_id + "\n")
+    return "".join(lines)
 
 
 def amend_format(workspace: Path) -> Optional[str]:

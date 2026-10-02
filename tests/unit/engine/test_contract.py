@@ -108,9 +108,13 @@ class TestContract(unittest.TestCase):
             (src / "broken.py").write_text("def bar( ->\n", encoding="utf-8")
             from k3dge.engine.contract import _ExtractError
 
-            with self.assertRaises(_ExtractError):
+            with self.assertRaises(_ExtractError) as cm:
                 contract.collect_domain_interface(src)
-            self.assertTrue(h1)
+            # 断**消息点名坏文件**（t-098）：`assertTrue(h1)` 恒真（compute_hash 永远回
+            # 64-hex），对"语法错可见"这条要求零覆盖——真判据是错误里要说得出是谁坏了。
+            self.assertIn("broken.py", str(cm.exception), str(cm.exception))
+            # 坏文件出现前的成功提取 h1 必须是合法 64-hex（"非空"太弱）
+            self.assertRegex(h1, r"^[0-9a-f]{64}$")
 
     def test_ts_function_body_not_in_signature(self):
         import importlib.util
@@ -271,15 +275,33 @@ class TestContract(unittest.TestCase):
         finally:
             _EXTRACTORS[:] = before
 
+    def _dropin_sandbox(self):
+        """插件面的**真**隔离（t-096/097）。
+
+        旧代码 poke `contract._load_plugin_extractors._attempted`——那函数属性**不存在**
+        （缓存早搬到模块级 `_PLUGIN_ATTEMPTED`）⇒ `attempted` 恒 None、clear/restore
+        全是死分支；测能过纯靠"每轮 tempdir 路径是新的"，进程级缓存则背着陈旧
+        路径无限涨。teardown 也不得按 `k3dge_plugin_` 前缀**全拆**——那会连别处
+        （TS 资产测/本仓 `.agent/extractors`）加载的插件一起卸载＝隐式跨测干扰、
+        顺序相关。这里只还原"本测新增"的模块与缓存项。返回 (restorer,)。
+        """
+        import sys
+        from k3dge.engine.contract import _EXTRACTORS, _PLUGIN_ATTEMPTED
+        before_ext = list(_EXTRACTORS)
+        saved_attempted = set(_PLUGIN_ATTEMPTED)
+        saved_modules = set(sys.modules)
+
+        def restore() -> None:
+            _EXTRACTORS[:] = before_ext
+            for mod in set(sys.modules) - saved_modules:
+                if mod.startswith("k3dge_plugin_"):
+                    sys.modules.pop(mod, None)
+            _PLUGIN_ATTEMPTED.difference_update(_PLUGIN_ATTEMPTED - saved_attempted)
+        return restore
+
     def test_convention_dir_dropin_plugin(self):
         import sys
-        from k3dge.engine.contract import _EXTRACTORS
-        before = list(_EXTRACTORS)
-        # reset per-process attempt cache so this test's plugdir is scanned
-        attempted = getattr(contract._load_plugin_extractors, "_attempted", None)
-        saved_attempted = set(attempted) if attempted is not None else None
-        if attempted is not None:
-            attempted.clear()
+        restore = self._dropin_sandbox()
         try:
             with tempfile.TemporaryDirectory() as d:
                 ws = Path(d)
@@ -301,22 +323,12 @@ class TestContract(unittest.TestCase):
                 (src / "a.dropin").write_text("x", encoding="utf-8")
                 out = contract.collect_domain_interface(src, manifest=None, workspace_root=ws)
                 self.assertIn("dropin iface", out)
+                self.assertIn("k3dge_plugin_zz_dropin_test", sys.modules)   # 真的加载过
         finally:
-            _EXTRACTORS[:] = before
-            for mod in [m for m in sys.modules if m.startswith("k3dge_plugin_")]:
-                sys.modules.pop(mod, None)
-            if saved_attempted is not None:
-                attempted.clear()
-                attempted.update(saved_attempted)
+            restore()
 
     def test_convention_dir_broken_file_does_not_block(self):
-        import sys
-        from k3dge.engine.contract import _EXTRACTORS
-        before = list(_EXTRACTORS)
-        attempted = getattr(contract._load_plugin_extractors, "_attempted", None)
-        saved_attempted = set(attempted) if attempted is not None else None
-        if attempted is not None:
-            attempted.clear()
+        restore = self._dropin_sandbox()
         try:
             with tempfile.TemporaryDirectory() as d:
                 ws = Path(d)
@@ -341,13 +353,7 @@ class TestContract(unittest.TestCase):
                 out = contract.collect_domain_interface(src, manifest=None, workspace_root=ws)
                 self.assertIn("good iface", out)
         finally:
-            _EXTRACTORS[:] = before
-            for mod in [m for m in sys.modules if m.startswith("k3dge_plugin_")]:
-                sys.modules.pop(mod, None)
-            if saved_attempted is not None:
-                attempted.clear()
-                attempted.update(saved_attempted)
-
+            restore()
 
 if __name__ == "__main__":
     unittest.main()

@@ -39,15 +39,33 @@ def test_finding_rows_have_exactly_twelve_cells(path: Path) -> None:
 def test_status_column_is_in_closed_set(path: Path) -> None:
     if path.name == "LEFTOVERS.md":
         pytest.skip("留账本不是 finding 表")
-    bad = [(no, c[0], c[7]) for no, c in _rows(path.read_text(encoding="utf-8")) if c[7] not in STATUSES]
-    assert not bad, f"{path.name}: 状态列不在闭集（行号, ID, 落进状态槽的文本）: {bad[:5]}"
+    bad = [(no, c[0], c[7]) for no, c in _rows(path.read_text(encoding="utf-8"))
+           if c[7] and c[7] not in STATUSES]
+    assert not bad, f"{path.name}: 状态列不在闭集 {sorted(STATUSES)}（行号, ID, 落进状态槽的文本）: {bad[:5]}"
 
 
 @pytest.mark.parametrize("path", sorted((REPO / "docs" / "reviews").glob("*.md")), ids=lambda p: p.name)
-def test_status_column_in_closed_set(path: Path) -> None:
+def test_finding_table_is_contiguous(path: Path) -> None:
+    """表头/分隔行/数据行必须**相邻且连续**——GFM 认表的形状条件。
+
+    真实故障模式（2026-09-30 测试扫描报告）：一张 350 行的 finding 表，表头之后插进
+    一节"续作口径"再回来分隔行——表头与 `| --- |` 不相邻 ⇒ 整表不渲染成表，读者看到的
+    就是一堆裸竖线。格数/闭集两个守卫对此**全绿**（它们只看单行）。这里补上跨行不变量：
+    ①每个 `| ID |` 表头的下一行必须是分隔行；②数据段被非表行打断之后，不得再出现
+    形如数据行的管道行（那是被打断的第二张"影子表"）。
+    """
     if path.name == "LEFTOVERS.md":
-        pytest.skip("留账本不是 finding 表")
-    odd = [(no, c[0], c[7]) for no, c in _rows(path.read_text(encoding="utf-8"))
-           if c[7] and c[7] not in STATUSES]
-    assert not odd, f"{path.name}: 状态列不在闭集 {sorted(STATUSES)} 的行: {odd[:5]}"
+        pytest.skip("留账本的表是分节台账，本就不许单张连续")
+    lines = path.read_text(encoding="utf-8").splitlines()
+    heads = [i for i, l in enumerate(lines) if l.startswith("| ID |")]
+    if not heads:
+        pytest.skip("没有 finding 表")
+    for h in heads:
+        assert h + 1 < len(lines) and lines[h + 1].startswith("| ---"), \
+            f"{path.name}:{h + 2} 不是分隔行（表头被打断，整表不渲染）：{lines[h + 1][:60]!r}"
+        i = h + 2
+        while i < len(lines) and lines[i].startswith("| "):
+            i += 1
+        shadow = [j + 1 for j in range(i, len(lines)) if re.match(r"^\| [a-z]+-\d+ \|", lines[j])]
+        assert not shadow, f"{path.name}: 表被非表行打断后仍有数据行 {shadow[:5]}——把说明节挪到表外"
 

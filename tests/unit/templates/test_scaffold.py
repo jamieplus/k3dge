@@ -20,16 +20,27 @@ class TestScaffoldProblemsChannel(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_exec_bit_is_restored_on_existing_file(self) -> None:
-        from k3dge.templates.scaffold import _write_if_missing
+        """公开行为从公开入口验（t-333）。
 
-        self.target.mkdir(parents=True)
+        旧测直接调私有 `_write_if_missing`：①`scaffold()` 哪天不再对 gate.sh 传
+        `executable=True`（类 docstring 承诺的"重跑 init 修回执行位"没了），旧测照绿；
+        ②内部改名它就先红。现在跑**两遍真 scaffold()**；mode 位在 Windows/部分挂载
+        文件系统上不承载 ⇒ 相应环境显式 skip，而不是记错误导。
+        """
+        if os.name == "nt":
+            self.skipTest("exec 位语义不适用于 Windows")
+        problems = scaffold(self.target, name="p")
+        self.assertEqual([m for m in problems if "gate" in m], [], problems)
         f = self.target / "scripts" / "gate.sh"
-        f.parent.mkdir(parents=True)
-        f.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
-        f.chmod(0o644)                      # 跨_fs/checkout 丢 mode
-        _write_if_missing(f, "别的\n", executable=True)
+        self.assertTrue(f.is_file(), "scaffold 未下发 scripts/gate.sh")
+        if not (os.stat(f).st_mode & 0o111):
+            self.skipTest("本文件系统不承载 exec 位（挂载选项/umask）")
+        f.chmod(0o644)                      # 模拟跨 fs/checkout 丢 mode
+        content_before = f.read_text(encoding="utf-8")
+        problems2 = scaffold(self.target, name="p")     # 重跑＝公开幂等面
+        self.assertEqual([m for m in problems2 if "gate" in m], [], problems2)
         self.assertTrue(os.stat(f).st_mode & 0o111, "重复跑 init 永远修不回执行位")
-        self.assertEqual(f.read_text(encoding="utf-8"), "#!/usr/bin/env bash\n")   # 内容仍不动
+        self.assertEqual(f.read_text(encoding="utf-8"), content_before)   # 内容不动
 
     def test_manifest_problems_come_back_in_the_channel(self) -> None:
 
@@ -51,6 +62,12 @@ class TestScaffoldProblemsChannel(unittest.TestCase):
         self.assertEqual(data["version"], "9.9.9")
         self.assertTrue(data["self_hosting"])
         self.assertIn("p", data["domains"])
+        # 新域条目与保留键**内部一致**（t-335/t-338）：旧实现在 package_root=lib 时
+        # 把域写成 `src/p`、包也铺在 src/ 下——本测只验"键没被抹"，等于给自相矛盾的
+        # 清单发了合格证。域 src 与落盘位置都跟 package_root 走。
+        self.assertEqual(data["domains"]["p"]["src"], "lib/p")
+        self.assertTrue((self.target / "lib" / "p" / "__init__.py").is_file())
+        self.assertFalse((self.target / "src" / "p").exists(), "package_root=lib 不得往 src/ 铺包")
 
     def test_corrupt_mcp_json_is_a_problem(self) -> None:
 
@@ -58,6 +75,10 @@ class TestScaffoldProblemsChannel(unittest.TestCase):
         (self.target / ".mcp.json").write_text("{ nope", encoding="utf-8")
         problems = scaffold(self.target, name="p")
         self.assertTrue([m for m in problems if ".mcp.json" in m], problems)
+        # 契约的破坏面（t-334）：`False` 的存在理由＝"跳过、不改写"以免抹掉 peers——
+        # 只断"有 problem"的话，"从空 dict 重写 `.mcp.json`"的回归同样有 problem 照样绿。
+        self.assertEqual((self.target / ".mcp.json").read_bytes(), b"{ nope",
+                         "坏文件被重写＝用户的对端配置没了")
 class TestScaffold(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
@@ -76,7 +97,11 @@ class TestScaffold(unittest.TestCase):
         self.assertTrue((self.target / "docs" / "tasks").is_dir())
         self.assertTrue((self.target / "docs" / "guides").is_dir())
         self.assertTrue((self.target / "docs" / "generated").is_dir())
-        self.assertTrue((self.target / "docs" / "tasks").is_dir())
+        # 旧这里把 `docs/tasks` 又断了一遍（t-336）——受管面真正没被点名的是协议/架构/分支/备忘：
+        self.assertTrue((self.target / "docs" / "protocols").is_dir())
+        self.assertTrue((self.target / "docs" / "architecture").is_dir())
+        self.assertTrue((self.target / "docs" / "branches").is_dir())
+        self.assertTrue((self.target / "docs" / "memo").is_dir())
         self.assertTrue((self.target / "docs" / "tasks" / "README.md").exists())
         self.assertTrue((self.target / "docs" / "adr" / ".schema.json").is_file())
         self.assertTrue((self.target / "docs" / "adr" / "AUTHORING.md").is_file())

@@ -122,6 +122,8 @@ def run_phase(
     """跑一个相位的全部节点（**单一执行器**）。返回 `(ok, 首个失败或末节点输出)`。
 
     - `phase` ∈ {preconditions, actions}；id 列表来自声明面（`gates.preconditions/actions`）
+    - 空/未配置相位 ⇒ `(True, "")`：**显式 no-op**（没有节点跑过，不等于"所有闸都过了"；
+      判定由 `tests/unit/engine/test_nodes.py::test_empty_declaration_is_explicit_noop` 钉住）
     - 未知 id ⇒ 拒绝（`unknown_gate_id` / `unknown_action_id`）
     - precondition 的失败值 ⇒ `Rejection(gid, msg)`；action 的失败值 ⇒ `gates.rejection(out, aid)`
     - `on_error=continue` 的节点失败**不中断**（用于收尾类步骤），其消息并入输出

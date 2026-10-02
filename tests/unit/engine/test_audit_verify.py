@@ -28,6 +28,7 @@ def make_bundle(root: Path, *, version: int = 1, claimed: str = "closed", row_st
                 verify_cell: str = "验证：跑通 tests/unit/x.py", dup: bool = False,
                 drop_row: bool = False, header_swapped: bool = False, tamper: bool = False,
                 finding_state: str = "fixed", review_ack: bool = True,
+                disposition: str = "已改：加了 added_by_fix",
                 input_path: str = "/tmp/ws", order=("fix.patch", "pins.patch"),
                 preexisting_pin: bool = False, pins_in_code: bool = True) -> Path:
     """造一个**结构完整**的包：`code/` + `baseline.json` + 12 列表格 + 真生成的补丁。
@@ -52,14 +53,14 @@ def make_bundle(root: Path, *, version: int = 1, claimed: str = "closed", row_st
     (b / "findings.json").write_text(json.dumps({"items": [
         {"id": "code-1", "state": finding_state, "review_ack": review_ack,
          "location": "src/a.py:1",          # 真包含 location（部分落地要靠它把未关项所在文件排除）
-         "disposition": "已改：加了 added_by_fix", "verification": "跑通 tests/unit/x.py"}]},
+         "disposition": disposition, "verification": "跑通 tests/unit/x.py"}]},
         ensure_ascii=False), encoding="utf-8")
     hdr = _HEADER
     if header_swapped:      # 表头顺序错（消费侧判据必须按序）
         hdr = ("| ID | 优先级 | 严重度 | 日期 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
     row = ("| code-1 | 2026-09-27 | 中 | P1 | 正确性 | 说明 | src/a.py:1 | "
-           f"{row_state} | 已改：加了 added_by_fix | {verify_cell} | | |\n")
+           f"{row_state} | {disposition} | {verify_cell} | | |\n")
     rows = "" if drop_row else (row + (row if dup else ""))
     (b / "report.md").write_text("# 审计\n\n" + hdr + rows, encoding="utf-8")
     (b / "manifest.json").write_text(json.dumps({
@@ -96,8 +97,12 @@ def test_report_must_match_findings_one_to_one(tmp_path):
 
 
 def test_fixed_row_requires_disposition_and_verification(tmp_path):
+    """名字承诺两列、此前只钉了「验证」半（t-093）。现在两列各断一次——
+    「处置」空走 REQUIRED_CELLS 的「必需列 `处置` 为空」，与「验证」列是两条独立护栏。"""
     res = av.verify_bundle_local(make_bundle(tmp_path, verify_cell=""))
     assert not res["ok"] and "「验证」列为空" in _errors(res), _errors(res)
+    res2 = av.verify_bundle_local(make_bundle(tmp_path / "d", disposition=""))
+    assert not res2["ok"] and "`处置` 为空" in _errors(res2), _errors(res2)
 
 
 def test_report_header_must_be_the_exact_12_columns(tmp_path):
@@ -130,6 +135,11 @@ def test_hash_chain_uses_contract_grammar_and_catches_tampering(tmp_path):
     # artifact 形态（`pins.in_code=false`）：`code/` 已是语义层 ⇒ **不反向** pins.patch（只反向 fix.patch）
     art = av.verify_bundle_local(make_bundle(tmp_path / "art", pins_in_code=False))
     assert art["ok"], _errors(art)
+    # **组合形状**（t-094）：既有钉 + 篡改——旧 bug 正是"被 pins.patch 碰过的文件整份跳过"，
+    # 于是这类文件里追加的代码永远抓不到。先 `preexisting_pin` 让钉能挺过两遍反向应用，
+    # 再 tamper 加一行代码：strip_markers 仍容忍旧钉，但**必须**抓到多出来的代码。
+    combo = av.verify_bundle_local(make_bundle(tmp_path / "combo", preexisting_pin=True, tamper=True))
+    assert not combo["ok"] and "内容哈希链不通过" in _errors(combo), _errors(combo)
 
 
 def test_version_and_input_identity_are_gated(tmp_path):
@@ -137,6 +147,42 @@ def test_version_and_input_identity_are_gated(tmp_path):
     assert not res["ok"] and "bundle_version" in _errors(res)
     res2 = av.verify_bundle_local(make_bundle(tmp_path / "i"), expect_input="/tmp/OTHER")
     assert not res2["ok"] and "输入身份不符" in _errors(res2), _errors(res2)
+
+
+def test_input_identity_is_read_from_the_bundle_not_a_constant(tmp_path):
+    """用**非缺省** `input_path` 验身份比对（t-092：该旋钮此前恒为 `/tmp/ws`）。
+
+    若实现把期望值写死、或干脆不读 `facts["input"]`，"喂不同 input 应红"这条永远测不到。
+    正反两面：包 input 与 expect 一致 ⇒ 过；不一致 ⇒ `输入身份不符`。
+    """
+    b = make_bundle(tmp_path, input_path="/tmp/elsewhere")
+    ok = av.verify_bundle_local(b, expect_input="/tmp/elsewhere")
+    assert ok["ok"], _errors(ok)
+    bad = av.verify_bundle_local(make_bundle(tmp_path / "x", input_path="/tmp/elsewhere"),
+                                 expect_input="/tmp/ws")
+    assert not bad["ok"] and "输入身份不符" in _errors(bad), _errors(bad)
+
+
+def test_apply_order_unknown_patch_rejected(tmp_path):
+    """`apply_order` 含未知/越界补丁名（t-092：`order` 旋钮此前恒为默认对）。
+
+    这条同时是 `replay_to_baseline` 的路径穿越闸——只认白名单补丁名。
+    """
+    res = av.verify_bundle_local(make_bundle(tmp_path, order=("fix.patch", "../evil.patch")))
+    assert not res["ok"] and "未知补丁" in _errors(res), _errors(res)
+    # 对照：**顺序是有语义的**（重放按声明序反向做）——换序不是"另一个合法值"，
+    # 而是会让哈希链反向应用失败；这里只证"白名单外的名字被闸下"。
+    ok = av.verify_bundle_local(make_bundle(tmp_path / "same", order=("fix.patch", "pins.patch")))
+    assert ok["ok"], _errors(ok)
+
+
+def test_terminal_state_without_review_ack_is_unclosed(tmp_path):
+    """`review_ack` 旋钮此前恒 True ⇒ "终态但没背书＝未关"这条闭环判据从没测到（t-092）。"""
+    res = av.verify_bundle_local(
+        make_bundle(tmp_path, finding_state="fixed", review_ack=False, row_state="已修"),
+        require_closed=True)
+    assert not res["ok"] and "未闭环（消费侧算）" in _errors(res), _errors(res)
+    assert res["unclosed"] == ["code-1"], res
 
 
 def test_missing_files_and_empty_patch_fail_clear(tmp_path):

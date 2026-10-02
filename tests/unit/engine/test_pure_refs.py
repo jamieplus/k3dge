@@ -328,8 +328,10 @@ class TestPointerAndClosureShape(unittest.TestCase):
 
     def _ws_with_report(self, report: str) -> Path:
 
-        ws = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
+        base = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, base, ignore_errors=True)
+        ws = base / "ws"                       # 嵌一层：`../` 越界靶落在受管沙箱内（t-256）
+        ws.mkdir()
         (ws / "docs" / "reviews").mkdir(parents=True)
         (ws / "docs" / "reviews" / "r.md").write_text("# r\n", encoding="utf-8")
         self._report = report
@@ -345,9 +347,16 @@ class TestPointerAndClosureShape(unittest.TestCase):
         text = f"---\nreport: {self._report}\n---\n\n# X\n"
         out = pure_refs.check_report_pointer(ws, self.REL, text)
         self.assertEqual([c for c, _ in out], ["DANGLING_REPORT_REF"])
-        ws2 = self._ws_with_report("../elsewhere/x.md")
-        self.assertTrue(pure_refs.check_report_pointer(
-            ws2, self.REL, f"---\nreport: ../elsewhere/x.md\n---\n"))
+        # t-256：越界靶**必须真实存在**——旧夹具里 `../elsewhere/x.md` 根本不存在，
+        # 一个只做 `is_file()`、完全不管 containment 的实现也会"报违规"（不存在当然不是
+        # 合法指针）⇒ 本测点名的回归（不校验越界）恰恰逃过。造在 ws 的父目录、相对可达。
+        base = ws.parent
+        escape = base / "elsewhere-x.md"
+        escape.write_text("# 在仓外但真实存在\n", encoding="utf-8")
+        self.assertTrue(escape.is_file())
+        out2 = pure_refs.check_report_pointer(
+            ws, self.REL, f"---\nreport: ../{escape.name}\n---\n")
+        self.assertEqual([c for c, _ in out2], ["DANGLING_REPORT_REF"], out2)
 
     def test_body_meta_gate_ignores_fence_samples(self) -> None:
         text = "# X\n\n反例长这样：\n\n```md\n- **Status**: done\n```\n"
@@ -355,17 +364,23 @@ class TestPointerAndClosureShape(unittest.TestCase):
 
     def test_screen_ack_target_must_be_in_repo(self) -> None:
 
-        ws = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
-        (ws / "docs").mkdir()
+        base = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, base, ignore_errors=True)
+        ws = base / "ws"                        # 同上（t-257）：`..` 靶要与 ws 同父
+        (ws / "docs").mkdir(parents=True)
         (ws / "docs" / "a.md").write_text("x", encoding="utf-8")
-        outside_dir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, outside_dir, ignore_errors=True)
-        outside = outside_dir / "elsewhere.md"
+        outside = base / "elsewhere.md"
         outside.write_text("x", encoding="utf-8")
         self.assertTrue(pure_refs.screen_target_exists(ws, "docs/a.md"))
         self.assertFalse(pure_refs.screen_target_exists(ws, str(outside)))
-        self.assertFalse(pure_refs.screen_target_exists(ws, "../%s" % outside.name))
+        # t-257：`..` 靶必须**真在**——旧夹具里 `ws/../elsewhere.md` 从不存在，
+        # `is_file()` 单独就能把这个假绿喂饱。换成与 ws 同父的真实兄弟文件：
+        # 只有 containment 判据能拒它。
+        base = ws.parent
+        sibling = base / "elsewhere.md"
+        sibling.write_text("x", encoding="utf-8")
+        self.assertTrue(sibling.is_file(), "前置：越界靶必须存在，否则测不到 containment")
+        self.assertFalse(pure_refs.screen_target_exists(ws, "../%s" % sibling.name))
 
     def test_retired_ledger_warns_when_marker_drifted(self) -> None:
         import contextlib
@@ -649,18 +664,20 @@ class TestRetiredAdrDest(unittest.TestCase):
 
     REL = "docs/adr/obsolete/0042-old-decisions.md"
 
-    def _fm(self, body: str) -> str:
-        return body
+    def _fm(self, status: str, *meta: str) -> str:
+        """frontmatter 由这里拼（t-259）：`_fm` 曾是个"定义了没人调"的透传死函数，
+        字面量散在三条测里各飘各的。"""
+        return "---\nStatus: " + status + "\n" + "".join(m + "\n" for m in meta) + "---\n# ADR-0042\n"
 
     def test_missing_dest_blocks(self):
-        out = pure_refs.check_retired_adr_dest(self.REL, "---\nStatus: Superseded\n---\n# ADR-0042\n")
+        out = pure_refs.check_retired_adr_dest(self.REL, self._fm("Superseded"))
         self.assertEqual([c for c, _ in out], ["ADR_RETIRED_NO_DEST"])
         self.assertIn("merged-into", out[0][1])          # 提示里给出合法形态
 
     def test_three_legal_forms_pass(self):
-        for body in ("---\nStatus: Superseded\nmerged-into: ADR-0005 §2.7\n---\n# ADR-0042\n",
-                     "---\nStatus: Superseded\nsuperseded_by: ADR-0005\n---\n# ADR-0042\n",
-                     "---\nStatus: Rejected\n---\n# ADR-0042\n"):
+        for body in (self._fm("Superseded", "merged-into: ADR-0005 §2.7"),
+                     self._fm("Superseded", "superseded_by: ADR-0005"),
+                     self._fm("Rejected")):
             self.assertEqual(pure_refs.check_retired_adr_dest(self.REL, body), [], body)
 
     def test_empty_value_does_not_count(self):

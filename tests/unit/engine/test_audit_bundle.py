@@ -112,11 +112,11 @@ def test_ignored_runtime_projection_does_not_trip_dirty_tree(tmp_path):
         subprocess.run(["git", *argv], cwd=ws, check=True, capture_output=True)
     (ws / ".agent").mkdir(exist_ok=True)
     (ws / ".agent" / "audit_checklist.json").write_text('{"milestone": "M1"}\n', encoding="utf-8")
-    rc, out = subprocess.run(["git", "status", "--porcelain"], cwd=ws,
-                             capture_output=True, text=True).returncode, \
-        subprocess.run(["git", "status", "--porcelain"], cwd=ws, capture_output=True,
-                       text=True).stdout
-    assert rc == 0 and out.strip() == "", out        # 投影不污染工作树
+    # **一次观察、两个字段**（t-121）：旧写法跑两遍 status、rc 取第一遍 stdout 取第二遍——
+    # 两个值不来自同一观测态（并发下互相矛盾仍可能"通过"）。
+    st = subprocess.run(["git", "status", "--porcelain"], cwd=ws, check=True,
+                        capture_output=True, text=True)
+    assert st.returncode == 0 and st.stdout.strip() == "", st.stdout   # 投影不污染工作树
 
     r = ab.apply_bundle(ws, _bundle(tmp_path / "proj"))
     assert r.get("error") != "DIRTY_TREE", r
@@ -291,11 +291,15 @@ def test_leg_reads_tool_knobs_from_declaration_and_audit_only_is_evidence_only(t
             encoding="utf-8")
         _early, _ = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
         assert _early is not None and _early[0] == "refused" and "k3dit_scope" in _early[1], _bad
+    # 恢复合法配置后**必须重跑腿**再断（t-120）：旧形状写完就断言，验的是第一次调用的
+    # 陈旧 `consumed/early`——"非法值被拒后合法配置仍可用"这条从没被证明。
     (ws / ".agent" / "pipeline.toml").write_text(
         '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\n'
         'k3dit_mode = "audit-only"\nk3dit_pins = "artifact"\n', encoding="utf-8")
+    early3, _ = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
+    assert calls == {"mode": "audit-only", "pins": "artifact", "scope": ""}   # 坏 scope 没留下污染
     assert consumed.get("require_closed") is False                  # partial 不进 NOT_CLOSED
-    assert early is not None and early[0] == "refused" and "只出证据" in early[1]
+    assert early3 is not None and early3[0] == "refused" and "只出证据" in early3[1]
     assert _find_report(ws, "M77", "audit"), "纯审计也要落报告（证据）"
 
     # 非法取值 ⇒ 拒绝（不静默按缺省跑）
@@ -389,12 +393,14 @@ def test_land_report_is_the_single_entry_used_by_all_three_paths(tmp_path, monke
     # 投影面：`sync_all`（文档/契约/索引）与 `write_symbol_index`（`k3dge where` 判据面）都要跑
     gen = ws / "docs" / "generated"
     gen.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(doc_catalog, "write_docs_index",
-                        lambda w: (gen / "docs-index.json").write_text("{}\n", encoding="utf-8") or
-                        (gen / "docs-index.json"))
-    monkeypatch.setattr(search, "write_symbol_index",
-                        lambda w: (gen / "symbol-index.json").write_text("{}\n", encoding="utf-8") or
-                        (gen / "symbol-index.json"))
+    def _stub_writer(target: Path):
+        def _w(*a, **k):
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("{}\n", encoding="utf-8")
+            return target          # write_text 返回**字符数**（恒真）——`or path` 从不起效，
+        return _w                  # 桩"返回路径"的意图此前是假的（t-123）
+    monkeypatch.setattr(doc_catalog, "write_docs_index", _stub_writer(gen / "docs-index.json"))
+    monkeypatch.setattr(search, "write_symbol_index", _stub_writer(gen / "symbol-index.json"))
     seen = {}
     monkeypatch.setattr(ab, "commit_applied",
                         lambda w, m, f: (seen.update(msg=m, files=list(f)) or ("a" * 40, "")))
@@ -464,6 +470,10 @@ def test_tool_state_never_lands_in_a_foreign_subject(tmp_path, monkeypatch):
     被审仓 k3dge ⇒ 工作区变脏 ⇒ 消费相位被自家 `DIRTY_TREE` 拒，而且那些是工具状态不是审计产物）。
     外部被审仓 ⇒ 落缓存（确定性路径，跨轮续用）；工具审自己 ⇒ 不动（保持仓库内状态连续性）。
     """
+    # 宿主环境可能本来就带着这两个变量（开发机跑过真审计）——先清，否则
+    # "env 里没有 K3DIT_HALL_ROOT / 外部仓不吃宿主值"两类断言红得与实现无关（t-119）
+    monkeypatch.delenv("K3DIT_HALL_ROOT", raising=False)
+    monkeypatch.delenv("K3DIT_LEDGER", raising=False)
     subj = tmp_path / "subject"
     subj.mkdir()
     fake_tool = tmp_path / "k3dit" / ".venv" / "bin" / "k3dit"
@@ -702,7 +712,13 @@ def test_half_applied_patches_are_rolled_back_before_merge_fallback(tmp_path, mo
 
 
 def test_tool_state_root_is_hardened_and_refuses_symlink(tmp_path, monkeypatch):
-    """code-9（报告）：工具状态目录可被环境劫持 ⇒ `mkdir 0700`、拒符号链接、拒非目录；不安全就**别放子进程**。"""
+    """code-9（报告）：工具状态目录可被环境劫持 ⇒ `mkdir 0700`、拒符号链接、拒非目录；不安全就**别放子进程**。
+
+    先清宿主 `K3DIT_HALL_ROOT/K3DIT_LEDGER`（t-340）：`_tool_env` 继承 os.environ，宿主带着
+    这两个变量时"不安全 ⇒ env 里不该再有它们"的断言会因**继承**而红，与被测判据无关。
+    """
+    monkeypatch.delenv("K3DIT_HALL_ROOT", raising=False)
+    monkeypatch.delenv("K3DIT_LEDGER", raising=False)
     ok = tmp_path / "state"
     assert ab._harden_state_root(ok) == "" and (ok.stat().st_mode & 0o777) == 0o700
     (tmp_path / "real").mkdir()
@@ -829,17 +845,16 @@ def test_audit_flow_has_no_dead_audit_surface() -> None:
 
 
 def test_repo_gitignore_covers_both_runtime_projections():
-    """决策的钉子：`audit_jobs.json` 与 `audit_checklist.json` 都不许再入库（ADR-0004 §2.1.10）。"""
-    import tempfile
+    """决策的钉子：`audit_jobs.json` 与 `audit_checklist.json` 都不许再入库（ADR-0004 §2.1.10）。
 
+    `git check-ignore` 只查忽略规则，不碰文件系统——旧夹具的临时目录与 `probe` 路径是死布置
+    （t-122/t-341：让测看起来依赖磁盘，实际只用 rel 字符串），删。
+    """
     repo = Path(__file__).resolve().parents[3]
-    with tempfile.TemporaryDirectory() as d:
-        for rel in (".agent/audit_jobs.json", ".agent/audit_checklist.json"):
-            f = Path(d) / "probe"
-            f.parent.mkdir(exist_ok=True)
-            r = subprocess.run(["git", "-C", str(repo), "check-ignore", "-q", "--", rel],
-                               capture_output=True, text=True)
-            assert r.returncode == 0, f"{rel} 未被 .gitignore 覆盖 ⇒ 审计一跑就会弄脏工作树"
+    for rel in (".agent/audit_jobs.json", ".agent/audit_checklist.json"):
+        r = subprocess.run(["git", "-C", str(repo), "check-ignore", "-q", "--", rel],
+                           capture_output=True, text=True)
+        assert r.returncode == 0, f"{rel} 未被 .gitignore 覆盖 ⇒ 审计一跑就会弄脏工作树"
 def test_dummy_peer_state_and_report_shape(tmp_path, monkeypatch) -> None:
     """dummy peer 桩自身的三条不变量（t-013/014/015）——它是"对端契约"的替身，桩不可信则开环/闭环两态的验证全无意义。"""
     import importlib.util

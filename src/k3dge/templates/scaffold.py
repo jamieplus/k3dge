@@ -298,14 +298,19 @@ def _ensure_first_domain(target: Path, name: str, today: str) -> list:
         # `name` 走调用方意图（`--name`/目录名）：这条路只在"没有任何域"时进，且 init 的
         # 语义＝"我要把这个项目命名/铺成 name"；其余用户键一律保留（371）
         merged["name"] = name
-        merged["domains"] = fresh["domains"]
+        # 新域的 `src` 跟随**用户保留的 `package_root`**：旧形状硬编码 `src/<name>`——
+        # package_root=lib 的仓升级后 domains 指向 src/p、package_root 写着 lib，
+        # 清单自相矛盾，包也被铺在 src/ 下（t-335/t-338）。
+        pkg_root = str(merged.get("package_root") or "src").strip("/") or "src"
+        merged["domains"] = {name: {**fresh["domains"][name], "src": f"{pkg_root}/{name}"}}
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")
     else:
+        pkg_root = "src"
         _write_if_missing(path, json.dumps(_first_domain_manifest(name), indent=2) + "\n")
     spec = SPEC_TEMPLATE.replace("<domain>", name)
     spec = re.sub(r"(\*\*Last Updated\*\*:).*", rf"\1 {today}", spec)
-    _write_if_missing(target / "src" / name / "__init__.py", f'__version__ = "0.1.0"\n')
+    _write_if_missing(target / pkg_root / name / "__init__.py", f'__version__ = "0.1.0"\n')
     _write_if_missing(target / "docs" / "specs" / name / "spec.md", spec)
     _write_if_missing(
         target / "tests" / "unit" / name / "test_smoke.py",

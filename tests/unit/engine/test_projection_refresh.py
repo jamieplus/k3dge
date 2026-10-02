@@ -40,11 +40,11 @@ def _make_repo(tmp: Path) -> Path:
 
 class TestProjectionRefresh(unittest.TestCase):
     def setUp(self) -> None:
+        # 清理**先登记再建仓**（t-235）：`setUp` 抛错时 unittest 不跑 tearDown，旧写法
+        # 只剩解释器退出时的 finalizer 兜底；`self.repo` 也会悬空。
         self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
         self.repo = _make_repo(Path(self._tmp.name))
-
-    def tearDown(self) -> None:
-        self._tmp.cleanup()
 
     def _fresh_contents(self) -> dict:
         return render_manual_docs_content(self.repo, Manifest.load(self.repo))
@@ -59,11 +59,24 @@ class TestProjectionRefresh(unittest.TestCase):
         self.assertEqual((gen / "api.md").read_text(encoding="utf-8"), expected)
 
     def test_refresh_is_idempotent(self) -> None:
-        _refresh_projections(self.repo)
-        self.assertEqual(_refresh_projections(self.repo), [])
+        """第二次为空**只有第一次真写了**才有意义（t-233）。
+
+        `_refresh_projections` 把每件失败都内部吞成"无变化"——两连空返回时旧测全绿，
+        "幂等"与"全坏了"不可分辨。把 `failures` 传出来断言为空，并钉首轮确有产出。
+        """
+        f1: list = []
+        first = _refresh_projections(self.repo, f1)
+        self.assertEqual(f1, [], f"投影失败被吞：{f1}")
+        self.assertTrue(first, "首轮什么都没刷新＝'已新鲜'的前提没建立，二轮的'空'是假绿")
+        f2: list = []
+        second = _refresh_projections(self.repo, f2)
+        self.assertEqual(second, [], f2)
+        self.assertEqual(f2, [], "第二轮把失败吞进了返回值之外")
 
     def test_readme_layout_block_is_refreshed(self) -> None:
-        self.assertIn("README.md", " ".join(_refresh_projections(self.repo)))
+        # **列表成员**精确断（t-234）：`" ".join` 后子串匹配会被任何含 README.md 的路径
+        # （docs/generated/README.md…）满足——根 README 没刷也绿。
+        self.assertIn("README.md", _refresh_projections(self.repo))
         self.assertIn("| core |", (self.repo / "README.md").read_text(encoding="utf-8"))
 
     def test_symbol_index_is_written(self) -> None:
@@ -74,23 +87,28 @@ class TestProjectionRefresh(unittest.TestCase):
 class TestWhereSelfHeals(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)          # 同 t-235：setUp 抛错也回收
         self.repo = _make_repo(Path(self._tmp.name))
-
-    def tearDown(self) -> None:
-        self._tmp.cleanup()
 
     def test_stale_index_is_rebuilt_on_where(self) -> None:
         search.write_symbol_index(self.repo)
         idx = search.index_path(self.repo)
         data = json.loads(idx.read_text(encoding="utf-8"))
-        data.pop("foo", None)
+        # 先证"foo 键本来在"（t-236）：顶层键约定若变，pop 带 default 会静默 no-op——
+        # "被破坏的索引"其实没被破坏，本测就白跑。
+        self.assertIn("foo", data, f"索引顶层形状变了？keys={sorted(data)[:8]}")
+        data.pop("foo")
         idx.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         (self.repo / "src" / "core" / "mod.py").write_text(
             "def foo() -> int:\n    return 2\n", encoding="utf-8"
         )
         # 显式把索引 mtime 拨到过去：不依赖文件系统的秒级粒度（CI 上防 flake）
         os.utime(idx, (time.time() - 60, time.time() - 60))
-        self.assertTrue(search.where(self.repo, "foo"))
+        locs = search.where(self.repo, "foo")
+        # "非空"太宽（t-236）：钉**重建后坐标对**——文件与行号来自现树，不是残留载荷。
+        self.assertTrue(locs, "自愈没把删掉的 `foo` 建回来")
+        self.assertEqual({l.file for l in locs}, {"src/core/mod.py"}, locs)
+        self.assertEqual([l.line for l in locs], [1], locs)
 
     def test_missing_index_is_built(self) -> None:
         self.assertTrue(search.where(self.repo, "foo"))

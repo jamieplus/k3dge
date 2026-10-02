@@ -22,7 +22,11 @@ import re
 _SIGN_KEYS = ("审计人", "透镜来源", "基线")
 # 模板未填的占位值：`基线` 被 docstring 称作"可验的内容锚点"，只做"非空"判就允许
 # AUTHORING 模板原句（`commit/tests 状态快照`）过闸 ⇒ 锚点是空的（ocr-288）。
-_SIGN_PLACEHOLDER_MARKS = ("状态快照", "待填", "TBD", "<", "{{", "…")
+# ocr-288 点名要拒的模板残渣＝这套标记（t-193）：`...`/TODO/N/A 是 AUTHORING 模板与
+# 手写报告里最常见的未填形态，旧表漏了它们 ⇒ `- **审计人**: ...` 被当真实署名放行。
+# 判据是**子串**，标记本身不得是真实值可能包含的普通词（`<` 会拒 HTML 式署名——可接受：
+# 锚点要求纯值）。
+_SIGN_PLACEHOLDER_MARKS = ("状态快照", "待填", "TBD", "<", "{{", "…", "...", "TODO", "N/A")
 
 
 def sign_missing(text: str) -> list:

@@ -39,15 +39,29 @@ def test_field_accepts_fullwidth_colon() -> None:
     assert process_audit._field("- **审计人**：k3dit\n", "审计人") == "k3dit"
 
 
-def test_signed_report_yields_all_three_keys(tmp_path: Path) -> None:
+def test_field_empty_value_does_not_capture_the_next_line(tmp_path: Path) -> None:
+    r"""ocr-097 的 fail-open 形状**必须留在测里**（t-191）：`- **审计人**:` 空值 +
+    下一行 `- **基线**: abc…`——旧 `[ \t]*\s*(.+)` 的 `\s` 含 `\n`，跨行捕获下一行 ⇒
+    假"值非空"，报告没署名也算签了。现判据（行内空白 + 值同行 + re.M）没测兜住它，
+    将来谁改回 `\s*(.+)` 或丢了 re.M，本文件全绿而闸被绕过。
+    """
+    text = "- **审计人**: \n- **基线**: abc123\n"
+    assert process_audit._field(text, "审计人") == ""
+    assert process_audit._field(text, "基线") == "abc123"
+
+
+def test_signed_report_passes_the_single_criterion(tmp_path: Path) -> None:
+    """两测走 `sign_missing()`（t-192）：生产唯一判定（milestone_audit 用它），
+    `[k for k in _SIGN_KEYS if not _field(...)]` 是**退休的 accept 形状**——
+    下面的模板占位测恰好证明它放行未填模板。保留 `_field` 真值位只用来展示分歧。
+    """
     text = _report(tmp_path, sign=True).read_text(encoding="utf-8")
-    assert [k for k in process_audit._SIGN_KEYS if not process_audit._field(text, k)] == []
+    assert process_audit.sign_missing(text) == []
 
 
 def test_unsigned_report_lists_missing_keys(tmp_path: Path) -> None:
     text = _report(tmp_path, sign=False).read_text(encoding="utf-8")
-    missing = [k for k in process_audit._SIGN_KEYS if not process_audit._field(text, k)]
-    assert missing == ["审计人", "透镜来源", "基线"]
+    assert process_audit.sign_missing(text) == list(process_audit._SIGN_KEYS)
 
 
 def test_sign_missing_rejects_template_placeholder(tmp_path: Path) -> None:
@@ -58,8 +72,21 @@ def test_sign_missing_rejects_template_placeholder(tmp_path: Path) -> None:
         "- **审计人**: k3dit\n- **透镜来源**: k3dit 工单\n- **基线**: commit/tests 状态快照\n",
         encoding="utf-8")
     text = (reviews / "r.md").read_text(encoding="utf-8")
+    # 分歧登记：`_field` 真值判据（退休 accept 形状）放行这条未填模板……
     assert [k for k in process_audit._SIGN_KEYS if not process_audit._field(text, k)] == []
+    # ……而唯一判定 `sign_missing()` 拒它。这就是 t-192 把上面两测翻到 sign_missing 的原因。
     assert process_audit.sign_missing(text) == ["基线"]
+
+
+def test_every_placeholder_mark_is_rejected(tmp_path: Path) -> None:
+    """逐个标记测（t-193）：旧测只钉 `状态快照` 一个值，其余标记（含 ocr-288 点名补进来的
+    `...`/TODO/N/A）漂移进元组也不会有测红——把 `_SIGN_PLACEHOLDER_MARKS` **本身**当参数源。"""
+    marks = process_audit._SIGN_PLACEHOLDER_MARKS
+    assert len(marks) >= 6 and all(isinstance(m, str) and m for m in marks), marks
+    for mark in marks:
+        text = (f"- **审计人**: k3dit\n- **透镜来源**: k3dit 工单\n"
+                f"- **基线**: {mark}\n")
+        assert "基线" in process_audit.sign_missing(text), f"标记 {mark!r} 被放行＝占位当实名"
 
 
 def test_sign_missing_accepts_filled_anchor(tmp_path: Path) -> None:

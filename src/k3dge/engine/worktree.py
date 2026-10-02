@@ -26,8 +26,16 @@ def _safe_job(job: str) -> str:
     return j
 
 
+# `GIT_*` 一律剥（防止调用方的 worktree/index 指针串进来），**除了配置隔离对**：
+# 测试/CI 用 `GIT_CONFIG_GLOBAL`/`GIT_CONFIG_NOSYSTEM` 声明"别读宿主 globalconfig"，
+# 连它们一起剥会让生产调用成为被测面里唯一没隔离的那一份——断言红绿都可能是宿主
+# globalconfig（hooksPath/gpgsign/alias.*/init.defaultBranch）造成的（t-310）。
+_CONFIG_ISOLATION_VARS = frozenset({"GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM"})
+
+
 def _git(workspace: Path, *args: str) -> subprocess.CompletedProcess:
-    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith("GIT_") or k in _CONFIG_ISOLATION_VARS}
     return subprocess.run(["git", *args], cwd=str(workspace), capture_output=True, text=True, env=env)
 
 

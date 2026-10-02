@@ -119,22 +119,34 @@ _SEP = "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- 
 
 
 def _now() -> str:
-    return datetime.datetime.now().isoformat(timespec="seconds")
+    # tz-aware 输出（t-018）：M10 起全仓规定 k3dge 产的时间戳带显式偏移
+    # （`2026-09-16-M10-chore-timestamp_tz_offset`），naive `datetime.now()` 与
+    # events.jsonl 的 UTC 戳比较会歧义——peer_contract §generated_at 也是 ISO-8601。
+    return datetime.datetime.now(datetime.timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
 @mcp.tool()
 def dummy_submit(baseline: str = "", scope: str = "", milestone_id: str = "",
                  branch: str = "", wt_dir: str = "") -> str:
     """Contract §1: validate + enqueue only; the wait lives outside the protocol."""
-    if not baseline or not all(c in "0123456789abcdef" for c in baseline) or len(baseline) not in (40, 64):
+    # 长度先判再全形式匹配（t-017）：旧顺序 `all(...)` 在前——调用方可控的超长串会被
+    # 逐字符扫完才因长度被拒；错误消息也补上"小写十六进制/长度"，大写粘贴不再无从下手。
+    bl = str(baseline or "").strip()
+    len_ok = len(bl) in (40, 64)
+    hex_ok = bool(bl) and all(c in "0123456789abcdef" for c in bl)
+    if not (len_ok and hex_ok):
         return json.dumps(
-            {"ok": False, "error": "BAD_BUNDLE", "message": f"baseline must be a commit oid, got {baseline!r}"},
+            {"ok": False, "error": "BAD_BUNDLE",
+             "message": f"baseline 必须是 40 或 64 位**小写**十六进制 commit oid，收到 {baseline!r}"},
             ensure_ascii=False,
         )
     job_id = uuid.uuid4().hex[:12]
     with _state_lock():                     # 读改写整段上锁（t-012）
         jobs = _load_jobs()
-        jobs[job_id] = {"baseline": baseline, "scope": scope, "milestone_id": milestone_id}
+        # branch/wt_dir 是工具公开 schema 的一部分：旧实现收下即丢 ⇒ 作业记录不含被审现场
+        # 上下文，用桩跑真链时行为不明显（t-016）——一并存进作业记录并回显进报告。
+        jobs[job_id] = {"baseline": bl, "scope": scope, "milestone_id": milestone_id,
+                        "branch": str(branch or "").strip(), "wt_dir": str(wt_dir or "").strip()}
         _save_jobs(jobs)
     return json.dumps({"ok": True, "kind": "job", "payload": {"job_id": job_id}}, ensure_ascii=False)
 
@@ -174,7 +186,9 @@ def dummy_collect(job_id: str) -> str:
         f"- **透镜来源**: dummy（peer contract 桩）\n"
         # 这里原本又拼了**第二条** `- **基线**: 0000…`（40 个 0）⇒ 同一份报告两个互相矛盾的
         # 基线事实，消费侧读到的第一条恰好是 job 的真基线才没炸；契约上仍是自相矛盾件（t-015）
-        f"- **范围**: {job.get('scope') or '-'}\n\n"
+        f"- **范围**: {job.get('scope') or '-'}\n"
+        f"- **分支**: {job.get('branch') or '-'}\n"
+        f"- **工作树**: {job.get('wt_dir') or '-'}\n\n"
         f"{_HEADER}\n{_SEP}\n" + ("\n".join(rows) + "\n" if rows else "")
     )
     return json.dumps(

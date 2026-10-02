@@ -78,10 +78,16 @@ def test_attrs_v2_parsed():
     from k3dge.engine.markers import parse_text
 
     ms, probs = parse_text("a.py", "code\n# k3dit:pending code-9 sev=高 prio=P1 type=复杂度 未设超时\n")
+    # 非空先行（t-146）：解析回归时 `ms[0]` 先抛 IndexError——把"可读的 probs 诊断"整个丢掉、
+    # 伪装成崩溃。先断条数与 probs，再取 [0]。
+    assert not probs, probs
+    assert len(ms) == 1, ms
     assert ms[0].id == "code-9" and (ms[0].sev, ms[0].prio, ms[0].type) == ("高", "P1", "复杂度")
-    assert ms[0].note == "未设超时" and not probs
+    assert ms[0].note == "未设超时"
 
-    ms2, _ = parse_text("r.md", "<!-- k3dit:pending doc-3 sev=低 prio=P3 type=设计 摘要 -->\n")
+    ms2, probs2 = parse_text("r.md", "<!-- k3dit:pending doc-3 sev=低 prio=P3 type=设计 摘要 -->\n")
+    assert not probs2, probs2
+    assert len(ms2) == 1, ms2
     assert ms2[0].type == "设计" and ms2[0].note == "摘要" and ms2[0].sev == "低"
 
 

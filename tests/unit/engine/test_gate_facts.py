@@ -6,11 +6,92 @@
 必须同形，否则判断主体会收到两种形状。
 """
 
+import ast
+import functools
 import unittest
 from pathlib import Path
 
 from k3dge.engine import gate_facts
 from k3dge.engine.models import Violation
+
+_SRC = Path(__file__).resolve().parents[3] / "src" / "k3dge"
+# t-150①：parents[3] 一旦指错，rglob 对不存在的目录**静默空转**（os.walk 吞 OSError），
+# 三条 AST 守卫会集体假绿——先验根再扫描。
+assert (_SRC / "engine" / "gate_facts.py").is_file(), f"repo root mis-detected: {_SRC}"
+
+# `Violation` 是 frozen dataclass：字段序＝位置参序（t-153 的"第 5 位置参"形状合法）。
+_FIELDS = ("rule_id", "message", "domain", "file_path", "detail")
+
+
+def _scan():
+    """单点 AST 扫描（t-151）：三条守卫吃**同一份**站点表。
+
+    旧形状是三份 ~25 行的近似拷贝（已漂移：一份要"首参字面量"、两份要"位置参≥2"），
+    下一处"什么算构造点"的修法只会改进其中一份。这里两种形状都认（位置参/关键字），
+    读不了/解不出的文件如实收集而非 traceback（t-150②）。
+    """
+    sites = []
+    unreadable = []
+    for py in sorted(_SRC.rglob("*.py")):
+        if "__pycache__" in py.parts:
+            continue
+        try:
+            tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
+        except (SyntaxError, UnicodeDecodeError, OSError) as exc:
+            unreadable.append(f"{py.relative_to(_SRC)}: {type(exc).__name__}: {exc}")
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            fn = node.func
+            name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+            if name != "Violation":
+                continue
+            kws = {k.arg: k.value for k in node.keywords if k.arg}
+            star = any(k.arg is None for k in node.keywords)
+
+            def slot(i: int, key: str):
+                if i < len(node.args):
+                    return node.args[i]
+                return kws.get(key)
+
+            code_node = slot(0, "rule_id")
+            if not (isinstance(code_node, ast.Constant) and isinstance(code_node.value, str)):
+                continue          # 动态 code（变量拼表）不归本表管（GATE_FACTS 键闭集另测）
+            sites.append({
+                "rel": py.relative_to(_SRC).as_posix(), "lineno": node.lineno,
+                "code": code_node.value,
+                "message": slot(1, "message"), "domain": slot(2, "domain"),
+                "file_path": slot(3, "file_path"), "detail": slot(4, "detail"),
+                "star_kwargs": star,
+            })
+    return unreadable, sites
+
+
+@functools.lru_cache(maxsize=1)
+def _violation_sites():
+    return _scan()
+
+
+def _literal_text(node) -> "str | None":
+    """message 里**静态可得**的字面文本：常量、f-string 的字面段、字面串相加。
+
+    返回 None ＝ 值不可静态确定（变量/函数结果）——调用方按"不可核"棘轮处理，
+    不得当作通过（t-151：旧守卫只看位置参常量，`Violation("X", message="…")`
+    与 f"…" 全部绕过措辞棘轮）。
+    """
+    if node is None:
+        return ""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.JoinedStr):
+        return "".join(v.value for v in node.values
+                       if isinstance(v, ast.Constant) and isinstance(v.value, str))
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left = _literal_text(node.left)
+        right = _literal_text(node.right)
+        return (left + right) if left is not None and right is not None else None
+    return None
 
 
 class TestDeclarationShape(unittest.TestCase):
@@ -24,13 +105,23 @@ class TestDeclarationShape(unittest.TestCase):
                if d.get("severity") == "block" and len(d.get("options") or []) < 2]
         self.assertEqual(bad, [])
 
-    def test_no_interrogative_in_declared_text(self):
-        """疑问句会把预设嵌进句式 ⇒ 纯打印面一律陈述式（ADR-0026 §2.2 语法维）。"""
+    def test_no_interrogative_in_declared_text(self) -> None:
+        """疑问句会把预设嵌进句式 ⇒ 纯打印面一律陈述式（ADR-0026 §2.2 语法维）。
+
+        扫描面＝`facts_of` 承认的全部四个字段（fact/fix_hint/options/pointers）——
+        `render()` 对这四个都填占位，任何一个漏进 `？`/`y/N`/`倒计时` 都会直接
+        渲染进闸红（t-152：旧守卫只看 fact+options，fix_hint 与 pointers 是盲区）。
+        半角 `?` 同查（本表当前零命中，中英混排路径/标识符也不该出现问号）。
+        """
+        fields = ("fact", "fix_hint")
+        bad = ("？", "?", "y/N", "Y/n", "倒计时")
         for code, decl in gate_facts.GATE_FACTS.items():
-            for text in [decl.get("fact", "")] + list(decl.get("options") or []):
-                self.assertNotIn("？", text, code)
-                self.assertNotIn("y/N", text, code)
-                self.assertNotIn("倒计时", text, code)
+            texts = [str(decl.get(f, "")) for f in fields]
+            texts += [str(x) for x in (decl.get("options") or [])]
+            texts += [str(x) for x in (decl.get("pointers") or [])]
+            for t in texts:
+                for b in bad:
+                    self.assertNotIn(b, t, f"{code}: {b!r} in {t!r}")
 
     def test_every_declared_code_has_fact_and_pointers(self):
         for code, decl in gate_facts.GATE_FACTS.items():
@@ -154,76 +245,103 @@ class TestViolationWiring(unittest.TestCase):
 
 
 class TestProducersFeedDeclaredFacts(unittest.TestCase):
-    """结构守卫：声明了占位符的 code，其 `Violation(...)` 构造点必须给 `detail=`。
+    """结构守卫：声明了占位符的 code，其 `Violation(...)` 构造点必须**真给出**那些事实。
 
     这是"内容/流程解耦"的接缝检查——表里写了 `{path}`，检查器就必须真给 `path`；
     否则文案永远缺字段，而这种漂移以前无人发现。静态扫 AST，不靠人记。
+
+    判据强度与承诺对齐（t-153）："detail= 在场"远不够——`detail={}` 照样过闸、
+    文案里 {expected_hash} 以字面量外漏。这里对**字面 dict** 逐键核对，覆盖
+    `Violation.format()` 会注入的 `{path}`/`{domain}`（来源＝file_path/domain 在场）；
+    不可静态核的形状（`**kwargs`、非字面 detail）按显式白名单棘轮，不许增。
     """
 
-    def _violation_calls(self):
-        import ast
-
-        root = Path(__file__).resolve().parents[3] / "src" / "k3dge"
-        for py in sorted(root.rglob("*.py")):
-            tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
-            for node in ast.walk(tree):
-                if not isinstance(node, ast.Call):
-                    continue
-                fn = node.func
-                name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
-                if name != "Violation" or not node.args:
-                    continue
-                first = node.args[0]
-                if isinstance(first, ast.Constant) and isinstance(first.value, str):
-                    yield py.relative_to(root), node, first.value
+    def _scan_state(self):
+        unreadable, sites = _violation_sites()
+        self.assertEqual(unreadable, [], "AST 扫描有读不了的文件——守卫看不见它们（t-150②）")
+        declared = [s for s in sites if gate_facts.is_declared(s["code"])]
+        self.assertGreaterEqual(len(declared), 40,
+                                f"只扫到 {len(declared)} 个已声明构造点——根/布局错了还是表空了（t-150③）")
+        return declared
 
     def test_declared_codes_with_placeholders_pass_detail(self):
         missing = []
-        for rel, node, code in self._violation_calls():
-            keys = set(gate_facts.facts_of(code))
+        unverifiable = []
+        for s in self._scan_state():
+            keys = set(gate_facts.facts_of(s["code"]))
             if not keys:
                 continue
-            if "detail" not in {k.arg for k in node.keywords}:
-                missing.append(f"{rel}:{node.lineno} {code} 缺 detail=（声明用了 {sorted(keys)}）")
+            if s["star_kwargs"]:
+                unverifiable.append(f"{s['rel']}:{s['lineno']} {s['code']}（**kwargs 解不动）")
+                continue
+            injected = set()
+            if s["file_path"] is not None:
+                injected.add("path")
+            if s["domain"] is not None:
+                injected.add("domain")
+            detail = s["detail"]
+            if detail is None:
+                uncovered = keys - injected
+                if uncovered:
+                    missing.append(f"{s['rel']}:{s['lineno']} {s['code']} 缺 detail=（声明用了 "
+                                   f"{sorted(keys)}，注入面只覆盖 {sorted(injected)}）")
+                continue
+            if isinstance(detail, ast.Dict):
+                lit_keys = {k.value for k in detail.keys
+                            if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+                if any(k is None for k in detail.keys):     # dict 里 `**` 展开
+                    unverifiable.append(f"{s['rel']}:{s['lineno']} {s['code']}（detail 含 **）")
+                    continue
+                uncovered = keys - lit_keys - injected
+                if uncovered:
+                    missing.append(f"{s['rel']}:{s['lineno']} {s['code']} detail 字面 dict 没给 "
+                                   f"{sorted(uncovered)}（渲染会外漏占位符）")
+                continue
+            unverifiable.append(f"{s['rel']}:{s['lineno']} {s['code']}（detail 非字面 dict）")
         self.assertEqual(missing, [])
+        # 棘轮：不可静态核的构造点现状登记，只许减不许增（消灭"绕过＝通过"）
+        self.assertLessEqual(len(unverifiable), 6,
+                             f"不可核站点增长：{unverifiable}")
 
 
 class TestNoProseBackflow(unittest.TestCase):
     """棘轮：已声明的 code，其构造点不得再拼散文（措辞只能来自表）。
 
-    实测基线 2026-09-19：35 处 Violation 构造点、静态 message 最长 25 字符（全是事实摘要）。
-    阈值放到 100 是给事实字段留余量，不是给散文留口子。
+    字面段也覆盖 **f-string 的字面部分**（t-151）：39/56 个 message 是 JoinedStr，
+    旧守卫只看常量位置参 ⇒ 主要形状整体绕过；`f"闸红：{x}；先跑 k3dge sync"` 这种
+    把补救散文拼回 message 的写法，字面段必须照扫。
     """
 
     MAX_MESSAGE = 100
+    _WORDS = ("run 'k3dge", "run `k3dge", "；先 ", "please ", "请先跑", "请运行")
 
     def test_declared_code_messages_stay_factual(self):
-        import ast
-
-        root = Path(__file__).resolve().parents[3] / "src" / "k3dge"
         offenders = []
-        for py in sorted(root.rglob("*.py")):
-            tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
-            for node in ast.walk(tree):
-                if not isinstance(node, ast.Call):
-                    continue
-                fn = node.func
-                name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
-                if name != "Violation" or len(node.args) < 2:
-                    continue
-                code = node.args[0].value if isinstance(node.args[0], ast.Constant) else None
-                msg = node.args[1]
-                if not (isinstance(code, str) and gate_facts.is_declared(code)):
-                    continue
-                if isinstance(msg, ast.Constant) and isinstance(msg.value, str):
-                    if len(msg.value) > self.MAX_MESSAGE:
-                        offenders.append(f"{py.relative_to(root)}:{node.lineno} {code} "
-                                         f"message {len(msg.value)} 字符（措辞应归表）")
-                    for word in ("run 'k3dge", "run `k3dge", "；先 ", "please "):
-                        if word in msg.value:
-                            offenders.append(f"{py.relative_to(root)}:{node.lineno} {code} "
-                                             f"message 里出现补救散文 {word!r}（应归 options）")
+        unverifiable = []
+        for s in self._scan_sites():
+            if not gate_facts.is_declared(s["code"]):
+                continue
+            text = _literal_text(s["message"])
+            if text is None:
+                unverifiable.append(f"{s['rel']}:{s['lineno']} {s['code']}")
+                continue
+            if len(text) > self.MAX_MESSAGE:
+                offenders.append(f"{s['rel']}:{s['lineno']} {s['code']} "
+                                 f"message 字面 {len(text)} 字符（措辞应归表）")
+            for word in self._WORDS:
+                if word in text:
+                    offenders.append(f"{s['rel']}:{s['lineno']} {s['code']} "
+                                     f"message 里出现补救散文 {word!r}（应归 options）")
         self.assertEqual(offenders, [])
+        # 棘轮：2026-10-01 实测 7 处（变量/函数结果拼 message），只许减不许增
+        self.assertLessEqual(len(unverifiable), 7,
+                             f"message 完全静态不可核的站点在增长：{unverifiable}")
+
+    @staticmethod
+    def _scan_sites():
+        unreadable, sites = _violation_sites()
+        assert not unreadable, f"AST 扫描有读不了的文件：{unreadable}"
+        return sites
 
 
 class TestMessageDoesNotRestateFact(unittest.TestCase):
@@ -232,6 +350,7 @@ class TestMessageDoesNotRestateFact(unittest.TestCase):
     detail（检查器原文）与 fact（声明文案）是两层；message 只该是"事实摘要"，
     复述 fact 的措辞会立刻产生第二个文案源（改一处忘一处）。
     字段名/标识符的重叠不算（那本身就是事实），故只查**含中文的散文片段**。
+    f-string 的字面段同样进比对（与 TestNoProseBackflow 共判据面）。
     """
 
     MIN_SEG = 10
@@ -245,31 +364,25 @@ class TestMessageDoesNotRestateFact(unittest.TestCase):
                 if len(s.strip()) >= self.MIN_SEG and re.search(r"[\u4e00-\u9fff]", s)]
 
     def test_static_messages_do_not_restate_facts(self):
-        import ast
-
-        root = Path(__file__).resolve().parents[3] / "src" / "k3dge"
         offenders = []
-        for py in sorted(root.rglob("*.py")):
-            tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
-            for node in ast.walk(tree):
-                if not isinstance(node, ast.Call):
-                    continue
-                fn = node.func
-                name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
-                if name != "Violation" or len(node.args) < 2:
-                    continue
-                code = node.args[0].value if isinstance(node.args[0], ast.Constant) else None
-                msg = node.args[1]
-                if not (isinstance(code, str) and gate_facts.is_declared(code)):
-                    continue
-                if not (isinstance(msg, ast.Constant) and isinstance(msg.value, str)):
-                    continue
-                fact = (gate_facts.GATE_FACTS.get(code) or {}).get("fact", "")
-                for seg in self._segments(fact):
-                    if seg in msg.value:
-                        offenders.append(f"{py.relative_to(root)}:{node.lineno} {code}: "
-                                         f"message 复述 fact 片段 {seg!r}")
+        for s in self._scan_sites():
+            if not gate_facts.is_declared(s["code"]):
+                continue
+            text = _literal_text(s["message"])
+            if not text:
+                continue
+            fact = (gate_facts.GATE_FACTS.get(s["code"]) or {}).get("fact", "")
+            for seg in self._segments(fact):
+                if seg in text:
+                    offenders.append(f"{s['rel']}:{s['lineno']} {s['code']}: "
+                                     f"message 复述 fact 片段 {seg!r}")
         self.assertEqual(offenders, [])
+
+    @staticmethod
+    def _scan_sites():
+        unreadable, sites = _violation_sites()
+        assert not unreadable, f"AST 扫描有读不了的文件：{unreadable}"
+        return sites
 
 
 class TestFactsAreProducedNotParsed(unittest.TestCase):

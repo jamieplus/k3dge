@@ -109,7 +109,7 @@ class TestApplyRules(unittest.TestCase):
         self.addCleanup(shutil.rmtree, d, ignore_errors=True)
         _ws(d)
         p = d / "docs" / "memo" / "a.md"
-        p.write_text("# t\n\n正文   \n", encoding="utf-8")
+        _write_lf(p, "# t\n\n正文   \n")
         rep = doc_fix.apply(d, dry_run=True)
         self.assertTrue(rep["fixed"])
         self.assertIn("   \n", p.read_text(encoding="utf-8"))   # 原样
@@ -130,8 +130,15 @@ class TestScope(unittest.TestCase):
                     "docs/generated/api.md", "docs/adr/obsolete/0001-x.md"):
             p = d / rel
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text("# t\n\n正文   \n", encoding="utf-8")
+            _write_lf(p, "# t\n\n正文   \n")
         self.assertEqual(doc_fix.scan(d), [])      # 都不在扫描面里
+
+
+def _write_lf(path: Path, text: str) -> None:
+    """markdown 夹具**按字节写**（t-116）：text-mode `write_text` 在 Windows 会把
+    `\n` 译成 `\r\n`——凭空给工作区注入一条 MD_CRLF 偏差，计数断言（"1 处"）随平台漂。
+    `_scan_and_fix` 那侧同样用 bytes 写，这里保持同形状。"""
+    path.write_bytes(text.replace("\r\n", "\n").encode("utf-8"))
 
 
 class TestNextHint(unittest.TestCase):
@@ -144,7 +151,7 @@ class TestNextHint(unittest.TestCase):
         (d / ".agent" / "manifest.json").write_text('{"package_root":"src","domains":{}}', encoding="utf-8")
         (d / ".agent" / "milestone").write_text("M10\n", encoding="utf-8")
         (d / "docs" / "memo").mkdir(parents=True)
-        (d / "docs" / "memo" / "a.md").write_text("# t\n\n正文   \n", encoding="utf-8")
+        _write_lf(d / "docs" / "memo" / "a.md", "# t\n\n正文   \n")
         return d
 
     def test_hint_emitted_with_counts(self):
@@ -168,7 +175,7 @@ class TestNextHint(unittest.TestCase):
         self.assertEqual([s for s in _collect_hints(d) if s.state == "doc_fix"], [])
 
 
-def test_adr_amend_rules_are_deterministically_fixable(tmp_path, monkeypatch):
+def test_adr_amend_rules_are_deterministically_fixable(tmp_path):
     """ADR 三规则（顺序/占位括号/脚注位置）都能**确定性修**并幂等——不需要 agent 参与。"""
 
     d = tmp_path / "docs" / "adr"
@@ -184,10 +191,16 @@ def test_adr_amend_rules_are_deterministically_fixable(tmp_path, monkeypatch):
     doc_fix.apply(tmp_path)
     out = p.read_text(encoding="utf-8")
     assert "  - 🅰1 | B | 2026-01-01 | a\n  - 🅰2 | A | 2026-01-02 | b" in out     # 前缀 + 升序
-    assert "### 2.4 X[^🅰2.1]" in out or "### 2.4 X[^🅰2" in out               # 括号 → 引用
+    # 规范期望**只钉一个**（t-114）：marker-text 规则把 `（🅰N，日期）` 写成该标号首个定义
+    # 的脚注引用。旧 `or "### 2.4 X[^🅰2"` 是第一支的严格前缀——`[^🅰2]`、
+    # `[^🅰2.9]`、`[^🅰20]` 全被放过，恰好漏掉本断言想防的"映射错号"。
+    assert "### 2.4 X[^🅰2.1]" in out
     # 定义集中在文末：最后一个非空行是脚注定义，且它位于最后一个 '## ' 之后
     last_def = [i for i, l in enumerate(out.splitlines()) if l.startswith("[^🅰")][-1]
     last_sec = [i for i, l in enumerate(out.splitlines()) if l.startswith("## ")][-1]
     assert last_def > last_sec, out
-    assert doc_fix.scan(tmp_path) == [] or all(x["rule"] not in doc_fix.FIXABLE_RULES
-                                                for x in doc_fix.scan(tmp_path))    # 幂等
+    # 幂等＝单一判据（t-113）：旧写法 `scan()==[] or all(rule not in FIXABLE…)` 的
+    # 后支是**死分支**——`scan()` 经 `_codes` 已按 FIXABLE_RULES 过滤，非空 scan 里
+    # 的 rule 永远在表内 ⇒ all(...) 恒 False；看起来更宽松，实际从不豁免，还多扫一遍全仓。
+    remaining = doc_fix.scan(tmp_path)
+    assert remaining == [], f"修复不幂等：{remaining}"

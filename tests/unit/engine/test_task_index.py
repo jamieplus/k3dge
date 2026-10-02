@@ -40,16 +40,19 @@ def test_pointer_matches_path_not_basename() -> None:
 
 
 def test_unreadable_ticket_is_skipped_loudly() -> None:
+    """读不出要**跨平台必然**读不出（t-286）。
+
+    旧夹具 `chmod(0o000)` 在 root（Docker/CI 常态）与 Windows 上根本不挡读——
+    前提静默消失，断言随环境红/绿。换成同名的**目录**占住 `*.md` 路径：
+    `read_text` 必抛 OSError，也省掉还原 chmod 的 finally。
+    """
     ws = _ws()
     good = _ticket(ws / "docs" / "tasks", "2026-09-01-M9-feat-a.md")
-    bad = _ticket(ws / "docs" / "tasks", "2026-09-01-M9-feat-b.md")
-    bad.chmod(0o000)
+    bad = ws / "docs" / "tasks" / "2026-09-01-M9-feat-b.md"
+    bad.mkdir()
     err = io.StringIO()
-    try:
-        with contextlib.redirect_stderr(err):
-            rows = list_tasks(ws)
-    finally:
-        bad.chmod(0o644)
+    with contextlib.redirect_stderr(err):
+        rows = list_tasks(ws)
     assert [r.path.name for r in rows] == [good.name]
     assert "WARN" in err.getvalue()
 

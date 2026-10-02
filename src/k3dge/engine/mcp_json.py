@@ -36,19 +36,32 @@ def load_mcp_endpoints(workspace: Path) -> Dict[str, Any]:
 
 
 def mcp_server_names(workspace: Path) -> Optional[Set[str]]:
-    """Declared server names.
+    """Declared server names — `None` 只表示"文件缺失"，别的都不是。
 
-    `None` **只**表示"文件缺失/不可读"（schema 跳过）；文件在但没有 `mcpServers`（或写成数组/
-    字符串）是**已配置但一个都没有** ⇒ 返回空集。旧写法两种都返回 None，下游 `is None` 分支
-    据此跳过 `MCP_JSON_PEER_MISSING` 检查 ⇒ 坏配置静默变绿（docstring 与实现不一致，ocr-261）。
+    三张脸（ocr-261 的方向补齐，t-147/148）：
+    - **文件缺失** ⇒ `None`：下游（`pipeline_schema._validate_peers` / `cli.mcp_peers`）
+      唯一的"跳过 peer 闸"信号——没有可比的东西。
+    - **文件在但坏**（JSON 不可解析、根不是对象、`mcpServers` 缺失或不是表）⇒ **空集 + WARN**：
+      "有配置而一个 server 都不在"。旧形状这些都回 `None` ⇒ 坏 `.mcp.json` 恰好走"跳过"分支，
+      `MCP_JSON_PEER_MISSING` 静默变绿——把闸的开关做成配置文件自己的形状，是反的。
+    - **正常表** ⇒ 键集合。
     """
-    data = load_mcp_document(workspace)
-    if data is None:
+    p = workspace / _MCP_CONFIG_REL
+    if not p.is_file():
         return None
+    import sys
+
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"[mcp_json] WARN: .mcp.json 存在但读不出/坏 JSON（{type(exc).__name__}）"
+              "⇒ 按『无 server』处理（peer 闸会照常比对）", file=sys.stderr)
+        return set()
+    if not isinstance(data, dict):
+        print("[mcp_json] WARN: .mcp.json 根不是对象 ⇒ 按『无 server』处理", file=sys.stderr)
+        return set()
     servers = data.get("mcpServers")
     if not isinstance(servers, dict):
-        import sys
-
         print("[mcp_json] WARN: .mcp.json 存在但 mcpServers 缺失/不是表 ⇒ 按『无 server』处理",
               file=sys.stderr)
         return set()

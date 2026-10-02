@@ -78,13 +78,35 @@ def test_unmet_exits_one_and_lists_reason(tmp_path, monkeypatch):
 
 
 def test_read_only_does_not_touch_state(tmp_path, monkeypatch):
-    """只读：不得写侧车、不得改票/报告。"""
+    """只读＝**全文件内容快照**对账（t-003），不是路径集合差。
+
+    旧形状的三处欠账：①只比 `after - before`——**改了既有票/报告/配置**、或删文件，
+    都不违反"新增皆 logs"，全部逃逸；②白名单是裸 `startswith("logs")`，
+    `logs.md`、`logsbackup/x.json` 一并放行；③注释点名"不得产侧车 .k3dge/next.json"，
+    却没有任何断言——写进**已存在**的 `.k3dge/` 在集合差里根本不可见。
+    """
     ws = _ws(tmp_path, "")
+    (ws / ".k3dge").mkdir()                      # 先有侧车目录：写它里面的东西集合差看不见
+    (ws / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
+    (ws / "docs" / "tasks" / "2026-09-01-M10-idea-x.md").write_text(
+        "---\nstatus: idea\nmilestone: M10\npriority: P2\ndate: 2026-09-01\n---\n\n# X\n",
+        encoding="utf-8")
     monkeypatch.chdir(ws)
-    before = {p.relative_to(ws).as_posix() for p in ws.rglob("*")}
+
+    def snap() -> dict:
+        return {p.relative_to(ws).as_posix(): p.read_bytes()
+                for p in ws.rglob("*") if p.is_file() and "__pycache__" not in p.parts}
+
+    before = snap()
+    assert any(k.startswith("docs/tasks/") for k in before), "既有票没建出来，快照对账无从谈起"
     with redirect_stdout(io.StringIO()):
         main(["milestone", "seal-check", "M10"])
-    after = {p.relative_to(ws).as_posix() for p in ws.rglob("*")}
-    # 只许出现命令日志（logs/ 是设计内的操作留痕）；**不得**产侧车 `.k3dge/next.json`
-    new_paths = after - before
-    assert all(pp.startswith("logs") for pp in new_paths), new_paths
+    after = snap()
+    changed = {k for k in before.keys() & after.keys() if before[k] != after[k]}
+    assert not changed, f"只读命令改了既有文件：{sorted(changed)}"
+    removed = set(before) - set(after)
+    assert not removed, f"只读命令删了既有文件：{sorted(removed)}"
+    added = set(after) - set(before)
+    assert all(p == "logs/k3dge.log" or p.startswith("logs/") for p in added), \
+        f"白名单只认 logs/ 目录本身，logs.md/logsbackup 不算：{added}"
+    assert not (ws / ".k3dge" / "next.json").exists(), "只读命令不得产侧车"

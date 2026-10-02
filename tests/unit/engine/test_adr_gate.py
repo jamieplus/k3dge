@@ -1,4 +1,5 @@
 """封版 ADR 硬闸：全 Accepted + 可解析落地指针。"""
+import os
 import tempfile
 from pathlib import Path
 
@@ -120,13 +121,103 @@ def test_rejected_idempotent():
 
 
 def test_landing_pointer_must_stay_in_workspace_and_be_file():
-    """落地指针越出 workspace（绝对路径 / `..`）或指向目录都不算落地（ocr-033）。"""
+    """落地指针越出 workspace（绝对路径 / `..`）或指向目录都不算落地（ocr-033）。
+
+    旧测的越界靶（`/etc`、`../../etc/hosts`）都**不是文件**⇒ containment 检查删掉照样绿
+    （t-061）。这里造一个**真实存在**的 workspace 外文件：`is_file()` 会真，
+    只有 containment 拦得住。
+    """
     with tempfile.TemporaryDirectory() as d:
-        ws = _ws(d, {})
+        outer = Path(d)
+        ws = _ws(outer / "ws", {})               # ws 嵌一层：让 outside 成为**真兄弟**（在 ws 外）
+        outside = outer / "outside.md"           # tmp 根的兄弟件：在 ws 外、确实是文件
+        outside.write_text("# outside landing\n", encoding="utf-8")
         assert adr_gate._pointer_resolves(ws, "docs/specs/x/spec.md") is True
         assert adr_gate._pointer_resolves(ws, "docs/specs/x") is False        # 目录不算
-        assert adr_gate._pointer_resolves(ws, "/etc") is False                # 绝对路径越界
-        assert adr_gate._pointer_resolves(ws, "../../etc/hosts") is False     # `..` 越界
+        assert outside.is_file()
+        assert adr_gate._pointer_resolves(ws, str(outside)) is False          # 绝对越界（is_file 真）
+        rel = os.path.relpath(outside, ws)                                    # ../outside.md
+        assert rel.startswith("..") and adr_gate._pointer_resolves(ws, rel) is False
+        assert adr_gate._pointer_resolves(ws, "/etc") is False
+        assert adr_gate._pointer_resolves(ws, "../../etc/hosts") is False
+
+
+def test_landed_end_to_end_rejects_outside_workspace_pointer():
+    """helper 绿不等于闸绿：`Landed-by: <ws 外真实文件>` 必须让 adr_landed 拒（t-061 端到端面）。"""
+    with tempfile.TemporaryDirectory() as d:
+        outside = Path(d) / "outside.md"
+        outside.write_text("# outside\n", encoding="utf-8")
+        ws = _ws(Path(d) / "ws", {
+            "0001-a.md": f"---\nStatus: Accepted\nLanded-by: {outside}\n---\n# ADR-0001\n",
+        })
+        out = adr_gate.adr_landed(ws)
+        assert out and "指针不可解析" in out
+
+
+def test_reconcile_validates_all_before_touching_disk():
+    """两遍结构的行为面（t-063）：坏声明必须**全部**拦在动盘之前。
+
+    只测单条声明＝融合"校验+动盘"也照样绿——前半合法声明先落盘、后半坏声明才拒，
+    工作区停在"部分生效"。两个晚发现型失败各测一条：缺目标（声明相）与
+    目标无规范 Status 行（原实现要到**写相**才撞上）。
+    """
+    # ① 0002 合法取代 0001 + 0003 指向不存在的 ADR-0099 ⇒ 整轮拒，0001 未动
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {
+            "0001-old.md": "---\nStatus: Accepted\nSupersedes: -\n---\n# ADR-0001\n",
+            "0002-new.md": "---\nStatus: Accepted\nSupersedes: ADR-0001\nLanded-by: docs/specs/x/spec.md\n---\n# ADR-0002\n",
+            "0003-x.md": "---\nStatus: Accepted\nSupersedes: ADR-0099\nLanded-by: docs/specs/x/spec.md\n---\n# ADR-0003\n",
+        })
+        out = adr_gate.reconcile_supersedes(ws)
+        assert out and "SEAL REJECTED" in out and "ADR-0099" in out
+        assert (ws / "docs" / "adr" / "0001-old.md").is_file(), "部分生效：0001 已先被归档"
+        assert not (ws / "docs" / "adr" / "obsolete").exists()
+    # ② 0002 合法 + 0004 的目标 0005 没有可改 Status 行 ⇒ 同样先拒后动
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {
+            "0001-old.md": "---\nStatus: Accepted\nSupersedes: -\n---\n# ADR-0001\n",
+            "0002-new.md": "---\nStatus: Accepted\nSupersedes: ADR-0001\nLanded-by: docs/specs/x/spec.md\n---\n# ADR-0002\n",
+            "0004-y.md": "---\nStatus: Accepted\nSupersedes: ADR-0005\nLanded-by: docs/specs/x/spec.md\n---\n# ADR-0004\n",
+            "0005-bad.md": "# ADR-0005 没有 frontmatter\n",
+        })
+        out = adr_gate.reconcile_supersedes(ws)
+        assert out and "SEAL REJECTED" in out and "0005-bad.md" in out
+        assert (ws / "docs" / "adr" / "0001-old.md").is_file(), "部分生效：0001 已先被归档"
+        assert not (ws / "docs" / "adr" / "obsolete").exists()
+
+
+def test_supersede_refuses_to_overwrite_archived_source():
+    """撞名守卫（ocr-193）此前**零覆盖**（t-064）：obsolete/ 已有同名件时拒、不覆盖。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {
+            "0001-old.md": "---\nStatus: Accepted\nSupersedes: -\n---\n# ADR-0001 活跃件\n",
+            "0002-new.md": "---\nStatus: Accepted\nSupersedes: ADR-0001\nLanded-by: docs/specs/x/spec.md\n---\n# ADR-0002\n",
+        })
+        obs = ws / "docs" / "adr" / "obsolete"
+        obs.mkdir(parents=True)
+        (obs / "0001-old.md").write_text("---\nStatus: Accepted\n---\n# 归档事实源（别毁）\n",
+                                         encoding="utf-8")
+        out = adr_gate.reconcile_supersedes(ws)
+        assert out and "拒绝覆盖归档事实源" in out
+        assert "别毁" in (obs / "0001-old.md").read_text(encoding="utf-8")
+        assert (ws / "docs" / "adr" / "0001-old.md").is_file()
+
+
+def test_rejected_archival_refuses_to_overwrite_archived_name():
+    """Rejected 分支以前裸 `write_text` 直写，同名归档件被静默销毁（t-064 的不对称）。
+
+    修后与 Supersedes 同规则：撞名 ⇒ 拒，活件与归档件都原样留着。
+    """
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {"0003-bad.md": "---\nStatus: Rejected\n---\n# 活体\n"})
+        obs = ws / "docs" / "adr" / "obsolete"
+        obs.mkdir(parents=True)
+        (obs / "0003-bad.md").write_text("---\nStatus: Rejected\n---\n# 归档事实源（别毁）\n",
+                                         encoding="utf-8")
+        out = adr_gate.reconcile_supersedes(ws)
+        assert out and "拒绝覆盖归档事实源" in out
+        assert "别毁" in (obs / "0003-bad.md").read_text(encoding="utf-8")
+        assert (ws / "docs" / "adr" / "0003-bad.md").is_file()
 
 
 def test_supersedes_self_is_refused():
@@ -162,6 +253,33 @@ def test_is_superseded_needs_the_actual_field_line() -> None:
             "讨论里写过 superseded_by: 与 ADR-0026 的引用，但 frontmatter 没有该字段\n")
     assert not _is_superseded(body, "0026")
     assert _is_superseded("---\nStatus: Superseded\nsuperseded_by: ADR-0026\n---\n", "26")
+
+
+def test_is_superseded_field_line_must_live_in_frontmatter() -> None:
+    """行锚定不等于归属：正文里**顶格**的示例行 `superseded_by: ADR-0026` 恰好吃中旧判据
+    （t-062）⇒ 假"已标记"、reconcile 幂等早退、真字段永不写入——正是 ocr-390 那一类。
+    同族的还有正文顶格 `Status: Rejected` 示例行（会把活件归档掉）⇒ 一并圈进 frontmatter。
+    """
+    from k3dge.engine.adr_gate import _is_superseded, _status
+
+    prose = ("---\nStatus: Superseded\n---\n\n# ADR-0009\n\n"
+             "文档示例（顶格、独立成行，与真字段一字不差）：\n\n"
+             "superseded_by: ADR-0026\n")
+    assert not _is_superseded(prose, "0026")
+    assert _is_superseded("---\nStatus: Superseded\nsuperseded_by: ADR-0026\n---\n", "26")
+    assert _status("---\nStatus: Accepted\n---\n\n# 例\n\nStatus: Rejected\n") == "Accepted"
+
+
+def test_rejected_example_line_in_body_does_not_archive_live_adr() -> None:
+    """端到端：`Status: Rejected` 只出现在正文示例 ⇒ 不得被收进 obsolete（t-062 同族）。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {
+            "0006-doc.md": ("---\nStatus: Accepted\nLanded-by: docs/specs/x/spec.md\n---\n"
+                            "# ADR-0006\n\n反例长这样（顶格）：\n\nStatus: Rejected\n"),
+        })
+        assert adr_gate.reconcile_supersedes(ws) is None
+        assert (ws / "docs" / "adr" / "0006-doc.md").is_file()
+        assert not (ws / "docs" / "adr" / "obsolete").exists()
 
 
 def test_mark_superseded_refuses_when_no_status_line() -> None:

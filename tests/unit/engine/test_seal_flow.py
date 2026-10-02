@@ -635,7 +635,9 @@ class TestGateIdDispatch(TestCase):
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "rejected")
-        self.assertIn("k3dge milestone audit-submit M1", self._sidecar(ws)["fact"])
+        # 断**路由专属**文案（t-343）：`k3dge milestone audit-submit M1` 同样出现在
+        # escalated 的 fact/pointers——派发错到 escalated 也不会被这条子串抓到。
+        self.assertIn("审计缺失：先落盘报告", self._sidecar(ws)["fact"])
 
     def test_declined_fix_routes_by_gate_id(self) -> None:
         ws = _ws_oneshot()
@@ -643,7 +645,8 @@ class TestGateIdDispatch(TestCase):
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["n"]))
         self.assertEqual(status, "rejected")
-        self.assertIn("转人工干预", self._sidecar(ws)["fact"])
+        # 同样别用两态共享的 `转人工干预`（escalated 也有）；钉 declined 专属半句（t-343）
+        self.assertIn("待修未修复且 agent 拒绝修复", self._sidecar(ws)["fact"])
 
     def test_seal_preconditions_rejection_carries_declared_gate_id(self) -> None:
         from k3dge.engine.seal import seal_preconditions_error
@@ -736,7 +739,11 @@ class TestStagesAreDeclaredNotHardcoded(TestCase):
     def test_audit_flow_calls_the_declared_ref(self):
         ws = _ws_oneshot()
         _clean_report(ws)
+        # 覆盖整份配置时**重新声明 role 块**（t-345）：旧写法把 `_ws_oneshot()` 立的
+        # `[roles.audit] mode="oneshot"` 静默抹掉——本测只走 oneshot 腿是因为
+        # `_audit_mode()` 的缺省恰好是 oneshot，正是 `_ONESHOT` 注释警告的"隐式依赖"。
         (ws / ".agent" / "pipeline.toml").write_text(
+            '[roles.audit]\nbind = "k3dit"\nmode = "oneshot"\n\n'
             '[checks.audit]\nstages_produce = ["dummy.actions.lens"]\nstages_verify = []\n',
             encoding="utf-8")
         calls = []
@@ -776,7 +783,7 @@ class TestAuditNoNoop(TestCase):
             return ws, run_audit_flow(ws, "M1", prompter=_Prompt(answers=list(answers)))
 
     def test_skip_not_closed_even_with_stale_report(self) -> None:
-        ws, (status, msg) = self._refused(TransportResult(True, "skip", "skipped", skipped=True))
+        _ws, (status, msg) = self._refused(TransportResult(True, "skip", "skipped", skipped=True))
         self.assertEqual(status, "refused")
         self.assertIn("skip", msg)
         from k3dge.engine.audit_flow import audit_result_of
@@ -933,10 +940,18 @@ class TestSealFlowEdges(TestCase):
         lo.write_text("] [x](2026-09-01-M11-audit.md)", encoding="utf-8")
         ok, _ = _rewrite_leftover_links(ws, "2026-09-01-M11-audit.md", "archive/M11/a.md")
         self.assertTrue(ok)
-        lo.chmod(0o000)
-        try:
-            ok2, note = _rewrite_leftover_links(ws, "2026-09-02-M11-audit.md", "archive/M12/b.md")
-            self.assertFalse(ok2)
-            self.assertIn("LEFTOVERS.md", note)
-        finally:
-            lo.chmod(0o644)
+        # 失败注入走确定性 seam（t-342，同 `test_align_stub_write_failure_warns_not_raises`）：
+        # 旧的 `chmod(0o000)` 在 root（Docker/CI 默认）下不挡读写、Windows 上是摆设 ⇒
+        # `ok=False` 只在特定环境成立，`assertFalse(ok2)` 会误红。读/写两条支路各钉一次。
+        real_write_text = Path.write_text
+        with mock.patch.object(Path, "read_text", side_effect=OSError("EIO")):
+            ok2, note2 = _rewrite_leftover_links(ws, "2026-09-01-M11-audit.md", "archive/M12/b.md")
+        self.assertFalse(ok2)
+        self.assertIn("读不出", note2)
+        # 写支路：先放一条**真会被改写**的链接（同文件名无改动会走"无变化 ⇒ True"早退）
+        real_write_text(ws / "docs" / "reviews" / "LEFTOVERS.md",
+                        "] [x](2026-09-02-M11-audit.md)", encoding="utf-8")
+        with mock.patch.object(Path, "write_text", side_effect=OSError("read-only fs")):
+            ok3, note3 = _rewrite_leftover_links(ws, "2026-09-02-M11-audit.md", "archive/M13/c.md")
+        self.assertFalse(ok3)
+        self.assertIn("写不进", note3)

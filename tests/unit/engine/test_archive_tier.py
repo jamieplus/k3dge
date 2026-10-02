@@ -30,7 +30,8 @@ def test_unguarded_archive_detected(tmp_path: Path) -> None:
     res = find_unguarded_archives(
         tmp_path, ["docs/memo/archive/x.md", "docs/memo/archive/y.md", "docs/memo/live.md"])
     assert [c for c, _ in res] == ["ARCHIVE_NO_DEST"]
-    assert "archive/x.md" in res[0][1]
+    # **精确等于**工作区相对路径，不用子串（t-060）：子串会放过被改写成绝对路径/别的样子
+    assert res[0][1] == "docs/memo/archive/x.md", res[0][1]
 
 
 def test_doc_list_archive_prints_low_authority_header(tmp_path: Path, monkeypatch) -> None:
@@ -46,3 +47,24 @@ def test_doc_list_archive_prints_low_authority_header(tmp_path: Path, monkeypatc
     out = buf.getvalue()
     assert rc == 0
     assert "低权威层" in out and "archive/old.md" in out
+
+
+def test_doc_list_without_include_archive_has_no_low_authority_header(tmp_path, monkeypatch) -> None:
+    """契约的另一半（t-060）：低权威头**只**随 `--include-archive` 出。
+
+    旧测只钉正向半——"无条件打印 header"的回归照样绿。这里跑不带 flag 的同一仓，
+    header 与被归档文件都不得出现（默认面看不见 archive 层）。
+    """
+    (tmp_path / ".agent").mkdir()
+    (tmp_path / ".git").mkdir()
+    d = tmp_path / "docs" / "reviews" / "archive"
+    d.mkdir(parents=True)
+    (d / "old.md").write_text("# old\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = main(["doc", "list", "--type", "reviews"])   # 无 --include-archive
+    out = buf.getvalue()
+    assert rc == 0
+    assert "低权威层" not in out
+    assert "archive/old.md" not in out

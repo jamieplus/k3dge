@@ -160,7 +160,11 @@ class TestScreenGateWiring(unittest.TestCase):
             ws = Path(td)
             orig, hook.WS = hook.WS, ws
             try:
-                sev, text = hook.run_screen_gate(["docs/memo/2026-09-19-y.md"], pr, None)[0]
+                res = hook.run_screen_gate(["docs/memo/2026-09-19-y.md"], pr, None)
+                # 先断形状再索引（t-294）：回退路径哪天不出 finding，`[0]` 的 IndexError
+                # 伪装成测试崩溃，把"兜底没接线"这个真信号丢在 traceback 里
+                self.assertEqual(len(res), 1, res)
+                sev, text = res[0]
                 self.assertEqual(sev, "block")
                 self.assertEqual(text, "[DOC_NEW_UNSCREENED] docs/memo/2026-09-19-y.md")
             finally:

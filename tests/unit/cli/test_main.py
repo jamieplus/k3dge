@@ -1,5 +1,6 @@
 import contextlib
 import io
+import os
 import json
 import subprocess
 import tempfile
@@ -15,20 +16,21 @@ class TestEvidenceAndPorcelain(unittest.TestCase):
     """日志写不进必须出声；porcelain 的重命名行不得当成路径（ocr-380/381/384）。"""
 
     def test_append_log_failure_is_loud(self) -> None:
+        """写不进必须出声（ocr-380）。
 
+        旧夹具靠 `chmod(0o000)`——uid 0（Docker/CI 常是 root）根本不受权限位约束、
+        Windows 上是 no-op：追加**成功**、无 WARN，测红成"代码回归"。改成可移植的
+        必然失败：把日志路径位置放一个**目录** ⇒ open(path,"a") 恒 IsADirectoryError。
+        """
         from k3dge.cli.main import _append_log
 
         ws = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / "logs").mkdir()
-        (ws / "logs" / "k3dge.log").write_text("", encoding="utf-8")
-        (ws / "logs" / "k3dge.log").chmod(0o000)
+        (ws / "logs" / "k3dge.log").mkdir()        # 目录冒充日志文件：跨平台必败
         err = io.StringIO()
-        try:
-            with contextlib.redirect_stderr(err):
-                _append_log(ws, "check rc=0")
-        finally:
-            (ws / "logs" / "k3dge.log").chmod(0o644)
+        with contextlib.redirect_stderr(err):
+            _append_log(ws, "check rc=0")
         self.assertIn("WARN", err.getvalue(), "证据面失败静默 ⇒ 复盘误判'没跑过'")
 
     def test_porcelain_rename_lines_take_new_path(self) -> None:
@@ -59,7 +61,6 @@ class TestCli(unittest.TestCase):
         self.assertIn("bundle", audit_action_choices)
 
     def test_audit_submit_no_peer(self):
-        import os
 
         with tempfile.TemporaryDirectory() as d:
             d = Path(d)
@@ -80,7 +81,6 @@ class TestCli(unittest.TestCase):
 
     def test_milestone_audit_submit_persists(self):
         """回归（真跑 M8 发现 code-1）：`milestone audit-submit` 曾引未定义的 `ms` → NameError。"""
-        import os
 
         with tempfile.TemporaryDirectory() as d:
             d = Path(d)
@@ -124,12 +124,21 @@ class TestCli(unittest.TestCase):
                 ws = Path(d)
                 (ws / ".agent").mkdir()
                 (ws / "docs").mkdir()
-                out = io.StringIO()
-                with contextlib.redirect_stdout(out):
-                    rc = main(["milestone", "audit", "M9"])
-                self.assertEqual(rc, 1)                     # rejected ⇒ 退 1
-                self.assertIn("审计被拒：理由 X", out.getvalue())
-                self.assertEqual(calls["args"][1], "M9")    # 真把里程碑 id 传了下去
+                # CLI 的工作区＝`_find_workspace(Path.cwd())`：不 chdir 进沙箱，上面这套
+                # `.agent/`＋`docs/` 布置全为空转，测的意义随 pytest 启动目录漂移（t-040）。
+                cwd = os.getcwd()
+                os.chdir(ws)
+                try:
+                    out = io.StringIO()
+                    with contextlib.redirect_stdout(out):
+                        rc = main(["milestone", "audit", "M9"])
+                    self.assertEqual(rc, 1)                     # rejected ⇒ 退 1
+                    self.assertIn("审计被拒：理由 X", out.getvalue())
+                    self.assertEqual(calls["args"][1], "M9")    # 真把里程碑 id 传了下去
+                    self.assertEqual(Path(str(calls["args"][0])).resolve(), ws.resolve(),
+                                     "解析出的工作区没有传下去——流程靠它定位账本/侧车")
+                finally:
+                    os.chdir(cwd)
         finally:
             ma.run_audit_flow = orig            # type: ignore[assignment]
 
@@ -191,7 +200,6 @@ class TestCli(unittest.TestCase):
             self.assertFalse(report.passed)
             # also verify CLI main returns 1 when workspace is the temp repo
             # need to chdir
-            import os
 
             old = Path.cwd()
             try:
@@ -213,7 +221,6 @@ class TestCli(unittest.TestCase):
                 os.chdir(old)
 
     def test_milestone_status_no_tasks_exits_one(self):
-        import os
 
         with tempfile.TemporaryDirectory() as d:
             repo = Path(d) / "repo"
@@ -236,7 +243,6 @@ class TestCli(unittest.TestCase):
         [NEXT] but `status --json` and MCP `k3dge_status` had no `next` field at all,
         so machine consumers could not see the routing at all.
         """
-        import os
 
         from k3dge.cli.mcp import k3dge_status
 
@@ -280,7 +286,6 @@ class TestCli(unittest.TestCase):
         command (NEXT + hints) raised NameError and `status` never finished cleanly.
         Also asserts docs/tasks/AUTHORING.md is not reported as an unfinished task.
         """
-        import os
 
         with tempfile.TemporaryDirectory() as d:
             repo = Path(d) / "repo"
@@ -319,7 +324,6 @@ class TestCli(unittest.TestCase):
             self.assertEqual(data["tasks"][0]["path"], "docs/tasks/2026-09-02-M1-feat-demo.md")
 
     def test_task_list_json(self):
-        import os
 
         with tempfile.TemporaryDirectory() as d:
             repo = Path(d) / "repo"
@@ -352,7 +356,6 @@ class TestCli(unittest.TestCase):
                 os.chdir(old)
 
     def test_init_creates_harness(self):
-        import os
 
         with tempfile.TemporaryDirectory() as d:
             target = Path(d) / "proj"
@@ -368,7 +371,6 @@ class TestCli(unittest.TestCase):
                 os.chdir(old)
 
     def test_mcp_sync_adds_peer_pythonpath(self):
-        import os
 
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -399,7 +401,6 @@ class TestCli(unittest.TestCase):
                 os.chdir(old)
 
     def test_mcp_sync_repairs_peer_pythonpath(self):
-        import os
 
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -431,7 +432,6 @@ class TestCli(unittest.TestCase):
                 os.chdir(old)
 
     def test_workspace_status_shared_by_cli_and_mcp(self):
-        import os
 
         ws = Path(__file__).resolve().parents[3]
         if not (ws / ".agent" / "manifest.json").exists():
@@ -453,7 +453,6 @@ class TestCli(unittest.TestCase):
 
 def test_find_workspace_confines_to_mcp_root():
     """ADR-0026：MCP 服务根存在时 workspace_path 越界报错；显式 opt-in 才放行。"""
-    import os
 
     from k3dge.cli.main import _find_workspace
 
@@ -485,12 +484,23 @@ def test_find_workspace_confines_to_mcp_root():
                 os.environ[k] = v
 
 
-def test_status_deep_vs_summary(monkeypatch, capsys):
-    """ADR-0008 §2：默认摘要前 10 + 还有 N 条提示；--deep 出全量。"""
+def test_status_deep_vs_summary(monkeypatch, tmp_path, capsys):
+    """ADR-0008 §2：默认摘要前 10 + 还有 N 条提示；--deep 出全量。
+
+    隔离工作区与配置（t-039）：旧 `_find_workspace` 打桩成 `Path(".")`——截断上限读的是
+    **真仓**的 `[gates.output] default_lines`（="10" 才成立），`_emit_all_hints` 也扫真
+    checkout ⇒ `"more" not in out2` 这种全输出子串判据可被任何提示措辞打破或假通过。
+    现在：临时 ws 显式钉 default_lines=10，断言收窄到 Unfinished 块。
+    """
     import argparse
 
     from k3dge.cli import main as m
     from k3dge.cli import status as st
+
+    ws = tmp_path / "ws"
+    (ws / ".agent").mkdir(parents=True)
+    (ws / ".agent" / "pipeline.toml").write_text("[gates.output]\ndefault_lines = 10\n",
+                                                 encoding="utf-8")
 
     obj = {
         "ok": True, "domains": ["d"], "gate_passed": True, "modified_domains": [],
@@ -498,21 +508,33 @@ def test_status_deep_vs_summary(monkeypatch, capsys):
         "unfinished_tasks": [{"task": f"t{i}", "title": f"T{i}", "status": "idea"} for i in range(12)],
         "next": None, "cache": None,
     }
-    monkeypatch.setattr(st, "workspace_status", lambda ws: obj)
-    monkeypatch.setattr(m, "_find_workspace", lambda *a, **k: Path("."))
+    monkeypatch.setattr(st, "workspace_status", lambda w: obj)
+    monkeypatch.setattr(m, "_find_workspace", lambda *a, **k: ws)
     assert m.cmd_status(argparse.Namespace(json=False, deep=False)) == 0
-    out = capsys.readouterr().out
-    assert "Unfinished tasks (12)" in out and "2 more" in out and "T11" not in out
+    lines = capsys.readouterr().out.splitlines()
+    block = [ln for ln in lines
+             if ln.startswith("Unfinished") or ln.strip().startswith("- [") or " more" in ln]
+    body = "\n".join(block)
+    assert "Unfinished tasks (12)" in body, body
+    assert sum(1 for ln in block if ln.strip().startswith("- [")) == 10, body
+    assert "2 more" in body and "T11" not in body, body
     assert m.cmd_status(argparse.Namespace(json=False, deep=True)) == 0
-    out2 = capsys.readouterr().out
-    assert "T11" in out2 and "more" not in out2
+    lines2 = capsys.readouterr().out.splitlines()
+    rows2 = [ln for ln in lines2 if ln.strip().startswith("- [")]
+    assert len(rows2) == 12, lines2
+    assert any("T11" in ln for ln in rows2)
+    assert not [ln for ln in lines2 if " more (" in ln], lines2
 
 
-def test_audit_bundle_manual_entry_lands_report_like_the_leg():
+def test_audit_bundle_manual_entry_lands_report_like_the_leg(monkeypatch):
     """手动入口与封板腿**效果唯一**：`k3dge audit bundle` 也必须落报告+提交（共用 `land_report`）。
 
     流程体检出处（2026-09-27）：手动入口此前只跑 consume，报告不落盘、不提交 ⇒ "同一模块同一参数"
     只是形式（判定面看不到产物）。
+
+    `cmd_audit` 的工作区＝`_find_workspace(Path.cwd())`（`--into` 只决定 target），**必须 chdir 进
+    沙箱**（t-037）：否则 (a) 建好的 `.agent/` 从不被用，(b) 收尾的 `_append_log` 把
+    `logs/k3dge.log` 写进**跑测试的真仓**——测的意义随 pytest 启动目录漂移。
     """
     from k3dge.engine import audit_bundle as ab
 
@@ -532,18 +554,25 @@ def test_audit_bundle_manual_entry_lands_report_like_the_leg():
             (ws / ".agent").mkdir()
             (ws / "bundle").mkdir()
             (ws / "bundle" / "manifest.json").write_text('{"bundle_version": 1}', encoding="utf-8")
+            monkeypatch.chdir(ws)
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
                 rc = main(["audit", "bundle", str(ws / "bundle"), "--into", str(ws)])
             assert rc == 0
             assert calls.get("extra") == ["src/a.py"] and "landed" in out.getvalue()
             assert calls.get("mid") == "local", calls        # 绝不能用包路径当里程碑 id
+            # 工作区解析真的落在沙箱：审计行写进 ws/logs，而不是启动目录
+            log = ws / "logs" / "k3dge.log"
+            assert log.is_file() and "audit bundle" in log.read_text(encoding="utf-8")
     finally:
         ab.consume, ab.land_report = orig_consume, orig_land
 
 
-def test_audit_bundle_manual_entry_fails_clear_when_landing_fails():
-    """落地失败必须**退非零**（否则"看着成功、其实没落"＝正是要消灭的那类无实效）。"""
+def test_audit_bundle_manual_entry_fails_clear_when_landing_fails(monkeypatch):
+    """落地失败必须**退非零**（否则"看着成功、其实没落"＝正是要消灭的那类无实效）。
+
+    同 t-037：chdir 进沙箱，`_append_log` 不再往真仓的 `logs/k3dge.log` 添行。
+    """
     from k3dge.engine import audit_bundle as ab
 
     orig_consume, orig_land = ab.consume, ab.land_report
@@ -560,13 +589,22 @@ def test_audit_bundle_manual_entry_fails_clear_when_landing_fails():
             (ws / ".agent").mkdir()
             (ws / "bundle").mkdir()
             (ws / "bundle" / "manifest.json").write_text('{"bundle_version": 1}', encoding="utf-8")
+            monkeypatch.chdir(ws)
             out, err = io.StringIO(), io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 rc = main(["audit", "bundle", str(ws / "bundle"), "--into", str(ws)])
             assert rc == 1 and "落报告/提交失败" in err.getvalue()
+            assert (ws / "logs" / "k3dge.log").is_file()     # 失败轮也留证据，且留在沙箱
     finally:
         ab.consume, ab.land_report = orig_consume, orig_land
 
 
 if __name__ == "__main__":
-    unittest.main()
+    # 本文件混装 TestCase 类与模块级 pytest 函数（t-041）：`unittest.main()` 只发现前者，
+    # ADR-0026 MCP 封闭性与 audit-bundle 落地这两组**安全/数据完整性**回归会在直跑时静默消失。
+    try:
+        import pytest
+    except ImportError:                                # pragma: no cover
+        unittest.main()
+    else:
+        raise SystemExit(pytest.main([__file__, "-q"]))

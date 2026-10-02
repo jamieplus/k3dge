@@ -64,8 +64,22 @@ class TestEvaluator(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_no_violations_when_only_meta_files_changed(self) -> None:
+        """元文件分类的回归必须可触发（t-134）：旧测对着 unborn HEAD 的空仓直接 evaluate，
+        实际只验了"无改动 ⇒ 过"。基线提交 → **只动元文件**（pipeline.toml / 架构文档，
+        不碰 src/、docs/specs/）→ 再验：过，且不因域检查（CONTRACT_DRIFT/SPEC_*）报。"""
+        _git(self.repo, "add", "-A")
+        _git(self.repo, "commit", "-q", "-m", "baseline")
+        (self.repo / ".agent" / "pipeline.toml").write_text(
+            "[gates.search]\ncontext_max = 2\n", encoding="utf-8")
+        (self.repo / "docs" / "architecture").mkdir(parents=True, exist_ok=True)
+        (self.repo / "docs" / "architecture" / "overview.md").write_text("# Arch\n", encoding="utf-8")
+        _git(self.repo, "add", "-A")
+        _git(self.repo, "commit", "-q", "-m", "meta: only pipeline/docs meta")
         report = ConsistencyEngine(self.repo).evaluate()
-        self.assertTrue(report.passed)
+        dom = [v.rule_id for v in report.violations
+               if v.rule_id.startswith(("CONTRACT_DRIFT", "SPEC_", "NO_DOMAINS", "TEST_"))]
+        self.assertEqual(dom, [], f"元文件改动惊动了域检查：{dom}")
+        self.assertTrue(report.passed, [(v.rule_id, v.message) for v in report.violations])
 
     def test_contract_drift_detected(self) -> None:
         (self.repo / "src/core/mod.py").write_text(
@@ -206,20 +220,48 @@ class TestEvaluator(unittest.TestCase):
         self.assertTrue(any(v.rule_id == "SPEC_DECODE_FAILED" for v in report.violations))
 
     def test_engine_source_does_not_import_templates(self) -> None:
+        """engine ↛ templates（ADR-0001 §2）。
+
+        收口三洞（t-132）：①根漂了 `rglob` 静默空转——先验根、并断确实扫到文件；
+        ②相对写法 `from ..templates import x`（module="templates", level=2）不匹配
+        任何 `k3dge.templates` 前缀；③`from k3dge import templates` 同理。重构恰好
+        会走这两种写法把 templates 拽进引擎——判据按**解析后的完整模块名**算。
+        """
         import ast
 
         root = Path(__file__).resolve().parents[3] / "src" / "k3dge" / "engine"
-        for path in root.rglob("*.py"):
+        self.assertTrue(root.is_dir(), f"根解析错误：{root}")
+        files = sorted(p for p in root.rglob("*.py") if "__pycache__" not in p.parts)
+        self.assertGreater(len(files), 30, f"只扫到 {len(files)} 个文件——守卫在空转")
+        banned = "k3dge.templates"
+
+        def _resolved_names(node):
+            """一个 import 语句解析出的**全部完整模块名**（含 alias 粒度）。"""
+            if isinstance(node, ast.Import):
+                return [a.name for a in node.names]
+            if isinstance(node, ast.ImportFrom):
+                if node.level:
+                    depth = len(pkg_parts) - (node.level - 1)
+                    base = pkg_parts[:max(depth, 0)]
+                    if node.module:
+                        base = base + node.module.split(".")
+                    out = [".".join(base)]
+                    out += [".".join([*base, a.name]) for a in node.names if a.name != "*"]
+                    return [o for o in out if o]
+                mods = [node.module] if node.module else []
+                if node.module:
+                    mods += [f"{node.module}.{a.name}" for a in node.names if a.name != "*"]
+                return mods
+            return []
+
+        for path in files:
+            pkg_parts = ["k3dge", "engine"] + list(path.relative_to(root).parts[:-1])
             tree = ast.parse(path.read_text(encoding="utf-8"))
             for node in ast.walk(tree):
-                if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith(
-                    "k3dge.templates"
-                ):
-                    self.fail(f"{path.name} imports {node.module}")
-                if isinstance(node, ast.Import):
-                    for alias in node.names:
-                        if alias.name.startswith("k3dge.templates"):
-                            self.fail(f"{path.name} imports {alias.name}")
+                for m in _resolved_names(node):
+                    if m == banned or m.startswith(banned + "."):
+                        self.fail(f"{path.name} imports {m}")
+
 
     def test_empty_domains_is_violation(self) -> None:
         (self.repo / ".agent" / "manifest.json").write_text(
@@ -333,8 +375,10 @@ class TestAdrGovernance(unittest.TestCase):
         from k3dge.engine.doc_catalog import validate_docs
 
         ws = Path(__file__).resolve().parents[3]
-        if not (ws / "docs" / "adr").is_dir():
-            self.skipTest("no adr dir")
+        # 仓根解析错要**红**（t-135）：旧 skipTest 让 parents[3] 漂移＝治理测集体静默
+        # 跳过、CI 全绿而无人被校验。本仓必有该目录——没找到即路径错。
+        self.assertTrue((ws / "docs" / "adr").is_dir(),
+                        f"仓根解析错误：{ws / 'docs' / 'adr'} 不存在（parents[3] 漂了？）")
         adr_v = [v for v in validate_docs(ws, types=["adr"]) if v.rule_id.startswith("ADR_")]
         self.assertEqual(
             adr_v, [], [f"{v.rule_id}: {v.message} ({v.file_path})" for v in adr_v]
@@ -392,8 +436,10 @@ class TestTaskGovernance(unittest.TestCase):
         from k3dge.engine.doc_catalog import validate_docs
 
         ws = Path(__file__).resolve().parents[3]
-        if not (ws / "docs" / "tasks").is_dir():
-            self.skipTest("no tasks dir")
+        # 仓根解析错要**红**（t-135）：旧 skipTest 让 parents[3] 漂移＝治理测集体静默
+        # 跳过、CI 全绿而无人被校验。本仓必有该目录——没找到即路径错。
+        self.assertTrue((ws / "docs" / "tasks").is_dir(),
+                        f"仓根解析错误：{ws / 'docs' / 'tasks'} 不存在（parents[3] 漂了？）")
         tv = [v for v in validate_docs(ws, types=["tasks"]) if v.rule_id.startswith("TASK_")]
         self.assertEqual(tv, [], [f"{v.rule_id}: {v.message} ({v.file_path})" for v in tv])
 
@@ -451,8 +497,10 @@ class TestIncidentGovernance(unittest.TestCase):
         from k3dge.engine.doc_catalog import validate_docs
 
         ws = Path(__file__).resolve().parents[3]
-        if not (ws / "docs" / "incidents").is_dir():
-            self.skipTest("no incidents dir")
+        # 仓根解析错要**红**（t-135）：旧 skipTest 让 parents[3] 漂移＝治理测集体静默
+        # 跳过、CI 全绿而无人被校验。本仓必有该目录——没找到即路径错。
+        self.assertTrue((ws / "docs" / "incidents").is_dir(),
+                        f"仓根解析错误：{ws / 'docs' / 'incidents'} 不存在（parents[3] 漂了？）")
         iv = [v for v in validate_docs(ws, types=["incidents"]) if v.rule_id.startswith("INCIDENT_")]
         self.assertEqual(iv, [], [f"{v.rule_id}: {v.message} ({v.file_path})" for v in iv])
 

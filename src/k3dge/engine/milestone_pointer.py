@@ -5,7 +5,9 @@ import re
 from pathlib import Path
 from typing import Optional
 
-_SAFE_MILESTONE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+# 上限 64：id 是**路径分量**（archive/<id>、报告名），无上限时一个 5000 字符的游标
+# 会一路拼进文件名（t-185）。真实形态（M1…M11）远在限内。
+_SAFE_MILESTONE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
 class MilestoneError(ValueError):
@@ -23,8 +25,17 @@ def get_current_milestone(workspace: Path) -> str:
     以 M0 为基数把真实游标（如 M10）永久改成 M1，历史归档对不上（ocr-086）。
     """
     p = _milestone_file(workspace)
-    if not p.is_file():
+    try:
+        p.lstat()
+    except FileNotFoundError:
         return "M0"
+    except OSError as exc:
+        raise MilestoneError(f"{p} 无法 stat（{exc}）——请人工修复，勿当 M0") from exc
+    if not p.is_file():
+        # 存在但**不是普通文件**（目录/指目录的符号链接/FIFO）：`is_file()` 为假会走
+        # "缺省 M0"，随后 bump 以 M0 为基数重写真实游标位——ocr-086 说的正是"不得静默回落"
+        # （t-183：旧代码只挡了"内容坏"，没挡"形状坏"）。
+        raise MilestoneError(f"{p} 存在但不是普通文件（目录/符号链接/FIFO？）——请人工修复，勿当 M0")
     try:
         v = p.read_text(encoding="utf-8").strip()
     except (OSError, UnicodeDecodeError) as exc:
@@ -39,7 +50,10 @@ def get_current_milestone(workspace: Path) -> str:
 def set_current_milestone(workspace: Path, milestone_id: str) -> None:
     err = _validate_milestone_id(milestone_id)
     if err:
-        raise ValueError(err)
+        # 游标失败一律 `MilestoneError`（公开错误类）：读侧/`bump` 都抛它，写侧曾抛裸
+        # `ValueError`——`except MilestoneError` 的调用方恰恰接不住不安全 id（t-182）。
+        # `MilestoneError ⊂ ValueError`，只按 ValueError 捕获的旧调用方不受影响。
+        raise MilestoneError(err)
     p = _milestone_file(workspace)
     p.parent.mkdir(parents=True, exist_ok=True)
     # 原子写：游标留下半行（`M1`→`M`）会让下次读走"内容非法"分支，与 bump 的读-改-写

@@ -1,58 +1,77 @@
 """K3DGE_SOURCE 统管：环境声明 vs 装时落盘不一致 ⇒ gate.* exit 2 拒跑。"""
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 
 
+def _sealed_root(test: unittest.TestCase, receipt: "str | None", *,
+                 policy_source: "str | None" = None) -> Path:
+    """密封 fixture（t-026）：**绝不碰开发者的真 `.venv`**。
+
+    旧 `_set_receipt` 改的是 `ROOT/.venv/k3dge-source.txt`——生产闸真读的装时收据：
+    ①还原只靠 addCleanup，SIGINT/crash 后**回不去原值**（原值只活在死进程内存里），
+    留下的假收据＋任何来源声明会让此后每一次 `gate.*` exit 2＝把作者的 pre-commit
+    静默变砖；②两个用例写同一个路径＝共享可变状态，并行/乱序即互相污染。
+    这里把两轨脚本、收据、pyproject 与一个**确定退出码（41）的 venv 入口桩**收进
+    临时根——"政策放行走到了执行"也有可断言的必然信号（t-025：rc==0 从此不再
+    取决于这台机器装没装 k3dge）。
+    """
+    root = Path(tempfile.mkdtemp())
+    test.addCleanup(shutil.rmtree, root, True)
+    (root / "scripts").mkdir()
+    for f in ("gate.sh", "gate.py"):
+        shutil.copy2(ROOT / "scripts" / f, root / "scripts" / f)
+    py = '[project]\nname = "x"\nversion = "0.1.0"\n'
+    if policy_source:
+        py += f"\n[tool.k3dge]\nsource = \"{policy_source}\"\n"
+    (root / "pyproject.toml").write_text(py, encoding="utf-8")
+    (root / ".venv" / "bin").mkdir(parents=True)
+    if receipt is not None:
+        (root / ".venv" / "k3dge-source.txt").write_text(receipt + "\n", encoding="utf-8")
+    stub = root / ".venv" / "bin" / "k3dge"
+    stub.write_text("#!/bin/sh\nexit 41\n", encoding="utf-8")
+    stub.chmod(0o755)
+    return root
+
+
+def _run_gate(track: str, root: Path, env: dict):
+    cmd = (["bash", "scripts/gate.sh", "version"] if track == "sh"
+           else [sys.executable, "scripts/gate.py", "version"])
+    return subprocess.run(cmd, cwd=root, capture_output=True, text=True, env=env, timeout=60)
+
+
 class TestGateSource(unittest.TestCase):
-    def _set_receipt(self, value: str) -> None:
-        """测试自备装时收据，不依赖本机 `.venv`（CI `pip install -e` 不会落这份文件）。"""
-        venv = ROOT / ".venv"
-        path = venv / "k3dge-source.txt"
-        existed_venv = venv.is_dir()
-        prev = path.read_text(encoding="utf-8") if path.is_file() else None
-        venv.mkdir(parents=True, exist_ok=True)
-        path.write_text(value + "\n", encoding="utf-8")
+    """env 声明（K3DGE_SOURCE）vs 装时收据：不一致 ⇒ 拒跑；一致 ⇒ 放行进入口。"""
 
-        def _restore() -> None:
-            if prev is None:
-                path.unlink(missing_ok=True)
-                if not existed_venv:
-                    try:
-                        venv.rmdir()
-                    except OSError:
-                        pass
-            else:
-                path.write_text(prev, encoding="utf-8")
-
-        self.addCleanup(_restore)
-
+    @unittest.skipUnless(shutil.which("bash"), "gate.sh 轨需要 bash（Windows 走 ps1 轨，见下）")
     def test_mismatch_exits_2(self):
-        self._set_receipt("installed-from-here")
+        root = _sealed_root(self, "installed-from-here")
         env = dict(os.environ, K3DGE_SOURCE="git+https://example.invalid/x.git")
-        r = subprocess.run(["bash", "scripts/gate.sh", "version"], cwd=ROOT,
-                           capture_output=True, text=True, env=env, timeout=60)
+        r = _run_gate("sh", root, env)
         self.assertEqual(r.returncode, 2, r.stderr[-300:])
         self.assertIn("MISMATCH", r.stderr)
 
-    def test_match_proceeds_no_mismatch(self):
+    def test_match_proceeds_no_mismatch(self):   # py 轨：python3 恒在（sys.executable）
         rec = "git+https://example.invalid/match.git"
-        self._set_receipt(rec)
+        root = _sealed_root(self, rec)
         env = dict(os.environ, K3DGE_SOURCE=rec)
-        r = subprocess.run([sys.executable, "scripts/gate.py", "version", "show"], cwd=ROOT,
-                           capture_output=True, text=True, env=env, timeout=60)
-        self.assertEqual(r.returncode, 0, r.stderr[-300:])
+        r = _run_gate("py", root, env)
         self.assertNotIn("MISMATCH", r.stdout + r.stderr)
+        # 政策放行才会 exec 入口桩：41 是**必然信号**——不再拿"全局 k3dge 恰好能跑且
+        # 退 0"当判据（旧形状在没 init 的检出上 exit 1，与政策无关地红；t-025）。
+        self.assertEqual(r.returncode, 41,
+                         f"未走到执行入口（政策被误拦？）：{(r.stdout + r.stderr)[-200:]}")
 
     def test_gate_py_mismatch_exits_2(self):
-        self._set_receipt("installed-from-here")
+        root = _sealed_root(self, "installed-from-here")
         env = dict(os.environ, K3DGE_SOURCE="git+https://example.invalid/x.git")
-        r = subprocess.run([sys.executable, "scripts/gate.py", "version"], cwd=ROOT,
-                           capture_output=True, text=True, env=env, timeout=60)
+        r = _run_gate("py", root, env)
         self.assertEqual(r.returncode, 2, r.stderr[-300:])
         self.assertIn("MISMATCH", r.stderr)
 
@@ -60,30 +79,13 @@ class TestPyprojectOnlyPolicy(unittest.TestCase):
     """政策只写在 pyproject（env 未设）这条路——三轨都得判同一件事（ocr-347 的 (b)）。"""
 
     def _fixture(self, receipt: str) -> Path:
-        import shutil
-        import tempfile
-
-        root = Path(tempfile.mkdtemp())
-        (root / "scripts").mkdir()
-        for f in ("gate.sh", "gate.py"):
-            shutil.copy2(ROOT / "scripts" / f, root / "scripts" / f)
-        (root / "pyproject.toml").write_text(
-            '[project]\nname = "x"\nversion = "0.1.0"\n\n[tool.k3dge]\nsource = "git+x"\n',
-            encoding="utf-8")
-        (root / ".venv").mkdir()
-        (root / ".venv" / "k3dge-source.txt").write_text(receipt + "\n", encoding="utf-8")
-        # 密封 fixture：放一个确定退出码的 venv 入口。不放的话，两轨会回落去 exec **全局**
-        # k3dge（CI 里 `pip install -e` 就装着），而 `version` 缺 action 位置参数 ⇒ argparse
-        # 退 2 —— 于是"匹配 ⇒ 政策未拦"这条路只能靠猜环境跑，断言成了环境的函数（t-024）。
-        exe = root / ".venv" / "bin"
-        exe.mkdir(exist_ok=True)
-        stub = exe / "k3dge"
-        stub.write_text("#!/bin/sh\nexit 41\n", encoding="utf-8")
-        stub.chmod(0o755)
-        self.addCleanup(shutil.rmtree, root, True)
-        return root
+        # 与 TestGateSource 同一密封形状（t-024 的桩、t-026 的临时根）——两份近似
+        # 拷贝迟早各修各的；政策写在 pyproject（env 不出现在调用方）。
+        return _sealed_root(self, receipt, policy_source="git+x")
 
     def _run(self, track, root):
+        if track == "sh" and not shutil.which("bash"):
+            self.skipTest("gate.sh 轨需要 bash（sh track）")
         env = dict(os.environ)
         env.pop("K3DGE_SOURCE", None)
         cmd = (["bash", "scripts/gate.sh", "version"] if track == "sh"

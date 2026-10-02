@@ -73,10 +73,10 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
     },
     "ARCH_STATE_DOC_DRIFT": {
         "severity": "block", "fix": "judgment",
-        "fact": "`{path}` 没列全状态闭集（缺 `{missing}`）——`[NEXT]` 态与 task 态的**唯一源在代码**"
-                "（`engine/nextstep.STATE_OPTIONS` / `engine/state_machine.py`），文档缺项会让新状态"
-                "在架构总览里不存在",
-        "options": ["在 `overview.md` §6.2/§6.3 的表里补上缺的态（反引号写标识符）",
+        "fact": "`{path}` 的状态表与代码不符（缺/偏 `{missing}`）——`[NEXT]` 态与 task 态的**唯一源在代码**"
+                "（`engine/nextstep.STATE_OPTIONS` / `engine/state_machine.py`），文档缺项或写错数"
+                "都会让它与判定分叉",
+        "options": ["在 `overview.md` §6.2/§6.3 的表里补上缺的态、改正写错的 priority（反引号写标识符）",
                     "状态刚改名 → 同步改文档表；确属新增实验态 → 仍要写进表（闭集是给人看的）"],
         "pointers": ["docs/architecture/overview.md §6", "engine/nextstep.py", "engine/state_machine.py"],
     },

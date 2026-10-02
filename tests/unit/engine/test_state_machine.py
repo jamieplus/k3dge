@@ -21,23 +21,34 @@ def test_resolve_is_table_driven() -> None:
 
 
 def test_terminal_with_outgoing_is_flagged() -> None:
+    # 消息**必须专属这条规则**（t-282）："终态"同时出现在死锁/活锁两支的"非终态 …"
+    # 文案里——子串 `"终态"` 在别的规则上也成立，规则①回归时此测可能照绿。
+    # 现在钉规则①自己的措辞 `终态 <s> 有出边 -> <t>`，并排除其它两支的句式。
     bad = (T(S.DONE, M.START, S.IDEA),) + _GOOD
     v = sm.check_completeness(bad, set(S), sm.TERMINAL_STATES, sm.INITIAL)
-    assert any("终态" in x for x in v), v
+    own = [x for x in v if "有出边 ->" in x and x.startswith("终态")]
+    assert own, v
+    assert any("done" in x for x in own), own
+    assert not [x for x in v if "无出边" in x or "活锁" in x], v
 
 
 def test_non_terminal_dead_end_is_flagged() -> None:
+    # 夹具把 _GOOD 整个丢掉，活锁/不可达噪声会同屏（t-283）——关键词只锁**死锁规则自己**
+    # 的句式，并点名列出的状态：被标的是 DEFERRED/IN_PROGRESS，不含 DONE（终态不该报）。
     bad = (T(S.IDEA, M.FINISH, S.DONE),)  # DEFERRED/IN_PROGRESS 无出边
     v = sm.check_completeness(bad, set(S), sm.TERMINAL_STATES, sm.INITIAL)
-    assert any("无出边" in x for x in v), v
+    dead = [x for x in v if "无出边" in x]
+    assert dead, v
+    assert any("deferred" in x for x in dead) and any("in-progress" in x for x in dead), dead
+    assert not [x for x in dead if "done" in x], dead
 
 
 def test_nondeterministic_pair_is_flagged() -> None:
-    bad = (
-        T(S.IDEA, M.START, S.IN_PROGRESS),
-        T(S.IDEA, M.START, S.DEFERRED),  # 同 (source, move) 双目标
-    )
+    # **叠在 _GOOD 上**（t-284）：独立两行的夹具会顺带触发死锁/活锁/不可达一串噪声，
+    # "红了几条"里分不清哪条是二义性引的。叠加后违例恰好只有二义性这一条。
+    bad = _GOOD + (T(S.IDEA, M.FINISH, S.DEFERRED),)     # ('idea','finish') 已有目标 done → 双目标
     v = sm.check_completeness(bad, set(S), sm.TERMINAL_STATES, sm.INITIAL)
+    assert len(v) == 1, v
     assert any("非确定" in x for x in v), v
 
 

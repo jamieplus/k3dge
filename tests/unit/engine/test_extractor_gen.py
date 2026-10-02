@@ -40,10 +40,23 @@ class TestRender(unittest.TestCase):
 
     def test_language_arity_fallback_narrows_except(self):
         """code-4: `Language(ptr)` vs `Language(ptr, name)` 的差异只该被 `TypeError` 兜住，
-        真实故障（ABI/import 错）不得被吞成降级分支（fail-closed 而非 fail-silent）。"""
-        src = g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"])
-        self.assertIn("except TypeError:", src)
-        self.assertNotIn("except Exception:", src)
+        真实故障（ABI/import 错）不得被吞成降级分支（fail-silent→fail-closed）。
+
+        断言走 **AST**（t-141）：字符串 grep 会把注释/docstring 里的字样算数，
+        `except Exception` 换个拼法（`except Exception as e:`）也能骗过子串比对。
+        """
+        import ast
+        tree = ast.parse(g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"]))
+        handlers = [h for h in ast.walk(tree) if isinstance(h, ast.ExceptHandler) and h.type]
+
+        def _types(h):
+            tt = h.type.elts if isinstance(h.type, ast.Tuple) else [h.type]
+            return {t.id for t in tt if isinstance(t, ast.Name)}
+
+        types_at = [_types(h) for h in handlers]
+        self.assertIn({"TypeError"}, types_at, types_at)          # 真有且**只**兜 TypeError 的处理器
+        self.assertFalse([t for t in types_at if "Exception" in t],
+                         f"出现吞万能 Exception 的降级分支：{types_at}")
 
     def test_skip_is_documented_as_gate_caught(self):
         """code-1/code-11: 缺 grammar 时 `raise ImportError` 是**被门禁吞的 skip 信号**，
@@ -53,13 +66,51 @@ class TestRender(unittest.TestCase):
         self.assertIn("never fatal", src)
 
     def test_thread_safe_language_and_include_doc(self):
-        """code-1/2/6：缓存不可变 Language（带锁）、Parser 每次新建；include_doc 透传。"""
+        """code-1/2/6：缓存不可变 Language（带锁）、Parser 每次新建；include_doc 透传。
+
+        判据全部走 AST（t-141）：旧 grep 形状 ①`assertNotIn("_PARSER", src)` 改名
+        `_SHARED_P` 即绕过，②"有锁声明"不等于"缓存路径上取了锁"，③注释里出现同样
+        字串照样绿。现在：锁**以 with 语境包住**缓存读写才算线程安全。
+        """
+        import ast
         src = g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"])
-        self.assertIn("_LANGUAGE = None", src)
-        self.assertIn("_LANGUAGE_LOCK = threading.Lock()", src)
-        self.assertIn("parser = Parser(language)", src)
-        self.assertNotIn("_PARSER", src)
-        self.assertIn("extract_typescript_interface(path, include_doc=include_doc)", src)
+        tree = ast.parse(src)
+        assigned: dict = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and len(node.targets) == 1 \
+                    and isinstance(node.targets[0], ast.Name):
+                assigned.setdefault(node.targets[0].id, node.value)
+        self.assertIn("_LANGUAGE", assigned)
+        lock_init = assigned.get("_LANGUAGE_LOCK")
+        self.assertIsNotNone(lock_init, "_LANGUAGE_LOCK 没在模块级初始化")
+        self.assertIsInstance(lock_init, ast.Call)
+        # 缓存变量只在 `with _LANGUAGE_LOCK:` 块内被触碰：锁不是装饰
+        locked_names = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.With):
+                for item in node.items:
+                    ctx = item.context_expr
+                    if isinstance(ctx, ast.Name) and ctx.id == "_LANGUAGE_LOCK":
+                        for sub in ast.walk(node):
+                            if isinstance(sub, (ast.Name, ast.Assign)):
+                                for n in ast.walk(sub):
+                                    if isinstance(n, ast.Name):
+                                        locked_names.add(n.id)
+        self.assertIn("_LANGUAGE", locked_names, "缓存读写没被锁包住（线程安全声明作废）")
+        # Parser 每次新建（不是进程级缓存）：存在 `Parser(language)` 调用；且**任何**名字里
+        # 都不出现 `_PARSER`（AST 面，改名缓存会在 `locked/assigned` 检查上现形）
+        pcalls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+                  and isinstance(n.func, ast.Name) and n.func.id == "Parser"]
+        self.assertTrue(pcalls, "Parser 不再每次新建？")
+        all_names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+        self.assertNotIn("_PARSER", all_names)
+        # include_doc 透传：extract 入口真以关键字传下去（调用面，不是字串）
+        calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+                 and isinstance(n.func, ast.Name)
+                 and n.func.id == "extract_typescript_interface"]
+        self.assertTrue(any(any(k.arg == "include_doc" and isinstance(k.value, ast.Name)
+                                and k.value.id == "include_doc" for k in c.keywords)
+                            for c in calls), src)
 
 
 class TestGeneratedFiltering(unittest.TestCase):
@@ -72,8 +123,12 @@ class TestGeneratedFiltering(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "gen_ts.py"
             p.write_text(g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"]), encoding="utf-8")
+            # 构建产物在 tests/ 之外（`.agent/extractors/…`）：稀疏检出/未 sync 时 p 可以不存在，
+            # `spec` 会是 None、`spec.loader` 可缺——直接抛 AttributeError 读不出"缺工件"这个因（t-142）
+            assert p.is_file(), f"构建工件不在：{p}（先跑 k3dge extractor sync）"
             spec = importlib.util.spec_from_file_location("gen_ts_filter_probe", p)
-            assert spec is not None and spec.loader is not None
+            self.assertIsNotNone(spec, f"spec_from_file_location 对 {p} 回 None")
+            self.assertIsNotNone(spec.loader, f"{p} 没有可用 loader")
             mod = importlib.util.module_from_spec(spec)
             sys.modules["gen_ts_filter_probe"] = mod
             spec.loader.exec_module(mod)

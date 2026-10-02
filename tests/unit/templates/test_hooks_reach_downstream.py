@@ -182,12 +182,15 @@ class TestInitEntrypoints(unittest.TestCase):
         from k3dge.engine import doc_gate
 
         with tempfile.TemporaryDirectory() as d:
+            prev = doc_gate.WS                 # 模块级全局（t-322）：不改回来，后续用例在**同进程**里对着已删除的临时目录跑
+            self.addCleanup(doc_gate.set_workspace, prev)
             doc_gate.set_workspace(Path(d))
             buf = io.StringIO()
             with mock.patch.object(sys, "argv", ["prog"]), redirect_stdout(buf):
                 rc = doc_gate.main(["--scan"])
             self.assertEqual(rc, 0)
             self.assertIn("无 docs/ 目录", buf.getvalue())
+            self.assertEqual(doc_gate.WS, Path(d).resolve())   # 扫描真用了指令式工作区
 
     def test_load_doc_gate_prefers_installed_k3dge(self) -> None:
         """自举兜底不得遮蔽已装那份（367）。"""
@@ -203,9 +206,20 @@ class TestInitEntrypoints(unittest.TestCase):
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         before = list(sys.path)
+
+        def _restore_path() -> None:
+            # `_load_doc_gate` 的自举兜底可能把 `ws/src` 塞进 sys.path（t-323）：
+            # ws 是本测的临时目录、随测删除——不还原＝给后续所有 in-process k3dge
+            # import 留一个指向虚空的遮蔽条目。旧代码算了 `before` 却从不用。
+            sys.path[:] = before
+
+        self.addCleanup(_restore_path)
         dg = mod._load_doc_gate(ws)
-        self.assertTrue(str(Path(dg.__file__)).startswith(str(K3DGE_SRC / "k3dge")))
-        self.assertNotIn(str(ws / "src"), sys.path, "已能 import 时不得再塞仓内路径")
+        try:
+            self.assertTrue(str(Path(dg.__file__)).startswith(str(K3DGE_SRC / "k3dge")))
+            self.assertNotIn(str(ws / "src"), sys.path, "已能 import 时不得再塞仓内路径")
+        finally:
+            _restore_path()
 
     def test_ps1_init_gates_are_declared(self) -> None:
         """`init.ps1` 在本机（无 pwsh）不可跑，但四条判据必须在文本里成对存在（358/359/360/361/362）。"""

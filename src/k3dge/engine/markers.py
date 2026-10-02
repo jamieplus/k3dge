@@ -26,12 +26,19 @@ SIDECAR = "AUDIT.md"
 #（案发现场就在行尾——指针必须钉得起）。
 # v2（ADR-0025 §2.7）：kind 后、desc 前，可选属性段 sev= prio= type=（固定序、闭集；闭集
 # 权威在 k3dit rounds，此处只解析结构、不复校词表，避免 k3dge 反向依赖 k3dit）。
+# 行界必须与 str.splitlines() 同源（code-11）：`$`（re.M）只认 \n，note 若写 `[^\n]`，
+# 遇 \r/\v/\f/\x1c-\x1e/\x85/\u2028/\u2029 等非常规行界会**跨行吞掉下一行的钉**
+# （实测 t-160：第二枚钉消失 ⇒ 审计计数偏低、结项误判）。strip_pins 按 splitlines
+# 索引删行，解析比它少认行界＝两份"行"的口径，必分叉。
+_LINE_BREAK_PAT = r"\r\n|[\r\n\v\f\x1c-\x1e\x85\u2028\u2029]"
+_NOTE_NOT = r"[^\r\n\v\f\x1c-\x1e\x85\u2028\u2029]"
+_LINE_END = rf"(?=(?:{_LINE_BREAK_PAT})|\Z)"
 _ATTRS = r"(?:[ \t]+sev=(?P<sev>\S+))?(?:[ \t]+prio=(?P<prio>\S+))?(?:[ \t]+type=(?P<type>\S+))?"
 MARKER_RE = re.compile(
     r"(?:#|//|<!--)[ \t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \t]+"
     r"(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \t]*@(?P<scope>line|file|repo)(?![A-Za-z0-9_-]))?"
     + _ATTRS +
-    r"[ \t]*(?P<note>[^\n]*?)[ \t]*(?:-->)?[ \t]*$",
+    rf"[ \t]*(?P<note>{_NOTE_NOT}*?)[ \t]*(?:-->)?[ \t]*{_LINE_END}",
     re.M,
 )
 _COMMENT_LINE_RE = re.compile(r"^\s*(?:#|//|<!--)")
@@ -39,7 +46,7 @@ MARKER_RE_MD = re.compile(
     r"<!--[ \t]*k3dit:(?P<kind>pending|leftover|disputed|fixnote|fixed)[ \t]+"
     r"(?P<id>[A-Za-z0-9][A-Za-z0-9._#-]*)(?:[ \t]*@(?P<scope>line|file|repo)(?![A-Za-z0-9_-]))?"
     + _ATTRS +
-    r"(?P<note>[^\n]*?)[ \t]*-->[ \t]*$",
+    rf"(?P<note>{_NOTE_NOT}*?)[ \t]*-->[ \t]*{_LINE_END}",
     re.M,
 )
 _SCAN_SUFFIXES = frozenset(
@@ -97,9 +104,8 @@ def head_block_end(lines: Sequence[str]) -> int:
     return i
 
 
-# str.splitlines() 的行界（除 \n 外还含 \x0b\x0c\x1c-\x1e\x85\u2028\u2029）——
-# parse_text 的行号必须用同一套，否则 worktree.strip_pins 按 splitlines 索引会错位（code-11）。
-_LINE_BREAK_RE = re.compile(r"\r\n|[\r\n\v\f\x1c-\x1e\x85\u2028\u2029]")
+# str.splitlines() 的行界——**同一份** `_LINE_BREAK_PAT`（见文件头；两处各写一遍＝分叉源）。
+_LINE_BREAK_RE = re.compile(_LINE_BREAK_PAT)
 
 
 def _line_starts(text: str) -> list:

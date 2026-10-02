@@ -71,6 +71,21 @@ class TestDocSchemaCollision(unittest.TestCase):
             self.assertIn("ADR_NUMBER_COLLISION", [v.rule_id for v in vs])
 
 
+def _repo_root(test: unittest.TestCase) -> Path:
+    """仓根＝向上找 `docs/adr/.schema.json` 标记（t-105）。
+
+    旧写法 `parents[3]` 只在这个文件的规范位置成立——摊平复制（scan_in/…）或换深度
+    就指到仓根**之外**：`list_docs`/`where_doc` 返回空 ⇒ 报"没有 ADR"这种误导话，
+    而不是"fixture 路径错"。找不到标记 ⇒ 显式 skip，不空转绿。
+    """
+    cur = Path(__file__).resolve()
+    for cand in cur.parents:
+        if (cand / "docs" / "adr" / ".schema.json").is_file():
+            return cand
+    test.skipTest("找不到带 docs/adr/.schema.json 的仓根（文件被复制到别处？）")
+    raise AssertionError  # unreachable
+
+
 class TestDocList(unittest.TestCase):
     def test_list_excludes_aux_and_archive(self):
         with tempfile.TemporaryDirectory() as d:
@@ -88,11 +103,16 @@ class TestDocList(unittest.TestCase):
             (ws / "docs" / "adr" / "archive" / "0000-old.md").write_text("old\n", encoding="utf-8")
             cards = list_docs(ws, typ="adr")
             paths = [c["path"] for c in cards]
-            self.assertTrue(all("README.md" not in p for p in paths))
-            self.assertTrue(all("AUTHORING.md" not in p for p in paths))
-            self.assertTrue(all("LEFTOVERS.md" not in p for p in paths))
-            self.assertTrue(all("_template.md" not in p for p in paths))
-            self.assertTrue(all("archive" not in p for p in paths))
+            # 正对照（t-104）：真 ADR 必须**在**列表里——否则过滤过狠/布局不认时
+            # `list_docs` 返回 [] ，下面全部 all() 恒真，本测什么都没排除也"通过"。
+            self.assertIn("docs/adr/0001-a.md", paths, paths)
+            for name in ("README.md", "AUTHORING.md", "LEFTOVERS.md", "_template.md"):
+                self.assertNotIn(f"docs/adr/{name}", paths, name)
+            # `archive` 用**路径分量**判，不用子串（t-104）：一个真叫
+            # `0002-archive-policy.md` 的现行 ADR 不该被误当归档件排除。
+            for pth in paths:
+                parts = Path(pth).parts
+                self.assertNotIn("archive", parts, pth)
 
 
 class TestDocGrep(unittest.TestCase):
@@ -221,7 +241,7 @@ class TestCardTitleSkipsFrontmatter(unittest.TestCase):
 
     def test_repo_adr_titles_are_real_h1(self):
         """自举：本仓 ADR 的索引标题必须是 `ADR-NNNN: …`，不是注释残句。"""
-        ws = Path(__file__).resolve().parents[3]
+        ws = _repo_root(self)
         cards = [c for c in list_docs(ws, typ="adr") if c["id"].startswith("ADR-")]
         self.assertTrue(cards)
         bad = [c["id"] for c in cards if not c["title"].startswith(c["id"])]
@@ -236,7 +256,7 @@ class TestRetiredAdrVisibility(unittest.TestCase):
     """
 
     def test_repo_retired_ledger_is_resolvable(self):
-        ws = Path(__file__).resolve().parents[3]
+        ws = _repo_root(self)
         rows = where_doc(ws, "ADR-0020")
         self.assertEqual(len(rows), 1)
         c = rows[0]
@@ -246,21 +266,26 @@ class TestRetiredAdrVisibility(unittest.TestCase):
         self.assertIn("ADR-0005", c["dest"])                  # 去向量可读
 
     def test_live_id_still_resolves_to_live_file(self):
-        ws = Path(__file__).resolve().parents[3]
+        ws = _repo_root(self)
         rows = where_doc(ws, "ADR-0025")
         self.assertEqual([c["path"] for c in rows], ["docs/adr/0025-hall-harness-topology.md"])
         self.assertFalse(rows[0].get("retired"))
 
     def test_default_list_excludes_retired(self):
-        ws = Path(__file__).resolve().parents[3]
-        self.assertFalse(any(c.get("retired") for c in list_docs(ws, typ="adr")))
+        ws = _repo_root(self)
+        live = list_docs(ws, typ="adr")                      # 各扫一遍全仓索引（t-106）：算一次
+        self.assertFalse(any(c.get("retired") for c in live))
         with_retired = list_docs(ws, typ="adr", include_retired=True)
-        self.assertTrue(any(c.get("retired") for c in with_retired))
-        self.assertEqual(len(with_retired) - len(list_docs(ws, typ="adr")), 13)   # 账本 13 号
+        retired = [c for c in with_retired if c.get("retired")]
+        self.assertTrue(retired)
+        # 不钉死"13"这个魔法数（t-106）：一次常规退役/恢复就会打断测——**增量**由账本自己定义：
+        # 带 retired 标记的卡数 == 两个视图的差，且现行视图一张不漏。
+        self.assertEqual(len(with_retired) - len(live), len(retired),
+                         "退役面/现行面差不等于退役卡数")
 
     def test_stored_projection_stays_live_only(self):
         """存盘投影（docs-index.json）保持现行视图，不被退役面污染（DOC_INDEX_STALE 语义不变）。"""
-        ws = Path(__file__).resolve().parents[3]
+        ws = _repo_root(self)
         self.assertFalse(any(c.get("retired") for c in build_docs_index(ws)["docs"]))
 
     def test_obsolete_file_is_marked_with_destination(self):
@@ -291,14 +316,21 @@ def test_shipped_schema_codes_are_declared() -> None:
     from k3dge.engine.gate_facts import GATE_FACTS, is_declared
 
     repo = Path(__file__).resolve().parents[3]
+    assert (repo / "docs").is_dir(), f"仓根解析错误：{repo}（parents[3] 漂了？）"
+    schema_files = sorted((repo / "docs").glob("*/.schema.json"))
+    # 正对照（同 t-105 的病）：一份 schema 都没扫到时循环空转、undeclared 恒空＝假绿
+    assert len(schema_files) >= 5, f"只扫到 {len(schema_files)} 份 .schema.json——判据在空转"
     undeclared = []
-    for f in sorted((repo / "docs").glob("*/.schema.json")):
+    for f in schema_files:
         codes = (json.loads(f.read_text(encoding="utf-8")).get("codes") or {})
-        undeclared += [f"{f.parent.name}:{k}={v}" for k, v in codes.items()
+        undeclared += [(f.parent.name, k, v) for k, v in codes.items()
                        if not is_declared(v)]
     # 已知债（2026-09-30，LEFTOVERS「schema 未声明码」）：这四码是 schema 专用别名，
     # 需要各自写 fact/options 才能进声明表 ⇒ 独立批次。本测试兜住"别再新增第五个"。
     known_debt = {"ADR_AMEND_FORMAT", "INCIDENT_FORM_INVALID",
                   "TASK_STATUS_INVALID", "TASK_SECTION_MISSING"}
-    fresh = [u for u in undeclared if u.split("=")[-1] not in known_debt]
-    assert not fresh, "未声明的 schema 码（回执降级）：" + str(fresh)
+    # 直接对**结构化值**过滤（旧写 `u.split("=")[-1]` 再比——值里含 `=` 即错配，
+    # 且 type/key 改名会静默把新债当旧债、或把旧债当新违例，t-108）；展示时才拼串。
+    fresh = [u for u in undeclared if u[2] not in known_debt]
+    assert not fresh, "未声明的 schema 码（回执降级）：" \
+        + str([f"{t}:{k}={v}" for t, k, v in fresh])

@@ -143,4 +143,8 @@ def audit_closed(workspace: Path, milestone_id: str) -> bool:
         return False
     if "<!-- k3dge:incomplete -->" in found[1]:
         return False   # 未尽项报告永不构成闭环
-    return _parse_audit_stats(found[1])["待修"] == 0
+    stats = _parse_audit_stats(found[1])
+    # 截断/畸形行走"解析跳过"口径 ⇒ `待修` 数得出 0 却不代表没有未关项（t-252，ocr-009 同族）
+    if stats.get("malformed"):
+        return False
+    return stats["待修"] == 0

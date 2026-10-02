@@ -201,16 +201,19 @@ def cmd_mcp_probe(args, workspace: Path) -> int:
     timeout = int(getattr(args, "timeout", 20) or 20)
     servers = load_mcp_endpoints(workspace)
     if not servers:
-        # 缺失 / 坏 JSON / 形状不对 / 真的没声明 是四种不同的事实，旧都报"no servers declared"（386）
-        from k3dge.engine.mcp_json import mcp_server_names
+        # 缺失 / 坏 JSON / 根非对象 / 没写 mcpServers 表 / 写了个空表 是**不同**的事实，
+        # 旧都报"no servers declared"（386）。分支不能建立在 `mcp_server_names` 的 None 上——
+        # 它的语义已收紧为"仅缺失"（ocr-261 补齐：在而坏 ⇒ set()+WARN），这里直接看文档。
+        from k3dge.engine.mcp_json import load_mcp_document
 
         doc_path = workspace / ".mcp.json"
+        doc = load_mcp_document(workspace)
         if not doc_path.is_file():
             why = f"没有 {doc_path}（跑 k3dge mcp sync 生成）"
-        elif mcp_server_names(workspace) is None:
-            why = f"{doc_path} 读不出/形状不对（不是对象或缺 mcpServers）"
+        elif doc is None:
+            why = f"{doc_path} 读不出/形状不对（坏 JSON 或根不是对象）"
         else:
-            why = f"{doc_path} 里没有声明任何 server"
+            why = f"{doc_path} 里没有声明任何 server（mcpServers 缺失/非表/空表）"
         print(f"[MCP] {why}", file=sys.stderr)
         return 1
     rows = probe_servers(workspace, timeout=timeout)

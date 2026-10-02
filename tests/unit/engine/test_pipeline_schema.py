@@ -4,15 +4,20 @@ import unittest
 from k3dge.engine.pipeline_schema import validate_pipeline_config
 
 
-def test_valid_providers_has_single_source():
+class TestProviderSingleSource(unittest.TestCase):
     """守卫：合法 provider 集只能有一处定义，执行层 import 校验层那份（同一对象）。
 
     曾发生：`pipeline_runner` 与 `pipeline_schema` 各写一份相同的 frozenset，
     加新 provider 时容易只改一处。
-    """
-    from k3dge.engine import pipeline_runner, pipeline_schema
 
-    assert pipeline_runner._VALID_PROVIDERS is pipeline_schema._VALID_PROVIDERS
+    收进 TestCase（t-221）：pytest 裸函数＋`assert` 的两种死法——`python -m unittest`
+    / 直跑根本不收集它；`python -O` 下 assert 被剥成空语句——"单源"回归可以全绿通过。
+    """
+
+    def test_valid_providers_has_single_source(self) -> None:
+        from k3dge.engine import pipeline_runner, pipeline_schema
+
+        self.assertIs(pipeline_runner._VALID_PROVIDERS, pipeline_schema._VALID_PROVIDERS)
 
 
 def _write(root: pathlib.Path, rel: str, text: str) -> None:
@@ -33,12 +38,47 @@ def _mk_cfg(root, toml, mcp_json=None):
         _write(root, ".mcp.json", mcp_json)
 
 def _no_audit_stages(root: pathlib.Path) -> None:
-    """下游可配路径：在**同一声明面**（pipeline.toml）把审计线两步清空。"""
+    """下游可配路径：在**同一声明面**（pipeline.toml）把审计线两步清空。
+
+    幂等（t-222）：先剥掉任何已存在的 `[checks.audit]` 表再追加。盲 append 的旧形状下，
+    配置本来声明了 `[checks.audit]`、或同一 root 被多个用例各调一次 ⇒ TOML 重复键炸，
+    测就转去断 `PIPELINE_SYNTAX_ERROR` 噪声——验的早已不是本用例声明的意图。
+    """
     cfg = root / ".agent" / "pipeline.toml"
     body = cfg.read_text(encoding="utf-8") if cfg.is_file() else ""
+    kept, dropping = [], False
+    for line in body.splitlines():
+        if line.strip() == "[checks.audit]":
+            dropping = True
+            continue
+        if dropping and line.strip().startswith("["):
+            dropping = False
+        if not dropping:
+            kept.append(line)
     cfg.parent.mkdir(parents=True, exist_ok=True)
-    cfg.write_text(body + "\n[checks.audit]\nstages_produce = []\nstages_verify = []\n",
-                   encoding="utf-8")
+    prefix = "\n".join(kept)
+    tail = "\n[checks.audit]\nstages_produce = []\nstages_verify = []\n"
+    cfg.write_text((prefix + "\n" if prefix.strip() else "") + tail, encoding="utf-8")
+
+
+class TestNoAuditStagesHelper(unittest.TestCase):
+    """夹具自身的契约（t-222）：重复调用不产生重复 `[checks.audit]` 表。"""
+
+    def test_double_apply_is_idempotent(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            _write(root, ".agent/pipeline.toml",
+                   '[roles.audit]\nbind = "k3dit"\n'
+                   '[checks.audit]\nstages_produce = []\nstages_verify = []\n'
+                   '[peers.k3dit.actions.audit]\ntransports = [ { provider = "skip" } ]\n'
+                   '[peers.k3dit.actions.verify]\ntransports = [ { provider = "skip" } ]\n')
+            _no_audit_stages(root)
+            _no_audit_stages(root)
+            body = (root / ".agent" / "pipeline.toml").read_text(encoding="utf-8")
+            self.assertEqual(body.count("[checks.audit]"), 1, body)
+            self.assertEqual(validate_pipeline_config(root), [], body)
 
 
 class TestPipelineSchema(unittest.TestCase):
@@ -413,9 +453,13 @@ class TestTransportShapeRobustness(unittest.TestCase):
         self.assertTrue(any("tool" in m for _, m in errs), errs)
 
     def test_unhashable_provider_does_not_crash(self):
+        """不崩 **且必须报**（t-223）：`assertIsInstance(errs, list)` 恒真——校验器把
+        不可哈希的 provider 吞成"无违例"也照样绿。崩溃由异常本身证；这里钉的另一半是
+        "形状怪的值要进违例清单，不是静默通过"。"""
         errs = self._errs('[peers.k3dit.actions.a]\n'
                           'transports = [ { provider = ["mcp"], tool = "x" } ]\n')
-        self.assertIsInstance(errs, list)
+        codes = [c for c, _ in errs]
+        self.assertIn("PIPELINE_SCHEMA_INVALID", codes, errs)
 
     def test_manual_protocol_must_be_string(self):
         errs = self._errs('[peers.k3dit.actions.v]\n'

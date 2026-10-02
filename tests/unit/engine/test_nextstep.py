@@ -143,28 +143,48 @@ class TestDecisionSingleSource(TestCase):
             self.assertEqual(nextstep.question_text(state, "M7", n=n), ns._fill(opt["question"]))
 
     def test_question_text_falls_back_to_fact(self) -> None:
-        """无 question 的态（不交互）回落 fact；未知态返回空串。"""
-        self.assertIn("待修", nextstep.question_text("audit_open", "M7"))
+        """无 question 的态（不交互）回落 fact；未知态返回空串。
+
+        用**真的没有 question** 的态（ocr t-210）：`audit_open` 声明了 question 且
+        恰好也含"待修"，拿它测回落＝fallback 分支从不被走。等值对账声明表，不测子串。
+        """
+        opt = nextstep.STATE_OPTIONS["sealed"]
+        self.assertNotIn("question", opt)
+        self.assertEqual(nextstep.question_text("sealed", "M7"), opt["fact"])
         self.assertEqual(nextstep.question_text("no_such_state", "M7"), "")
 
     def test_no_hardcoded_ask_literals_in_src(self) -> None:
-        """结构守卫：`prompt.ask(...)` 的首参不得是硬编码字面量（否则又长出第二源）。"""
+        """结构守卫：`prompt.ask(...)` 的问句不得是硬编码字面量（否则又长出第二源）。
+
+        收口三处（ocr t-208）：①关键字形状也要查——`ask` 声明为
+        `ask(self, question, *, countdown, default_yes)`，写 `ask(question="…")`
+        时 `node.args` 为空，旧守卫直接跳过；②只认**名为 `prompt` 的接收者**上的
+        `ask`（裸名匹配会把无关 helper `ask(...)` 也卷进来）；③正向控制——
+        真的扫到了调用点才谈"没有违例"，守卫不能对着白墙绿。
+        """
         import ast
 
         root = Path(__file__).resolve().parents[3] / "src" / "k3dge"
         offenders = []
+        sites = 0
         for py in sorted(root.rglob("*.py")):
             tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
             for node in ast.walk(tree):
-                if not isinstance(node, ast.Call):
+                if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
                     continue
-                fn = node.func
-                name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
-                if name != "ask" or not node.args:
+                if node.func.attr != "ask" or not isinstance(node.func.value, ast.Name):
                     continue
-                if isinstance(node.args[0], (ast.Constant, ast.JoinedStr, ast.BinOp)):
+                if node.func.value.id != "prompt":
+                    continue
+                sites += 1
+                first = node.args[0] if node.args else next(
+                    (kw.value for kw in node.keywords if kw.arg in (None, "question")), None)
+                if first is None:
+                    continue          # 没传问句＝运行期另有来源，不是本守卫的靶面
+                if isinstance(first, (ast.Constant, ast.JoinedStr, ast.BinOp)):
                     offenders.append(f"{py.relative_to(root)}:{node.lineno}")
-        self.assertEqual(offenders, [])
+        self.assertGreaterEqual(sites, 2, f"守卫白扫：src/ 里 prompt.ask 调用点只剩 {sites} 处")
+        self.assertEqual(offenders, [], "问句必须走 nextstep.question_text（单源 STATE_OPTIONS）")
 
 
 class TestPersistedProjection(TestCase):
@@ -280,33 +300,64 @@ class TestAuditTrigger(TestCase):
 
 
 class TestWorkspaceHints(TestCase):
-    def test_new_domain_detected(self) -> None:
+    """喂**真格式**（`-z`＝NUL 分隔）＋正向控制（ocr t-211）。
+
+    旧 mock 给的是换行分隔的 stdout：整串落进**一条**记录"碰巧"解析出想要的路径——
+    `-z` 判据若回归（split 改回 `\n`、`R`/`C` 双记录跳过被破坏）这些测不红；
+    且 `_workspace_hints` 外面包着 `except Exception: return []`，纯负断言分不清
+    "确实没提示"与"整个炸了早退"。⇒ 每条负测都先验 git 真被调用（含 `-z` 与 cwd）。
+    """
+
+    def _run_git(self, stdout_z: str):
         from k3dge.cli import main as cli_main
 
         ws = _base_ws()
         with mock.patch("subprocess.run") as run:
-            run.return_value = mock.MagicMock(stdout="?? src/newdom/bar.py\n", returncode=0)
+            run.return_value = mock.MagicMock(stdout=stdout_z, returncode=0)
             hints = cli_main._workspace_hints(ws)
+        run.assert_called_once()
+        self.assertIn("-z", run.call_args[0][0])            # 判据＝NUL 分隔格式
+        self.assertEqual(run.call_args.kwargs.get("cwd"), ws)
+        return ws, hints
+
+    def test_new_domain_detected(self) -> None:
+        _ws, hints = self._run_git("?? src/newdom/bar.py\0")
         self.assertIn("new_domain", [h.state for h in hints])
 
     def test_known_domain_not_new(self) -> None:
-        from k3dge.cli import main as cli_main
-
-        ws = _base_ws()
-        with mock.patch("subprocess.run") as run:
-            run.return_value = mock.MagicMock(stdout=" M src/k3dge/engine/foo.py\n", returncode=0)
-            hints = cli_main._workspace_hints(ws)
+        _ws, hints = self._run_git(" M src/k3dge/engine/foo.py\0")
         # overview staleness is no longer a standalone hint (folded into audit_suggested)
         self.assertEqual(hints, [])
 
     def test_bare_untracked_tree_not_new_domain(self) -> None:
         # whole tree untracked -> git collapses to "?? src/"; that is NOT a new domain
+        _ws, hints = self._run_git("?? src/\0")
+        self.assertEqual([h.state for h in hints], [])
+
+    def test_top_level_file_under_src_not_new_domain(self) -> None:
+        """`src/__main__.py` 是 zipapp 入口**文件**，不是域——曾被 new_domain 误报，
+        逼操作者去 manifest 注册一个不存在的域（启发式：域＝`src/<dir>/…`，≥3 段）。"""
+        _ws, hints = self._run_git("?? src/__main__.py\0")
+        self.assertEqual([h.state for h in hints], [])
+        # 对照：真的新域（目录级）仍要报
+        _ws, hints = self._run_git("?? src/newdom/mod.py\0")
+        self.assertIn("new_domain", [h.state for h in hints])
+
+    def test_porcelain_paths_splits_nul_and_consumes_rename_origin(self) -> None:
+        """重命名记录正是 `-z` 解析器存在的理由（381），此前零覆盖。"""
         from k3dge.cli import main as cli_main
 
-        ws = _base_ws()
-        with mock.patch("subprocess.run") as run:
-            run.return_value = mock.MagicMock(stdout="?? src/\n", returncode=0)
-            hints = cli_main._workspace_hints(ws)
+        out = (" M src/k3dge/engine/foo.py\0"
+               "R  src/k3dge/engine/new.py\0src/k3dge/engine/old.py\0"
+               "?? docs/specs/engine/spec.md\0\0")
+        self.assertEqual(cli_main._porcelain_paths(out),
+                         ["src/k3dge/engine/foo.py", "src/k3dge/engine/new.py",
+                          "docs/specs/engine/spec.md"])
+
+    def test_rename_inside_known_domain_not_new(self) -> None:
+        """`R` 的原始路径必须被消费：若双记录跳过被破坏，`src/ghostdom/old.py` 会漏进
+        改动面 ⇒ 假报 new_domain。这条测对旧解析（整行当一个路径）也可红。"""
+        _ws, hints = self._run_git("R  src/k3dge/engine/new.py\0src/ghostdom/old.py\0")
         self.assertEqual([h.state for h in hints], [])
 
 
@@ -391,14 +442,24 @@ class TestNextStepPointers(TestCase):
 
         y/N 与倒计时真实存在于 `prompt.ask`（它读 stdin）；[NEXT] 只是打印，
         写了就是虚假承诺（曾误植三处，见 memo S7）。
+
+        旧守卫遍历的是 `ask/if_y/if_n/note`——这些字段早已从 STATE_OPTIONS 退役
+        （`test_mcp_isomorphic` 自己就断言它们不存在），内层永远取到 `None` ⇒
+        恒绿空转（ocr t-207）。改为遍历**真的在声明**的显示字段，并正向控制
+        "确实扫到了串"。
         """
+        bad = ("y/N", "Y/n", "倒计时")
+        scanned = 0
         for state, opt in nextstep.STATE_OPTIONS.items():
-            for field in ("ask", "if_y", "if_n", "note"):
+            for field in ("fact", "fact_blocked", "fact_with_blockers",
+                          "question", "options", "pointers"):
                 val = opt.get(field)
                 items = val if isinstance(val, list) else ([val] if val else [])
                 for s in items:
-                    for bad in ("y/N", "倒计时"):
-                        self.assertNotIn(bad, s, f"{state}.{field} 含通道词汇 {bad}：{s}")
+                    scanned += 1
+                    for b in bad:
+                        self.assertNotIn(b, s, f"{state}.{field} 含通道词汇 {b}：{s}")
+        self.assertGreater(scanned, 10, f"守卫白扫：只取到 {scanned} 条显示串")
 
     def test_no_state_name_collides_with_task_status(self) -> None:
         """术语守卫：next-step 态名不得与 task status 撞名。
@@ -525,16 +586,23 @@ class TestSealReadyStatesItsBlockers(TestCase):
         ——那是**瞬时状态**，ADR-0026 一转 Accepted 它就红（克隆操演时实测）。不变量是：
         ①`reasons` 与 `unmet_seal_preconditions` 逐条一致；②⚙️ 项（`satisfies` 声明，如
         `align_pass`）不得进"需人先办"；③退休的报告类闸不得出现。
+
+        本仓依赖不满足时**显式 skip**，不静默早退（ocr t-212）：旧写法在浅克隆/
+        已安装包装/无当前里程碑时只断一条 `state == "normal"` 就 return，CI 报绿
+        但不变量从没被验——fail-open 的逃逸口。判据面（hermetic）由
+        `test_lists_unmet_preconditions` 兜底，这里红/绿都真话。
         """
         from k3dge.engine.seal import unmet_seal_preconditions
         from k3dge.engine.milestone_pointer import get_current_milestone
         from k3dge.engine.task_index import scan_milestone_tasks
 
-        mid = get_current_milestone(REPO) or "M11"
-        ns = nextstep.seal_ready_for(REPO, mid)
+        hermetic = "隔离形状由 test_lists_unmet_preconditions 等用例覆盖"
+        mid = get_current_milestone(REPO)
+        if not mid:
+            self.skipTest(f"{REPO} 无当前里程碑（浅克隆/安装态？）；{hermetic}")
         if not scan_milestone_tasks(REPO, mid):
-            self.assertEqual(ns.state, "normal")
-            return
+            self.skipTest(f"{REPO} 的 {mid} 无在办票；{hermetic}")
+        ns = nextstep.seal_ready_for(REPO, mid)
         unmet = [gid for gid, _msg in unmet_seal_preconditions(REPO, mid)]
         self.assertEqual([r.split("：")[0] for r in (ns.reasons or [])], unmet[:4])
         if not unmet:
@@ -550,9 +618,16 @@ class TestSealReadyStatesItsBlockers(TestCase):
 
 
 class TestSealReadyHasOneConstructionEntry(TestCase):
-    """棘轮：生产代码里 `from_state("seal_ready")` 只能用 `seal_ready_for()`。
+    """棘轮：生产代码里 `seal_ready` 只能用 `seal_ready_for()` 产出。
 
     否则某条路径会渲染出没有前置信息的 seal_ready（投影与判据分叉）。
+
+    形状面收口（ocr t-209）：旧守卫只看**名为 `from_state` 的调用 + 首个位置参**。
+    `from_state(state="seal_ready", …)`（关键字形状）与 `NextStep(state="seal_ready", …)`
+    （公开再导出的数据类直接构造）都造得出同一个分叉投影，却都从指缝溜走。
+    已知限度（如实登记，不装全覆盖）：守卫只认 **Constant**——经变量/字典中转
+    （如 `mcp.py` 的 `nxt_state` 兜底表）解析不到字面量，那条路径的正当性靠
+    `load_persisted` 优先（流程自己判过）+ `test_mcp_isomorphic` 的投影对账兜底。
     """
 
     def test_no_raw_construction_in_src(self) -> None:
@@ -569,10 +644,11 @@ class TestSealReadyHasOneConstructionEntry(TestCase):
                     continue
                 fn = node.func
                 name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
-                if name != "from_state" or not node.args:
+                if name not in ("from_state", "NextStep"):
                     continue
-                first = node.args[0]
-                if isinstance(first, ast.Constant) and first.value == "seal_ready":
+                state_arg = node.args[0] if node.args else next(
+                    (kw.value for kw in node.keywords if kw.arg == "state"), None)
+                if isinstance(state_arg, ast.Constant) and state_arg.value == "seal_ready":
                     offenders.append(f"{py.relative_to(root)}:{node.lineno}")
         self.assertEqual(offenders, [], f"用 seal_ready_for() 代替：{offenders}")
 

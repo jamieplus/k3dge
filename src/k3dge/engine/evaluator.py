@@ -222,7 +222,8 @@ def _run_batch_tests(
                         f"tests timed out after 300s (batch {refs})",
                         domain=d,
                         file_path=_spec_violation_path(workspace, manifest, d),
-                        detail={"domain": d, "target": refs, "reason": "300s 超时"},
+                        detail={"domain": d, "target": refs, "reason": "300s 超时",
+                                "pytest_tail": "（超时被 killpg，无 pytest 输出）"},
                     )
                 )
         return violations
@@ -940,7 +941,7 @@ class ConsistencyEngine:
                     "MCP_JSON_PEER_MISSING",
                     f".mcp.json check crashed: {exc}",
                     file_path=".mcp.json",
-                    detail={"path": ".mcp.json", "reason": str(exc)},
+                    detail={"path": ".mcp.json", "peer": "（校验崩溃，未定位）", "reason": str(exc)},
                 )
             )
         return out
@@ -971,7 +972,7 @@ class ConsistencyEngine:
                     "MCP_JSON_PEER_MISSING",
                     "`.mcp.json` has no mcpServers map",
                     file_path=".mcp.json",
-                    detail={"path": ".mcp.json", "reason": "缺 mcpServers"},
+                    detail={"path": ".mcp.json", "peer": "（缺 mcpServers 表）", "reason": "缺 mcpServers"},
                 )
             ]
         out: List[Violation] = []
@@ -1043,7 +1044,8 @@ class ConsistencyEngine:
                         "ARCH_STATE_DOC_DRIFT",
                         f"{rel} 的 `{state}` priority 写成 {prio}，代码是 {want}",
                         file_path=rel,
-                        detail={"path": rel, "state": state, "got": int(prio), "want": int(want)},
+                        detail={"path": rel, "missing": f"{state}.priority（文档 {prio}，代码 {want}）",
+                                "state": state, "got": int(prio), "want": int(want)},
                     )
                 )
         return out
@@ -1121,7 +1123,7 @@ class ConsistencyEngine:
             return [
                 Violation(
                     "EXTRACTOR_PLUGIN_STALE",
-                    f"抽取器插件与配置不一致（{missing}）——由 `k3dge extractor sync` 重生",
+                    f"plugin drift: {missing}",
                     file_path=extractor_gen.PLUGDIR_REL,
                     detail={"path": extractor_gen.PLUGDIR_REL, "languages": missing},
                 )
@@ -1132,7 +1134,8 @@ class ConsistencyEngine:
                     "EXTRACTOR_PLUGIN_STALE",
                     f"extractor plugin check crashed: {exc}",
                     file_path=".agent/extractors",
-                    detail={"path": ".agent/extractors", "reason": str(exc)},
+                    detail={"path": ".agent/extractors", "languages": "（校验崩溃，未定位）",
+                            "reason": str(exc)},
                 )
             ]
 

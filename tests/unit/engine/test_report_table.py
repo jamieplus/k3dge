@@ -23,8 +23,50 @@ def test_has_table_and_rows_skip_malformed():
 
 def test_count_statuses_single_source():
     c = rt.count_statuses(_TBL)
-    assert c["待修"] == 1 and c["已修"] == 1 and c["有意留"] == 1 and c["total"] == 3
+    # 一格一断（t-253）：合取断言红时只报整个表达式，CI 里定位不了一条计数回归
+    assert c["待修"] == 1, c
+    assert c["已修"] == 1, c
+    assert c["有意留"] == 1, c
+    assert c["total"] == 3, c
     assert c["_ids_待修"] == ["A-1"]
+    # 畸形行不再是"当它不存在"（t-252）：A-3 列数不符被解析跳过，但必须有信号可查
+    assert c["malformed"] == 1, c
+    assert c["_ids_畸形"] == ["A-3"], c
+
+
+def test_zero_hit_ids_keys_exist() -> None:
+    """456 不变量的**零命中面**（t-251）：每个 `_ids_*` 键无命中也必须在——
+    调用方（task_write/milestone_audit）直接按键取值。旧文件所有 `_ids_` 断言
+    都指向真有命中的桶，"只有命中才建键"的简化会全绿通过、在调用点炸 KeyError。
+    """
+    tbl = ("| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+          "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+          "| Z-1 | 2026-01-01 | 中 | P2 | 缺陷 | d | f.py:1 | 待修 |  |  |  |  |\n")
+    c = rt.count_statuses(tbl)
+    for key in ("_ids_待修", "_ids_已修", "_ids_有意留", "_ids_待验证", "_ids_待裁",
+                "_ids_未知状态", "_ids_畸形"):
+        assert key in c, key
+    assert c["_ids_已修"] == [] and c["_ids_有意留"] == [] and c["_ids_未知状态"] == []
+    assert c["_ids_待修"] == ["Z-1"]
+
+
+def test_audit_closed_refuses_truncated_pending_row(tmp_path) -> None:
+    """fail-open 的端到端面（t-252）：唯一一行 `待修` 被截成 9 列 ⇒ 解析 0 行、
+    `待修==0` 假成立——旧 `audit_closed` 会宣布闭环。现在畸形信号挡住它。
+    """
+    from k3dge.engine.audit_trigger import audit_closed
+
+    (tmp_path / ".agent").mkdir()
+    (tmp_path / ".agent" / "manifest.json").write_text("{}", encoding="utf-8")
+    revs = tmp_path / "docs" / "reviews"
+    revs.mkdir(parents=True)
+    truncated = (
+        "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+        "| B-1 | 2026-01-01 | 高 | P1 | 缺陷 | 写漏几列 | f.py:1 | 待修\n"
+    )
+    (revs / "2026-09-01-M7-audit.md").write_text(truncated, encoding="utf-8")
+    assert audit_closed(tmp_path, "M7") is False, "截断的待修行被当成了闭环"
 
 
 def test_no_table():
@@ -43,7 +85,9 @@ def test_open_aliases_and_unknown_fail_closed():
         "| A-8 | 2026-01-01 | 低 | P3 | 规范 | d8 | f.py:8 | 已修 | 已修 | v | 通过 |  |\n"
     )
     c = rt.count_statuses(tbl)
-    assert c["待修"] == 2 and c["total"] == 4 and c["已修"] == 1
+    assert c["待修"] == 2, c
+    assert c["total"] == 4, c
+    assert c["已修"] == 1, c
     assert c["_ids_未知状态"] == ["A-7"]
     assert set(c["_ids_待修"]) == {"A-5", "A-6"}
 

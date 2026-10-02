@@ -68,6 +68,30 @@ class TestVersion(unittest.TestCase):
         # manifest version None != pyproject 0.1.0 → drift
         self.assertTrue(any(v.rule_id == "VERSION_MISMATCH" for v in violations))
 
+    def test_downstream_layout_bump_and_validate_use_manifest_branch(self) -> None:
+        """下游布局把 `_init_path` 的 manifest 支路**走满闭环**（t-291）。
+
+        本文件其余用例都把 `__version__` 写进 `src/k3dge/__init__.py`——只经过
+        fallback 那半条解析路。下游脚手架（name=myproj，包在 `src/myproj/`）若
+        解析错位，`bump_version` 会"成功"却不动真文件、`validate_versions` 靠
+        同一处错位继续绿 ⇒ 三处一致的 promise 当场失效，没有测会红。
+        """
+        ws = self.ws
+        pkg = ws / "src" / "myproj"
+        pkg.mkdir(parents=True)
+        (pkg / "__init__.py").write_text('__version__ = "0.1.0"\n', encoding="utf-8")
+        (ws / ".agent").mkdir(exist_ok=True)
+        (ws / ".agent" / "manifest.json").write_text(json.dumps(
+            {"name": "myproj", "package_root": "src", "domains": {}, "version": "0.1.0"}),
+            encoding="utf-8")
+        _write_pyproject(ws, "0.1.0")
+        self.assertEqual(version.validate_versions(ws), [])
+        self.assertEqual(version.bump_version(ws, "patch"), "0.1.1")
+        self.assertIn("0.1.1", (pkg / "__init__.py").read_text(encoding="utf-8"))
+        # fallback 支路不许在下游布局里凭空造 `src/k3dge/`——造了＝解析根本没走 manifest
+        self.assertFalse((ws / "src" / "k3dge").exists())
+        self.assertEqual(version.validate_versions(ws), [])
+
     def test_bump_patch_updates_all(self) -> None:
         _write_pyproject(self.ws, "0.1.0")
         _write_manifest(self.ws, "0.1.0")

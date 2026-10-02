@@ -1,4 +1,5 @@
 """markers: 审计钉解析——重点锁 code-11（行号口径）与 @repo/多主锚校验。"""
+from pathlib import Path
 import unittest
 
 from k3dge.engine.markers import (
@@ -49,24 +50,40 @@ class TestHeadBlockEnd(unittest.TestCase):
 class TestLineIndex(unittest.TestCase):
     """code-11 回归守卫：行号必须与 str.splitlines() 同口径。
 
-    splitlines 除 \\n 外还切 \\x0b \\x0c \\x1c-\\x1e \\x85 \\u2028 \\u2029；
+    splitlines 除 \\n 外还切 \\r \\v \\f \\x1c-\\x1e \\x85 \\u2028 \\u2029；
     若 _line_index 只认 \\n，strip_pins 按 splitlines 索引删行会错位删错行。
+
+    期望值取 `splitlines(keepends=True)` 的偏移累加（ocr t-160）：旧 oracle
+    `count("\\n")+1` 等于把"待防的错误答案"重写一遍——非 \\n 行界一进入 fixture，
+    它就报出一个**错**行号而测仍绿。
     """
+
+    @staticmethod
+    def _oracle(text: str, offset: int) -> int:
+        pos = 0
+        for i, ln in enumerate(text.splitlines(keepends=True), 1):
+            pos += len(ln)
+            if offset < pos:
+                return i
+        return len(text.splitlines()) or 1
 
     def test_matches_splitlines_for_plain_newlines(self):
         text = "a\nb\nc\n"
         for offset in range(len(text)):
-            expected = text[:offset].count("\n") + 1
-            self.assertEqual(_line_index(text, offset), expected, f"offset={offset}")
+            self.assertEqual(_line_index(text, offset), self._oracle(text, offset),
+                             f"offset={offset}")
 
-    @unittest.skipUnless(True, "exotic line breaks")
-    def test_exotic_breaks_count_as_lines(self):
-        # \x0b (vertical tab) 是 splitlines 的行界
-        text = "a\x0bb\n"
-        self.assertEqual(len(text.splitlines()), 2)
-        # 第二行起点在 \x0b 之后
-        pos_b = text.index("b")
-        self.assertEqual(_line_index(text, pos_b), 2)
+    def test_all_splitlines_boundaries_count_as_lines(self):
+        """行界全字符集逐一代入（ocr t-159）：旧 `@skipUnless(True, …)` 是恒真摆设，
+        且只有 \\x0b 一例——那批分隔符里其余八个从没被走过。
+        """
+        for br in ("\r", "\v", "\f", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"):
+            with self.subTest(br=repr(br)):
+                text = f"a{br}b\n"
+                self.assertEqual(len(text.splitlines()), 2)
+                self.assertEqual(_line_index(text, text.index("b")), 2)
+                self.assertEqual(_line_index(text, text.index("b")),
+                                 self._oracle(text, text.index("b")))
 
     def test_unicode_line_separator(self):
         text = "a\u2028b"
@@ -77,6 +94,16 @@ class TestLineIndex(unittest.TestCase):
         text = "a\r\nb"
         self.assertEqual(len(text.splitlines()), 2)
         self.assertEqual(_line_index(text, text.index("b")), 2)
+
+    def test_lone_cr_source_parses_with_right_line_numbers(self):
+        """两份实现的对账现场（ocr t-160）：parse_text 用 splitlines 切行、_line_index
+        用正则扫行界——只含 \\r 的文件正是两者悄悄分叉的形状（此前仅 \\r\\n 被覆盖）。
+        """
+        src = "x = 1  # k3dit:pending A1 第一行\ry = 2  # k3dit:pending A2 第二行\r"
+        ms, problems = parse_text("src/a.py", src)
+        self.assertEqual([m.line for m in ms], [1, 2])
+        self.assertEqual([m.id for m in ms], ["A1", "A2"])
+        self.assertEqual(problems, [])
 
 
 class TestParseText(unittest.TestCase):
@@ -131,6 +158,23 @@ class TestParseText(unittest.TestCase):
         self.assertEqual(len(ms), 1)
         self.assertEqual(problems, [])
 
+    def test_file_scope_boundary_is_strictly_after_header(self):
+        """`mk.line > hb` 的相等边界（ocr t-161）：旧 fixture 钉在 line 1、hb 是 2，
+        从没贴着边界走——改成 `>=`（最后一行头部注释被误拒）或偏移一格全都测不出。
+        """
+        # ①line == hb：@file 恰在头部注释块**最后一行**、紧挨首行代码 ⇒ 干净
+        src = "# 说明\n# k3dit:leftover F1 @file 恰在块尾\ncode = 1\n"
+        ms, problems = parse_text("src/a.py", src)
+        self.assertEqual(len(ms), 1)
+        self.assertEqual(ms[0].line, head_block_end(src.splitlines()))
+        self.assertEqual(problems, [])
+        # ②line == hb+1：@file 落在首行代码的行尾注释 ⇒ 必须报
+        src2 = "# 说明\ncode = 1  # k3dit:leftover F1 @file 正文首行\n"
+        ms2, problems2 = parse_text("src/a.py", src2)
+        self.assertEqual(len(ms2), 1)
+        self.assertEqual(ms2[0].line, head_block_end(src2.splitlines()) + 1)
+        self.assertTrue(any("@file" in p for p in problems2), problems2)
+
     def test_fixed_and_leftover_not_open(self):
         src = ("a = 1  # k3dit:fixed D1 ok\n"
                "b = 2  # k3dit:leftover L1 keep\n"
@@ -166,6 +210,20 @@ class TestParseSidecar(unittest.TestCase):
         self.assertEqual(ms, [])
         self.assertEqual(problems, [])
 
+    def test_non_marker_heading_resets_current_entry(self):
+        """ocr-260 的**行为面**（ocr t-162）：非条目标题必须关掉上一条——
+        旧测只喂标题不喂后续 `- files:`，删掉 `cur = None` 全测仍绿，
+        sidecar 笔记就跨条目污染。
+        """
+        text = "## k3dit:pending R4@repo n\n\n## 普通标题\n- files: src/x.py\n"
+        ms, problems = parse_sidecar(text)
+        self.assertEqual(len(ms), 1)
+        self.assertEqual(problems, [])
+        self.assertNotIn("src/x.py", ms[0].note)
+        # 对照：标题紧随条目时 `- files:` 正常挂到条目（reset 不是"一律不收"）
+        ms2, _ = parse_sidecar("## k3dit:pending R5@repo n\n- files: src/y.py\n")
+        self.assertIn("src/y.py", ms2[0].note)
+
 
 class TestOpenSamplesAndCounts(unittest.TestCase):
     def test_open_kinds_are_pending_disputed_fixnote(self):
@@ -175,6 +233,16 @@ class TestOpenSamplesAndCounts(unittest.TestCase):
         ms = [_mk("A", "pending"), _mk("B", "fixed"), _mk("C", "leftover"), _mk("D", "disputed")]
         got = open_samples(ms)
         self.assertEqual(sorted(got), ["src/a.py#A", "src/a.py#D"])
+
+    def test_open_samples_and_counts_cover_fixnote(self):
+        """fixnote 是 OPEN_KINDS 三员之一，此前**没有任何 fixture 造过它**（ocr t-163）：
+        把它从 open_samples/counts/closure_ok 任一处摘掉，本类全绿。对称补齐。
+        """
+        ms = [_mk("A", "pending"), _mk("E", "fixnote"), _mk("B", "fixed"), _mk("C", "leftover")]
+        self.assertEqual(sorted(open_samples(ms)), ["src/a.py#A", "src/a.py#E"])
+        c = counts(ms)
+        self.assertEqual(c["fixnote"], 1)
+        self.assertEqual(c["open"], 2)
 
     def test_counts_includes_open_total(self):
         ms = [_mk("A", "pending"), _mk("B", "pending"), _mk("C", "fixed"), _mk("D", "leftover")]
@@ -189,6 +257,11 @@ class TestOpenSamplesAndCounts(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("pending", info["blockers"])
 
+    def test_closure_ok_blocked_by_fixnote(self):
+        ok, info = closure_ok([_mk("E", "fixnote")])
+        self.assertFalse(ok)
+        self.assertIn("fixnote", info["blockers"])
+
     def test_closure_ok_passes_with_only_leftover(self):
         ok, info = closure_ok([_mk("L", "leftover"), _mk("F", "fixed")])
         self.assertTrue(ok)
@@ -198,27 +271,27 @@ class TestOpenSamplesAndCounts(unittest.TestCase):
 class TestValidate(unittest.TestCase):
     def test_repo_scope_outside_sidecar_is_problem(self):
         ms = [_mk("R", "pending", file="src/a.py", scope="repo")]
-        problems = validate(None, ms)
+        problems = validate(Path("."), ms)
         self.assertTrue(any("@repo" in p for p in problems), problems)
 
     def test_repo_scope_in_sidecar_ok(self):
         ms = [_mk("R", "pending", file=SIDECAR, scope="repo")]
-        self.assertEqual(validate(None, ms), [])
+        self.assertEqual(validate(Path("."), ms), [])
 
     def test_same_id_multiple_kinds_is_problem(self):
         ms = [_mk("X", "pending", file="src/a.py"), _mk("X", "leftover", file="src/a.py")]
-        problems = validate(None, ms)
+        problems = validate(Path("."), ms)
         self.assertTrue(any("多种 kind" in p for p in problems), problems)
 
     def test_multi_anchor_same_id_is_problem(self):
         ms = [_mk("X", "pending", file="src/a.py"), _mk("X", "pending", file="src/b.py")]
-        problems = validate(None, ms)
+        problems = validate(Path("."), ms)
         self.assertTrue(any("多主锚" in p for p in problems), problems)
 
     def test_leftover_may_span_files(self):
         """规则 2 例外：leftover 随文件走，多宿主不算违规。"""
         ms = [_mk("L", "leftover", file="src/a.py"), _mk("L", "leftover", file="src/b.py")]
-        self.assertEqual(validate(None, ms), [])
+        self.assertEqual(validate(Path("."), ms), [])
 
 
 if __name__ == "__main__":

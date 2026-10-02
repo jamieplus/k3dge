@@ -263,13 +263,25 @@ class CliTransportShape(unittest.TestCase):
             self.assertTrue(res.ok, res.detail)
 
     def test_timeout_kills_the_whole_process_group(self) -> None:
-        """shell=True 的超时以前只杀 `/bin/sh`：孙进程继续跑并持有管道（ocr-281）。"""
+        """shell=True 的超时以前只杀 `/bin/sh`：孙进程继续跑并持有管道（ocr-281）。
+
+        两处收口（t-216）：①marker 路径**必须 shlex.quote**——临时目录路径可能带
+        空格/元字符，`touch <path>` 被拆成多参数后失败，`assertFalse(exists)` 就
+        因"写不进"而假绿；②加**正对照**：同一 shell 通道先证明 touch 真能落盘，
+        "之后没有落盘"才归因于进程组被终止。
+        """
+        import shlex
         import time
         with TemporaryDirectory() as d:
             ws = Path(d)
             (ws / ".agent").mkdir(parents=True, exist_ok=True)
             marker = ws / "orphan.txt"
-            res = pr._run_cli(ws, f"( sleep 2; touch {marker} ) & sleep 30", 1, pr._NullIO())
+            q = shlex.quote(str(marker))
+            ok_run = pr._run_cli(ws, f"touch {q}", 10, pr._NullIO())
+            self.assertTrue(ok_run.ok and marker.exists(),
+                            "shell/路径/quoting 本身不通 ⇒ 负断言是 vacuous")
+            marker.unlink()
+            res = pr._run_cli(ws, f"( sleep 2; touch {q} ) & sleep 30", 1, pr._NullIO())
             self.assertFalse(res.ok)
             time.sleep(2.5)
             self.assertFalse(marker.exists(), "超时后孙进程仍在跑 ⇒ 进程组没被终止")

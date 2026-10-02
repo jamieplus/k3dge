@@ -143,6 +143,10 @@ def _workspace_hints(workspace: Path) -> list:
             segs = f.split("/")
             if len(segs) < 2 or not segs[1]:  # bare "src" (whole tree untracked) is not a domain
                 continue
+            # 域是 `src/<domain>/…` 的**目录**（≥3 段）；`src/__main__.py` 这类 src 顶层
+            # 单文件不是域，别把 zipapp 入口误报成新域、逼人去 manifest 注册（t 系列）。
+            if len(segs) < 3:
+                continue
             top = "/".join(segs[:2])  # e.g. "src/k3dge" or "src/newdom"
 
             def _known(t: str) -> bool:
@@ -871,9 +875,11 @@ def old_name_warnings(msg: str) -> List[str]:
     for line in (msg or "").splitlines():
         if _OLD_NAME not in line:
             continue
-        if _OLD_NAME_QUOTED.search(line):
-            continue
-        out.append(line.strip())
+        # 先抹掉反引号跨度、再查**余下部分**：旧形状"行里有一处引用就豁免整行"，
+        # 混写行（``引用 `k3ge` + 裸写 k3ge``）漏网——恰是 advisory 检测器最容易失手的形状（t-008）。
+        bare = _OLD_NAME_QUOTED.sub("", line)
+        if _OLD_NAME in bare:
+            out.append(line.strip())
     return out
 
 

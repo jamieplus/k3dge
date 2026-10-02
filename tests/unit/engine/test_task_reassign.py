@@ -1,5 +1,6 @@
 """里程碑重挂（ADR-0004 §2.1.9）：票的里程碑事实＝frontmatter + 文件名两处，必须同改。"""
 
+import subprocess
 import tempfile
 from pathlib import Path
 from unittest import TestCase
@@ -116,21 +117,56 @@ class TestReassignBulk(TestCase):
         self.assertTrue(ok, lines)
         self.assertIn("没有 M10 的票", lines[0])
 
+    def test_unreadable_ticket_does_not_half_migrate(self) -> None:
+        """坏文件让整批在循环中途抛异常 ⇒ 前面的票已改、后面的没改（334）。
+
+        自 `TestBoundaryNudge` 挪来（t-299）：这是**批量重挂**的行为测，advisory 类里
+        放着它，读者会以为"边界提醒"也讲"坏票不挡批"。
+        两处收口：①`chmod(0o000)` 只在非 root 的 POSIX 上挡读（CI 容器常 root、
+        Windows 只切只读位）——前提可能静默消失（t-296）。换成同名**目录**占住
+        `.md` 路径：`read_text` 恒抛 OSError，跨平台确定；②坏票必须排在**前**：
+        `sorted(glob)` 下旧夹具它最后读，"遇坏即中止"的实现同样留下 call_count==1，
+        断言空转（t-297）。再断被迁移的正是那张好票。
+        """
+        from unittest import mock
+
+        ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
+        d = ws / "docs" / "tasks"
+        d.mkdir(parents=True)
+        bad = d / "2026-08-01-M10-feat-zz-bad.md"      # 排最前（sorted 序）
+        bad.mkdir()
+        good = d / "2026-09-02-M10-feat-a.md"
+        good.write_text(
+            "---\nmilestone: M10\nstatus: idea\n---\n\n# A\n", encoding="utf-8")
+        with mock.patch("k3dge.engine.task_write.reassign_task_milestone",
+                        side_effect=lambda *a, **k: (True, "moved", None)) as rr:
+            ok, lines = reassign_milestone(ws, "M10", "M11")
+        self.assertFalse(ok, lines)
+        self.assertTrue([l for l in lines if "读不出" in l], lines)
+        self.assertEqual(rr.call_count, 1, "读不出的票不得挡掉别的票，也不得半途崩")
+        self.assertEqual(rr.call_args_list[0].args[1], good,
+                         f"被迁移的必须是好票：{rr.call_args_list}")
+
 
 class TestBoundaryNudge(TestCase):
     """`TASK_MILESTONE_AFTER_BOUNDARY`（advisory）：边界之后新增的票仍挂在边界那一版。"""
 
     def _repo(self) -> Path:
-        import subprocess
-
         ws = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / "docs" / "tasks").mkdir(parents=True)
         (ws / ".agent").mkdir()
         (ws / ".agent" / "milestone").write_text("M10\n", encoding="utf-8")
 
-        def g(*a):
-            return subprocess.run(["git", "-C", str(ws), *a], capture_output=True, text=True).stdout
+        def g(*a) -> str:
+            # 前置 git **步步查错**（t-298）：旧写法把 rc/stderr 扔了——缺 git、全局
+            # gpgsign/hooksPath 让 commit 或 tag 崩时，夹具半初始化往下跑，
+            # 红在 `tasks_after_boundary`/`validate_docs` 的下游断言里毫无线索。
+            r = subprocess.run(["git", "-C", str(ws), *a], capture_output=True, text=True)
+            if r.returncode != 0:
+                raise RuntimeError(f"git {' '.join(a)} 失败：{(r.stderr or r.stdout).strip()}")
+            return r.stdout
 
         g("init", "-q")
         (ws / "seed.md").write_text("seed\n", encoding="utf-8")
@@ -168,27 +204,3 @@ class TestBoundaryNudge(TestCase):
                       file_path="docs/tasks/x.md", detail={"path": "docs/tasks/x.md", "milestone": "M10"})
         self.assertTrue(v.format().startswith("[GATE WARN]"))
         self.assertIn("k3dge milestone reassign M10", v.format())
-
-
-    def test_unreadable_ticket_does_not_half_migrate(self) -> None:
-        """坏文件让整批在循环中途抛异常 ⇒ 前面的票已改、后面的没改（334）。"""
-        from unittest import mock
-
-        ws = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
-        d = ws / "docs" / "tasks"
-        d.mkdir(parents=True)
-        (d / "2026-09-01-M10-feat-a.md").write_text(
-            "---\nmilestone: M10\nstatus: idea\n---\n\n# A\n", encoding="utf-8")
-        bad = d / "2026-09-02-M10-feat-b.md"
-        bad.write_text("---\nmilestone: M10\nstatus: idea\n---\n\n# B\n", encoding="utf-8")
-        bad.chmod(0o000)
-        try:
-            with mock.patch("k3dge.engine.task_write.reassign_task_milestone",
-                            side_effect=lambda *a, **k: (True, "moved", None)) as rr:
-                ok, lines = reassign_milestone(ws, "M10", "M11")
-        finally:
-            bad.chmod(0o644)
-        self.assertFalse(ok, lines)
-        self.assertTrue([l for l in lines if "读不出" in l], lines)
-        self.assertEqual(rr.call_count, 1, "读不出的票不得挡掉别的票，也不得半途崩")

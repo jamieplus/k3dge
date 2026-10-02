@@ -53,12 +53,32 @@ def test_persist_replaces():
         assert [c["state"] for c in data["next"]] == ["sealed"]
 
 
-def test_persist_never_raises():
-    persist(Path("/dev/null/fake"), _ns())  # should not raise
+def test_persist_never_raises_but_says_so(tmp_path):
+    """写不进也要**出声**（ocr-273 的可观测面；t-186）。
+
+    旧夹具 `/dev/null/fake` 靠 POSIX 上 `/dev/null` 是字符设备才失败——Windows 上
+    它会 mkdir 成功、真写盘，失败路径从没被走还污染开发机。改为可移植的强制失败：
+    把侧车父目录位置放一个**普通文件**，`mkdir(parents=True, exist_ok=True)` 必然 OSError。
+    """
+    import contextlib
+    import io
+
+    ws = Path(tmp_path)
+    (ws / ".k3dge").write_text("我是一个占位的普通文件\n", encoding="utf-8")
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        persist(ws, _ns())                       # 不得抛
+    assert "[nextstep] WARN" in err.getvalue(), err.getvalue()
+    assert "侧车写入失败" in err.getvalue()
 
 
 def test_emit_upserts_and_orders_by_priority():
-    """一轮内多处理点：同 state 去重、按 priority 排、primary＝最小 priority。"""
+    """一轮内多处理点：同 state 去重、按 priority 排、primary＝最小 priority。
+
+    平级（两个 priority 4）之间的次序**不属契约**（t-187）——`emit` 的 `_upsert` 与
+    `emit_all` 的 tie-break 规则本就不同（前者跟插入序，后者跟 STATE_OPTIONS 序），
+    这里再锁状态序就会在"统一 tie 规则"那天红得莫名所以。只锁：档序、首条、平级集合。
+    """
     with tempfile.TemporaryDirectory() as d:
         ws = Path(d)
         begin_run(ws)
@@ -66,18 +86,60 @@ def test_emit_upserts_and_orders_by_priority():
         emit(ws, _ns("audit_suggested"))            # priority 4（原 ratchet_open 的 5 档已退休）
         emit(ws, NextStep.from_state("pending_findings", "M10", pending=2))   # priority 1
         data = _raw(ws)
-        assert [c["state"] for c in data["next"]] == ["pending_findings", "seal_ready", "audit_suggested"]
-        assert data["primary"] == "pending_findings"
         assert [c["priority"] for c in data["next"]] == [1, 4, 4]
+        assert data["next"][0]["state"] == "pending_findings"
+        assert {c["state"] for c in data["next"][1:]} == {"seal_ready", "audit_suggested"}
+        assert data["primary"] == "pending_findings"
 
 
-def test_emit_same_state_dedupes():
+def test_emit_same_state_dedupes_and_merges_reasons():
+    """去重的契约是"**后到的合并 reasons**"（ocr-274），旧测两张无差异的卡把"整条覆盖"
+    的回归原样放过（t-188）。给两张**不同 reasons** 的同态卡：只剩一条，理由并集。"""
     with tempfile.TemporaryDirectory() as d:
         ws = Path(d)
         begin_run(ws)
-        emit(ws, _ns("seal_ready"))
-        emit(ws, _ns("seal_ready"))
-        assert len(_raw(ws)["next"]) == 1
+        emit(ws, NextStep.from_state("seal_ready", "M10", reasons=["A 已满足"]))
+        emit(ws, NextStep.from_state("seal_ready", "M10", reasons=["B 待办"]))
+        data = _raw(ws)
+        assert len(data["next"]) == 1, data
+        merged = data["next"][0]["reasons"]
+        assert "A 已满足" in merged and "B 待办" in merged, merged
+
+
+def test_legacy_and_malformed_sidecars_are_survivable():
+    """防御支路逐个走（t-190）：priority 缺失/null/字符串、非 dict 条目、坏 JSON——
+    `load_all`/`_prio`/`load_persisted` 为它们写的分支此前只测过最优情况。"""
+    card = {"state": "seal_ready", "milestone": "M10", "fact": "f", "options": ["a", "b"]}
+    shapes = {
+        "no_priority": {"next": [dict(card)], "primary": "seal_ready"},
+        "null_priority": {"next": [dict(card, priority=None)], "primary": "seal_ready"},
+        "string_priority": {"next": [dict(card, priority="4")], "primary": "seal_ready"},
+        "non_dict_entries": {"next": ["junk", dict(card), 42], "primary": "seal_ready"},
+    }
+    for name, payload in shapes.items():
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            p = ws / ".k3dge" / "next.json"
+            p.parent.mkdir(parents=True)
+            p.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            cards = load_all(ws)                       # 不抛；坏条目由 load_all 滤掉
+            if name == "non_dict_entries":
+                assert [c["state"] for c in cards] == ["seal_ready"], (name, cards)
+            else:
+                assert len(cards) == 1, (name, cards)
+            assert load_persisted(ws)["state"] == "seal_ready", name
+            # 再 emit 一张真卡：`_prio` 的兜底（缺省/坏值按 5）参与排序，不 KeyError/TypeError
+            emit(ws, NextStep.from_state("pending_findings", "M10", pending=1))
+            ordered = load_all(ws)
+            assert len(ordered) == 2, (name, ordered)
+            assert ordered[0]["state"] == "pending_findings", (name, ordered)  # priority 1 必在前
+    with tempfile.TemporaryDirectory() as d:
+        ws = Path(d)
+        p = ws / ".k3dge" / "next.json"
+        p.parent.mkdir(parents=True)
+        p.write_text("{ broken", encoding="utf-8")     # 坏 JSON ⇒ "本轮无处理点"，不崩
+        assert load_all(ws) == []
+        assert load_persisted(ws) is None
 
 
 def test_begin_run_clears_previous_run():
@@ -102,6 +164,29 @@ def test_emit_all_orders_and_writes_all():
         assert [c["priority"] for c in data["next"]] == [2, 4, 4]
         assert {c["state"] for c in data["next"]} == {"audit_open", "seal_ready", "audit_suggested"}
         assert data["primary"] == "audit_open"
+        # 原子写的残留面（t-189）：`.tmp` + replace 是侧车与 git-hook/MCP 并发共存的前提，
+        # 成功后不许留 `next.json.tmp`（留了＝上次替换断在半路，读侧下次读到过期快照）
+        assert not (ws / ".k3dge" / "next.json.tmp").exists()
+
+
+def test_emit_all_merges_with_cards_already_landed_this_run():
+    """ocr-275 的行为面（t-189）：`begin_run` 会清空侧车，旧测先 clear 再 emit_all＝
+    合并路径从没被走——把 `emit_all` 写成整片覆盖，全部断言照样绿。
+
+    正确形状：本轮里 `emit`/`persist` 先落地的处理点，其后 `emit_all` 必须**并**进去，
+    不抹掉（同轮多源：前一个 hook 的拒绝 + 本命令的汇总判定共存）。
+    """
+    with tempfile.TemporaryDirectory() as d:
+        ws = Path(d)
+        begin_run(ws)
+        emit(ws, _ns("doc_fix"))                                   # 单点先落
+        emit_all(ws, [NextStep.from_state("new_domain", "M10")])   # 汇总随后到
+        states = {c["state"] for c in load_all(ws)}
+        assert {"doc_fix", "new_domain"} <= states, f"emit_all 整片覆盖了先落的 {states}"
+        # 平级 tie 不锁（同上），但 primary 必须是现存卡里 priority 最小者
+        prim = load_all(ws)[0]
+        assert prim["priority"] == min(c["priority"] for c in load_all(ws))
+        assert not (ws / ".k3dge" / "next.json.tmp").exists()
 
 
 def test_emit_all_prints_in_priority_order(capsys):

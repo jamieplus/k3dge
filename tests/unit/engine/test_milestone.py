@@ -1,6 +1,10 @@
+import json
 import pathlib
+import shutil
+import subprocess
 import tempfile
 import unittest
+import atexit
 
 from k3dge.engine.align import (
     _ALIGN_STUB_MARKER,
@@ -10,8 +14,13 @@ from k3dge.engine.align import (
 from k3dge.engine.seal import seal_milestone, seal_preconditions_error
 from k3dge.engine.task_index import list_tasks, scan_milestone_tasks
 from k3dge.engine.task_write import create_task, mark_task_done
-import shutil
-import atexit
+
+
+def _git(ws, *args) -> None:
+    """测试侧 git 前置：查返回码并把 git 的 stderr 拼进异常（t-175）。"""
+    r = subprocess.run(["git", *args], cwd=str(ws), capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)} 失败：{(r.stderr or r.stdout).strip()}")
 
 
 def _write_task(path: pathlib.Path, status: str, milestone: str) -> None:
@@ -32,7 +41,6 @@ def _set_seal_gates(ws: pathlib.Path, *gate_ids: str) -> None:
 
 def _write_one_domain(ws: pathlib.Path) -> None:
     """Minimal domain so align's Full Matrix is not NO_DOMAINS."""
-    import json
 
     from k3dge.engine.contract import collect_domain_interface, compute_hash
 
@@ -142,17 +150,17 @@ class TestMilestone(unittest.TestCase):
         ok2, msg2, _ = create_task(self.ws, "New item", typ="fix", milestone="M2")
         self.assertTrue(ok2, msg2)
 
+    @unittest.skipUnless(shutil.which("git"), "seal 的 align-pass 前置要真 git 仓")
     def test_seal_archives_to_archive_dir(self) -> None:
         # Use scaffold-like tasks dir with git for k3dge check to pass
-        import json
-        import subprocess
-
+        # 五步 git 全部查返回码（t-175）：旧代码 `capture_output` 吞掉 stderr，git 缺失/
+        # safe.directory/只读 HOME 时测在**半截仓**上评估 ConsistencyEngine——红得莫名或绿得没跑。
         (self.ws / ".agent").mkdir(exist_ok=True)
         (self.ws / ".agent" / "manifest.json").write_text(
             json.dumps({"package_root": "src", "domains": {}}), encoding="utf-8"
         )
         (self.ws / "src").mkdir(exist_ok=True)
-        (_write_task(self.ws / "docs/tasks/2026-08-22-a.md", "done", "M9") if True else None)
+        _write_task(self.ws / "docs/tasks/2026-08-22-a.md", "done", "M9")
         _write_task(self.ws / "docs/tasks/2026-08-22-b.md", "done", "M9")
         (self.ws / "docs/reviews").mkdir(parents=True)
         (self.ws / "docs/reviews/2026-08-23-M9-align.md").write_text(
@@ -172,11 +180,11 @@ class TestMilestone(unittest.TestCase):
             encoding="utf-8",
         )
         # Minimal git for ConsistencyEngine
-        subprocess.run(["git", "init", "-b", "main"], cwd=self.ws, capture_output=True)
-        subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=self.ws, capture_output=True)
-        subprocess.run(["git", "config", "user.name", "t"], cwd=self.ws, capture_output=True)
-        subprocess.run(["git", "add", "-A"], cwd=self.ws, capture_output=True)
-        subprocess.run(["git", "commit", "-m", "init"], cwd=self.ws, capture_output=True)
+        _git(self.ws, "init", "-b", "main")
+        _git(self.ws, "config", "user.email", "t@t.com")
+        _git(self.ws, "config", "user.name", "t")
+        _git(self.ws, "add", "-A")
+        _git(self.ws, "commit", "-m", "init")
 
         ok, msg = seal_milestone(self.ws, "M9")
         self.assertTrue(ok, msg)
@@ -223,7 +231,6 @@ class TestMilestone(unittest.TestCase):
         self.assertIn("Invalid milestone id", msg)
 
     def test_align_rejects_unknown_status(self) -> None:
-        import json
 
         (self.ws / ".agent").mkdir(exist_ok=True)
         (self.ws / ".agent" / "manifest.json").write_text(
@@ -235,7 +242,6 @@ class TestMilestone(unittest.TestCase):
         self.assertIn("Invalid Status", msg)
 
     def test_align_stub_blocks_seal(self) -> None:
-        import json
 
         _write_one_domain(self.ws)
         _write_task(self.ws / "docs/tasks/x.md", "done", "M21")
@@ -251,7 +257,6 @@ class TestMilestone(unittest.TestCase):
         self.assertTrue((self.ws / "docs/tasks/x.md").exists())
 
     def test_seal_rollback_reports_incomplete(self) -> None:
-        import json
         from unittest import mock
 
         (self.ws / ".agent").mkdir(exist_ok=True)
@@ -265,14 +270,18 @@ class TestMilestone(unittest.TestCase):
             f"# Review M22\n{_align_pass_marker('M22')}\n- [x] `a.md`\n- [x] `b.md`\n", encoding="utf-8"
         )
 
-        real_move = __import__("shutil").move
-        calls = {"n": 0}
+        real_move = shutil.move
+        # 故障注入按**被搬的文件**关键，不按调用次序计数（t-174）：数次数版钉的是
+        # `_archive` 当前的搬运动线——动线一改（如 reviews 先于 tasks）故障就落错文件，
+        # "rollback blocked/incomplete" 支路可能从没到达而测仍绿。
+        # 正向故障：归档 review 那一次炸；回滚方向（dst 落回 docs/tasks）一律炸。
 
         def flaky_move(src, dst):
-            calls["n"] += 1
-            if calls["n"] == 2:
+            # 正向=搬**进** archive；回滚=从 archive 搬**出**（dst 不再含 archive 段）
+            if "2026-08-24-M22-align.md" in str(dst):
                 raise OSError("disk full")
-            if calls["n"] >= 3:
+            if "archive" in pathlib.Path(str(src)).parts \
+                    and "archive" not in pathlib.Path(str(dst)).parts:
                 raise OSError("rollback blocked")
             return real_move(src, dst)
 
@@ -368,7 +377,7 @@ class TestMilestone(unittest.TestCase):
         )
         (reviews / "LEFTOVERS.md").write_text(leftover, encoding="utf-8")
 
-        real_move = __import__("shutil").move
+        real_move = shutil.move
         calls = {"n": 0}
 
         def flaky_move(src, dst):
@@ -405,9 +414,6 @@ class TestMilestone(unittest.TestCase):
 
 def test_backfill_into_third_level_stub_creates_section() -> None:
     """报告只写了 `### 回填`：子串判据以为"已有回填段"，插入函数找不到锚行 ⇒ 静默漏回填（332）。"""
-    import contextlib
-    import io
-
     from k3dge.engine.task_write import _ensure_backfill_section
 
     lines: list = []
@@ -417,22 +423,30 @@ def test_backfill_into_third_level_stub_creates_section() -> None:
 
 
 def test_report_pointer_outside_workspace_is_ignored() -> None:
-    """`report:` 是票里可控文本：绝对路径/`..` 不得让引擎去读仓外文件（333）。"""
+    """`report:` 是票里可控文本：绝对路径/`..` 不得让引擎去读仓外文件（333）。
+
+    旧夹具把"仓外文件"写在 `ws.parent`＝**系统临时根**（t-171）：与并行 run/他人文件相撞
+    （root 拥有的同名件会 PermissionError）、从不回收、且 docstring 点名的 `..` 形状根本没测。
+    改：临时根下嵌一层当 workspace，"外面"留在沙箱内；两种越界形状都走。
+    """
     import contextlib
     import io
-    import tempfile as _tf
-    from pathlib import Path as _P
+    import os
 
     from k3dge.engine.task_write import _report_open_findings
 
-    ws = _P(_tf.mkdtemp())
-    atexit.register(shutil.rmtree, ws, True)
-    outside = ws.parent / "leak.md"
+    sandbox = pathlib.Path(tempfile.mkdtemp())
+    atexit.register(shutil.rmtree, sandbox, True)
+    ws = sandbox / "ws"
+    ws.mkdir()
+    outside = sandbox / "leak.md"        # ws 之外、沙箱之内
     outside.write_text("# x\n\n| ID | 状态 |\n| A-1 | 待修 |\n", encoding="utf-8")
+    assert outside.is_file()             # 正对照：文件真在（绝对形状只有 containment 拦得住）
     buf = io.StringIO()
     with contextlib.redirect_stderr(buf):
         got = _report_open_findings(ws, str(outside))
-    assert got is None
+        got_rel = _report_open_findings(ws, f"..{os.sep}leak.md")
+    assert got is None and got_rel is None
     assert "越出本仓" in buf.getvalue()
 
 

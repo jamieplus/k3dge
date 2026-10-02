@@ -35,11 +35,34 @@ def test_override_keeps_other_defaults():
 
 
 def test_malformed_falls_back_to_defaults():
-    """坏 TOML ⇒ 回落缺省，不抛（闸不因配置坏而失效）。"""
+    """坏 TOML ⇒ 回落缺省**且必须出声**（t-124）。
+
+    模块 docstring 与 `gates.load` 都写着"回落缺省但**必须出声**"——静默放宽
+    阈值/前置闸＝假绿；此前全树没有任何测试碰过那条 WARN，删掉它这里照样绿。
+    异常类名也要可见：编码/权限坏了不得伪装成"坏 TOML"（排查面靠它分流）。
+    """
+    import contextlib
+    import io
+
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d, "this is not toml = = =\n")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            data = gates.load(ws)
+        assert data == gates.DEFAULTS                      # 内容＝缺省
         assert gates.get(ws, "audit_trigger", "c2_nesting_max") == 5
-        assert gates.preconditions(ws, "seal")            # 缺省编排仍在
+        assert gates.preconditions(ws, "seal")             # 缺省编排仍在
+        text = err.getvalue()
+        assert "[gates] WARN" in text and "按缺省跑" in text, text
+        assert "TOMLDecodeError" in text, text             # 坏因是 TOML，不是别的 bug
+
+    # 对照：**缺文件**才是合法的静默（下游最小仓不必配）；出声义务只属于"有而读不出"
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d)                                        # 无 pipeline.toml
+        err2 = io.StringIO()
+        with contextlib.redirect_stderr(err2):
+            gates.load(ws)
+        assert err2.getvalue() == "", err2.getvalue()
 
 
 def test_pipeline_toml_with_peers_only_keeps_check_defaults():
@@ -71,7 +94,10 @@ def test_seal_preconditions_default_and_override():
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d, "[checks.seal]\npreconditions = []\n")
         assert gates.preconditions(ws, "seal") == []
-        assert gates.actions(ws, "seal")                   # 逐键覆盖：没写的键保留缺省
+        # 逐键覆盖＝**没写的键保留缺省原值**（t-126）：裸真值只能证"非空"，
+        # 若实现把 actions 也清成 [] 之外的占位甚至只剩一个 id 都看不出来——对账缺省全表。
+        assert gates.actions(ws, "seal") == list(gates.DEFAULTS["checks"]["seal"]["actions"]), \
+            gates.actions(ws, "seal")
         assert gates.get(ws, "audit_trigger", "c2_nesting_max") == 5
 
 
@@ -94,6 +120,9 @@ def test_repo_declares_the_same_values_as_defaults():
     reconcile ⇒ 功能静默死亡，见 2026-09-17-M10-refactor-adr_archive_to_sync）。
     """
     repo = Path(__file__).resolve().parents[3]
+    # 前提（t-125）：`gates.load` 对**任何**读不到声明件的目录都回 DEFAULTS——根一漂，
+    # declared 就变成缺省自己的复印件，"declared == fresh" 恒真，本测什么都不比就绿。
+    assert (repo / ".agent" / "pipeline.toml").is_file(), f"仓根解析错误：{repo}"
     declared = {k: v for k, v in gates.load(repo).items() if k != "nodes"}
     fresh_ws = Path(tempfile.mkdtemp())
     atexit.register(shutil.rmtree, fresh_ws, True)

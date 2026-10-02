@@ -87,19 +87,46 @@ def parse_rows(
     return header, rows
 
 
+def malformed_rows(text: str) -> list:
+    """被 `parse_rows` 因列数不符**跳过**的数据样行 `[(line_idx, cells)]`（t-252）。
+
+    "跳过畸形"是解析器的口径，但闭环判定不许因此把这些行当不存在：一行 `待修`
+    写漏几列 ⇒ `待修==0` 假成立——与 ocr-009 同族，方向是 fail-open。
+    """
+    lines = (text or "").splitlines()
+    hidx, header = find_table(text)
+    if hidx < 0 or header is None:
+        return []
+    out: list = []
+    for i in range(hidx + 1, len(lines)):
+        s = lines[i].strip()
+        if not s.startswith("|"):
+            break
+        cells = _cells(s)
+        if _is_separator(cells):
+            continue
+        if len(cells) != len(header):
+            out.append((i, cells))
+    return out
+
+
 def count_statuses(text: str) -> Dict[str, object]:
     """状态列计数（含 `_ids_<状态>`）。封板闸与 `_count_status` 共用此唯一口径。
 
     **total＝表内所有数据行**（不因状态未知而漏计）；未知/非法状态进 `_ids_未知状态`；
     开放态别名（`待验证`/`待裁`）并入 `待修` ⇒ fail-closed：有未关行就不可能 `待修==0`（ocr-009）。
+    列数不符被跳过的行进 `malformed`/`_ids_畸形`（t-252）——`audit_closed` 据此拒闭环。
     """
     counts: Dict[str, object] = {s: 0 for s in STATUSES}
     counts["total"] = 0
     # `_ids_*` 键**无论命中与否都存在**：调用方按 `counts["_ids_待修"]` 取值时，
     # "这一态没出现过"与"键不存在"是两种形状，前者安全后者让新代码 KeyError（456）
-    for s in list(STATUSES) + list(_OPEN_ALIASES) + ["待修", "未知状态"]:
+    for s in list(STATUSES) + list(_OPEN_ALIASES) + ["待修", "未知状态", "畸形"]:
         counts.setdefault(f"_ids_{s}", [])
     _, rows = parse_rows(text)
+    malf = malformed_rows(text)
+    counts["malformed"] = len(malf)
+    counts["_ids_畸形"] = [str(cells[0]).strip() or f"line{idx + 1}" for idx, cells in malf]
     for _, row in rows:
         st = str(row.get("状态", "")).strip()
         rid = row.get("ID", "")

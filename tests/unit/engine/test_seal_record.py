@@ -26,8 +26,15 @@ import atexit
 
 
 def _git(ws: Path, *args: str) -> str:
-    return subprocess.run(["git", "-C", str(ws), *args], capture_output=True,
-                          text=True).stdout.strip()
+    """git 前置失败必须**炸出来**（t-271）：旧写法把 rc/stderr 一起扔了——git 缺失、
+    仓没建起来时所有读断言拿到 `""`，`assertEqual("", baseline)` 之类的谜之 diff 之外，
+    `test_parses_git_trailers_output_shape` 甚至会因 `git log` 失败回 `""` 而**假绿**。
+    本文件的用法全是"必须成功"；失败就带 stderr 抛。
+    """
+    r = subprocess.run(["git", "-C", str(ws), *args], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)} 失败：{(r.stderr or r.stdout).strip()}")
+    return r.stdout.strip()
 
 
 def _repo() -> Path:
@@ -92,10 +99,18 @@ class TestSealRecord(TestCase):
         self.assertTrue(ok, amsg)
 
     def test_clean_tree_does_not_create_empty_commit(self) -> None:
+        """干净树：不造空提交**但边界 tag 必须立**（t-273）。
+
+        旧测把 `seal_record` 的返回扔了——若它返回 `(False, …)`（tag 被拒/提交失败），
+        树根本没动，`rev-list --count == 1` 照样绿：测的是"什么都没发生"，
+        不是"该发生的发生了"。返回与 tag 两头都要断。
+        """
         ws = _repo()
         baseline = _git(ws, "rev-parse", "HEAD")
-        seal_record(ws, "M11", baseline=baseline, result="closed")
+        ok, msg = seal_record(ws, "M11", baseline=baseline, result="closed")
+        self.assertTrue(ok, msg)
         self.assertEqual(_git(ws, "rev-list", "--count", "HEAD"), "1")  # 只有 init
+        self.assertEqual(_git(ws, "rev-parse", "M11^{commit}"), baseline)  # durable 边界在
 
     def test_reentrant_seal_record_is_idempotent(self) -> None:
         """code-7 正面回应：seal 是幂等重入入口。基线不变时重跑 `seal_record`
@@ -134,10 +149,19 @@ class TestTagBoundary(TestCase):
         self.assertEqual(_git(ws, "rev-parse", "M10^{commit}"), first)  # 未被移动
 
     def test_refuses_invalid_baseline_and_id(self) -> None:
+        """只断布尔会把"git 自己拒了"当"我们的校验生效"（t-277）：`M 10` 这类名字
+        git 也拒，校验器删掉测照样绿。逐个钉**是谁说的不**，并证 tag 确实没立。"""
         ws = _repo()
-        self.assertFalse(tag_audit_baseline(ws, "M10", "")[0])
-        self.assertFalse(tag_audit_baseline(ws, "M10", "not-a-sha")[0])
-        self.assertFalse(tag_audit_baseline(ws, "M 10", "abc1234")[0])   # 非法里程碑 id
+        ok, msg = tag_audit_baseline(ws, "M10", "")
+        self.assertFalse(ok)
+        self.assertIn("审计基线不可用", msg)
+        ok2, msg2 = tag_audit_baseline(ws, "M10", "not-a-sha")
+        self.assertFalse(ok2)
+        self.assertIn("审计基线不可用", msg2)
+        ok3, msg3 = tag_audit_baseline(ws, "M 10", "abc1234")     # 非法里程碑 id
+        self.assertFalse(ok3)
+        self.assertIn("milestone id", msg3.lower(), msg3)         # 是校验器拒的，不是 git
+        self.assertEqual(_git(ws, "tag", "--list").strip(), "")
 
     def test_record_fails_when_not_a_repo(self) -> None:
         ws = Path(tempfile.mkdtemp())

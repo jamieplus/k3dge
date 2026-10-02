@@ -5,6 +5,9 @@
 ③ 显式排除某些文件（不做猜测）。
 """
 
+import difflib
+import hashlib
+import json
 from pathlib import Path
 
 from k3dge.engine import audit_merge as am
@@ -52,9 +55,21 @@ def test_merge_excludes_files_explicitly(tmp_path):
     assert res["ok"] and res["merged"] == {} and res["excluded"] == ["src/a.py"], res
 
 
-def test_touched_files_reads_both_patches(tmp_path):
-    b = make_bundle(tmp_path)
-    assert am.touched_files(b) == {"src/a.py"}
+def test_touched_files_reads_both_patches(tmp_path) -> None:
+    """"两份的并集"只有**两层摸不同文件**才测得到（t-088）。
+
+    `make_bundle` 的 fix.patch 与 pins.patch 都指 `src/a.py`——摘掉 pins 那一项，
+    并集结果不变、本测照绿。手工两份不同文件的补丁，缺哪层都红。
+    """
+    b = tmp_path / "b"
+    b.mkdir()
+    (b / "fix.patch").write_text(
+        "--- a/src/a.py\n+++ b/src/a.py\n@@ -1 +1 @@\n-x\n+y\n", encoding="utf-8")
+    (b / "pins.patch").write_text(
+        "--- a/docs/x.md\n+++ b/docs/x.md\n@@ -1 +1 @@\n-a\n+b\n", encoding="utf-8")
+    assert am.touched_files(b) == {"src/a.py", "docs/x.md"}
+    # 旧夹具的同文件形状仍在（回归对照）
+    assert am.touched_files(make_bundle(tmp_path / "mb")) == {"src/a.py"}
 
 
 def test_merge_file_rc_is_conflict_count_not_error(tmp_path):
@@ -73,13 +88,11 @@ def test_merge_file_rc_is_conflict_count_not_error(tmp_path):
     for root, text in ((ws, ours), (b / "code", theirs)):
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
         (root / rel).write_text(text, encoding="utf-8")
-    (b / "baseline.json").write_text(__import__("json").dumps(
-        {"files": {rel: __import__("hashlib").sha1(base.encode()).hexdigest()}, "tree_hash": "x", "count": 1}),
+    (b / "baseline.json").write_text(json.dumps(
+        {"files": {rel: hashlib.sha1(base.encode()).hexdigest()}, "tree_hash": "x", "count": 1}),
         encoding="utf-8")
-    (b / "manifest.json").write_text(__import__("json").dumps(
+    (b / "manifest.json").write_text(json.dumps(
         {"bundle_version": 1, "apply_order": ["fix.patch"], "pins": {"in_code": True}}), encoding="utf-8")
-    import difflib
-
     (b / "fix.patch").write_text("".join(difflib.unified_diff(
         base.splitlines(keepends=True), theirs.splitlines(keepends=True),
         fromfile=f"a/{rel}", tofile=f"b/{rel}")), encoding="utf-8")
@@ -112,21 +125,34 @@ def test_hunks_multi_file_boundary():
     assert all(not ln.startswith("--- a/") for ln in h["x.py"][0]["lines"])
 
 
-def test_fail_channel_matches_success_shape() -> None:
-    """失败面必须与成功面同键，否则新调用方 KeyError（399）。"""
+def test_fail_channel_matches_success_shape(tmp_path) -> None:
+    """失败面必须与成功面同键，否则新调用方 KeyError（399）。
+
+    判据从**真成功合并的键集**推导（t-089）：手抄的键清单只验证"`_fail` 和它自己
+    一致"——成功面哪天加一个键，本测（该防的漂移恰恰是这个）照样绿。
+    字面清单降级为"下限说明"保留。
+    """
     from k3dge.engine.audit_merge import _fail
 
+    b = make_bundle(tmp_path)
+    ws = _ws(tmp_path, "# k3dit:pending old-1 钉\nx = 1\ny = 2\n")
+    ok = am.merge_into(ws, b)
+    assert ok["ok"], ok
     got = _fail("x")
+    missing = set(ok) - set(got)
+    assert not missing, f"失败面缺成功面的键：{sorted(missing)}"
     for key in ("ok", "merged", "conflicts", "missing", "pins_rels", "pins_patch",
                 "excluded", "detail"):
-        assert key in got, key
+        assert key in got, key          # 下限（改名/删键也要有意识地过这条）
 
 
 def test_missing_files_reach_the_detail(tmp_path, monkeypatch) -> None:
     """主干缺文件过去只在 `missing` 里、detail 空串 ⇒ 落盘方一句话都拼不出（400）。"""
 
     bundle = tmp_path / "bundle"
-    (bundle / "pins").mkdir(parents=True)
+    bundle.mkdir(parents=True)
+    # （旧行的 `(bundle / "pins").mkdir()` 是上一代包布局残渣：merge_into/replay 从不读
+    #  `pins/`——换成只建包根目录，t-091。）
     (tmp_path / "base").mkdir()
     (bundle / "manifest.json").write_text(
         '{"bundle_version":"1","apply_order":["fix.patch"],"pins":{"in_code":false}}',
@@ -137,6 +163,31 @@ def test_missing_files_reach_the_detail(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(am, "patch_rels",
                         lambda b, name: {"gone.py"} if name == "fix.patch" else set())
     (tmp_path / "base" / "gone.py").write_text("x\n", encoding="utf-8")   # base 有、主干没有
+    # code-6 支路要**真被走到**（t-087）：修复侧必须有这份文件，否则循环在更早的
+    # `not theirs.is_file()` 就 `missing.append` 了——断言由错误路径满足，
+    # code-6（base 在、主干缺）回归检测不到。
+    (bundle / "code").mkdir()
+    (bundle / "code" / "gone.py").write_text("fixed\n", encoding="utf-8")
     res = am.merge_into(tmp_path, bundle)
     assert res["missing"] == ["gone.py"], res
     assert "主干缺文件" in res["detail"], res
+    assert (tmp_path / "gone.py").exists() is False, "主干缺文件不得被凭空写出来"
+
+
+def test_theirs_missing_is_reported_separately(tmp_path, monkeypatch) -> None:
+    """对照（t-087 的兄弟支路）：补丁声明了文件而包里根本没有 ⇒ 走 theirs-missing 路径。"""
+    bundle = tmp_path / "bundle"
+    bundle.mkdir(parents=True)
+    # （旧行的 `(bundle / "pins").mkdir()` 是上一代包布局残渣：merge_into/replay 从不读
+    #  `pins/`——换成只建包根目录，t-091。）
+    (tmp_path / "base").mkdir()
+    (bundle / "manifest.json").write_text(
+        '{"bundle_version":"1","apply_order":["fix.patch"],"pins":{"in_code":false}}',
+        encoding="utf-8")
+    (bundle / "fix.patch").write_text("not a real patch\n", encoding="utf-8")
+    monkeypatch.setattr(am, "_owned_replay",
+                        lambda b, **k: {"ok": True, "root": str(tmp_path / "base")})
+    monkeypatch.setattr(am, "patch_rels",
+                        lambda b, name: {"ghost.py"} if name == "fix.patch" else set())
+    res = am.merge_into(tmp_path, bundle)
+    assert res["missing"] == ["ghost.py"], res

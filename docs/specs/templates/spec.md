@@ -71,7 +71,7 @@ main(argv: Optional[Sequence[str]]=None) -> int
 | Scenario ID | Level | Input Condition | Expected Outcome | Test File |
 | --- | --- | --- | --- | --- |
 | TC-TPL-01 | L0 | 对空目录执行 init | 生成 manifest 与 docs 树 | `tests/unit/templates/test_scaffold.py::test_generates_tree` |
-| TC-TPL-02 | L0 | 对空目录执行 init | `.agent/rules/` 含完整 00–10（含 02，非空标题） | `tests/unit/templates/test_template_sync.py::test_all_expected_assets_exist` |
+| TC-TPL-02 | L0 | assets 盘点 vs 登记表 | 盘上每个资产可归位（PAIRS ∪ `_RENDER_ONLY` 双射），登记表不许多指；规则文件随资产面全覆盖 | `tests/unit/templates/test_template_sync.py::test_asset_inventory_is_fully_registered` |
 | TC-TPL-03 | L0 | assets/rules 与本仓 `.agent/rules` | 字节级一致 | `tests/unit/templates/test_template_sync.py::test_templates_match_repo_scripts` |
 | TC-TPL-04 | L0 | 对空目录执行 init | 写出 `.agent/README.md`（标明进程配置） | `tests/unit/templates/test_scaffold.py::test_generates_tree` |
 | TC-TPL-05 | L0 | 对空目录 scaffold | 至少一域 + mcp-bridge + 空 reviews 索引 + gitignore | `tests/unit/templates/test_scaffold.py::test_generates_tree` |
