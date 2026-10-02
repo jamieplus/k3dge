@@ -111,42 +111,33 @@ def _codes(rel: str, text: str) -> List[str]:
 
 
 def _fix(rel: str, text: str, codes: List[str]) -> Tuple[str, List[str]]:
-    """按闭集规则改写文本；返回 (新文本, 实际应用的规则)。规则间无冲突（字节级/删行）。"""
-    out = text
-    applied: List[str] = []
-    if "MD_CRLF" in codes:
-        out = out.replace("\r\n", "\n").replace("\r", "\n")
-        applied.append("MD_CRLF")
-    if "MD_TRAILING_WS" in codes:
-        out = re.sub(r"[ \t]+$", "", out, flags=re.MULTILINE)
-        applied.append("MD_TRAILING_WS")
-    if "TASK_BODY_META_REDUNDANT" in codes:
-        out = _strip_body_meta(out)
-        applied.append("TASK_BODY_META_REDUNDANT")
-    if "INCIDENT_ID_REDUNDANT" in codes:
-        out = _fix_incident_id(out)
-        applied.append("INCIDENT_ID_REDUNDANT")
-    if "ADR_AMEND_ORDER" in codes:
-        out = _fix_amend_order(out)
-        applied.append("ADR_AMEND_ORDER")
-    if "ADR_FOOTNOTE_TAIL" in codes:
-        out = _fix_footnote_tail(out)
-        applied.append("ADR_FOOTNOTE_TAIL")
-    if "ADR_FOOTNOTE_LINE" in codes:
-        out = _fix_footnote_line(out)
-        applied.append("ADR_FOOTNOTE_LINE")
+    """按闭集规则改写文本；返回 (新文本, 实际应用的规则)。规则间无冲突（字节级/删行）。
+
+    `applied` 只收**真改了文本**的规则：按"检测到"列会把"没动过"也报成已修，
+    门禁复查仍红时报告与事实分叉（ocr2-055）。
+    """
     # marker_text 会在正文里**新增/改写脚注引用** ⇒ 改变出现序，而 footnote_seq 的小标号是按
     # 正文首现序算的：seq 先跑、marker_text 后跑 ⇒ 修完又不服从 seq（不幂等，需再跑一遍）。
     # 所以顺序必须是 marker_text 在前、seq 在后（ocr-232）。
-    if "ADR_AMEND_MARKER_TEXT" in codes:
-        out = _fix_marker_text(out)
-        applied.append("ADR_AMEND_MARKER_TEXT")
-    if "ADR_FOOTNOTE_SEQ" in codes:
-        out = _fix_footnote_seq(out)
-        applied.append("ADR_FOOTNOTE_SEQ")
-    if "MD_NO_FINAL_NEWLINE" in codes:
-        out = out.rstrip("\n") + "\n"
-        applied.append("MD_NO_FINAL_NEWLINE")
+    _order = [
+        ("MD_CRLF", lambda s: s.replace("\r\n", "\n").replace("\r", "\n")),
+        ("MD_TRAILING_WS", lambda s: re.sub(r"[ \t]+$", "", s, flags=re.MULTILINE)),
+        ("TASK_BODY_META_REDUNDANT", _strip_body_meta),
+        ("INCIDENT_ID_REDUNDANT", _fix_incident_id),
+        ("ADR_AMEND_ORDER", _fix_amend_order),
+        ("ADR_FOOTNOTE_TAIL", _fix_footnote_tail),
+        ("ADR_FOOTNOTE_LINE", _fix_footnote_line),
+        ("ADR_AMEND_MARKER_TEXT", _fix_marker_text),
+        ("ADR_FOOTNOTE_SEQ", _fix_footnote_seq),
+        ("MD_NO_FINAL_NEWLINE", lambda s: s.rstrip("\n") + "\n"),
+    ]
+    out, applied = text, []
+    for _code, _fn in _order:
+        if _code in codes:
+            _new = _fn(out)
+            if _new != out:
+                applied.append(_code)
+            out = _new
     return out, applied
 
 
@@ -180,13 +171,22 @@ def _fix_amend_order(text: str) -> str:
 
 
 def _fix_footnote_tail(text: str) -> str:
-    """把 `[^🅰…]:` 定义块（含缩进续行）整体移到文末（确定性；保持定义间原有顺序）。"""
+    """把 `[^🅰…]:` 定义块（含缩进续行）整体移到文末（确定性；保持定义间原有顺序）。
+
+    围栏代码块内的同形行不得动：那是示例字面量，不是脚注定义（ocr2-056；与 `_strip_body_meta`、
+    `check_task_body_meta_redundant` 的围栏口径一致）。
+    """
     lines = text.splitlines()
     blocks: List[List[str]] = []
     keep: List[str] = []
-    i = 0
+    i, _fence = 0, False
     while i < len(lines):
-        if lines[i].startswith("[^🅰"):
+        if lines[i].strip().startswith("```"):
+            _fence = not _fence
+            keep.append(lines[i])
+            i += 1
+            continue
+        if lines[i].startswith("[^🅰") and not _fence:
             blk = [lines[i]]
             i += 1
             while i < len(lines) and (not lines[i].strip() or lines[i].startswith((" ", "\t"))):

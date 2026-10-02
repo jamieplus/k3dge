@@ -176,7 +176,7 @@
   "analyze_adr_coverage": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 527
+      "line": 531
     }
   ],
   "append_changelog": [
@@ -776,7 +776,7 @@
   "describe_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 508
+      "line": 510
     }
   ],
   "emit": [
@@ -912,7 +912,7 @@
   "get_changed_files": [
     {
       "file": "src/k3dge/engine/diff.py",
-      "line": 122
+      "line": 115
     }
   ],
   "get_current_milestone": [
@@ -1242,7 +1242,7 @@
   "main": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 371
+      "line": 374
     },
     {
       "file": "src/k3dge/cli/main.py",
@@ -1688,7 +1688,7 @@
   "run_screen_gate": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 311
+      "line": 314
     }
   ],
   "run_seal_flow": [
@@ -1890,7 +1890,7 @@
   "symbol_diff": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 510
+      "line": 522
     }
   ],
   "sync_all": [
@@ -1980,13 +1980,13 @@
   "validate_docs": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 438
+      "line": 442
     }
   ],
   "validate_docs_index": [
     {
       "file": "src/k3dge/engine/doc_catalog.py",
-      "line": 485
+      "line": 489
     }
   ],
   "validate_pipeline_config": [
@@ -2028,7 +2028,7 @@
   "verify_contract": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 430
+      "line": 436
     }
   ],
   "violations_for": [

@@ -477,7 +477,9 @@ def sync_extractors(workspace: Path) -> Dict[str, Any]:
             existing = dest.read_text(encoding="utf-8")
         except OSError:
             existing = None
-        if existing is not None and not existing.splitlines()[0].startswith(MARKER):
+        # 空文件没有首行：`splitlines()[0]` 直接 IndexError，抢在冲突守卫之前崩（ocr2-060）。
+        # 空文件＝无标记＝非生成产物，按同一规则记冲突（不覆盖），不抛异常。
+        if existing is not None and (not existing.splitlines() or not existing.splitlines()[0].startswith(MARKER)):
             # 既有文件不是生成产物（用户手写 / 按生成头提示删了标记做定制）⇒ **不覆盖**
             # （与"markerless never pruned or overwritten"自洽，ocr-077）；改名让开是用户的事。
             conflicts.append(dest.name)

@@ -50,11 +50,7 @@ def _is_shallow(workspace: Path) -> bool:
 
 
 def resolve_base(workspace: Path) -> str:
-    """Return the base ref for branch-level diffing.
-
-    找不到候选基线时**不许**回退 `"HEAD"`：`HEAD..HEAD` 是空集 ⇒ 门禁绿灯但一行没查，
-    "定不出分支基线"被洗成"没有改动"（ocr2-053）。fail-closed，调用方显式给基线。
-    """
+    """Return the base ref for branch-level diffing, falling back to HEAD."""
     for base in BASE_CANDIDATES:
         probe = _try_run(
             ["git", "merge-base", base, "HEAD"], workspace
@@ -63,13 +59,10 @@ def resolve_base(workspace: Path) -> str:
             return base
     if _is_shallow(workspace):
         raise GitError(
-        "shallow clone detected and no base branch reachable; "
-        "fetch with --unshallow or set fetch-depth: 0, or export K3DGE_BASE_SHA"
+            "shallow clone detected and no base branch reachable; "
+            "fetch with --unshallow or set fetch-depth: 0, or export K3DGE_BASE_SHA"
         )
-    raise GitError(
-        "no base branch reachable (tried origin/main, origin/master, main, master); "
-        "export K3DGE_BASE_SHA 或在有基线的分支上跑（拒绝用 HEAD 当基线：空 diff 会假绿）"
-    )
+    return "HEAD"
 
 
 def _strip_quotes(path: str) -> str:
@@ -147,6 +140,19 @@ def get_changed_files(workspace: Path) -> List[str]:
             workspace,
         ).split("\0")
         for path in committed:
+            path = path.strip()
+            if path and path not in seen:
+                seen.add(path)
+                files.append(path)
+    else:
+        # 基线不明（`resolve_base` 回退 HEAD）时**不许**跳过已提交 diff：`HEAD..HEAD` 是空集，
+        # 门禁绿灯但一行没查（ocr2-053）。fail-closed：查全量跟踪文件（`git ls-files`），
+        # 不多不少——漏检比慢检糟。
+        tracked = _run(
+            ["git", "-c", "core.quotePath=false", "ls-files", "-z"],
+            workspace,
+        ).split("\0")
+        for path in tracked:
             path = path.strip()
             if path and path not in seen:
                 seen.add(path)

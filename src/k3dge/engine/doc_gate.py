@@ -233,6 +233,9 @@ def _run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) 
         schema, schema_err = schemas[typ]
         raw = _staged_bytes(rel)
         if raw is None:
+            # staged  blob 读不出（`git show :<rel>` 失败）⇒ 该文件逃过全部内容检查还绿灯＝fail-open（ocr2-057）。
+            # 未声明码默认 block：阻断并让人重试，不静默跳过。
+            _add("STAGED_UNREADABLE", f"{rel}: staged 内容不可读（git show 失败），无法校验 ⇒ 阻断提交（重试；持续失败查 git 状态）", where=rel)
             continue
         # B3 bytes first: undecodable files cannot be text-checked
         for code, msg in pure_refs.check_markdown_bytes(raw, rel):

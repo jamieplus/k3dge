@@ -110,9 +110,7 @@ class TestPorcelainZ(unittest.TestCase):
 
 class TestResolveBase(unittest.TestCase):
     @unittest.skipUnless(_git_available(), "需要 git")
-    def test_resolve_base_refuses_head_fallback(self) -> None:
-        # 无候选基线时不许回退 "HEAD"：`HEAD..HEAD` 空集会让门禁假绿（ocr2-053）。
-        # 调用方必须显式给基线（K3DGE_BASE_SHA）。
+    def test_resolve_base_falls_back_to_head(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             repo = Path(d) / "repo"
             repo.mkdir()
@@ -122,8 +120,21 @@ class TestResolveBase(unittest.TestCase):
             (repo / "a.txt").write_text("1\n", encoding="utf-8")
             _git(repo, "add", "a.txt")
             _git(repo, "commit", "-m", "one")
-            with self.assertRaises(GitError):
-                resolve_base(repo)
+            self.assertEqual(resolve_base(repo), "HEAD")
+
+    def test_unknown_base_falls_back_to_full_scan(self) -> None:
+        # 基线不明时 `get_changed_files` 不得跳过已提交文件：`HEAD..HEAD` 空集会假绿（ocr2-053）。
+        # fail-closed：回退全量 `ls-files`，已提交的改动仍被查到。
+        with tempfile.TemporaryDirectory() as d:
+            repo = Path(d) / "repo"
+            repo.mkdir()
+            _git(repo, "init", "-b", "dev")
+            _git(repo, "config", "user.email", "t@t.com")
+            _git(repo, "config", "user.name", "t")
+            (repo / "a.txt").write_text("1\n", encoding="utf-8")
+            _git(repo, "add", "a.txt")
+            _git(repo, "commit", "-m", "one")
+            self.assertIn("a.txt", get_changed_files(repo))
 
 
 if __name__ == "__main__":

@@ -323,7 +323,18 @@ class ConsistencyEngine:
             events.emit(self.workspace_root, "gate_fail", violations=len(report.violations))
             return report
         if staged:
-            files = self._staged_files()
+            try:
+                files = self._staged_files()
+            except GitError as exc:
+                # staged 模式的 git 失败此前只在非 staged 分支捕获，staged 失败会逃逸成调用方崩栈（ocr2-059）。
+                # 与非 staged 同口径：报闸，不抛。
+                events.emit(self.workspace_root, "gate_fail", violations=1)
+                return GateReport(
+                    passed=False,
+                    violations=(Violation("GIT_UNAVAILABLE", str(exc),
+                                          file_path="",
+                                          detail={"reason": str(exc)}),),
+                )
         else:
             try:
                 files = diff.get_changed_files(self.workspace_root)

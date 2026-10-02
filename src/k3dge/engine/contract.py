@@ -404,6 +404,7 @@ def collect_domain_interface(
                 rel = str(file_path).replace("\\", "/")
             if manifest.is_ignored(rel):
                 continue
+        _claimed, _import_failed = False, False
         for extractor in _EXTRACTORS:
             if extractor.can_handle(file_path):
                 try:
@@ -413,6 +414,7 @@ def collect_domain_interface(
                             chunks.append(f"# {file_path.name}\n{iface}")
                         else:
                             chunks.append(iface)
+                    _claimed = True
                     break          # 只有真拿到接口才认领这个 extractor
                 except ImportError as exc:
                     # 依赖缺失 ≠ 认领成功：`break` 会让该文件谁都没计（合同只覆盖一部分还判"一致"），
@@ -421,9 +423,13 @@ def collect_domain_interface(
 
                     print(f"[contract] WARN: {file_path} 的 extractor 依赖缺失（{exc}）⇒ 尝试下一个",
                           file=_sys.stderr)
+                    _import_failed = True
                     continue
                 except (SyntaxError, UnicodeDecodeError, OSError) as exc:
                     raise _ExtractError(f"failed to extract interface from {file_path}: {exc}") from exc
+        # 认领了该文件的 extractor 全因缺依赖失败 ⇒ 合同是"残缺"不是"一致"：只 WARN 会让降级跑过闸（ocr2-051）。
+        if not _claimed and _import_failed:
+            raise _ExtractError(f"no working extractor for {file_path}（依赖缺失），合同不完整")
     return "\n".join(chunks)
 
 
@@ -469,6 +475,12 @@ def _symbol_name(line: str) -> Optional[str]:
     m = re.match(r"([A-Za-z_]\w*)\s*[:=]", s)
     if m:  # module constant / annotated constant (key = name, value = full line)
         return m.group(1)
+    if s.startswith("async "):
+        # `async def f(...)` / `async f(...)`：`head` 会是 `async def f`/`async f`，过不了全名校验 ⇒
+        # 异步函数整条丢（ocr2-052）。`async` 开头必是定义行，去掉再按同步走。
+        s = s[len("async "):].strip()
+        if s.startswith("def "):
+            s = s[len("def "):].strip()
     if "(" in s:
         head = s[: s.index("(")].strip()
         if re.fullmatch(r"[A-Za-z_]\w*", head):

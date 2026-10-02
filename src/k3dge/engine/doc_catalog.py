@@ -289,7 +289,11 @@ def grep_docs(
     if not q:
         return []
     rgx = _compile_query(q, ignore_case)
-    types = [typ] if typ else iter_doc_types(workspace)
+    # `typ` 来自 CLI/MCP（不可信/模型可控）：直接用会绕过 `iter_doc_types` 的全部过滤
+    #（`SKIP_TYPES`、`.` 开头、非目录），`generated`/`..`/隐藏面都会被扫（ocr2-054）。
+    # 只认"当前真实存在的受管类型"；指名不存在的类型 ⇒ 空结果，不回落全量（回落等于放大）。
+    _allowed = set(iter_doc_types(workspace))
+    types = [typ] if (typ and typ in _allowed) else ([] if typ else iter_doc_types(workspace))
     hits: List[dict] = []
     files_used = 0
     scanned = 0
