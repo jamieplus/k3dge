@@ -189,14 +189,12 @@ class TestDecisionSingleSource(TestCase):
 
 class TestPersistedProjection(TestCase):
     def test_roundtrip(self) -> None:
-        ws = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
+        ws = _tmp_ws(self)
         nextstep.persist(ws, nextstep.NextStep.from_state("audit_open", "M7"))
         self.assertEqual(nextstep.load_persisted(ws)["state"], "audit_open")
 
     def test_missing_or_corrupt_is_none(self) -> None:
-        ws = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
+        ws = _tmp_ws(self)
         self.assertIsNone(nextstep.load_persisted(ws))
         p = ws / ".k3dge" / "next.json"
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -213,6 +211,16 @@ class TestPersistedProjection(TestCase):
         cli = nextstep.NextStep.from_state("new_domain", "M7").render_cli()
         self.assertIn("[NEXT] state=new_domain milestone=M7", cli)
         self.assertIn("manifest + spec + tests", cli)
+
+
+def _tmp_ws(test: unittest.TestCase) -> Path:
+    """统一"临时工作区＋随测回收"（t-213 尾账：同一两行在 4 处复制）。
+
+    每例都是全新 mkdtemp ⇒ 不存在旧 `next.json`/事件日志继承；清理句柄在建目录的
+    **同时**登记（setUp 抛错也不漏，卫生守卫同款要求）。"""
+    ws = Path(tempfile.mkdtemp())
+    test.addCleanup(shutil.rmtree, ws, ignore_errors=True)
+    return ws
 
 
 def _base_ws(mid="M7"):
@@ -541,8 +549,7 @@ class TestSealReadyStatesItsBlockers(TestCase):
     def _ws(self, preconditions: list, pending_task: bool = False) -> Path:
         """空仓里大部分形式闸都"过"（无 guides/无 ADR 就是没有偏差）；要隔离"未过闸被列出"
         就得放一个**真会失败**的事实：一张未 done 的 M10 票（`tasks_all_done` 会拒）。"""
-        ws = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
+        ws = _tmp_ws(self)
         (ws / ".agent").mkdir(parents=True)
         body = ", ".join(f'"{p}"' for p in preconditions)
         (ws / ".agent" / "pipeline.toml").write_text(
@@ -657,8 +664,7 @@ class TestSidecarAndRejectionShape(TestCase):
     """侧车语义、`seal_ready` 事实的声明单源、`rejected` 的 priority/pointers（ocr-275/276/277）。"""
 
     def test_emit_all_upserts_instead_of_overwriting(self) -> None:
-        ws = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
+        ws = _tmp_ws(self)
         nextstep.emit(ws, nextstep.NextStep.from_state("doc_fix", "M7"))
         nextstep.emit_all(ws, [nextstep.NextStep.from_state("seal_ready", "M7")])
         states = [c.get("state") for c in (nextstep.load_all(ws) or [])]

@@ -478,7 +478,7 @@ class TestAuditChecklist(TestCase):
         _mk_task(ws)
         data = ac.build_checklist(ws, "M1")
         self.assertTrue(data["audit_suggested"])
-        self.assertTrue(any("账齐" in r for r in data["reasons"]))
+        self.assertTrue(any("账齐" in r for r in data["reasons"]), data["reasons"])
         self.assertFalse(data["closed"])  # no reports yet
         self.assertEqual(data["verify_attempts"], 0)
 
@@ -589,18 +589,18 @@ class TestRatchetRetired(TestCase):
     """棘轮形状已退休（2026-09-26）：声明它必须**显式拒绝**，不得静默换成别的形状。"""
 
     def test_ratchet_mode_is_refused_with_guidance(self):
-
+        # （t-348 尾账）旧形状 `with TemporaryDirectory() as d:` 包了个**空壳**——被测
+        # 工作区来自 `_ws()`（自带 mkdtemp＋清理），`d` 从没被用；"with 块＝隔离"是假象。
         from k3dge.engine import nextstep  # noqa: F401  （拒绝分支会 persist [NEXT]）
 
-        with tempfile.TemporaryDirectory() as d:
-            ws = _ws()
-            (ws / ".agent" / "pipeline.toml").write_text(
-                '[roles.audit]\nbind = "k3dit"\nmode = "ratchet"\n', encoding="utf-8")
-            _mk_task(ws)
-            status, msg = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
-            self.assertEqual(status, "refused")
-            self.assertIn("棘轮形状已退休", msg)
-            self.assertIn('mode = "bundle"', msg)
+        ws = _ws()
+        (ws / ".agent" / "pipeline.toml").write_text(
+            '[roles.audit]\nbind = "k3dit"\nmode = "ratchet"\n', encoding="utf-8")
+        _mk_task(ws)
+        status, msg = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
+        self.assertEqual(status, "refused")
+        self.assertIn("棘轮形状已退休", msg)
+        self.assertIn('mode = "bundle"', msg)
 
 
 class TestSingleAuditReport(TestCase):

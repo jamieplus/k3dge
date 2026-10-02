@@ -394,10 +394,21 @@ class TestFactsAreProducedNotParsed(unittest.TestCase):
     """
 
     def test_hook_does_not_split_messages(self):
-        hook = (Path(__file__).resolve().parents[3] / "scripts" / "pre-commit").read_text(encoding="utf-8")
-        code_lines = [ln for ln in hook.splitlines()
-                      if "msg.split" in ln and not ln.strip().startswith("#")]
-        self.assertEqual(code_lines, [], f"hook 仍在从 message 里切字段：{code_lines}")
+        """扫描面＝**薄壳＋实现宿主**两件（t-154 尾账）。
+
+        2026-09-21 起实现搬进 `k3dge.engine.doc_gate`、`scripts/pre-commit` 只是薄壳——
+        旧测只扫壳，散文解析若回流到 doc_gate 里，本守卫照样绿；壳哪天挪走/改名，
+        read_text 还会以 FileNotFoundError 崩掉而不是说清"守卫的靶没了"。
+        """
+        root = Path(__file__).resolve().parents[3]
+        targets = [root / "scripts" / "pre-commit",
+                   root / "src" / "k3dge" / "engine" / "doc_gate.py"]
+        for t in targets:
+            self.assertTrue(t.is_file(), f"守卫靶不存在（搬家了？）：{t}")
+        for t in targets:
+            code_lines = [ln for ln in t.read_text(encoding="utf-8").splitlines()
+                          if "msg.split" in ln and not ln.strip().startswith("#")]
+            self.assertEqual(code_lines, [], f"{t.name} 仍在从 message 里切字段：{code_lines}")
 
     def test_pure_checks_return_facts_for_declared_codes(self):
         """抽样：`ORPHAN_*` / `MD_CRLF` / `ARCHIVE_NO_DEST` 返回的第二项就是**事实**（路径）。"""

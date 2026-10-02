@@ -11,13 +11,29 @@ import shutil
 import atexit
 
 
+def _git_env(extra: "dict | None" = None) -> dict:
+    """夹具的 git 环境钉死（t-069）：`commit.gpgsign`/`core.hooksPath`/`alias.*`/include.path
+    这些宿主 globalconfig 会让 init/commit 在开发机与 CI 上表现不一（签名缺失直接红）。
+    `GIT_CONFIG_GLOBAL=devnull + NOSYSTEM` 把两层配置全关掉；仓库身份仍由各命令的 `-c` 给。"""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_CONFIG")}
+    env["GIT_CONFIG_GLOBAL"] = os.devnull
+    env["GIT_CONFIG_NOSYSTEM"] = "1"
+    if extra:
+        env.update(extra)
+    return env
+
+
+def _gitc(ws: Path, *args: str, env_extra: "dict | None" = None) -> str:
+    r = subprocess.run(["git", *args], cwd=str(ws), check=True,
+                       capture_output=True, text=True, env=_git_env(env_extra))
+    return r.stdout
+
+
 def _head(ws: Path) -> str:
     """取 HEAD **必须查返回码**（t-073）：失败回空串时 `verify_commit(ws, "")` 报的是
     "提交标识不合法"——前置崩了伪装成产品结论，missing/replay 两条测全部误导性红。
     """
-    r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(ws), check=True,
-                       capture_output=True, text=True)
-    h = r.stdout.strip()
+    h = _gitc(ws, "rev-parse", "HEAD").strip()
     assert h, "rev-parse 回了空——本测的前提（有提交）没建立"
     return h
 
@@ -25,17 +41,16 @@ def _head(ws: Path) -> str:
 def _repo() -> Path:
     ws = Path(tempfile.mkdtemp())
     atexit.register(shutil.rmtree, ws, True)
-    subprocess.run(["git", "init", "-q"], cwd=ws, check=True, capture_output=True)
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
-                    "commit", "-q", "--allow-empty", "--no-verify", "-m", "chore: init"],
-                   cwd=ws, check=True, capture_output=True)
+    _gitc(ws, "init", "-q")
+    _gitc(ws, "-c", "user.name=t", "-c", "user.email=t@t",
+          "commit", "-q", "--allow-empty", "--no-verify", "-m", "chore: init")
     return ws
 
 
 def test_appended_line_verifies():
     ws = _repo()
     (ws / "a.txt").write_text("x\n", encoding="utf-8")
-    subprocess.run(["git", "add", "-A"], cwd=ws, check=True, capture_output=True)
+    _gitc(ws, "add", "-A")
     msg = append_to_message(ws, "feat: x", who="t")
     assert PREFIX in msg
     # 作者时间**钉在署名行的分钟上**（t-070）：`append_to_message` 内部取 now()，
@@ -44,11 +59,10 @@ def test_appended_line_verifies():
     # 从断言里拿掉。
     m = re.search(r"@ (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z", msg)
     assert m, msg
-    env = dict(os.environ, GIT_AUTHOR_DATE=m.group(1) + "Z",
-               GIT_COMMITTER_DATE=m.group(1) + "Z")
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
-                    "commit", "-q", "--no-verify", "-m", msg], cwd=ws, check=True,
-                   capture_output=True, env=env)
+    _gitc(ws, "-c", "user.name=t", "-c", "user.email=t@t",
+          "commit", "-q", "--no-verify", "-m", msg,
+          env_extra={"GIT_AUTHOR_DATE": m.group(1) + "Z",
+                     "GIT_COMMITTER_DATE": m.group(1) + "Z"})
     ok, out = verify_commit(ws, _head(ws))
     assert ok, out
 
@@ -67,9 +81,8 @@ def test_line_replayed_onto_other_commit_is_refused():
     ws = _repo()
     old = "2020-01-01T00:00:00Z"
     ln = f"{PREFIX}t @ {old} #{token(ws, old)}"
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
-                    "commit", "-q", "--allow-empty", "--no-verify", "-m", f"feat: x\n\n{ln}"],
-                   cwd=ws, check=True, capture_output=True)
+    _gitc(ws, "-c", "user.name=t", "-c", "user.email=t@t",
+          "commit", "-q", "--allow-empty", "--no-verify", "-m", f"feat: x\n\n{ln}")
     ok, out = verify_commit(ws, _head(ws))
     assert not ok
     assert "timestamp mismatch" in out
@@ -146,12 +159,11 @@ def test_wrong_token_in_window_is_refused() -> None:
             break
     assert bad, f"错误绑定的候选都撞进可接受窗：{acceptable}"
     forged = msg.replace("#" + m.group(2), "#" + bad)
-    env = dict(os.environ, GIT_AUTHOR_DATE=m.group(1).replace("T", " ") + " +0000",
-               GIT_COMMITTER_DATE=m.group(1).replace("T", " ") + " +0000")
+    env_extra = {"GIT_AUTHOR_DATE": m.group(1).replace("T", " ") + " +0000",
+                 "GIT_COMMITTER_DATE": m.group(1).replace("T", " ") + " +0000"}
     (ws / "b.txt").write_text("2\n", encoding="utf-8")
-    subprocess.run(["git", "add", "-A"], cwd=str(ws), check=True, capture_output=True)
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
-                    "commit", "-q", "--no-verify", "-m", forged],
-                   cwd=str(ws), check=True, capture_output=True, env=env)
+    _gitc(ws, "add", "-A")
+    _gitc(ws, "-c", "user.name=t", "-c", "user.email=t@t",
+          "commit", "-q", "--no-verify", "-m", forged, env_extra=env_extra)
     ok, out = verify_commit(ws, _head(ws))
     assert not ok and "token mismatch" in out, out

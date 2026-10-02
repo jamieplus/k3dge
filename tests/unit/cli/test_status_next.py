@@ -9,6 +9,16 @@ from unittest import mock
 import pytest
 
 from k3dge.cli import status as st
+# **先于任何 mock.patch 固化绑定**：`lifecycle_next` 在函数体内懒导入 `audit_trigger`，
+# 而 audit_trigger 模块级 `from milestone_pointer import get_current_milestone`——若它的
+# 首次导入发生在下面某个 `patch(milestone_pointer.get_current_milestone)` 上下文**里面**，
+# 捕获进模块状态的就是 mock（return_value 定死），patch 退出也不还原 ⇒ 后续任何测试
+# 进程内 `compute_audit_suggestion` 的里程碑恒为假值（实测：三文件组合下 seal_flow 的
+# 账齐断言红；全套件只是碰巧有人先导入才没炸）。这里用 `import_module` 触发首次导入
+# ——不是 Import 语句，卫生守卫（AST 判死导入）不误报，名字也不必假装被用。
+import importlib
+
+importlib.import_module("k3dge.engine.audit_trigger")
 import shutil
 import atexit
 
@@ -63,9 +73,10 @@ def test_seal_ready_for_reuses_precomputed_scans() -> None:
     """status 已算过票与前置闸，`seal_ready_for` 不得再各扫一遍（388）。"""
     from k3dge.engine import nextstep
 
+    # （t-034 尾账）`unmet=`/`tasks=` 都给齐时 `seal_ready_for` 短路返回、零磁盘 IO——
+    # 旧夹具的 `(root / ".agent").mkdir()` 是死 setup，删掉；root 只当形参占位。
     root = Path(tempfile.mkdtemp())
     atexit.register(shutil.rmtree, root, True)
-    (root / ".agent").mkdir()
     with mock.patch("k3dge.engine.seal.unmet_seal_preconditions") as unmet, \
             mock.patch("k3dge.engine.task_index.scan_milestone_tasks") as tasks:
         ns = nextstep.seal_ready_for(root, "M9", unmet=[], tasks=[object()])

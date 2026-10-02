@@ -8,6 +8,7 @@
 （封版动作必然产生改动）。
 """
 
+import os
 import subprocess
 import tempfile
 import unittest
@@ -31,7 +32,13 @@ def _git(ws: Path, *args: str) -> str:
     `test_parses_git_trailers_output_shape` 甚至会因 `git log` 失败回 `""` 而**假绿**。
     本文件的用法全是"必须成功"；失败就带 stderr 抛。
     """
-    r = subprocess.run(["git", "-C", str(ws), *args], capture_output=True, text=True)
+    # 宿主 globalconfig 出局（t-272 尾账）：`commit.gpgsign=true` 的开发机会让 `--no-verify`
+    # 之外的路径也炸；`alias.*`/`include.path` 伪装"引擎坏了"。测试侧 git 一律钉
+    # GIT_CONFIG_GLOBAL=devnull + NOSYSTEM；仓库身份仍由各命令 `-c` 显式给。
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_CONFIG")}
+    env["GIT_CONFIG_GLOBAL"] = os.devnull
+    env["GIT_CONFIG_NOSYSTEM"] = "1"
+    r = subprocess.run(["git", "-C", str(ws), *args], capture_output=True, text=True, env=env)
     if r.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} 失败：{(r.stderr or r.stdout).strip()}")
     return r.stdout.strip()
@@ -44,8 +51,6 @@ def _repo() -> Path:
     会对**外层仓**成功，于是 `_commit_all` 一路 `git add -A` + commit 污染开发/CI 仓库，
     测试自己也失（t-274）。`GIT_CEILING_DIRECTORIES` 让 git 不再向上找。
     """
-    import os
-
     root = Path(tempfile.mkdtemp()).resolve()
     atexit.register(shutil.rmtree, root, True)
     os.environ["GIT_CEILING_DIRECTORIES"] = str(root.parent)
