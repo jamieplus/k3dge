@@ -20,7 +20,20 @@ def atomic_write_text(path: Path, text: str, encoding: str = "utf-8") -> None:
     tmp = Path(name)
     try:
         tmp.write_text(text, encoding=encoding)
+        # 光 `rename` 只保证原子性，不保证落盘：page cache 里的数据 + 延迟分配下，
+        # rename 的元数据可先于数据块持久化 ⇒ 断电丢数据（ocr2-034）。先 fsync 文件，
+        # rename 后再 fsync 目录（目录项落盘），才是崩溃安全的原子写。
+        with open(tmp, "rb") as _f:
+            os.fsync(_f.fileno())
         tmp.replace(path)
+        try:
+            _dfd = os.open(str(parent), os.O_RDONLY)
+            try:
+                os.fsync(_dfd)
+            finally:
+                os.close(_dfd)
+        except OSError:
+            pass
     except Exception:
         tmp.unlink(missing_ok=True)
         raise

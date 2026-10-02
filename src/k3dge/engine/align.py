@@ -116,8 +116,10 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
     if review_file.is_file():
         try:
             _prev = review_file.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            _prev = ""
+        except (OSError, UnicodeDecodeError) as exc:
+            # 读失败 ≠ 空文件：把"读不出"当"空"会走到下面的写盘路径，把人工报告整篇抹掉且不可恢复
+            # （ocr2-033；正是 ocr-197 要防的事）。fail-closed，不覆盖。
+            return False, f"[ALIGN] 报告存在但不可读（{exc}），拒绝覆盖（防抹掉人工结论）", tasks
         if _prev and _ALIGN_STUB_MARKER not in _prev:
             return True, (
                 f"[ALIGN] Full Matrix verification PASS for milestone '{milestone_id}'.\n"

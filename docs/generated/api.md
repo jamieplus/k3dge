@@ -373,7 +373,7 @@ from typing import List
 BASE_CANDIDATES = ('origin/main', 'origin/master', 'main', 'master')
 class GitError(RuntimeError)
 resolve_base(workspace: Path) -> str
-    # doc: Return the base ref for branch-level diffing, falling back to HEAD.
+    # doc: Return the base ref for branch-level diffing.
 get_changed_files(workspace: Path) -> List[str]
     # doc: Return all files changed relative to merge-base, including uncommitted work.
 # doc_catalog.py

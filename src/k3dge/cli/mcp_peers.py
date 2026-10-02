@@ -115,8 +115,12 @@ def _sync_peers_into_mcp(workspace: Path, cfg: dict) -> Optional[str]:
             return ".mcp.json 根节点不是对象 ⇒ 跳过写盘（不覆盖用户内容）"
     else:
         data = {"mcpServers": {}}
-    if "mcpServers" not in data or not isinstance(data["mcpServers"], dict):
+    if "mcpServers" not in data:
         data["mcpServers"] = {}
+    elif not isinstance(data["mcpServers"], dict):
+        # 可解析但 `mcpServers` 非对象（数组/标量）⇒ **绝不**覆写为空骨架（与上分支同理，ocr2-027）。
+        # 覆写会静默丢掉用户内容；拒改比"修好"安全。
+        return f".mcp.json 的 mcpServers 非对象（{type(data['mcpServers']).__name__}）⇒ 跳过写盘（不覆盖用户内容）"
     changed = False
     for pid, pcfg in cfg.get("peers", {}).items():
         if pid == "k3dge" or not pcfg.get("enabled", True):

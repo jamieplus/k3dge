@@ -494,8 +494,13 @@ def cmd_doc(args: argparse.Namespace) -> int:
                 print(result.stdout or "")
                 if result.stderr:
                     print(result.stderr, file=sys.stderr)
+                # 生成器退出码/异常只打印不影响返回码 ⇒ 自动化以为成功（ocr2-023）。失败即按失败收。
+                if result.returncode != 0:
+                    print(f"[DOC] generate-docs.sh exit={result.returncode} ⇒ doc sync 按失败收", file=sys.stderr)
+                    return 1
             except Exception as exc:
                 print(f"[DOC] generate-docs.sh failed: {exc}", file=sys.stderr)
+                return 1
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc sync -> changed={changed}")
         return 0
     return 1
@@ -597,6 +602,11 @@ def cmd_init(args: argparse.Namespace) -> int:
     problems = scaffold(target, name=args.name)   # 契约是 list：不消费就又是"报成功而没铺"（372）
     for m in problems:
         print(f"[INIT] 未落: {m}", file=sys.stderr)
+    if problems:
+        # 脚手架有项没铺 ⇒ harness 不完整，不能报成功（ocr2-024）。`sync_all` 失败仍 WARN
+        # （用户可手动 `k3dge sync` 补齐，见下），但未落项必须拦。
+        print(f"[INIT] {len(problems)} 项未落 ⇒ 初始化不完整，拒绝报成功", file=sys.stderr)
+        return 1
     # Generate initial contract hash for first domain
     try:
         sync_all(target)
