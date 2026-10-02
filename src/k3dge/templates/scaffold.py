@@ -97,10 +97,15 @@ RULE_ASSETS = (
 )
 
 def _slug(raw: str) -> str:
+    import keyword
+    import sys
+
     s = re.sub(r"[^A-Za-z0-9_]+", "_", raw.strip()).strip("_").lower()
     if not s:
         s = "app"
-    if s[0].isdigit():
+    # 字符合法 ≠ 可 import：关键字（`class`）/ 标准库顶层名（`os`）做包名会语法错或影子标准库（ocr2-107）。
+    # 与数字开头同法，加 `p_` 前缀，保证铺出来就能 import。
+    if s[0].isdigit() or keyword.iskeyword(s) or s in getattr(sys, "stdlib_module_names", ()):
         s = "p_" + s
     return s
 
@@ -301,7 +306,14 @@ def _ensure_first_domain(target: Path, name: str, today: str) -> list:
         # 新域的 `src` 跟随**用户保留的 `package_root`**：旧形状硬编码 `src/<name>`——
         # package_root=lib 的仓升级后 domains 指向 src/p、package_root 写着 lib，
         # 清单自相矛盾，包也被铺在 src/ 下（t-335/t-338）。
-        pkg_root = str(merged.get("package_root") or "src").strip("/") or "src"
+        # 但 manifest 是外部输入：`..`/绝对路径会让铺装逃出 target（ocr2-108）。只认仓内相对单段。
+        _raw_root = str(merged.get("package_root") or "src").strip("/") or "src"
+        _rp = Path(_raw_root)
+        if _rp.is_absolute() or ".." in _rp.parts or len(_rp.parts) != 1:
+            print(f"[k3dge scaffold] WARN: package_root={_raw_root!r} 非法（须为仓内相对单段）⇒ 回落 'src'，请人工修正 manifest", file=sys.stderr)
+            pkg_root = "src"
+        else:
+            pkg_root = _raw_root
         merged["domains"] = {name: {**fresh["domains"][name], "src": f"{pkg_root}/{name}"}}
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")

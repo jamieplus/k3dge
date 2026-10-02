@@ -810,7 +810,7 @@
   "ensure_mcp_config": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 148
+      "line": 153
     }
   ],
   "extract": [
@@ -1250,7 +1250,7 @@
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 418
+      "line": 430
     }
   ],
   "malformed_rows": [
@@ -1712,7 +1712,7 @@
   "scaffold": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 324
+      "line": 336
     }
   ],
   "scan": [

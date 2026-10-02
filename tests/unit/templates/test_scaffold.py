@@ -194,5 +194,36 @@ class TestScaffold(unittest.TestCase):
         self.assertNotIn("PIPELINE_PEER_UNWIRED", codes, validate_pipeline_config(self.target))
 
 
+class TestSlugAndPackageRoot(unittest.TestCase):
+    def test_slug_rejects_keywords_and_stdlib(self) -> None:
+        # 关键字/标准库名做包名会语法错或影子标准库（ocr2-107）；与数字开头同法加前缀。
+        from k3dge.templates.scaffold import _slug
+
+        self.assertEqual(_slug("class"), "p_class")
+        self.assertEqual(_slug("os"), "p_os")
+        self.assertEqual(_slug("my-app"), "my_app")
+
+    def test_package_root_traversal_falls_back(self) -> None:
+        # manifest 的 package_root 含 `..`/绝对路径 ⇒ 回落 src，不铺出仓（ocr2-108）。
+        import json
+
+        from k3dge.templates import scaffold as sc
+
+        with self.subTest("parent-escape"):
+            import tempfile
+            from pathlib import Path
+
+            with tempfile.TemporaryDirectory() as d:
+                target = Path(d)
+                (target / ".agent").mkdir(parents=True)
+                (target / ".agent" / "manifest.json").write_text(
+                    json.dumps({"package_root": "../evil", "domains": {}}), encoding="utf-8")
+                sc._ensure_first_domain(target, "p", "2026-10-02")
+                data = json.loads((target / ".agent" / "manifest.json").read_text(encoding="utf-8"))
+                self.assertEqual(data["domains"]["p"]["src"], "src/p")
+                self.assertFalse((target / "evil").exists())
+                self.assertFalse((target.parent / "evil").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
