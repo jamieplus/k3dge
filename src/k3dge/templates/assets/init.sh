@@ -84,7 +84,9 @@ else
   if [ -z "${K3DGE_SOURCE:-}" ] || [ "${K3DGE_SOURCE:-}" = "pypi" ]; then
     INSTALL_TARGET="k3dge[mcp]"
   elif [ -d "${K3DGE_SOURCE:-}" ]; then
-    INSTALL_TARGET="${K3DGE_SOURCE}[mcp]"
+    # 目录型源先取**物理路径**再交给 pip：尾斜杠/相对/软链会拼出 `/path/[mcp]`（该路径不存在）
+    # 或依赖 cwd，安装命令与实际来源分叉（ocr2-164）。
+    INSTALL_TARGET="$(cd "$K3DGE_SOURCE" && pwd -P)[mcp]"
     INSTALL_FLAGS=("-e")
   # 子串匹配 `https://*github.com*` 会放行 `https://github.com.evil.tld/`，`https://*/*` 放行任意主机（ocr2-022）。
   # 与 init.ps1 同口径：只认 `git+` 前缀、三家已知托管商路径前缀、`.git` 后缀。
@@ -95,7 +97,7 @@ else
   fi
   # Fallback: downstream via /path/to/k3dge/k3dge-init.sh without K3DGE_SOURCE
   if [ -z "${K3DGE_SOURCE:-}" ] && [ -n "${K3DGE_HOME:-}" ] && [ -d "$K3DGE_HOME/src/k3dge" ]; then
-    INSTALL_TARGET="${K3DGE_HOME}[mcp]"
+    INSTALL_TARGET="$(cd "$K3DGE_HOME" && pwd -P)[mcp]"
     INSTALL_FLAGS=("-e")
   fi
   # 分类后**只印一次**：旧实现各分支先印，再被 catch-all 无条件印成"editable"⇒ 同一次安装
@@ -115,8 +117,9 @@ else
   case "$INSTALL_TARGET" in
     -*) echo "[k3dge] 非法 INSTALL_TARGET（不得以 - 开头，防 pip 选项注入）：$INSTALL_TARGET" >&2; exit 1 ;;
   esac
-  # 数组 + `--` 终止选项解析：INSTALL_TARGET 来自 K3DGE_SOURCE（外部输入），不得被 pip 当选项（ocr-024）。
-  .venv/bin/python -m pip install -q ${INSTALL_FLAGS[@]+"${INSTALL_FLAGS[@]}"} -- "$INSTALL_TARGET" pre-commit pytest
+  # INSTALL_TARGET 来自 K3DGE_SOURCE（外部输入），已在上面的 `-*` 分支拒绝选项注入；这里**不再**插 `--`：
+  # pip 的 optparse 会把 `-e` 后的 `--` 当成取值（`--editable=--`）⇒ "Invalid requirement: '--'"（ocr2-165）。
+  .venv/bin/python -m pip install -q ${INSTALL_FLAGS[@]+"${INSTALL_FLAGS[@]}"} "$INSTALL_TARGET" pre-commit pytest
   # 统管落盘：唯一值 = 解析后的源。运行时只读它。
   case "$INSTALL_TARGET" in
     "k3dge[mcp]") _SRC_RECORDED="pypi" ;;

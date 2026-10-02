@@ -28,18 +28,31 @@ SPEC = """# Domain Specification: core
 """
 
 
+def _git_env() -> dict:
+    """ocr2-467：夹具 git 必须出局宿主环境——只清 K3DGE_BASE_SHA/GIT_DIR 不够，
+    全局 commit.gpgsign/hooksPath/autocrlf/excludesFile、GIT_CONFIG_*、GIT_WORK_TREE
+    都会让 setup 为无关原因红或改写 fixture 字节。"""
+    e = {k: v for k, v in os.environ.items()
+         if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_CONFIG", "K3DGE_BASE_SHA")}
+    e["GIT_CONFIG_GLOBAL"] = os.devnull
+    e["GIT_CONFIG_NOSYSTEM"] = "1"
+    return e
+
+
 def _git(repo: Path, *args: str) -> None:
     """失败**带 git 的 stderr**（t-165）：`check=True` 的 CalledProcessError 只印命令与 rc，
     `capture_output` 又把 stderr 吞了——"Command returned non-zero exit status 128" 读起来
     像产品 bug，其实是 git <2.28 不认 `-b` / init.defaultBranch 被拦 / CI 包装器作怪。"""
-    r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True,
+                       env=_git_env(), timeout=60)
     if r.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} 失败：{(r.stderr or r.stdout).strip()}")
 
 
 def _git_out(repo: Path, *args: str) -> str:
     return subprocess.run(["git", "-C", str(repo), *args],
-                          check=True, capture_output=True, text=True).stdout
+                          check=True, capture_output=True, text=True, env=_git_env(),
+                          timeout=60).stdout
 
 
 def _make_repo(tmp: Path) -> Path:
@@ -110,8 +123,14 @@ class TestGeneratedProjections(unittest.TestCase):
     # --- ① 符号索引 ---
 
     def test_missing_symbol_index_is_not_a_violation(self) -> None:
-        """索引不存在 ⇒ 跳过（`k3dge where` 会惰性建；缺文件不是漂移）。"""
+        """索引不存在 ⇒ 跳过（`k3dge where` 会惰性建；缺文件不是漂移）。
+
+        ocr2-468：`_assert_gate_ran()` 只证闸可达，不证本规则沉默——先确证索引真的不在，
+        再断言 `SYMBOL_INDEX_STALE` 不在违例里（否则"缺索引漏报"会被测成绿）。
+        """
+        self.assertFalse(search.index_path(self.repo).is_file(), "夹具前提：索引本就不存在")
         self._assert_gate_ran()
+        self.assertNotIn("SYMBOL_INDEX_STALE", _rules(self.repo))
 
     def test_stale_symbol_index_is_violation(self) -> None:
         idx = search.index_path(self.repo)
@@ -122,6 +141,9 @@ class TestGeneratedProjections(unittest.TestCase):
     def test_fresh_symbol_index_passes(self) -> None:
         search.write_symbol_index(self.repo)
         self._assert_gate_ran()
+        # ocr2-469：正面判据是"新索引不报"——只证可达的话，写盘器与闸的
+        # build_symbol_index 字节不一致（键序/额外字段）也照样绿。
+        self.assertNotIn("SYMBOL_INDEX_STALE", _rules(self.repo))
 
     # --- ② docs/generated/{api,domains}.md ---
 
@@ -143,6 +165,9 @@ class TestGeneratedProjections(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
         self._assert_gate_ran()
+        # ocr2-470：正面判据是"新渲染不报"——只证可达时，尾换行/路径归一差异导致的
+        # 假 stale 也会被放过。
+        self.assertNotIn("DOCS_GENERATED_STALE", _rules(self.repo))
 
     # --- ③ .mcp.json vs pipeline.toml ---
 
@@ -160,7 +185,10 @@ class TestGeneratedProjections(unittest.TestCase):
         self._write_pipeline()
         self._make_sibling()
         (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"k3dge": {}}}), encoding="utf-8")
-        self.assertIn("MCP_JSON_PEER_MISSING", _rules(self.repo))
+        # ocr2-471：裸 `assertIn(rule_id)` 在闸崩溃（except 分支发同一 rule_id）时也绿。
+        # 走 `_fresh_check` 挡崩溃冒充，并钉住 detail["peer"]，区分 peer 缺 vs self 缺。
+        vs = self._fresh_check("MCP_JSON_PEER_MISSING")
+        self.assertEqual(vs.detail.get("peer"), "peerx", vs.detail)
 
     def test_peer_declared_in_mcp_json_passes(self) -> None:
         self._write_pipeline()
@@ -168,21 +196,27 @@ class TestGeneratedProjections(unittest.TestCase):
         (self.repo / ".mcp.json").write_text(
             json.dumps({"mcpServers": {"k3dge": {}, "peerx": {}}}), encoding="utf-8"
         )
+        # ocr2-472：负断言必须先证闸可达——否则 GIT_UNAVAILABLE/MANIFEST_INVALID 早退时
+        # 违例表里没有本规则，`assertNotIn` 空转绿。
+        self._assert_gate_ran()
         self.assertNotIn("MCP_JSON_PEER_MISSING", _rules(self.repo))
 
     def test_unresolvable_peer_is_not_a_violation(self) -> None:
         """sibling 不在 ⇒ 写侧本就会跳过（回退告警），闸不制造假红。"""
         self._write_pipeline(peer="nope")
         (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"k3dge": {}}}), encoding="utf-8")
+        self._assert_gate_ran()   # ocr2-473：先证闸跑了
         self.assertNotIn("MCP_JSON_PEER_MISSING", _rules(self.repo))
 
     def test_missing_k3dge_self_entry_is_violation(self) -> None:
         (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"other": {}}}), encoding="utf-8")
         self._write_pipeline(peer="nope")
-        self.assertIn("MCP_JSON_PEER_MISSING", _rules(self.repo))
+        vs = self._fresh_check("MCP_JSON_PEER_MISSING")
+        self.assertEqual(vs.detail.get("peer"), "k3dge", vs.detail)
 
     def test_no_mcp_json_is_not_a_violation(self) -> None:
         self._write_pipeline(peer="nope")
+        self._assert_gate_ran()   # ocr2-474：先证闸跑了
         self.assertNotIn("MCP_JSON_PEER_MISSING", _rules(self.repo))
 
     def test_corrupt_mcp_json_currently_skips_peer_gate_declared(self) -> None:

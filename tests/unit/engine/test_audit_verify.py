@@ -120,6 +120,23 @@ def test_report_header_must_be_the_exact_12_columns(tmp_path):
     assert not res["ok"] and "12 列" in _errors(res), _errors(res)
 
 
+def test_report_status_must_be_in_the_closed_set(tmp_path):
+    """ocr2-443：状态列的闭集守卫此前零覆盖——`row_state` 旋钮从没喂过闭集外的值。"""
+    res = av.verify_bundle_local(make_bundle(tmp_path, row_state="已完成"))
+    assert not res["ok"] and "不在闭集" in _errors(res), _errors(res)
+
+
+def test_malformed_report_row_is_rejected(tmp_path):
+    """ocr2-443：列数与表头不符的畸形行必须报——`_table_rows` 计数它、解析器跳过它，
+    旧测没有任何一行造出 `table_lines != len(rows)`。"""
+    b = make_bundle(tmp_path)
+    (b / "report.md").write_text(
+        (b / "report.md").read_text(encoding="utf-8") + "| code-1 | 2026-09-27 | 中 |\n",
+        encoding="utf-8")
+    res = av.verify_bundle_local(b)
+    assert not res["ok"] and "畸形行" in _errors(res), _errors(res)
+
+
 def test_closure_is_computed_locally_and_disagreement_is_reported(tmp_path):
     """产出方自报 `closed` 但 findings 里还有未关项 ⇒ **报出来**（以本地算的为准）。"""
     res = av.verify_bundle_local(make_bundle(tmp_path, claimed="closed", finding_state="pending",
@@ -223,15 +240,18 @@ def test_input_identity_is_read_from_the_bundle_not_a_constant(tmp_path):
 
 def test_apply_order_unknown_patch_rejected(tmp_path):
     """`apply_order` 含未知/越界补丁名（t-092：`order` 旋钮此前恒为默认对）。
-
-    这条同时是 `replay_to_baseline` 的路径穿越闸——只认白名单补丁名。
     """
     res = av.verify_bundle_local(make_bundle(tmp_path, order=("fix.patch", "../evil.patch")))
     assert not res["ok"] and "未知补丁" in _errors(res), _errors(res)
-    # 对照：**顺序是有语义的**（重放按声明序反向做）——换序不是"另一个合法值"，
-    # 而是会让哈希链反向应用失败；这里只证"白名单外的名字被闸下"。
-    ok = av.verify_bundle_local(make_bundle(tmp_path / "same", order=("fix.patch", "pins.patch")))
-    assert ok["ok"], _errors(ok)
+
+
+def test_replay_to_baseline_rejects_path_traversal_patch(tmp_path):
+    """ocr2-444：`replay_to_baseline` 自己的 `only=` 路径穿越闸——`verify_bundle_local`
+    在调 `_replay_hashes` 前已把 `apply_order` 收窄到白名单，所以那道闸从验收面**不可达**；
+    必须直接驱动（`audit_merge` 用的就是 `only=`）。"""
+    b = make_bundle(tmp_path, order=("../evil.patch",))
+    rep = av.replay_to_baseline(b, only=["../evil.patch"])
+    assert rep["ok"] is False and "非法补丁名" in rep["detail"], rep
 
 
 def test_terminal_state_without_review_ack_is_unclosed(tmp_path):

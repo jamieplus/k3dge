@@ -132,8 +132,15 @@ if venv_k3dge.is_file() and os.access(str(venv_k3dge), os.X_OK):
 # Fall back to globally installed k3dge
 k3dge = shutil.which("k3dge")
 if k3dge:
-    if _want:   # 收据只覆盖 `.venv`；全局那份来源未经校验 ⇒ 至少出声（与 gate.sh 同口径，ocr-158）。
-        print(f"[k3dge-source] WARN: 政策已声明但 .venv/bin/k3dge 缺失 ⇒ 回落全局 k3dge（其来源未经收据校验）：{k3dge}",
+    # 收据只覆盖 `.venv`；政策已声明而 .venv 判定核缺失时，全局那份来源未经收据校验。删/丢 venv 二进制
+    # 比伪造收据更省事 ⇒ 默认拒跑（与相邻 fail-closed 分支及 gate.sh 同口径，ocr2-143）；
+    # K3DGE_ALLOW_GLOBAL=1 保留便利回落。诊断按**平台实际探测的** venv 路径点名。
+    if _want:
+        if os.environ.get("K3DGE_ALLOW_GLOBAL") != "1":
+            print(f"[k3dge-source] 政策已声明但 {venv_k3dge} 缺失：全局 k3dge 来源未经校验 ⇒ 拒跑"
+                  "（K3DGE_ALLOW_GLOBAL=1 可强制回落）", file=sys.stderr)
+            sys.exit(2)
+        print(f"[k3dge-source] WARN: 政策已声明但 {venv_k3dge} 缺失 ⇒ 回落全局 k3dge（其来源未经收据校验）：{k3dge}",
               file=sys.stderr)
     try:
         sys.exit(subprocess.call([k3dge] + args))

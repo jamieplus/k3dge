@@ -274,6 +274,9 @@ class TestRetiredAdrVisibility(unittest.TestCase):
     def test_default_list_excludes_retired(self):
         ws = _repo_root(self)
         live = list_docs(ws, typ="adr")                      # 各扫一遍全仓索引（t-106）：算一次
+        # ocr2-454：现行视图必须**非空**（真发现到活 ADR）——否则发现机制坏成 [] 时，
+        # `any(retired)` 恒假，负断言的"排除"语义全空转。
+        self.assertTrue(live, "live ADR 发现为空 ⇒ 本测未证明任何排除")
         self.assertFalse(any(c.get("retired") for c in live))
         with_retired = list_docs(ws, typ="adr", include_retired=True)
         retired = [c for c in with_retired if c.get("retired")]
@@ -286,7 +289,10 @@ class TestRetiredAdrVisibility(unittest.TestCase):
     def test_stored_projection_stays_live_only(self):
         """存盘投影（docs-index.json）保持现行视图，不被退役面污染（DOC_INDEX_STALE 语义不变）。"""
         ws = _repo_root(self)
-        self.assertFalse(any(c.get("retired") for c in build_docs_index(ws)["docs"]))
+        docs = build_docs_index(ws)["docs"]
+        # ocr2-455：投影为空时 `any(...)` 恒假——先证明真的发现了文档（t-104/106 口径）。
+        self.assertTrue(docs, "docs-index 投影为空 ⇒ '保持现行视图' 无从谈起")
+        self.assertFalse(any(c.get("retired") for c in docs))
 
     def test_obsolete_file_is_marked_with_destination(self):
         with tempfile.TemporaryDirectory() as d:

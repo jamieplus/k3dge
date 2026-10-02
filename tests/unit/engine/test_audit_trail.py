@@ -23,13 +23,11 @@ def _positive_control() -> None:
     """自造一个**含必报代码**的工作区，确认本闸在该路径约定下真的会响（t-077b）。
     不往被测目录塞东西（那会污染负测的空断言），只证"分析确实发生"。"""
     import tempfile
-    from pathlib import Path as _P
     with tempfile.TemporaryDirectory() as d:
-        ctl = _P(d)
-        (ctl / "src" / "pkg").mkdir(parents=True)
-        (ctl / "src" / "pkg" / "ctl.py").write_text(
-            'def f(p):\n    open(p / "logs" / "x.log", "w").write("z")\n', encoding="utf-8")
-        assert _codes(ctl) == ["AUDIT_TRAIL_APPEND_ONLY"], "正对照失效：本闸不再分析 src/pkg/*.py"
+        # ocr2-441：复用 `_ws()` 的路径约定，不内联重写——否则两个代码路径会悄悄漂移，
+        # 正对照证的是旧布局而负测的 `== []` 又变 vacuous。消息也与实际面一致（全 src/**/*.py）。
+        ctl = _ws(Path(d), 'def f(p):\n    (p / "logs" / "x.log").write_text("z")\n')
+        assert _codes(ctl) == ["AUDIT_TRAIL_APPEND_ONLY"], "正对照失效：本闸不再分析 src/**/*.py"
 
 
 def test_flags_logs_write_text(tmp_path: Path) -> None:
@@ -64,4 +62,12 @@ def test_allows_default_read_open(tmp_path: Path) -> None:
     """负空间：无 mode 的 `open()` 默认 `r` 只读——不得误伤（t-076）。"""
     _positive_control()
     ws = _ws(tmp_path, 'def f(p):\n    return open(p / "logs" / "x.log").read()\n')
+    assert _codes(ws) == []
+
+
+def test_content_mentioning_logs_is_not_flagged(tmp_path: Path) -> None:
+    """ocr2-442 / ocr-241：字面量 `logs` 出现在**写入内容**里不算覆写 logs/——只看写入目标侧。
+    旧实现扫整个 Call 的全部字符串常量 ⇒ 这类文件被误报；本文件此前零负空间覆盖。"""
+    _positive_control()
+    ws = _ws(tmp_path, 'from pathlib import Path\n\n\ndef f(p):\n    Path("README.md").write_text("logs")\n')
     assert _codes(ws) == []

@@ -15,9 +15,11 @@ from k3dge.engine import gate_facts
 from k3dge.engine.models import Violation
 
 _SRC = Path(__file__).resolve().parents[3] / "src" / "k3dge"
-# t-150①：parents[3] 一旦指错，rglob 对不存在的目录**静默空转**（os.walk 吞 OSError），
-# 三条 AST 守卫会集体假绿——先验根再扫描。
-assert (_SRC / "engine" / "gate_facts.py").is_file(), f"repo root mis-detected: {_SRC}"
+# t-150① / ocr2-461：parents[3] 一旦指错，rglob 对不存在的目录**静默空转**（os.walk 吞
+# OSError），三条 AST 守卫会集体假绿。用显式 raise 而非裸 assert——`python -O` 会剥掉 assert，
+# 静默丢覆盖正是本守卫要防的失败模式。
+if not (_SRC / "engine" / "gate_facts.py").is_file():
+    raise RuntimeError(f"repo root mis-detected: {_SRC}")
 
 # `Violation` 是 frozen dataclass：字段序＝位置参序（t-153 的"第 5 位置参"形状合法）。
 _FIELDS = ("rule_id", "message", "domain", "file_path", "detail")
@@ -73,6 +75,15 @@ def _violation_sites():
     return _scan()
 
 
+def _scan_sites_strict():
+    """两只散文守卫共用的扫描入口（ocr2-464）：不可读文件必须**硬失败**（显式 raise，
+    不被 `python -O` 剥掉，也不是某个类的私有静态法），否则站点会从棘轮里消失而非现形。"""
+    unreadable, sites = _violation_sites()
+    if unreadable:
+        raise RuntimeError(f"AST 扫描有读不了的文件：{unreadable}")
+    return sites
+
+
 def _literal_text(node) -> "str | None":
     """message 里**静态可得**的字面文本：常量、f-string 的字面段、字面串相加。
 
@@ -92,6 +103,16 @@ def _literal_text(node) -> "str | None":
         right = _literal_text(node.right)
         return (left + right) if left is not None and right is not None else None
     return None
+
+
+def _empty_value_node(node) -> bool:
+    """值为 `None`/`""` 的字面常量不算覆盖（ocr2-463）。
+
+    `Violation.format()` 只在 `file_path`/`domain` **真值**时注入（models.py:32-35），
+    `gate_facts.fill()` 丢弃值为 `None` 的事实（gate_facts.py:617/621）——所以
+    `file_path=""`、`detail={"reason": None}` 这类站点会让渲染外漏 `{path}`/`{reason}`，
+    但旧判据（"节点在场/键在场"）照样算覆盖。"""
+    return isinstance(node, ast.Constant) and (node.value is None or node.value == "")
 
 
 class TestDeclarationShape(unittest.TestCase):
@@ -158,6 +179,9 @@ class TestFixClassification(unittest.TestCase):
         for code in ("ADR_NUMBER_MISMATCH", "TEMPLATE_DRIFT", "MD_CONFLICT_MARKER", "MD_ENCODING",
                      "MD_FENCE_UNCLOSED", "DOC_SECTION_ORDER", "DOC_NEW_UNSCREENED",
                      "DOC_SCHEMA_INVALID", "DANGLING_ADR_REF", "TASK_STATUS_MISMATCH"):
+            # ocr2-462：`fix_kind` 对**未声明** code 也回 "judgment"（fallback）——若某 code
+            # 从 GATE_FACTS 被删掉，仅断言 fix_kind 会照样绿。先钉它在声明表里。
+            self.assertIn(code, gate_facts.GATE_FACTS, f"{code} 已不在声明表里")
             self.assertEqual(gate_facts.fix_kind(code), "judgment", code)
         # 未声明的 code 保守按 judgment（不假装能自动修）
         self.assertEqual(gate_facts.fix_kind("SOMETHING_NEW"), "judgment")
@@ -275,9 +299,9 @@ class TestProducersFeedDeclaredFacts(unittest.TestCase):
                 unverifiable.append(f"{s['rel']}:{s['lineno']} {s['code']}（**kwargs 解不动）")
                 continue
             injected = set()
-            if s["file_path"] is not None:
+            if s["file_path"] is not None and not _empty_value_node(s["file_path"]):
                 injected.add("path")
-            if s["domain"] is not None:
+            if s["domain"] is not None and not _empty_value_node(s["domain"]):
                 injected.add("domain")
             detail = s["detail"]
             if detail is None:
@@ -287,8 +311,10 @@ class TestProducersFeedDeclaredFacts(unittest.TestCase):
                                    f"{sorted(keys)}，注入面只覆盖 {sorted(injected)}）")
                 continue
             if isinstance(detail, ast.Dict):
-                lit_keys = {k.value for k in detail.keys
-                            if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+                # ocr2-463：值为 None/"" 的键不算覆盖（fill 会丢 None；"" 渲染成空占位）
+                lit_keys = {k.value for k, v in zip(detail.keys, detail.values)
+                            if isinstance(k, ast.Constant) and isinstance(k.value, str)
+                            and not _empty_value_node(v)}
                 if any(k is None for k in detail.keys):     # dict 里 `**` 展开
                     unverifiable.append(f"{s['rel']}:{s['lineno']} {s['code']}（detail 含 **）")
                     continue
@@ -318,7 +344,7 @@ class TestNoProseBackflow(unittest.TestCase):
     def test_declared_code_messages_stay_factual(self):
         offenders = []
         unverifiable = []
-        for s in self._scan_sites():
+        for s in _scan_sites_strict():
             if not gate_facts.is_declared(s["code"]):
                 continue
             text = _literal_text(s["message"])
@@ -336,12 +362,6 @@ class TestNoProseBackflow(unittest.TestCase):
         # 棘轮：2026-10-01 实测 7 处（变量/函数结果拼 message），只许减不许增
         self.assertLessEqual(len(unverifiable), 7,
                              f"message 完全静态不可核的站点在增长：{unverifiable}")
-
-    @staticmethod
-    def _scan_sites():
-        unreadable, sites = _violation_sites()
-        assert not unreadable, f"AST 扫描有读不了的文件：{unreadable}"
-        return sites
 
 
 class TestMessageDoesNotRestateFact(unittest.TestCase):
@@ -365,7 +385,7 @@ class TestMessageDoesNotRestateFact(unittest.TestCase):
 
     def test_static_messages_do_not_restate_facts(self):
         offenders = []
-        for s in self._scan_sites():
+        for s in _scan_sites_strict():
             if not gate_facts.is_declared(s["code"]):
                 continue
             text = _literal_text(s["message"])
@@ -377,12 +397,6 @@ class TestMessageDoesNotRestateFact(unittest.TestCase):
                     offenders.append(f"{s['rel']}:{s['lineno']} {s['code']}: "
                                      f"message 复述 fact 片段 {seg!r}")
         self.assertEqual(offenders, [])
-
-    @staticmethod
-    def _scan_sites():
-        unreadable, sites = _violation_sites()
-        assert not unreadable, f"AST 扫描有读不了的文件：{unreadable}"
-        return sites
 
 
 class TestFactsAreProducedNotParsed(unittest.TestCase):
@@ -403,11 +417,20 @@ class TestFactsAreProducedNotParsed(unittest.TestCase):
         root = Path(__file__).resolve().parents[3]
         targets = [root / "scripts" / "pre-commit",
                    root / "src" / "k3dge" / "engine" / "doc_gate.py"]
+        import re as _re
+        # ocr2-465：不能只认 `msg.split` 这个名字——`m.split(...)`/`message.split(...)`/
+        # `v.message.split(...)`（任何指向 message 的局部名）以及 `re.search(..., msg)` 都是
+        # 同一类静默字段提取。按"对象是 message 系"匹配，而非钉死一个标识符。
+        split_pat = _re.compile(r"\b\w*(?:msg|message)\w*\s*\.\s*split\b", _re.IGNORECASE)
+        regex_pat = _re.compile(
+            r"\bre\.(?:search|match|findall|finditer|fullmatch|sub|split)\s*\([^)]*"
+            r"\b\w*(?:msg|message)\w*", _re.IGNORECASE)
         for t in targets:
             self.assertTrue(t.is_file(), f"守卫靶不存在（搬家了？）：{t}")
         for t in targets:
             code_lines = [ln for ln in t.read_text(encoding="utf-8").splitlines()
-                          if "msg.split" in ln and not ln.strip().startswith("#")]
+                          if not ln.strip().startswith("#")
+                          and (split_pat.search(ln) or regex_pat.search(ln))]
             self.assertEqual(code_lines, [], f"{t.name} 仍在从 message 里切字段：{code_lines}")
 
     def test_pure_checks_return_facts_for_declared_codes(self):

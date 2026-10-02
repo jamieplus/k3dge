@@ -97,6 +97,16 @@ def test_read_events_guard_rails(tmp_path):
     assert [e["i"] for e in tail] == [0, 1, 2, 3, 4], tail
 
 
+def test_read_events_default_returns_newest_20(tmp_path):
+    """ocr2-457：docstring 声称验证缺省 `last=20` 截断，但旧测只存 5 条——默认 20/5/999
+    或干脆忽略参数都绿。存 25 条，钉死"最新 20 条"。"""
+    for i in range(25):
+        events.emit(tmp_path, "evt", i=i)
+    got = events.read_events(tmp_path)
+    assert len(got) == 20, len(got)
+    assert [e["i"] for e in got] == list(range(5, 25))
+
+
 def test_next_persist_emits_next_event():
     """nextstep.persist() 内部复用 events.emit → events.jsonl 有 next 行。"""
     from k3dge.engine.nextstep import NextStep, persist

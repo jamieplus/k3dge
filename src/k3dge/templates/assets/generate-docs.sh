@@ -18,6 +18,16 @@ fi
 cd "$ROOT"
 
 CONFIG=".agent/docs.toml"
+# `! -f` 把"配置缺失"与"已存在但不是常规文件"混为一谈：docs.toml 是**目录**时 `cp` 会把模板拷进去
+# （配置仍缺、也不报错）；是**符号链接**时 `cp` 跟随并可能写到 $ROOT 之外。先按要求处理再恢复（ocr2-153）。
+if [ -L "$CONFIG" ]; then
+  echo "[k3dge] $CONFIG 是符号链接 ⇒ 拒跑（避免跟随写入仓外/覆盖链接目标）；请改用常规文件" >&2
+  exit 1
+fi
+if [ -e "$CONFIG" ] && [ ! -f "$CONFIG" ]; then
+  echo "[k3dge] $CONFIG 已存在但不是常规文件 ⇒ 拒跑；请先移除或修正" >&2
+  exit 1
+fi
 if [ ! -f "$CONFIG" ]; then
   echo "[k3dge] $CONFIG not found, creating from preset..."
   mkdir -p .agent

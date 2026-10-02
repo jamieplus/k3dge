@@ -33,6 +33,12 @@ class TestDupCheck(unittest.TestCase):
             with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=hit) as mk:
                 hints = _similar_task_hints(ws, "whatever", exclude=None)
             self.assertTrue(mk.called, "patch 未命中解析路径——延迟 import 可能被移到了模块级")
+            # ocr2-445：路由本身才是本文件的主体——action_ref / workspace / arguments 必须被钉死，
+            # 否则错 peer/错角色/坏 query(top_k) 也能全绿。
+            cargs, ckwargs = mk.call_args
+            self.assertEqual(cargs[0], ws)
+            self.assertEqual(cargs[1], "cache.search")
+            self.assertEqual(ckwargs.get("arguments"), {"query": "whatever", "top_k": 6})
             self.assertEqual(len(hints), 3)
             hit2 = TransportResult(True, "mcp", "x", payload=json.dumps({"ok": True, "results": [
                 {"path": "docs/tasks/new.md", "title": "self"}, {"path": "docs/x.md", "title": "keep"}]}))
@@ -55,11 +61,15 @@ class TestDupCheck(unittest.TestCase):
         with TemporaryDirectory() as d:
             ws = pathlib.Path(d)
             skipped = TransportResult(True, "skip", "skipped", skipped=True)
-            with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=skipped):
+            # ocr2-446：`== []` 也是未打桩真传输在同一环境下的产物 ⇒ 必须断桩确实被调过，
+            # 否则延迟 import 一旦提到模块级，本测静默退化成"真跑活 peer 后恰好返回空"。
+            with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=skipped) as mk1:
                 self.assertEqual(_similar_task_hints(ws, "t"), [])
+            self.assertTrue(mk1.called, "skip 分支的桩未被调用（延迟 import 漂移？）")
             bad = TransportResult(True, "mcp", "x", payload="nope")
-            with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=bad):
+            with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=bad) as mk2:
                 self.assertEqual(_similar_task_hints(ws, "t"), [])
+            self.assertTrue(mk2.called, "坏信封分支的桩未被调用（延迟 import 漂移？）")
 
     def test_cli_create_shows_dup_check_and_never_blocks(self):
         import io as _io
@@ -94,10 +104,13 @@ class TestDupCheck(unittest.TestCase):
                                  "cache 第一消费者必须走 observe 档（不进判定、不阻断）")
                 # service 挂掉：无提示，创建照旧成功
                 with mock.patch("k3dge.engine.pipeline_runner.run_action",
-                                return_value=TransportResult(True, "skip", "s", skipped=True)):
+                                return_value=TransportResult(True, "skip", "s", skipped=True)) as mk_skip:
                     buf2 = _io.StringIO()
                     with contextlib.redirect_stdout(buf2):
                         rc2 = main(["task", "create", "Dupcheck Demo B", "--type", "feat", "--milestone", "M1"])
+                # ocr2-447：`rc2==0` + 无 DUP_CHECK 在"桩未生效、真传输跑过"时同样成立 ⇒
+                # 必须证明桩被调到，否则"service 跳过 ⇒ 无提示"与"根本没 mock"分不开。
+                self.assertTrue(mk_skip.called, "service-skip 分支的桩未被调用（延迟 import 漂移？）")
                 self.assertEqual(rc2, 0)
                 self.assertNotIn("[DUP_CHECK]", buf2.getvalue())
 

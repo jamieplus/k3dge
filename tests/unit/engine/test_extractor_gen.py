@@ -84,26 +84,37 @@ class TestRender(unittest.TestCase):
         lock_init = assigned.get("_LANGUAGE_LOCK")
         self.assertIsNotNone(lock_init, "_LANGUAGE_LOCK 没在模块级初始化")
         self.assertIsInstance(lock_init, ast.Call)
-        # 缓存变量只在 `with _LANGUAGE_LOCK:` 块内被触碰：锁不是装饰
-        locked_names = set()
+        # ocr2-458：锁的判据必须落在**写**（ast.Store）上——旧写法收集子树里所有 Name
+        # （含纯 load），于是"读在锁内、写挪到锁外"的双检锁破损照样绿。
+        locked_stores = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.With):
                 for item in node.items:
                     ctx = item.context_expr
                     if isinstance(ctx, ast.Name) and ctx.id == "_LANGUAGE_LOCK":
                         for sub in ast.walk(node):
-                            if isinstance(sub, (ast.Name, ast.Assign)):
-                                for n in ast.walk(sub):
-                                    if isinstance(n, ast.Name):
-                                        locked_names.add(n.id)
-        self.assertIn("_LANGUAGE", locked_names, "缓存读写没被锁包住（线程安全声明作废）")
-        # Parser 每次新建（不是进程级缓存）：存在 `Parser(language)` 调用；且**任何**名字里
-        # 都不出现 `_PARSER`（AST 面，改名缓存会在 `locked/assigned` 检查上现形）
+                            if isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Store):
+                                locked_stores.add(sub.id)
+        self.assertIn("_LANGUAGE", locked_stores, "缓存**写**没在锁内（线程安全声明作废）")
+        # ocr2-459：Parser 每次新建——不能只靠 `_PARSER` 名字黑名单（改名缓存即可绕过）。
+        # 结构判据：①模块级不得有值为 `Parser(...)` 调用的赋值；②每个 `Parser(...)` 调用
+        # 都必须在函数体内（否则就是被模块级缓存的形态）。
         pcalls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
                   and isinstance(n.func, ast.Name) and n.func.id == "Parser"]
         self.assertTrue(pcalls, "Parser 不再每次新建？")
-        all_names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
-        self.assertNotIn("_PARSER", all_names)
+        module_level_cached = []
+        for stmt in tree.body:
+            if isinstance(stmt, ast.Assign) and isinstance(stmt.value, ast.Call) \
+                    and isinstance(stmt.value.func, ast.Name) and stmt.value.func.id == "Parser":
+                module_level_cached += [t.id for t in stmt.targets if isinstance(t, ast.Name)]
+        self.assertEqual(module_level_cached, [],
+                         f"Parser 实例被缓存在模块级：{module_level_cached}")
+        func_spans = [(n.lineno, getattr(n, "end_lineno", n.lineno))
+                      for n in ast.walk(tree)
+                      if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+        outside = [c.lineno for c in pcalls
+                   if not any(lo <= c.lineno <= hi for lo, hi in func_spans)]
+        self.assertEqual(outside, [], f"Parser(...) 出现在函数体外（会被缓存）：{outside}")
         # include_doc 透传：extract 入口真以关键字传下去（调用面，不是字串）
         calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
                  and isinstance(n.func, ast.Name)
@@ -325,21 +336,27 @@ class TestGeneratedPluginSurfaceGuards(unittest.TestCase):
     PLUGIN = Path(__file__).resolve().parents[3] / ".agent" / "extractors" / "typescript.py"
 
     def _load(self):
+        """ocr2-460：测**被测代码**（`g.render_plugin`）而不是仓内构建产物——产物回归
+        要等下一次 `extractor sync` 才会现形，且稀疏检出上可能根本不存在。渲染进临时目录加载。"""
         import importlib.util
         import sys
 
         from k3dge.engine import contract
 
-        spec = importlib.util.spec_from_file_location("gen_ts_guards", self.PLUGIN)
-        self.assertIsNotNone(spec)
-        mod = importlib.util.module_from_spec(spec)
-        snapshot = list(contract._EXTRACTORS)
-        sys.modules["gen_ts_guards"] = mod
-        try:
-            spec.loader.exec_module(mod)      # 模块体只 import contract；tree-sitter 在函数内才要
-        finally:
-            contract._EXTRACTORS[:] = snapshot
-            sys.modules.pop("gen_ts_guards", None)
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "gen_ts_guards.py"
+            p.write_text(g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"]),
+                         encoding="utf-8")
+            spec = importlib.util.spec_from_file_location("gen_ts_guards", p)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            snapshot = list(contract._EXTRACTORS)
+            sys.modules["gen_ts_guards"] = mod
+            try:
+                spec.loader.exec_module(mod)  # 模块体只 import contract；tree-sitter 在函数内才要
+            finally:
+                contract._EXTRACTORS[:] = snapshot
+                sys.modules.pop("gen_ts_guards", None)
         return mod
 
     def test_can_handle_rejects_unnormalized_and_escaping_paths(self) -> None:
@@ -389,11 +406,15 @@ class TestGeneratedPluginSurfaceGuards(unittest.TestCase):
         self.assertNotEqual(a, c)
 
     def test_generated_header_no_longer_tells_readers_to_edit_it(self) -> None:
-        text = self.PLUGIN.read_text(encoding="utf-8")
+        # ocr2-460：判据来自模板渲染（被测代码）；仓内产物若在，另加一条漂移对照。
+        text = g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"])
         first = text.splitlines()[0]
         self.assertIn("do not edit", first)
         self.assertNotIn("edit freely", text, "同一段头既禁改又教改 ⇒ 分叉指引归 README 单源")
         self.assertIn("Hand-written", text, "指向 README 的可解析去处")
+        if self.PLUGIN.is_file():
+            self.assertEqual(self.PLUGIN.read_text(encoding="utf-8"), text,
+                             "仓内构建件与模板渲染漂移（跑 k3dge extractor sync）")
 
 
 if __name__ == "__main__":

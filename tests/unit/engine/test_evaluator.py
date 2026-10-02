@@ -263,11 +263,27 @@ class TestEvaluator(unittest.TestCase):
                 return mods
             return []
 
+        def _dynamic_names(node):
+            """ocr2-456：静态 `import` 之外，运行期 `importlib.import_module("…")` /
+            `__import__("…")` 用字面量也能把 templates 拽进引擎——一并抓。非字面量（变量/
+            f-string）静态 AST 判不了，属已知边界，不在本守卫的证明范围内。"""
+            if not isinstance(node, ast.Call):
+                return []
+            f = node.func
+            dyn = ((isinstance(f, ast.Name) and f.id == "__import__")
+                   or (isinstance(f, ast.Attribute) and f.attr == "import_module"))
+            if not dyn or not node.args:
+                return []
+            first = node.args[0]
+            if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                return [first.value]
+            return []
+
         for path in files:
             pkg_parts = ["k3dge", "engine"] + list(path.relative_to(root).parts[:-1])
             tree = ast.parse(path.read_text(encoding="utf-8"))
             for node in ast.walk(tree):
-                for m in _resolved_names(node):
+                for m in (*_resolved_names(node), *_dynamic_names(node)):
                     if m == banned or m.startswith(banned + "."):
                         self.fail(f"{path.name} imports {m}")
 

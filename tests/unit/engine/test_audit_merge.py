@@ -96,6 +96,12 @@ def test_merge_file_rc_is_conflict_count_not_error(tmp_path):
     (b / "fix.patch").write_text("".join(difflib.unified_diff(
         base.splitlines(keepends=True), theirs.splitlines(keepends=True),
         fromfile=f"a/{rel}", tofile=f"b/{rel}")), encoding="utf-8")
+    # ocr2-437：必须证明夹具真造出 **>1 处冲突**（rc=2 形状）——否则夹具漂成单处冲突时
+    # 本测仍绿，`1 <= rc <= 127` 这条语义其实没被覆盖。
+    base_file = tmp_path / "base_c.py"
+    base_file.write_text(base, encoding="utf-8")
+    m = am._merge_file(ws / rel, base_file, b / "code" / rel)
+    assert m["conflict"] and m["conflicts"] > 1, m
     r = am.merge_into(ws, b)
     assert r["ok"] is False and r["conflicts"] == [rel], r        # 冲突（不是 MERGE_FAILED 那一类）
 

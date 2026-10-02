@@ -64,17 +64,43 @@ def test_finding_table_is_contiguous(path: Path) -> None:
     if path.name == "LEFTOVERS.md":
         pytest.skip("留账本的表是分节台账，本就不许单张连续")
     lines = path.read_text(encoding="utf-8").splitlines()
-    heads = [i for i, l in enumerate(lines) if l.startswith("| ID |")]
+    # ocr2-438：表头识别放宽到空格/反引号，但真正的判据在下面——有数据行却认不出表头 = 硬失败，
+    # 不再 skip（skip 是这个形状守卫最弱的一态，坏表头反而读成绿）。围栏代码块内不算。
+    head_re = re.compile(r"^\s*\|\s*`?ID`?\s*\|", re.IGNORECASE)
+    data_re = re.compile(r"^\s*\|\s*[A-Za-z]+-\d+\s*\|")
+    heads = [i for i, l in enumerate(lines) if head_re.match(l) and not _in_fence(lines, i)]
     if not heads:
+        orphans = [i + 1 for i, l in enumerate(lines)
+                   if not _in_fence(lines, i) and data_re.match(l)]
+        assert not orphans, (f"{path.name}: 有 {len(orphans)} 条 finding 数据行却认不出表头 "
+                             f"（表头形状坏了？行 {orphans[:5]}）")
         pytest.skip("没有 finding 表")
     for h in heads:
-        assert h + 1 < len(lines) and lines[h + 1].startswith("| ---"), \
+        # ocr2-439：先判越界再取下一行，否则消息在求值时 `lines[h+1]` 越界抛 IndexError，
+        # 把有用的断言信息吞成裸栈（表头恰是末行正是本守卫要诊断的坏形状）。
+        assert h + 1 < len(lines), f"{path.name}:{h + 1} finding 表头是最后一行，缺分隔行"
+        assert lines[h + 1].startswith("| ---"), \
             f"{path.name}:{h + 2} 不是分隔行（表头被打断，整表不渲染）：{lines[h + 1][:60]!r}"
         i = h + 2
         while i < len(lines) and lines[i].startswith("| "):
             i += 1
-        shadow = [j + 1 for j in range(i, len(lines)) if re.match(r"^\| [a-z]+-\d+ \|", lines[j])]
+        # ocr2-440：影子扫描止于下一个表头（合法多表不是影子）；跳过围栏块（示例行不算）；
+        # 数据行 ID 大小写都算（与 `_rows` 口径一致，旧 `[a-z]` 漏掉 D-1）。
+        shadow = []
+        for j in range(i, len(lines)):
+            if _in_fence(lines, j):
+                continue
+            if head_re.match(lines[j]):
+                break
+            if data_re.match(lines[j]):
+                shadow.append(j + 1)
         assert not shadow, f"{path.name}: 表被非表行打断后仍有数据行 {shadow[:5]}——把说明节挪到表外"
+
+
+def _in_fence(lines: list[str], idx: int) -> bool:
+    """`idx` 行是否落在 ``` 围栏代码块内（按到 idx 之前的围栏标记数判定）。"""
+    fences = sum(1 for l in lines[:idx] if l.lstrip().startswith("```"))
+    return fences % 2 == 1
 
 
 def test_report_kind_prefers_suffix_and_head_only_marker() -> None:

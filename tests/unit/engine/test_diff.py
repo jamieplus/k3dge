@@ -16,20 +16,46 @@ from k3dge.engine.diff import (
 )
 
 
-def _git_available() -> bool:
-    """git 是这两条测的**前置**而非产品依赖（生产对缺 git 走 GIT_UNAVAILABLE 降级，
-    t-101）：缺/太老（`init -b` 需 ≥2.28）时显式 skip，而不是 error 一屏。"""
+def _git_env() -> dict:
+    """ocr2-453：临时仓 git 调用必须出局宿主环境——GIT_DIR/GIT_WORK_TREE 会让 `git add`
+    写进真仓；全局 gpgsign/hooksPath/autocrlf/excludesFile 会让 setup 因无关原因红或改写字节。"""
+    e = {k: v for k, v in os.environ.items()
+         if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_CONFIG", "K3DGE_BASE_SHA")}
+    e["GIT_CONFIG_GLOBAL"] = os.devnull
+    e["GIT_CONFIG_NOSYSTEM"] = "1"
+    e["GIT_TERMINAL_PROMPT"] = "0"
+    return e
+
+
+def _probe_git() -> "tuple[bool, str]":
+    """git 是这两条测的**前置**而非产品依赖（生产对缺 git 走 GIT_UNAVAILABLE 降级，t-101）。
+
+    ocr2-452：探针不得把任何非零退出都读成"无需 git 跳过"——权限/safe.directory/
+    GIT_DIR 泄漏等会让**整块 git 集成覆盖静默消失**。这里把探针 stderr 带进 skip 理由，
+    并让探针与 `_git` 用同一份净化 env（否则跳过判定与执行环境不一致）。
+    """
     if not shutil.which("git"):
-        return False
+        return False, "需要 git（机器上找不到 git）"
     with tempfile.TemporaryDirectory() as d:   # 探针目录随用随清（裸 mkdtemp＝泄漏）
         probe = subprocess.run(["git", "init", "-q", "-b", "probe", d],
-                               capture_output=True, text=True)
-    return probe.returncode == 0
+                               capture_output=True, text=True, env=_git_env(), timeout=60)
+    if probe.returncode != 0:
+        detail = (probe.stderr or probe.stdout or "").strip().splitlines()
+        tail = detail[-1] if detail else ""
+        return False, (f"需要 git（`init -b` 失败 rc={probe.returncode}：{tail[:140]}）")
+    return True, ""
+
+
+_GIT_OK, _GIT_SKIP_REASON = _probe_git()
+
+
+def _git_available() -> bool:
+    return _GIT_OK
 
 
 def _git(repo, *args) -> str:
-    return subprocess.run(["git", *args], cwd=str(repo), check=True,
-                          capture_output=True, text=True).stdout
+    return subprocess.run(["git", *args], cwd=str(repo), check=True, timeout=60,
+                          capture_output=True, text=True, env=_git_env()).stdout
 
 
 def _make_repo(tmp) -> "tuple[Path, str]":
@@ -60,7 +86,7 @@ class TestDiff(unittest.TestCase):
     def test_strip_quotes_unescapes(self) -> None:
         self.assertEqual(_strip_quotes('"a\\"b"'), 'a"b')
 
-    @unittest.skipUnless(_git_available(), "需要 git（`init -b` 要求 ≥2.28）")
+    @unittest.skipUnless(_git_available(), _GIT_SKIP_REASON)
     def test_k3dge_base_sha_includes_committed(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             repo, first = _make_repo(d)
@@ -112,7 +138,7 @@ class TestPorcelainZ(unittest.TestCase):
 
 
 class TestResolveBase(unittest.TestCase):
-    @unittest.skipUnless(_git_available(), "需要 git")
+    @unittest.skipUnless(_git_available(), _GIT_SKIP_REASON)
     def test_resolve_base_falls_back_to_head(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             repo = Path(d) / "repo"

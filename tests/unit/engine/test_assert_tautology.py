@@ -1,14 +1,23 @@
 """ASSERT_TAUTOLOGY：断言的真值已经写在测试表达式里。"""
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from k3dge.engine import gate_facts
 from k3dge.engine.assert_tautology import check, is_test_path, scan_source, violations_for
 from k3dge.engine.evaluator import ConsistencyEngine
+
+# ocr2-429：宿主 GIT_*/K3DGE_BASE_SHA（CI 常导）与 global gitconfig 会让临时仓的
+# setup 或被测引擎的 git 调用为无关原因红/漂移。净化 env 同时喂 `_git` 与引擎调用。
+_ENV = {k: v for k, v in os.environ.items()
+        if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_CONFIG", "K3DGE_BASE_SHA")}
+_ENV["GIT_CONFIG_GLOBAL"] = os.devnull
+_ENV["GIT_CONFIG_NOSYSTEM"] = "1"
 
 
 def _hits(source: str):
@@ -193,7 +202,14 @@ class TestViolation(unittest.TestCase):
 
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True)
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True,
+                   env=_ENV)
+
+
+def _evaluate(repo: Path, **kwargs):
+    """被测引擎的 git 调用继承 os.environ（`diff.py` 无 env=）；在净化后的环境里求值。"""
+    with mock.patch.dict(os.environ, _ENV, clear=True):
+        return ConsistencyEngine(repo).evaluate(**kwargs)
 
 
 def _repo(tmp: Path) -> Path:
@@ -221,12 +237,30 @@ class TestEvaluateWiring(unittest.TestCase):
             (repo / "tests").mkdir()
             (repo / "tests" / "test_bad.py").write_text("def test_bad():\n    assert True\n", encoding="utf-8")
             (repo / "src" / "core" / "test_surface.py").write_text("assert True\n", encoding="utf-8")
-            report = ConsistencyEngine(repo).evaluate()
+            report = _evaluate(repo)
             taut = [v for v in report.violations if v.rule_id == "ASSERT_TAUTOLOGY"]
             self.assertEqual([v.file_path for v in taut], ["tests/test_bad.py"])
             self.assertFalse(report.passed)
 
-    def test_force_full_sees_committed_tests_only(self) -> None:
+    def test_incremental_reports_uncommitted_taut_test(self) -> None:
+        """ocr2-431：增量面在**空改动集**上断言"无告警"是恒绿。留一个未提交的 taut
+        测试，增量面必须真报出来，证明选择/接线没坏。"""
+        with tempfile.TemporaryDirectory() as d:
+            repo = _repo(Path(d))
+            (repo / "tests").mkdir()
+            _git(repo, "add", "-A")
+            _git(repo, "commit", "-m", "init")
+            (repo / "tests" / "test_dirty.py").write_text(
+                "def test_dirty():\n    assert True\n", encoding="utf-8"
+            )
+            report = _evaluate(repo)
+            paths = [v.file_path for v in report.violations if v.rule_id == "ASSERT_TAUTOLOGY"]
+            self.assertEqual(paths, ["tests/test_dirty.py"])
+
+    def test_force_full_scans_working_tree_tests_dir(self) -> None:
+        """ocr2-432：force_full 走 `assert_tautology.test_files()` 对 **工作树** `tests/`
+        的 rglob——不是"已提交集合"，也**不**覆盖 `src/**/test/`（与增量 `is_test_path`
+        口径不对称，显式钉住以免名字继续误导）。"""
         with tempfile.TemporaryDirectory() as d:
             repo = _repo(Path(d))
             (repo / "tests").mkdir()
@@ -237,11 +271,14 @@ class TestEvaluateWiring(unittest.TestCase):
             )
             _git(repo, "add", "-A")
             _git(repo, "commit", "-m", "init")
-            incremental = ConsistencyEngine(repo).evaluate()
-            self.assertFalse(any(v.rule_id == "ASSERT_TAUTOLOGY" for v in incremental.violations))
-            full = ConsistencyEngine(repo).evaluate(force_full=True)
-            paths = [v.file_path for v in full.violations if v.rule_id == "ASSERT_TAUTOLOGY"]
-            self.assertEqual(paths, ["tests/test_bad.py"])
+            # 未提交的工作树 taut 也被全量面看到 ⇒ 证明是工作树扫描而非已提交集
+            (repo / "tests" / "test_dirty.py").write_text(
+                "def test_dirty():\n    assert True\n", encoding="utf-8"
+            )
+            full = _evaluate(repo, force_full=True)
+            paths = sorted(v.file_path for v in full.violations if v.rule_id == "ASSERT_TAUTOLOGY")
+            self.assertEqual(paths, ["tests/test_bad.py", "tests/test_dirty.py"])
+            self.assertNotIn("src/core/test/test_x.py", paths)
 
     def test_real_assert_on_force_full_stays_quiet(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -250,7 +287,7 @@ class TestEvaluateWiring(unittest.TestCase):
             (repo / "tests" / "test_ok.py").write_text(
                 "def test_ok():\n    assert 1 + 1 == 2\n", encoding="utf-8"
             )
-            report = ConsistencyEngine(repo).evaluate(force_full=True)
+            report = _evaluate(repo, force_full=True)
             self.assertFalse(any(v.rule_id == "ASSERT_TAUTOLOGY" for v in report.violations))
 
     def test_check_reads_the_file(self) -> None:
@@ -261,3 +298,14 @@ class TestEvaluateWiring(unittest.TestCase):
             found = check(root, ["tests/test_bad.py", "src/test_surface.py"])
             self.assertEqual(len(found), 1)
             self.assertEqual(found[0].detail["shape"], "self_compare")
+
+    def test_check_skips_unreadable_and_non_utf8_test_paths(self) -> None:
+        """ocr2-433：`check` 的 except 分支只对**测试路径**才可达——旧测喂
+        `src/test_surface.py`（先被 `is_test_path` 滤掉）根本没走到。缺文件 + 非 UTF-8
+        两个测试路径，证明守卫真的吞掉而不是崩。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "tests").mkdir()
+            (root / "tests" / "test_binary.py").write_bytes(b"\xff\xfe\x00\x80")
+            found = check(root, ["tests/test_missing.py", "tests/test_binary.py"])
+            self.assertEqual(found, [])

@@ -115,6 +115,28 @@ class TestHooksReachDownstream(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("[k3dge doc-gate] PASS", r.stdout)
 
+    def test_scan_is_read_only_and_skips_consistency_gate(self):
+        # `--scan` 是只读自检：不得再落下游一致性闸（worktree 把它当落点 doc-gate 步调用，
+        # 否则会阻塞/按无关原因非零，ocr2-169）。
+        r = self._run_hook("--scan")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertNotIn("running consistency gate", r.stdout + r.stderr)
+
+    def test_deletion_only_commit_still_runs_consistency_gate(self):
+        # ocr2-170：`staged_files()` 的 `--diff-filter=ACM` 漏掉删除 ⇒ 只删 src/*.py 会被判
+        # "无代码/规格改动"而跳过一致性闸。删除恰是契约哈希/索引最易失效的改动。
+        f = self.repo / "src" / "k3dge" / "todelete.py"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text("x = 1\n", encoding="utf-8")
+        _git(self.repo, "add", "-A")
+        self.assertEqual(_git(self.repo, "commit", "-m", "add", "--no-verify").returncode, 0)
+        f.unlink()
+        _git(self.repo, "add", "-A")
+        r = self._run_hook()
+        blob = r.stdout + r.stderr
+        self.assertNotIn("skipped (no code/spec/agent changes", blob)
+        self.assertIn("running consistency gate", blob)
+
     def test_staged_spec_passes_when_governance_present(self):
         (self.repo / "docs" / "specs" / "core").mkdir(parents=True)
         (self.repo / "docs" / "specs" / "core" / "spec.md").write_text("# spec\n", encoding="utf-8")
@@ -132,6 +154,25 @@ class TestHooksReachDownstream(unittest.TestCase):
         r = self._run_hook()
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("AUTHORING.md", r.stdout)
+
+    @unittest.skipIf(os.name == "nt", "POSIX 权限位语义")
+    def test_commit_msg_refuses_unwritable_message_dir(self):
+        # gate.py 用 atomic_write_text（同目录临时件 + os.replace）就地改写消息文件 ⇒ 目录不可写
+        # 必须在跑闸前拒（否则闸跑完才以"改写失败"收场，归因滞后，ocr2-136）。
+        ro = self.repo / "rodir"
+        ro.mkdir()
+        msg = ro / "COMMIT_EDITMSG"
+        msg.write_text("feat: x\n", encoding="utf-8")
+        os.chmod(ro, 0o500)
+        try:
+            env = dict(os.environ, PYTHONPATH=str(K3DGE_SRC),
+                       PATH=f"{self._k3dge_shim()}{os.pathsep}{os.environ.get('PATH', '')}")
+            r = subprocess.run(["bash", str(self.repo / "scripts" / "commit-msg"), str(msg)],
+                               cwd=self.repo, capture_output=True, text=True, env=env, timeout=60)
+        finally:
+            os.chmod(ro, 0o700)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("不可写", r.stderr)
 
 
 
@@ -429,6 +470,22 @@ class TestTrackHygiene(unittest.TestCase):
                            capture_output=True, text=True, timeout=60)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("manifest.json", r.stderr)
+
+    def test_generate_docs_refuses_config_that_is_a_directory(self) -> None:
+        """`.agent/docs.toml` 是目录时不得被 `cp` 静默拷进去（ocr2-153）。"""
+        root = self._generate_docs_root()
+        (root / ".agent" / "docs.toml").mkdir()
+        r = subprocess.run(["bash", "scripts/generate-docs.sh"], cwd=root,
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("不是常规文件", r.stderr)
+
+    def test_init_sh_normalizes_dir_source_and_drops_dangling_double_dash(self) -> None:
+        """目录源先归一、`-e` 后不得插 `--`（pip optparse 会把它当成 -e 的取值，ocr2-164/165）。"""
+        sh = (K3DGE_SRC.parent / "scripts" / "init.sh").read_text(encoding="utf-8")
+        self.assertIn('"$(cd "$K3DGE_SOURCE" && pwd -P)[mcp]"', sh)
+        self.assertNotIn('-- "$INSTALL_TARGET"', sh)
+        self.assertIn('"$INSTALL_TARGET" pre-commit pytest', sh)
 
 
 if __name__ == "__main__":

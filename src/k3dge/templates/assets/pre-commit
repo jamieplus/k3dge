@@ -106,6 +106,26 @@ def _run_consistency_gate(ws: Path, relevant) -> int:
     return r.returncode
 
 
+def _changed_paths(ws: Path, doc_gate) -> list[str]:
+    """给"是否该跑一致性闸"用的**完整**改动集。
+
+    `doc_gate.staged_files()` 是 `git diff --cached --diff-filter=ACM`（只按内容做文档扫描的所需面）；
+    删除(D)/改名(R)/类型变化(T)被它滤掉，于是"只删 `src/k3dge/*.py`"会被判无关而跳过一致性闸——
+    恰是最容易让 contract hash / 文档索引 / 符号引用失效的改动（ocr2-170）。这里补上 DRT；拿不到
+    git 结果则抛错，由 `main` 的 catch 收敛为 fail-closed（relevant=None ⇒ 跑闸）。
+    """
+    files = list(doc_gate.staged_files())
+    r = subprocess.run(
+        ["git", "-c", "core.quotePath=false", "diff", "--cached", "--name-only", "-z",
+         "--diff-filter=DRT"],
+        cwd=str(ws), capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    if r.returncode != 0:
+        raise RuntimeError(f"git diff --cached (DRT) 失败：{(r.stderr or '').strip()[:200]}")
+    files += [p for p in r.stdout.split("\0") if p]
+    return files
+
+
 def main() -> int:
     ws = Path(__file__).resolve().parents[1]
     try:
@@ -121,9 +141,11 @@ def main() -> int:
     try:
         doc_gate.set_workspace(ws)
         rc = doc_gate.main(sys.argv[1:])   # 显式传参（366）：薄壳的 `--scan` 不再靠引擎偷读 sys.argv
-        if rc:
+        # `--scan` 是**只读自检**：`worktree.py` 把它当落点 doc-gate 步调用；再往下一致性闸会
+        # 让它阻塞 1800s 或按无关原因返回非零（ocr2-169）。
+        if rc or "--scan" in sys.argv[1:]:
             return rc
-        relevant = doc_gate.relevant_for_check(doc_gate.staged_files())
+        relevant = doc_gate.relevant_for_check(_changed_paths(ws, doc_gate))
     except Exception as exc:      # 闸**自身崩溃**（非判定失败）⇒ WARN 放行文档/结构闸，一致性闸照跑
         print(f"[k3dge doc-gate] WARN: 闸自身异常（{exc}）→ 跳过文档/结构闸", file=sys.stderr)
         relevant = None

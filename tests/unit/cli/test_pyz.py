@@ -94,6 +94,19 @@ def test_pyz_builder_and_runtime(tmp_path: Path) -> None:
                                r2.stdout[-500:] + "\n" + r2.stderr[-500:])
 
 
+def test_pyz_builder_rejects_unrunnable_shebang(tmp_path: Path) -> None:
+    """ocr2-131：冒烟必须**经产物自己的 shebang** 起一次进程——否则 `PYZ_SHEBANG` 写成不存在的
+    解释器/多参数也会"构建成功"，失败落在下游。"""
+    root = _stage(tmp_path)
+    build = subprocess.run(["sh", str(root / "scripts" / "build-pyz.sh")],
+                           cwd=str(root), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=300,
+                           env={**os.environ, "PYTHON": sys.executable,
+                                "PYZ_SHEBANG": "/nonexistent/interpreter-xyz"})
+    assert build.returncode != 0, "坏 shebang 还构建成功＝shebang 冒烟已死"
+    assert "shebang" in (build.stdout + build.stderr), build.stdout + build.stderr
+
+
 def test_pyz_builder_rejects_sensitive_files(tmp_path: Path) -> None:
     """ocr2-409 后半：敏感件（.env/*.key）守卫的拒收路径——不种就永远不知道它还活着。"""
     root = _stage(tmp_path)

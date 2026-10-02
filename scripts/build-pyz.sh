@@ -53,23 +53,63 @@ fi
 SHEBANG="${PYZ_SHEBANG:-/usr/bin/env python3}"
 # 原子写：先写进程唯一临时文件，成功再 mv；中断不留半截"看起来合法"的产物（ocr-139）。
 TMP="dist/.k3dge.pyz.$$"
-trap 'rm -f "$TMP"' EXIT INT TERM
+# 清理必须覆盖**所有**临时物（TMP + 冒烟目录 SMOKEY），且中断时要显式退出：
+# POSIX shell 的 INT/TERM trap 跑完 handler 会**继续执行**下一条命令，只删文件不终止脚本
+# 会让中断后的 zipapp/冒烟/mv 照常跑（mv 因源缺失而失败，报错误导归因）（ocr2-132）。
+SMOKEY=""
+cleanup() {
+  rm -f "$TMP"
+  if [ -n "$SMOKEY" ]; then
+    rm -rf "$SMOKEY"
+  fi
+}
+trap 'cleanup' EXIT
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
 # 入口必须是仓内 `src/__main__.py`：zipapp `--main` 生成的模板不调 `sys.exit(main())`，
 # 返回码被吞 ⇒ 下游用 `.pyz` 跑 `check` 恒 0 退出＝分发件把闸读成常绿（t-023 实测）。
 if [ ! -f src/__main__.py ]; then
   echo "[build-pyz] 缺 src/__main__.py（入口必须 sys.exit(main())；zipapp --main 模板不包办）" >&2
   exit 1
 fi
-# zipapp CLI 无 exclude ⇒ 派生垃圾（__pycache__/.pyc/.DS_Store）不得随单件外发（t-020：旧产物实测 59 条）。
-"$PY" -c 'import sys, zipapp
-zipapp.create_archive("src", target=sys.argv[1], interpreter=sys.argv[2],
-    filter=lambda p: "__pycache__" not in p.parts and p.suffix != ".pyc" and p.name != ".DS_Store")' "$TMP" "$SHEBANG"
-# 冒烟①：产物入口可运行（zipapp 不校验 main 存在，改名/移模块会产出"构建成功、下游一跑就崩"，ocr-140）。
+# zipapp CLI 无 exclude ⇒ 派生垃圾不得随单件外发（t-020：旧产物实测 59 条）。过滤器是唯一屏障：
+# 覆盖各解释器/工具链随手重建的缓存与备份，而不只是 __pycache__/.pyc/.DS_Store（ocr2-133）。
+# 构建后再对产物断言一次：改了 filter 也不会静默漏掉（否则"过滤是否生效"全靠构建机整洁度）。
+"$PY" -c 'import sys, zipapp, zipfile
+_JUNK_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "htmlcov"}
+_JUNK_SUFFIX = (".pyc", ".pyo", ".orig", ".swp", ".swo", ".egg-info")
+_JUNK_NAMES = {".DS_Store", ".coverage"}
+def _keep(p):
+    if set(p.parts) & _JUNK_DIRS:
+        return False
+    if p.name in _JUNK_NAMES or p.name.endswith("~"):
+        return False
+    if p.suffix in _JUNK_SUFFIX:
+        return False
+    return True
+zipapp.create_archive("src", target=sys.argv[1], interpreter=sys.argv[2], filter=_keep)
+_bad = [n for n in zipfile.ZipFile(sys.argv[1]).namelist()
+        if (set(n.split("/")) & _JUNK_DIRS)
+        or n.endswith((".pyc", ".pyo", ".orig", ".swp", ".swo"))
+        or n.endswith("/.coverage") or n == ".coverage"
+        or n.endswith("/.DS_Store") or n.endswith("~")]
+if _bad:
+    sys.stderr.write("build-pyz: 派生物进入产物: %s\n" % _bad[:5])
+    sys.exit(1)' "$TMP" "$SHEBANG"
+# 冒烟①（shebang 轨）：**经产物自己的 shebang** 起进程。上面两条都用 `"$PY"` 显式起，shebang 从头到尾
+# 没被执行过 ⇒ 写成 `python`、指向不存在的绝对路径、或带多参数（Linux 内核只接受单个可选参数）都会
+# 构建成功，失败落在下游别人的机器上（ocr2-131）。
+chmod +x "$TMP"
+if ! "$TMP" -h >/dev/null 2>&1; then
+  echo "[build-pyz] 冒烟失败：产物 shebang 不可执行（SHEBANG='$SHEBANG'；用 PYZ_SHEBANG 指定下游解释器）" >&2
+  exit 1
+fi
+# 冒烟②：产物入口可运行（zipapp 不校验 main 存在，改名/移模块会产出"构建成功、下游一跑就崩"，ocr-140）。
 if ! "$PY" "$TMP" -h >/dev/null 2>&1; then
   echo "[build-pyz] 冒烟失败：产物入口不可运行（检查 src/__main__.py）" >&2
   exit 1
 fi
-# 冒烟②：退出码透传——空目录 `check` 必须**非零**。`-h` 由 argparse 自己 SystemExit(0)，
+# 冒烟③：退出码透传——空目录 `check` 必须**非零**。`-h` 由 argparse 自己 SystemExit(0)，
 # 证明不了 main() 的返回值到达进程；这条才钉得住"入口 sys.exit"（t-023 的回归面）。
 SMOKEY="$(mktemp -d)"
 PYZ_ABS="$(pwd -P)/$TMP"
@@ -78,6 +118,7 @@ PYZ_ABS="$(pwd -P)/$TMP"
 _smoke_rc=0
 ( cd "$SMOKEY" || exit 2; "$PY" "$PYZ_ABS" check >/dev/null 2>&1 ) || _smoke_rc=$?
 rm -rf "$SMOKEY"
+SMOKEY=""
 if [ "$_smoke_rc" -eq 0 ]; then
   echo "[build-pyz] 冒烟失败：空目录 check 退出 0——main() 返回码被吞，下游闸会常绿" >&2
   exit 1
@@ -85,7 +126,5 @@ elif [ "$_smoke_rc" -eq 2 ]; then
   echo "[build-pyz] 冒烟失败：进不去临时目录（没跑到产物）" >&2
   exit 1
 fi
-rm -rf "$SMOKEY"
-chmod +x "$TMP"
 mv "$TMP" dist/k3dge.pyz
 echo "built dist/k3dge.pyz ($(wc -c < dist/k3dge.pyz) bytes)"

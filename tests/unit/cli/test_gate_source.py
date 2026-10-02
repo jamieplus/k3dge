@@ -138,6 +138,25 @@ class TestGateShLayoutAndPolicyShape(unittest.TestCase):
                            capture_output=True, text=True, env=env, timeout=60)
         self.assertEqual(r.returncode, 2, r.stderr[-300:])
 
+    @unittest.skipUnless(shutil.which("bash"), "gate.sh 轨需要 bash")
+    def test_text_fallback_parses_valid_quoted_source(self) -> None:
+        """无 tomllib 时，合法 `source = "git+x"`（无行尾注释）也必须解析出来、走到了入口桩。
+
+        回归 ocr2-145：旧实现用 GNU BRE 的 `\\?` 可选组（BSD/macOS sed 不认 ⇒ 匹配失败）并以
+        `head -1` 收尾（`set -o pipefail` 下 SIGPIPE=141 会静默中止 bootstrap）。
+        """
+        root = _sealed_root(self, "git+x", policy_source="git+x")
+        fake = root / "fakelib"
+        fake.mkdir()
+        (fake / "tomllib.py").write_text("raise ModuleNotFoundError('forced')\n", encoding="utf-8")
+        env = dict(os.environ)
+        env.pop("K3DGE_SOURCE", None)
+        env["PYTHONPATH"] = str(fake)
+        r = subprocess.run(["bash", "scripts/gate.sh", "version"], cwd=root,
+                           capture_output=True, text=True, env=env, timeout=60)
+        self.assertEqual(r.returncode, 41,
+                         f"合法 source 被当'读不懂'拒跑/漏解析：{(r.stdout + r.stderr)[-300:]}")
+
 
 class TestPyprojectOnlyPolicy(unittest.TestCase):
     """政策只写在 pyproject（env 未设）这条路——三轨都得判同一件事（ocr-347 的 (b)）。"""
@@ -297,3 +316,23 @@ class TestGatePyLayoutAndPolicyShape(unittest.TestCase):
             '[project]\nname = "x"\nversion = "0.1.0"\n\n[tool.k3dge]\nother = 1\n', encoding="utf-8")
         r = self._run_py(root, self._force_text_fallback(root))
         self.assertEqual(r.returncode, 1, (r.stdout + r.stderr)[-300:])
+
+    def test_declared_policy_refuses_unverified_global_fallback(self) -> None:
+        # 政策已声明、收据一致，但 .venv 判定核缺失 ⇒ 默认拒跑，不静默用来源未校验的全局 k3dge
+        #（ocr2-143，与 gate.sh 的 ocr2-357 同口径）。
+        root = _sealed_root(self, "git+x", policy_source="git+x")
+        (root / ".venv" / "bin" / "k3dge").unlink()
+        win = root / ".venv" / "Scripts" / "k3dge.exe"
+        if win.exists():
+            win.unlink()
+        shim = root / "globalshim"
+        shim.mkdir()
+        g = shim / "k3dge"
+        g.write_text("#!/bin/sh\nexit 41\n", encoding="utf-8")
+        g.chmod(0o755)
+        env = dict(os.environ)
+        env.pop("K3DGE_SOURCE", None)
+        env["PATH"] = f"{shim}{os.pathsep}{env.get('PATH', '')}"
+        r = subprocess.run([sys.executable, "scripts/gate.py", "version"], cwd=root,
+                           capture_output=True, text=True, env=env, timeout=60)
+        self.assertEqual(r.returncode, 2, r.stderr[-300:])

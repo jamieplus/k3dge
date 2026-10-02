@@ -57,7 +57,10 @@ def test_doc_list_without_include_archive_has_no_low_authority_header(tmp_path, 
     """
     (tmp_path / ".agent").mkdir()
     (tmp_path / ".git").mkdir()
-    d = tmp_path / "docs" / "reviews" / "archive"
+    live = tmp_path / "docs" / "reviews"
+    live.mkdir(parents=True)
+    (live / "live.md").write_text("# live\n", encoding="utf-8")
+    d = live / "archive"
     d.mkdir(parents=True)
     (d / "old.md").write_text("# old\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
@@ -66,5 +69,8 @@ def test_doc_list_without_include_archive_has_no_low_authority_header(tmp_path, 
         rc = main(["doc", "list", "--type", "reviews"])   # 无 --include-archive
     out = buf.getvalue()
     assert rc == 0
+    # ocr2-428：默认面必须**非空**（活件可见）才谈得上"archive 层被滤掉"；
+    # 否则 include_archive 反向坏成把全部文档滤掉也照样绿。
+    assert "live.md" in out, out
     assert "低权威层" not in out
     assert "archive/old.md" not in out

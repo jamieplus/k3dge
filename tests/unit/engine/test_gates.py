@@ -120,14 +120,35 @@ def test_repo_declares_the_same_values_as_defaults():
     reconcile ⇒ 功能静默死亡，见 2026-09-17-M10-refactor-adr_archive_to_sync）。
     """
     repo = Path(__file__).resolve().parents[3]
-    # 前提（t-125）：`gates.load` 对**任何**读不到声明件的目录都回 DEFAULTS——根一漂，
-    # declared 就变成缺省自己的复印件，"declared == fresh" 恒真，本测什么都不比就绿。
-    assert (repo / ".agent" / "pipeline.toml").is_file(), f"仓根解析错误：{repo}"
+    # 前提（t-125 / ocr2-466）：`gates.load` 对**任何**读不到/解析失败/无声明段的文件都回
+    # DEFAULTS——根一漂或 TOML 坏，`declared == fresh` 就恒真（`declared` 成了缺省的复印件）。
+    # 所以先**独立**用 tomllib 解析声明面，要求被测段真的在场，再逐键与 DEFAULTS 对。
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # pragma: no cover - Python 3.10
+        import tomli as tomllib  # type: ignore[no-redef]
+
+    pipeline = repo / ".agent" / "pipeline.toml"
+    assert pipeline.is_file(), f"仓根解析错误：{repo}"
+    raw = tomllib.loads(pipeline.read_text(encoding="utf-8"))
+    gates_decl = raw.get("gates")
+    checks_decl = raw.get("checks")
+    assert isinstance(gates_decl, dict) and gates_decl, "本仓 [gates.*] 段缺失/为空"
+    assert isinstance(checks_decl, dict) and checks_decl, "本仓 [checks.*] 段缺失/为空"
+    for name, sec in gates_decl.items():
+        for key, val in sec.items():
+            assert val == gates.DEFAULTS[name][key], f"gates.{name}.{key}: {val!r} != 缺省"
+    for name, sec in checks_decl.items():
+        for key, val in sec.items():
+            # `stages_*` 的缺省就是空列表；声明非空属允许的外部步，不是"值漂移"
+            if key.startswith("stages_"):
+                continue
+            assert val == gates.DEFAULTS["checks"][name][key], f"checks.{name}.{key}: {val!r} != 缺省"
+    # 再证 `gates.load` 真的走了声明合并路径（不是回落）：与非默认的独立解析结果一致。
     declared = {k: v for k, v in gates.load(repo).items() if k != "nodes"}
     fresh_ws = Path(tempfile.mkdtemp())
     atexit.register(shutil.rmtree, fresh_ws, True)
     fresh = {k: v for k, v in gates.load(fresh_ws).items() if k != "nodes"}
-    # `[nodes.*]` 覆盖的是 nodes.NODE_DEFAULTS（另一张表）⇒ 由 test_nodes 的自举断言管，不在此比
     assert declared == fresh, {
         k: (declared.get(k), fresh.get(k)) for k in set(declared) | set(fresh)
         if declared.get(k) != fresh.get(k)

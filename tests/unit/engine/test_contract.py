@@ -26,7 +26,9 @@ class TestContract(unittest.TestCase):
     def test_extract_interface(self):
         iface = contract.extract_python_interface(SRC)
         self.assertIn("foo(x: int, y: str='a') -> bool", iface)
-        self.assertIn("bar() -> None", iface)
+        # ocr2-448：`"bar() -> None"` 是 `"async bar() -> None"` 的子串——若 `async` 前缀被丢，
+        # 旧断言照绿（ocr-059 的回归恰好就此隐形）。钉整行。
+        self.assertIn("async bar() -> None", iface)
         self.assertIn("class Widget", iface)
         self.assertIn("    run(self, n: int) -> int", iface)
         self.assertNotIn("_helper", iface)
@@ -95,9 +97,16 @@ class TestContract(unittest.TestCase):
             "from functools import cached_property\n"
             "class W:\n    @cached_property\n    def x(self) -> int:\n        return 1\n"
         )
+        # ocr2-449：`cached` 比 `prop` 多一行 `from functools import cached_property`，
+        # 所以即便两个装饰器都从 `_SIGNIFICANT_DECORATORS` 删掉，接口仍不同 ⇒ 旧 `assertNotEqual`
+        # 恒绿。先直接断言装饰器真的进了接口，再比哈希。
+        prop_iface = contract.extract_python_interface(prop)
+        cached_iface = contract.extract_python_interface(cached)
+        self.assertIn("@property", prop_iface)
+        self.assertIn("@cached_property", cached_iface)
         self.assertNotEqual(
-            contract.compute_hash(contract.extract_python_interface(prop)),
-            contract.compute_hash(contract.extract_python_interface(cached)),
+            contract.compute_hash(prop_iface),
+            contract.compute_hash(cached_iface),
         )
 
     def test_syntax_error_is_visible(self):
@@ -260,6 +269,9 @@ class TestContract(unittest.TestCase):
                 _EXTRACTORS[:] = before
 
     def test_plugin_broken_module_warns_not_crash(self):
+        import contextlib
+        import io
+
         from k3dge.engine.contract import _EXTRACTORS
         before = list(_EXTRACTORS)
         try:
@@ -270,8 +282,13 @@ class TestContract(unittest.TestCase):
             with tempfile.TemporaryDirectory() as d:
                 src = Path(d)
                 (src / "a.py").write_text("def foo() -> int:\n    return 1\n", encoding="utf-8")
-                out = contract.collect_domain_interface(src, manifest=BadManifest(), workspace_root=Path(d))
+                err = io.StringIO()
+                with contextlib.redirect_stderr(err):
+                    out = contract.collect_domain_interface(src, manifest=BadManifest(), workspace_root=Path(d))
                 self.assertIn("foo", out)
+                # ocr2-450：名字承诺"坏插件可见"——只断"不崩"的话，整条 manifest-extractor
+                # 分支被删/警告被删也照样绿。断言坏 spec 名真的被报到 stderr。
+                self.assertIn("nonexistent_mod_xyz_abc", err.getvalue(), err.getvalue())
         finally:
             _EXTRACTORS[:] = before
 
@@ -328,6 +345,7 @@ class TestContract(unittest.TestCase):
             restore()
 
     def test_convention_dir_broken_file_does_not_block(self):
+        import sys
         restore = self._dropin_sandbox()
         try:
             with tempfile.TemporaryDirectory() as d:
@@ -352,6 +370,9 @@ class TestContract(unittest.TestCase):
                 (src / "a.goodtest").write_text("x", encoding="utf-8")
                 out = contract.collect_domain_interface(src, manifest=None, workspace_root=ws)
                 self.assertIn("good iface", out)
+                # ocr2-451：`_helper_test.py` 此前是死布置——删掉 `startswith("_")` 跳过规则
+                # 也测不出。直接钉"下划线文件没被加载进 sys.modules"（与正对照对称）。
+                self.assertNotIn("k3dge_plugin__helper_test", sys.modules)
         finally:
             restore()
 

@@ -27,9 +27,14 @@ _WANT="$(printf '%s' "${K3DGE_SOURCE:-}" | sed -e 's/^[[:space:]]*//' -e 's/[[:s
 if [ -z "$_WANT" ] && [ -f "$ROOT/pyproject.toml" ]; then
   _WANT="$(python3 -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb")).get("tool",{}).get("k3dge",{}).get("source",""))' 2>/dev/null || true)"
   if [ -z "$_WANT" ]; then
-    # 与 gate.py 同口径：允许 tab、单/双引号、行尾注释（原 `s/^source *= *"\(...\)"*/` 只认双引号 + 无 tab）。
-    _WANT="$(sed -n '/^\[tool\.k3dge\]$/,/^\[/p' pyproject.toml 2>/dev/null \
-             | sed -n "s/^[[:space:]]*source[[:space:]]*=[[:space:]]*[\"']\([^\"']*\)[\"'][[:space:]]*\(#.*\)\?$/\1/p" | head -1)"
+    # 与 gate.py 同口径：允许 tab、单/双引号、行尾注释。表头也容忍空白/行尾注释（ocr2-145）。
+    # 1) 不用 `head -1`：`set -o pipefail` 下上游 SIGPIPE（141）会让整段 bootstrap 静默中止（ocr2-145）；
+    #    取首个匹配改用参数展开。
+    # 2) 不用 GNU BRE 的 `\?` 可选组：BSD/macOS sed 不认 ⇒ 合法 `source = "x"`（无行尾注释）匹配失败，
+    #    政策被当"读不懂"而拒跑（ocr2-145）。行尾注释/多余字符由 `.*$` 吸收。
+    _WANT="$(sed -n '/^\[[[:space:]]*tool\.k3dge[[:space:]]*\]/,/^\[/p' pyproject.toml 2>/dev/null \
+             | sed -n "s/^[[:space:]]*source[[:space:]]*=[[:space:]]*[\"']\([^\"']*\)[\"'].*$/\1/p")"
+    _WANT="${_WANT%%$'\n'*}"
     # 段里写了 `source =` 却没解析出值（值非字符串/写法畸形）≠ 没声明政策：拒跑，别静默当 legacy
     # 放行一个未校验的判定核（ocr2-356，与 gate.ps1 同口径）。
     if [ -z "$_WANT" ] && awk '/^\[[[:space:]]*tool\.k3dge[[:space:]]*\]/{f=1;next} /^\[/{f=0} f' \
@@ -58,8 +63,14 @@ if [ -n "$_WANT" ]; then
     echo "[k3dge-source] 政策已声明但 .venv/k3dge-source.txt 为空/仅空白：无证据 ⇒ 拒跑" >&2
     exit 2
   fi
-  [ -d "$_WANT" ] && _WANT="$(cd "$_WANT" && pwd -P)"   # 只对真实目录取物理路径；pypi/URL 保持原样
-  [ -d "$_REC" ] && _REC="$(cd "$_REC" && pwd -P)"
+  # 只对真实目录取物理路径；pypi/URL 保持原样。用显式 if：`[ -d ] && X="$(cd … && pwd -P)"` 在
+  # `-d` 成立而 `cd` 失败（权限/被并发替换/NFS 卡）时，命中的是最后一条命令，`set -e` 会无消息中止（ocr2-147）。
+  if [ -d "$_WANT" ]; then
+    _WANT="$(cd "$_WANT" && pwd -P)" || { echo "[k3dge-source] 无法进入声明的源目录：$_WANT" >&2; exit 2; }
+  fi
+  if [ -d "$_REC" ]; then
+    _REC="$(cd "$_REC" && pwd -P)" || { echo "[k3dge-source] 无法进入收据记录的源目录：$_REC" >&2; exit 2; }
+  fi
   if [ "$_WANT" != "$_REC" ]; then
     echo "[k3dge-source] MISMATCH: want='$_WANT'（env>pyproject） but installed from '$_REC'." >&2
     echo "  重装或改政策后再跑闸。" >&2

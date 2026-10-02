@@ -12,10 +12,19 @@ if [ -z "${1:-}" ]; then
   echo "[k3dge] commit-msg: 缺提交信息文件参数" >&2
   exit 1
 fi
+# 后续交验的 `$1` 与 `token()`/workspace 都随 cwd 走，而 ROOT 可能因 hook 被工具/GUI 从别处调用
+# 与 cwd 分歧 ⇒ 锚到刚解析出的仓根，别在错误的仓/tree 上署名还 exit 0（ocr2-135）。
+cd "$ROOT" || { echo "[k3dge] commit-msg: 无法进入仓根 '$ROOT' ——拒绝提交" >&2; exit 1; }
 # 消息文件必须真在：不存在时 `grep -q ... "$1"` 返回 2（错误）被 `!` 取反成"没有 trailer"，
 # 于是走追加分支，而 `>>` 会**凭空造出**这个文件（343）
 if [ ! -f "$1" ] || [ ! -r "$1" ]; then
   echo "[k3dge] commit-msg: 提交信息文件不存在或不可读：$1 —— 拒绝提交" >&2
+  exit 1
+fi
+# gate.py 用 `atomic_write_text`（同目录临时件 + os.replace）**就地改写**本文件 ⇒ 目录也必须有写权限，
+# 只查文件可读不够；否则闸先跑完、之后才以"改写失败"收场，错误归因滞后（ocr2-136）。
+if [ ! -w "$(dirname "$1")" ]; then
+  echo "[k3dge] commit-msg: 提交信息所在目录不可写：$(dirname "$1") —— 拒绝提交" >&2
   exit 1
 fi
 

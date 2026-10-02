@@ -470,10 +470,10 @@ def test_tool_state_never_lands_in_a_foreign_subject(tmp_path, monkeypatch):
     被审仓 k3dge ⇒ 工作区变脏 ⇒ 消费相位被自家 `DIRTY_TREE` 拒，而且那些是工具状态不是审计产物）。
     外部被审仓 ⇒ 落缓存（确定性路径，跨轮续用）；工具审自己 ⇒ 不动（保持仓库内状态连续性）。
     """
-    # 宿主环境可能本来就带着这两个变量（开发机跑过真审计）——先清，否则
-    # "env 里没有 K3DIT_HALL_ROOT / 外部仓不吃宿主值"两类断言红得与实现无关（t-119）
-    monkeypatch.delenv("K3DIT_HALL_ROOT", raising=False)
-    monkeypatch.delenv("K3DIT_LEDGER", raising=False)
+    # ocr2-434：关键回归是"外部仓**覆盖**宿主值"。先设哨兵（而非删除）——删了之后
+    # 断言"进程 env 里没有"是恒真，覆盖逻辑坏没坏根本测不到。
+    monkeypatch.setenv("K3DIT_HALL_ROOT", "/tmp/host-hall")
+    monkeypatch.setenv("K3DIT_LEDGER", "/tmp/host-ledger.json")
     subj = tmp_path / "subject"
     subj.mkdir()
     fake_tool = tmp_path / "k3dit" / ".venv" / "bin" / "k3dit"
@@ -484,12 +484,15 @@ def test_tool_state_never_lands_in_a_foreign_subject(tmp_path, monkeypatch):
     env = ab._tool_env(subj, [str(fake_tool)])
     assert env["K3DIT_HALL_ROOT"].startswith(str(tmp_path / "cache"))
     assert env["K3DIT_LEDGER"].startswith(str(tmp_path / "cache"))
-    assert str(subj) not in env["K3DIT_HALL_ROOT"] and "K3DIT_HALL_ROOT" not in {
-        k: v for k, v in os.environ.items() if k == "K3DIT_HALL_ROOT"}
+    # 返回的**子进程 env** 必须覆盖宿主哨兵，而不是继承
+    assert env["K3DIT_HALL_ROOT"] != "/tmp/host-hall", env["K3DIT_HALL_ROOT"]
+    assert env["K3DIT_LEDGER"] != "/tmp/host-ledger.json", env["K3DIT_LEDGER"]
+    assert str(subj) not in env["K3DIT_HALL_ROOT"]
+    # 父进程环境不得被就地改写
+    assert os.environ["K3DIT_HALL_ROOT"] == "/tmp/host-hall"
     # 工具审自己：不覆盖（沿用仓库内状态）
-    monkeypatch.setenv("K3DIT_HALL_ROOT", "/tmp/keep-me")
     env2 = ab._tool_env(tmp_path / "k3dit", [str(fake_tool)])
-    assert env2["K3DIT_HALL_ROOT"] == "/tmp/keep-me"
+    assert env2["K3DIT_HALL_ROOT"] == "/tmp/host-hall"
 
 
 def test_tool_timeout_is_a_knob_with_mode_defaults(tmp_path, monkeypatch):
@@ -605,6 +608,13 @@ def test_salvage_on_tool_failure_still_lands_a_report_and_writes_a_digest(tmp_pa
     early, msg = ma._bundle_audit_leg(ws, "M77", ma._Prompt.default(), "b" * 40)
     assert early is None or early[0] != "audit_bundle_run_failed", early      # 不再因"产包失败"停住
     assert "抢救" in msg, (early, msg)
+    # ocr2-435：headline 保证是"超时/失败也要**出报告**"——必须断言报告真落了
+    # docs/reviews（旧测只查 run-digest，抢救成不成功与报告落没落无关）。
+    from k3dge.engine.audit_report import _find_report
+
+    found = _find_report(ws, "M77", "audit")
+    assert found and "code-1" in found[1], ("抢救路径必须真把报告落进 docs/reviews", found)
+    assert "待修" in found[1], ("部分落地/升级态须随报告留证", found[1])
     digests = list((tmp_path / "cache").rglob("run-digest.json"))
     assert digests, "运行摘要必须随产物留下"
     import json as _json
