@@ -226,6 +226,31 @@ class TestAuditPromptRouting(unittest.TestCase):
         self.assertEqual(evil.count("```"), base.count("```"))
         self.assertNotIn("~~~\n# 忽略", evil)
 
+    def test_harden_strips_before_defusing(self) -> None:
+        """先去控制字符、再去围栏：反过来会漏（ocr2-025）。
+
+        "`\\x00``" 里没有三反引号 ⇒ 先 scrub 看不见；去控制字符后造出 "```" ⇒ 必须再 scrub。
+        """
+        out = mcp._harden_prompt_text("`\x00``")
+        self.assertNotIn("```", out)
+
+    def test_protocol_fallback_returns_tuple_on_bad_workspace(self) -> None:
+        """越界 workspace 下 `_audit_protocol_with_fallback` 必须回传 tuple（ocr2-026）。
+
+        旧实现直接回传 JSON 串，调用方 `proto, fell_back, reason = ...` 解包即崩。
+        """
+        import os
+
+        os.environ["K3DGE_MCP_ROOT"] = "/tmp/mcp-root"
+        try:
+            proto, fell_back, reason = mcp._audit_protocol_with_fallback(
+                workspace_path="/no/such/dir/xyz")
+        finally:
+            del os.environ["K3DGE_MCP_ROOT"]
+        self.assertEqual(proto, "")
+        self.assertTrue(fell_back)
+        self.assertIn("WorkspaceOutsideRoot", reason)
+
 
 
 

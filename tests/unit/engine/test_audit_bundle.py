@@ -940,3 +940,28 @@ def test_dummy_peer_state_and_report_shape(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("DUMMY_PEER_STATE", str(link))
     with pytest.raises(RuntimeError, match="符号链接"):
         load("c")._load_jobs()
+
+
+def test_apply_bundle_rejects_missing_manifest(tmp_path):
+    """manifest 缺失/不可解析 ≠ "无补丁要打"：空 facts 必须 fail-clear（ocr2-037/038）。"""
+    ws = _repo(tmp_path)
+    b = tmp_path / "bad"
+    b.mkdir()
+    r = ab.apply_bundle(ws, b)
+    assert not r["ok"] and r["error"] == "NO_MANIFEST", r
+    (b / "manifest.json").write_text("{bad json", encoding="utf-8")
+    r2 = ab.apply_bundle(ws, b)
+    assert not r2["ok"] and r2["error"] == "NO_MANIFEST", r2
+
+
+def test_post_apply_check_fails_on_broken_declaration(tmp_path):
+    """pipeline.toml 存在但解析失败 ⇒ 不是"未声明"，不许跳过（ocr2-041/042）。"""
+    ws = _repo(tmp_path)
+    (ws / ".agent").mkdir(exist_ok=True)
+    (ws / ".agent" / "pipeline.toml").write_text("{ broken toml [[[", encoding="utf-8")
+    r = ab._post_apply_check(ws, ws)
+    assert not r["ok"] and "不可读/不可解析" in r["detail"], r
+    # 对照：文件缺失 ⇒ 未声明，跳过
+    (ws / ".agent" / "pipeline.toml").unlink()
+    r2 = ab._post_apply_check(ws, ws)
+    assert r2["ok"] and r2["cmd"] == "", r2

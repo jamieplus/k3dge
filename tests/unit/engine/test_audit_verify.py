@@ -291,3 +291,23 @@ def test_checklist_counts_escalations_as_pending(tmp_path):
     data = audit_checklist.build_checklist(ws, "M1")
     assert data["closure"]["audit"]["escalated"] == 2, data["closure"]
     assert data["closure"]["audit"]["pending"] == 2, data["closure"]
+
+
+def test_baseline_non_object_is_rejected(tmp_path):
+    """`baseline.json` 合法 JSON 但非对象 ⇒ 哈希链不可核，不抛 AttributeError（ocr2-048）。"""
+    b = make_bundle(tmp_path)
+    (b / "baseline.json").write_text('["not", "an", "object"]', encoding="utf-8")
+    res = av.verify_bundle_local(b)
+    assert not res["ok"] and "不是对象" in _errors(res), _errors(res)
+
+
+def test_duplicate_finding_ids_are_reported(tmp_path):
+    """`findings.json` 重复 ID 不得静默折叠（ocr2-049）：后条覆盖前条 ⇒ 必须报错。"""
+    import json as _json
+
+    b = make_bundle(tmp_path)
+    items = _json.loads((b / "findings.json").read_text(encoding="utf-8"))
+    items["items"] = items["items"] + [dict(items["items"][0])]
+    (b / "findings.json").write_text(_json.dumps(items, ensure_ascii=False), encoding="utf-8")
+    res = av.verify_bundle_local(b)
+    assert not res["ok"] and "ID 重复" in _errors(res), _errors(res)

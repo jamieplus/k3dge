@@ -654,7 +654,9 @@ def _audit_protocol_with_fallback(workspace_path: Optional[str] = None) -> tuple
     try:
         ws = _find_workspace(workspace_path=workspace_path)
     except ValueError as exc:   # 越界 workspace_path ⇒ 闭集 _err，不能 traceback（ADR-0006/ocr-181）
-        return _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or "")
+        # 本函数契约是 `tuple[str, bool, str]`：直接回传 JSON 串会让调用方解包崩掉（ocr2-026）。
+        # 把闭集错误放进 `reason`，协议路径空、标 fallback。
+        return ("", True, _err("WorkspaceOutsideRoot", str(exc), path=workspace_path or ""))
     candidates = [
         (ws.parent / "k3dit" / "docs" / "guides" / "audit-method.md", "k3dit"),
         (ws / ".." / "k3dit" / "docs" / "guides" / "audit-method.md", "k3dit alt"),
@@ -724,8 +726,10 @@ def _harden_prompt_text(s: object, limit: int = 8000) -> str:
     agent 注入指令；无上限也与本模块「Never returns bodies / token 经济」的约束相反（ocr-185）。
     """
     text = str(s or "")
-    text = text.replace("``" + "`", "``_").replace("~~~", " ~ ~ ~")
+    # 先去控制字符、再去围栏：反过来会漏——去控制字符能**造出**三反引号（如 "`\x00``" → "```"），
+    # 先 scrub 的话那个三串就没被见过（ocr2-025）。
     text = "".join(ch for ch in text if ch in ("\n", "\t") or (" " <= ch != "\x7f"))
+    text = text.replace("``" + "`", "``_").replace("~~~", " ~ ~ ~")
     return text[:limit]
 
 

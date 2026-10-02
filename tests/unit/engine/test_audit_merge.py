@@ -191,3 +191,15 @@ def test_theirs_missing_is_reported_separately(tmp_path, monkeypatch) -> None:
                         lambda b, name: {"ghost.py"} if name == "fix.patch" else set())
     res = am.merge_into(tmp_path, bundle)
     assert res["missing"] == ["ghost.py"], res
+
+
+def test_union_pins_refuses_binary(tmp_path):
+    """任一输入非 UTF-8（二进制）⇒ 不合，直接拒（ocr2-046）。
+
+    `decode("replace")` + `write_text(utf-8)` 会把二进制静默改写损坏。
+    """
+    b = make_bundle(tmp_path)
+    ws = _ws(tmp_path, "x = 1\n")
+    (ws / "src" / "a.py").write_bytes(b"\xff\xfe\x00binary")
+    u = am.union_pins(ws, b, "src/a.py")
+    assert not u["ok"] and "非 UTF-8" in u["detail"], u

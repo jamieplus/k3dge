@@ -257,8 +257,20 @@ def union_pins(workspace: Path, bundle: Path, rel: str) -> Dict[str, Any]:
         a.write_bytes((workspace / rel).read_bytes() if (workspace / rel).is_file() else b"")
         b.write_bytes((Path(base["root"]) / rel).read_bytes() if (Path(base["root"]) / rel).is_file() else b"")
         c.write_bytes((Path(bundle) / "code" / rel).read_bytes())
+        # 钉是文本标注：任一输入非 UTF-8（二进制）时 `decode("replace")` 会把字节换成 U+FFFD，
+        # 调用方再 `write_text(utf-8)` 写回 ⇒ 二进制文件被静默改写损坏（ocr2-046）。直接拒，不合二进制。
+        for _p in (a, b, c):
+            try:
+                _p.read_bytes().decode("utf-8")
+            except UnicodeDecodeError:
+                return {"ok": False, "text": "",
+                        "detail": f"{rel}: 非 UTF-8 文件不做钉并集（防二进制损坏），需人工处理"}
         rc = subprocess.run(["git", "merge-file", "--union", "-p", str(a), str(b), str(c)], capture_output=True)
-        return {"ok": rc.returncode == 0, "text": rc.stdout.decode("utf-8", "replace"),
+        try:
+            _text = rc.stdout.decode("utf-8")
+        except UnicodeDecodeError:
+            return {"ok": False, "text": "", "detail": f"{rel}: 合并输出非 UTF-8，不落盘"}
+        return {"ok": rc.returncode == 0, "text": _text,
                 "detail": (rc.stderr or b"").decode("utf-8", "replace")[:200]}
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

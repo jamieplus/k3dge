@@ -519,6 +519,11 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
     `exclude`＝显式排除某些文件（例如"这条修复与当前测试期望冲突，需人工重做"）——不做猜测。
     """
     facts = bundle_facts(bundle)
+    if not facts:
+        # manifest 缺失/不可解析 ⇒ **不是**"无补丁要打"：空 facts 与"显式空 apply_order"必须区分，
+        # 否则损坏包/误传包被当成成功消费（ocr2-037/038）。
+        return {"ok": False, "error": "NO_MANIFEST",
+                "detail": f"{bundle}/manifest.json 缺失或不可解析（不是显式空补丁列表）"}
     order = facts.get("apply_order") or []
     if not order:
         return {"ok": True, "applied": [], "files": [], "dry_run": dry_run,
@@ -675,9 +680,16 @@ def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry
         if pins:
             from k3dge.engine import audit_merge      # 单源：补丁→文件集合只认 `patch_rels`
 
+            # `pins.patch` 非空但 `pins_rels` 为空 ⇒ 钉层被静默丢掉（路径全被过滤或解析不出），
+            # `ok: True` 会让调用方以为钉已落（ocr2-045）。fail-clear。
+            _pins_path = Path(bundle) / pins
+            _pins_rels = sorted(res.get("pins_rels") or audit_merge.patch_rels(Path(bundle), pins))
+            if _pins_path.is_file() and _pins_path.stat().st_size > 0 and not _pins_rels:
+                return {"ok": False, "error": "PINS_UNACCOUNTED", "conflicts": [],
+                        "detail": f"{pins}: 补丁非空但解析不出可落文件（路径被过滤？），钉层未落，不静默通过"}
             rc, apply_out = _git(wt, "apply", "-p1", str(Path(bundle) / pins))
             if rc != 0:
-                for rel in sorted(res.get("pins_rels") or audit_merge.patch_rels(Path(bundle), pins)):
+                for rel in _pins_rels:
                     u = audit_merge.union_pins(wt, Path(bundle), rel)
                     if not u.get("ok"):
                         return {"ok": False, "error": "PINS_MERGE_FAILED", "conflicts": [rel],
@@ -726,8 +738,14 @@ def _post_apply_check(root: Path, workspace: Path) -> dict:
 
         data = tomllib.loads((Path(workspace) / ".agent" / "pipeline.toml").read_text(encoding="utf-8"))
         cmd = str(((data.get("roles") or {}).get("audit") or {}).get("post_apply_check") or "")
-    except Exception:
-        cmd = ""
+    except FileNotFoundError:
+        # 声明文件根本不存在 ⇒ 未声明，跳过（正常路径）。
+        pass
+    except Exception as exc:
+        # 文件存在但读不出/解析失败 ⇒ **不是**"未声明"：把损坏的声明当"跳过"会放行未经校验的落库
+        # （ocr2-041/042）。fail-clear。
+        return {"cmd": "", "ok": False,
+                "detail": f"post_apply_check 声明不可读/不可解析（非'未声明'，不跳过）：{exc}"}
     if not cmd:
         return {"cmd": "", "ok": True, "detail": "未声明 post_apply_check（跳过）"}
     try:

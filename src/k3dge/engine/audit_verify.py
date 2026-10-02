@@ -189,6 +189,11 @@ def _replay_hashes(bundle: Path) -> Dict[str, Any]:
     import hashlib
 
     baseline = _read_json(Path(bundle) / "baseline.json") or {}
+    if not isinstance(baseline, dict):
+        # `baseline.json` 是不可信外部输入：合法 JSON 但非对象（列表/字符串/数字）时 `.get`
+        # 会抛 `AttributeError`（ocr2-048）。与 manifest 的 `isinstance` 守卫同口径。
+        return {"ok": False, "checked": 0, "mismatched": [], "files_with_markers": [], "skipped_pin_files": [],
+                "detail": f"baseline.json 不是对象（{type(baseline).__name__}），哈希链不可核"}
     want = baseline.get("files") or {}
     if not want:
         return {"ok": False, "checked": 0, "mismatched": [], "files_with_markers": [], "skipped_pin_files": [],
@@ -293,6 +298,16 @@ def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed:
     if not isinstance(findings, list):
         findings = []
         errors.append("findings.json 结构不可识别（期望 {items: [...]}）")
+    # `findings.json` 里的重复 ID 不得静默折叠（字典只留最后一条）：报告侧会报重复行，
+    # findings 侧也要报，否则"已修"计数与闭环都可能基于被覆盖的记录（ocr2-049）。
+    seen: Dict[str, int] = {}
+    for x in findings:
+        if isinstance(x, dict) and x.get("id"):
+            _i = str(x.get("id"))
+            seen[_i] = seen.get(_i, 0) + 1
+    _dups = sorted(i for i, n in seen.items() if n > 1)
+    if _dups:
+        errors.append(f"findings.json ID 重复（后条覆盖前条，不闭环）：{_dups[:5]}")
     by_id = {str(x.get("id")): x for x in findings if isinstance(x, dict) and x.get("id")}
     unclosed = _unclosed_local({i: x for i, x in by_id.items()})
     terminal_unacked = sorted(str(i) for i, x in by_id.items()
