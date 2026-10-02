@@ -915,6 +915,43 @@ def test_dummy_peer_state_and_report_shape(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("DUMMY_PEER_STATE")
     m2 = load("b")
     assert m2._STATE_FILE.name.startswith("k3dge_dummy_peer_jobs-") and m2._STATE_FILE != m._STATE_FILE
+    sys.modules.pop("dummy_peer_a", None)
+    sys.modules.pop("dummy_peer_b", None)
+    # ocr2-436：只验名，不用缺省共享账跑行为；行为一律走 per-test 文件
+    monkeypatch.setenv("DUMMY_PEER_STATE", str(tmp_path / "jobs2.json"))
+    # ocr2-390：import 之后再改 env 必须生效（现场解析，不读导入快照）
+    assert str(m2._state_path()) == str(tmp_path / "jobs2.json")
+    monkeypatch.setenv("DUMMY_PEER_STATE", str(tmp_path / "jobs3.json"))
+    assert str(m2._state_path()) == str(tmp_path / "jobs3.json")
+    # ocr2-391：条目非对象必须拒收（不是 collect 侧 AttributeError）
+    (tmp_path / "jobs3.json").write_text('{"abc123": 5}', encoding="utf-8")
+    with pytest.raises(RuntimeError, match="条目不是对象"):
+        m2._load_jobs()
+    # ocr2-392：落盘失败不留 .tmp，且下一次提交仍可用
+    import json as _jl
+    monkeypatch.setattr(m2, "_json_dumps", lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")))
+    with pytest.raises(OSError):
+        m2._save_jobs({"x": {}})
+    assert list(tmp_path.glob("jobs3.json.*.tmp")) == []
+    monkeypatch.setattr(m2, "_json_dumps", _jl.dumps)
+    (tmp_path / "jobs3.json").unlink(missing_ok=True)  # 清掉 ocr2-391 的坏账夹具
+    mok = _jl.loads(m2.dummy_submit(baseline="c" * 40))
+    assert mok["ok"], mok
+    # ocr2-394：锁文件是符号链接 ⇒ 拒用
+    lock_link = tmp_path / "jobs3.json.lock"
+    if lock_link.exists() or lock_link.is_symlink():
+        lock_link.unlink()
+    lock_link.symlink_to(tmp_path / "evil.lock")
+    with pytest.raises(RuntimeError, match="锁文件是符号链接"):
+        m2.dummy_submit(baseline="d" * 40)
+    lock_link.unlink()
+    # ocr2-395：超长非 hex 直接拒（长度门在前，不逐字符全扫也必须 BAD_BUNDLE）
+    huge = _jl.loads(m2.dummy_submit(baseline="g" * 10000))
+    assert huge["ok"] is False and huge["error"] == "BAD_BUNDLE", huge
+    # ocr2-393：无 fcntl 平台不得静默无锁（源码级钉死 fail-loud）
+    import inspect as _insp
+    _src = _insp.getsource(m2._state_lock)
+    assert "拒跑" in _src and "yield\n        return" not in _src, _src
 
     # ② 畸形 DUMMY_PENDING ⇒ 入口式 BAD_CONFIG（旧写法在工具内部抛 ValueError，
     #    而文档说的"默认 0"只在变量缺失时生效）
@@ -940,6 +977,7 @@ def test_dummy_peer_state_and_report_shape(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("DUMMY_PEER_STATE", str(link))
     with pytest.raises(RuntimeError, match="符号链接"):
         load("c")._load_jobs()
+    sys.modules.pop("dummy_peer_c", None)
 
 
 def test_apply_bundle_rejects_missing_manifest(tmp_path):
@@ -965,3 +1003,115 @@ def test_post_apply_check_fails_on_broken_declaration(tmp_path):
     (ws / ".agent" / "pipeline.toml").unlink()
     r2 = ab._post_apply_check(ws, ws)
     assert r2["ok"] and r2["cmd"] == "", r2
+
+
+def test_tool_env_redirects_state_for_external_repo_without_tool_marker(tmp_path):
+    """ocr2-191/192：仅靠 3 层父目录相等不得判"工具审自己"，否则状态落外部被审仓。"""
+    ws = tmp_path / "audited"
+    bindir = ws / ".venv" / "bin"
+    bindir.mkdir(parents=True)
+    tool = bindir / "k3dit"
+    tool.write_text("x", encoding="utf-8")
+    env = ab._tool_env(ws, [str(tool)])
+    assert "K3DIT_HALL_ROOT" in env, env      # 外部仓 ⇒ 状态改落缓存
+    # 对照：真工具仓（有 .git 标识）⇒ 保持仓库内状态
+    home = tmp_path / "toolhome"
+    (home / ".git").mkdir(parents=True)
+    b2 = home / ".venv" / "bin"
+    b2.mkdir(parents=True)
+    t2 = b2 / "k3dit"
+    t2.write_text("x", encoding="utf-8")
+    assert "K3DIT_HALL_ROOT" not in ab._tool_env(home, [str(t2)])
+
+
+def test_bundle_digest_survives_unreadable_file(tmp_path, monkeypatch):
+    """ocr2-193：摘要阶段读失败不得抛 traceback（补丁已落树，必须结构化）。"""
+    b = tmp_path / "bundle"
+    b.mkdir()
+    (b / "x.py").write_text("x\n", encoding="utf-8")
+    real = Path.read_bytes
+
+    def fake_read(self):
+        if self.name == "x.py":
+            raise OSError("denied")
+        return real(self)
+
+    monkeypatch.setattr(Path, "read_bytes", fake_read)
+    digest = ab.bundle_digest(b)
+    assert isinstance(digest, str) and len(digest) == 64
+
+
+def test_escaping_rels_scans_deletion_headers(tmp_path):
+    """ocr2-194/195：删除型补丁的越界目标在 `--- a/`，不能只扫 `+++ b/`。"""
+    p = tmp_path / "del.patch"
+    p.write_text("--- a/../../outside/file\n+++ /dev/null\n", encoding="utf-8")
+    assert ab._escaping_rels(p) == ["../../outside/file"]
+
+
+def test_worktree_add_failure_cleans_temp_dir(tmp_path, monkeypatch):
+    """ocr2-196/197：`worktree add` 失败早退时也要清掉自建临时目录。"""
+    import tempfile
+
+    made = {}
+
+    def fake_mkdtemp(*a, **k):
+        d = tmp_path / "mktmp"
+        d.mkdir()
+        made["d"] = d
+        return str(d)
+
+    monkeypatch.setattr(tempfile, "mkdtemp", fake_mkdtemp)
+    monkeypatch.setattr(ab, "_git", lambda *a, **k: (1, "fatal: worktree"))
+    res = ab._apply_sequential_merged(tmp_path / "ws", tmp_path / "b")
+    assert res["error"] == "WORKTREE_UNAVAILABLE", res
+    assert not made["d"].exists(), "失败早退泄漏了临时目录"
+
+
+def test_commit_applied_removes_untracked_new_files_on_failure(tmp_path, monkeypatch):
+    """ocr2-200：commit 失败后新增的未跟踪文件也要清掉，否则下一轮 DIRTY_TREE。"""
+    new = tmp_path / "ws" / "docs" / "reviews" / "new.md"
+    new.parent.mkdir(parents=True)
+    new.write_text("x\n", encoding="utf-8")
+
+    def fake_git(w, *args, **k):
+        if args and args[0] == "add":
+            return (0, "")
+        if args[:2] == ("diff", "--cached"):
+            return (1, "")
+        if "commit" in args:
+            return (1, "hook failed")
+        if args and args[0] == "reset":
+            return (0, "")
+        if args and args[0] == "ls-files":
+            return (1, "")      # 未跟踪
+        return (0, "")
+
+    monkeypatch.setattr(ab, "_git", fake_git)
+    sha, err = ab.commit_applied(tmp_path / "ws", "msg", ["docs/reviews/new.md"])
+    assert sha == "" and "commit 失败" in err, (sha, err)
+    assert not new.exists(), "未跟踪新增文件未清理"
+
+
+def test_post_apply_check_kills_process_group_on_timeout(tmp_path, monkeypatch):
+    """ocr2-198/199：超时必须按进程组 kill，否则孙进程在回滚后继续写树。"""
+    import subprocess as _sp
+
+    ws = tmp_path
+    (ws / ".agent").mkdir()
+    (ws / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\npost_apply_check = "sleep 9999"\n', encoding="utf-8")
+    killed: dict = {}
+
+    class FakeProc:
+        pid = 4242
+
+        def communicate(self, timeout=None):
+            if timeout is not None:
+                raise _sp.TimeoutExpired("cmd", timeout)
+            return (b"", b"")
+
+    monkeypatch.setattr(ab.subprocess, "Popen", lambda *a, **k: FakeProc())
+    monkeypatch.setattr(ab.os, "killpg", lambda pid, sig: killed.update(pid=pid, sig=sig))
+    res = ab._post_apply_check(ws, ws)
+    assert res["ok"] is False and res["rc"] == 124, res
+    assert killed.get("pid") == 4242, killed

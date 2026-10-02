@@ -40,6 +40,13 @@ class TestEvidenceAndPorcelain(unittest.TestCase):
             "R  src/b.py\0src/a.py\0 M src/c.py\0A  docs/x.md\0?? src/é.md\0")
         self.assertEqual(got, ["src/b.py", "src/c.py", "docs/x.md", "src/é.md"])
 
+    def test_porcelain_paths_preserve_significant_spaces(self) -> None:
+        """ocr2-171：文件名里合法的前/后导空格不得被 `.strip()` 抹掉。"""
+        from k3dge.cli.main import _porcelain_paths
+
+        got = _porcelain_paths(" M leading.py\0 M  spaced.py \0")
+        self.assertEqual(got, ["leading.py", " spaced.py "])
+
     def test_mcp_err_normalizes_path_separators(self) -> None:
         import json as _json
 
@@ -219,6 +226,28 @@ class TestCli(unittest.TestCase):
                 self.assertTrue(any(v["rule_id"] == "CONTRACT_DRIFT" for v in data["violations"]))
             finally:
                 os.chdir(old)
+
+    def test_check_hint_failure_does_not_flip_passed_gate(self):
+        """ocr2-172：hint 是纯信息面——生成失败不得把已通过的 gate 翻成异常/非零。"""
+        import types
+        from unittest import mock
+
+        from k3dge.cli import main as cli
+
+        report = mock.Mock(passed=True, violations=[], changed_files=[], modified_domains=[])
+        report.render.return_value = "PASS"
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch.object(cli, "_find_workspace", return_value=Path(d)), \
+                mock.patch.object(cli, "ConsistencyEngine") as eng, \
+                mock.patch.object(cli, "_emit_all_hints", side_effect=RuntimeError("hint boom")), \
+                mock.patch.object(cli, "_append_log"):
+            eng.return_value.evaluate.return_value = report
+            args = types.SimpleNamespace(json=False, with_tests=False, force_full=False, staged=False)
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                rc = cli.cmd_check(args)
+        self.assertEqual(rc, 0, rc)
+        self.assertIn("hint 生成失败", err.getvalue(), err.getvalue())
 
     def test_milestone_status_no_tasks_exits_one(self):
 
@@ -445,6 +474,11 @@ class TestCli(unittest.TestCase):
             self.assertIn(k, cli)
         mcp = json.loads(k3dge_status(workspace_path=str(ws)))
         # MCP tool must delegate to the same implementation, not re-scan — identical shape.
+        # ocr2-400：白名单子集断言抓不住 `next`/`task_dag`/`cache` 这类键漂移；全量比共享键。
+        for k in keys:
+            self.assertIn(k, cli)
+        self.assertEqual({k: cli[k] for k in mcp if k in cli},
+                         {k: mcp[k] for k in mcp if k in cli})
         for k in keys:
             self.assertEqual(cli[k], mcp[k])
 
@@ -602,9 +636,10 @@ def test_audit_bundle_manual_entry_fails_clear_when_landing_fails(monkeypatch):
 if __name__ == "__main__":
     # 本文件混装 TestCase 类与模块级 pytest 函数（t-041）：`unittest.main()` 只发现前者，
     # ADR-0026 MCP 封闭性与 audit-bundle 落地这两组**安全/数据完整性**回归会在直跑时静默消失。
+    # ocr2-401：缺 pytest 时 fail-loud，不许降级跑 unittest.main() 报 OK。
     try:
         import pytest
-    except ImportError:                                # pragma: no cover
-        unittest.main()
+    except ImportError:
+        raise SystemExit("此文件含模块级 pytest 用例，必须用 pytest 运行（unittest.main 会静默跳过它们）")
     else:
         raise SystemExit(pytest.main([__file__, "-q"]))

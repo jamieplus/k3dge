@@ -166,6 +166,11 @@ def _validate_peers(workspace, peers, servers, role_bind):
                 errors.extend(_validate_transports(
                     workspace, a_cfg.get("transports", []),
                     f"{p_name}.actions.{a_name}", servers, role_bind))
+            # peer 级 transports 即使在 actions 表有效时仍是活配置（2-part 别名回退，
+            # ocr2-291）：有声明就必须同口径校验。
+            if isinstance(p_cfg.get("transports"), list) and p_cfg.get("transports"):
+                errors.extend(_validate_transports(
+                    workspace, p_cfg.get("transports", []), p_name, servers, role_bind))
         else:
 
             errors.extend(_validate_transports(
@@ -314,6 +319,16 @@ def _validate_manual_transport(workspace: Path, t: dict, idx: int, scope: str, *
     if not proto:
         return [("PIPELINE_SCHEMA_INVALID",
                  f"missing 'protocol' for manual transport in {scope}.transports[{idx}]")]
+    try:
+        # 纯词法检查挡不住仓内软链外逃（`docs/protocols -> ~/.ssh`，ocr2-292）：
+        # 解析后必须仍在 workspace 内才算存在。
+        cand = (workspace / proto).resolve()
+        if not cand.is_relative_to(workspace.resolve()):
+            return [("PIPELINE_SCHEMA_INVALID",
+                     f"manual transport '{scope}.transports[{idx}]' protocol 越出 workspace（软链）：{proto!r}")]
+    except OSError:
+        return [("PIPELINE_PROTOCOL_NOT_FOUND",
+                 f"protocol file '{proto}' in '{scope}' does not exist on disk")]
     if not (workspace / proto).is_file():
         return [("PIPELINE_PROTOCOL_NOT_FOUND",
                  f"protocol file '{proto}' in '{scope}' does not exist on disk")]

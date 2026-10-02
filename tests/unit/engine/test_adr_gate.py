@@ -62,8 +62,18 @@ def test_reconcile_supersedes_auto_marks_old():
         old_text = (ws / "docs" / "adr" / "obsolete" / "0001-old.md").read_text(encoding="utf-8")
         assert "Status: Superseded" in old_text
         assert "superseded_by: ADR-0002" in old_text
+        # ocr2-420 真 round-trip：写入器自己的输出必须被识别器认出，否则每轮重写。
+        from k3dge.engine.adr_gate import _is_superseded
+        assert _is_superseded(old_text, "0002"), old_text
+        assert adr_gate.reconcile_supersedes(ws) is None
         # adrs_all_accepted 应该跳过（obsolete/ 不在扫描范围）
         assert adr_gate.adrs_all_accepted(ws) is None
+        # ocr2-419：归档件是 Superseded（白名单内）⇒ 上行在 `_adr_files` 退化成
+        # rglob 时照样绿。`Rejected` 不在白名单 ⇒ 用它当真判别需要时补在下面；
+        # 这里钉 `adr_landed` 判别：归档件不参与落地闸（0002 指针有效 ⇒ 全过）。
+        assert adr_gate.adr_landed(ws) is None
+        # 结构直钉：扫描面只有活跃目录顶层，obsolete/ 永远不可见（rglob 退化即红）。
+        assert [p.name for p in adr_gate._adr_files(ws)] == ["0002-new.md"]
 
 
 def test_reconcile_supersedes_idempotent():
@@ -118,6 +128,8 @@ def test_rejected_idempotent():
         obs.mkdir(parents=True)
         (obs / "0003-bad.md").write_text("---\nStatus: Rejected\n---\n# ADR-0003\n", encoding="utf-8")
         assert adr_gate.reconcile_supersedes(ws) is None
+        # ocr2-419 真判别：Rejected 不在白名单 ⇒ 扫描面一旦把 obsolete/ 扫进来这里即红。
+        assert adr_gate.adrs_all_accepted(ws) is None
 
 
 def test_landing_pointer_must_stay_in_workspace_and_be_file():
@@ -168,10 +180,16 @@ def test_reconcile_validates_all_before_touching_disk():
             "0002-new.md": "---\nStatus: Accepted\nSupersedes: ADR-0001\nLanded-by: docs/specs/x/spec.md\n---\n# ADR-0002\n",
             "0003-x.md": "---\nStatus: Accepted\nSupersedes: ADR-0099\nLanded-by: docs/specs/x/spec.md\n---\n# ADR-0003\n",
         })
+        orig = {(ws / "docs" / "adr" / n).read_text(encoding="utf-8") for n in
+                ("0001-old.md", "0002-new.md", "0003-x.md")}
         out = adr_gate.reconcile_supersedes(ws)
         assert out and "SEAL REJECTED" in out and "ADR-0099" in out
         assert (ws / "docs" / "adr" / "0001-old.md").is_file(), "部分生效：0001 已先被归档"
         assert not (ws / "docs" / "adr" / "obsolete").exists()
+        # ocr2-421：只钉存在性抓不住"计划相就地改 0001 再拒"——原文逐字钉住 + 无 .tmp 残留。
+        for n in ("0001-old.md", "0002-new.md", "0003-x.md"):
+            assert (ws / "docs" / "adr" / n).read_text(encoding="utf-8") in orig, f"{n} 被部分改写"
+        assert list((ws / "docs" / "adr").glob("*.tmp")) == []
     # ② 0002 合法 + 0004 的目标 0005 没有可改 Status 行 ⇒ 同样先拒后动
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d, {
@@ -180,10 +198,16 @@ def test_reconcile_validates_all_before_touching_disk():
             "0004-y.md": "---\nStatus: Accepted\nSupersedes: ADR-0005\nLanded-by: docs/specs/x/spec.md\n---\n# ADR-0004\n",
             "0005-bad.md": "# ADR-0005 没有 frontmatter\n",
         })
+        orig2 = {n: (ws / "docs" / "adr" / n).read_text(encoding="utf-8") for n in
+                 ("0001-old.md", "0002-new.md", "0004-y.md", "0005-bad.md")}
         out = adr_gate.reconcile_supersedes(ws)
         assert out and "SEAL REJECTED" in out and "0005-bad.md" in out
         assert (ws / "docs" / "adr" / "0001-old.md").is_file(), "部分生效：0001 已先被归档"
         assert not (ws / "docs" / "adr" / "obsolete").exists()
+        # ocr2-421 同款：逐字钉住原文 + 无 .tmp 残留。
+        for n, body in orig2.items():
+            assert (ws / "docs" / "adr" / n).read_text(encoding="utf-8") == body, f"{n} 被部分改写"
+        assert list((ws / "docs" / "adr").glob("*.tmp")) == []
 
 
 def test_supersede_refuses_to_overwrite_archived_source():
@@ -337,3 +361,26 @@ def test_mark_superseded_updates_existing_provenance() -> None:
 
     out = _mark_superseded("---\nStatus: Accepted\nsuperseded_by: ADR-0001\n---\n# X\n", "0002")
     assert out is not None and "superseded_by: ADR-0002" in out and "ADR-0001" not in out
+
+
+def test_reconcile_rejects_unreadable_target_fail_closed(monkeypatch) -> None:
+    """ocr2-181：Supersedes 目标不可读 ⇒ 硬闸 fail-closed，不得静默跳过或移动。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {
+            "0001-old.md": "---\nStatus: Accepted\nSupersedes: -\n---\n# ADR-0001\n",
+            "0002-new.md": ("---\nStatus: Accepted\nSupersedes: ADR-0001\n"
+                            "Landed-by: docs/specs/x/spec.md\n---\n# ADR-0002\n"),
+        })
+        target = ws / "docs" / "adr" / "0001-old.md"
+        real = Path.read_text
+
+        def fake_read(self, *a, **k):
+            if self == target:
+                raise OSError("permission denied")
+            return real(self, *a, **k)
+
+        monkeypatch.setattr(Path, "read_text", fake_read)
+        out = adr_gate.reconcile_supersedes(ws)
+        assert out is not None and "SEAL REJECTED" in out and "不可读" in out, out
+        assert target.is_file(), "不可读 target 不得被移走/归档"
+        assert not (ws / "docs" / "adr" / "obsolete").exists()

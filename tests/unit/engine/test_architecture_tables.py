@@ -32,8 +32,22 @@ ENCY_ROWS = (
 )
 
 
+def _senv(repo: Path) -> dict:
+    """ocr2-426：与宿主 git 配置隔离（gpgsign/hook/autocrlf/excludes），调用有界。"""
+    e = {k: v for k, v in os.environ.items()
+         if not k.startswith("GIT_") and k != "K3DGE_BASE_SHA"}
+    e["GIT_CONFIG_GLOBAL"] = os.devnull
+    e["GIT_CONFIG_NOSYSTEM"] = "1"
+    e["GIT_TERMINAL_PROMPT"] = "0"
+    e["HOME"] = str(repo)
+    e["XDG_CONFIG_HOME"] = str(repo)
+    return e
+
+
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True)
+    subprocess.run(["git", "-c", "commit.gpgsign=false", "-C", str(repo), *args],
+                   check=True, capture_output=True, text=True,
+                   env=_senv(repo), timeout=60)
 
 
 def _make_repo(tmp: Path) -> Path:
@@ -149,10 +163,14 @@ class TestArchitectureTables(unittest.TestCase):
         self.assertNotIn("ARCH_TABLE_DRIFT", rules)
 
     def test_other_tables_are_ignored(self) -> None:
-        (self.repo / "docs" / "architecture" / "overview.md").write_text(
-            "# Arch\n\n| 术语 | 一句话 |\n| --- | --- |\n| Gate | 闸 |\n", encoding="utf-8"
-        )
-        self.assertNotIn("ARCH_TABLE_DRIFT", self._rules())
+        # ocr2-427：旧样本里根本没有域表 ⇒ `_domain_table_rows()` 回 None ⇒闸 `continue`，
+        # 删闸/删解析/早退全绿（且全文件唯独它缺可达性守卫）。先摆一张真（无漂移）域表，
+        # 再把无关表贴在旁边——闸必须解析过域表且仍忽略术语表。
+        self._write()
+        arch = self.repo / "docs" / "architecture"
+        with (arch / "overview.md").open("a", encoding="utf-8") as fh:
+            fh.write("\n| 术语 | 一句话 |\n| --- | --- |\n| Gate | 闸 |\n")
+        self._rules_gate_ran()
 
 
 if __name__ == "__main__":

@@ -296,6 +296,7 @@ def check_headers(
     codes: Dict[str, Any],
     filename: str,
     text: str,
+    schema_rel: str = ".schema.json",
 ) -> List[Check]:
     if not hdr_spec:
         return []
@@ -309,6 +310,14 @@ def check_headers(
                 code_for(codes, "headers", "DOC_SCHEMA_INVALID"),
                 f"{key}={val!r} not in {rule}: {Path(filename).name}",
                 "file",
+            ))
+        elif not isinstance(rule, list):
+            # 非 list 规则（str/dict/未知形状）不能静默认绿（ocr2-303）：
+            # 与 frontmatter 分支同口径，报 schema 侧不支持。
+            out.append((
+                code_for(codes, "headers", "DOC_SCHEMA_INVALID"),
+                f"{schema_rel} 的 headers.{key} 规则形状不支持（{type(rule).__name__}）",
+                "schema",
             ))
     return out
 

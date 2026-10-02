@@ -459,6 +459,41 @@ class TestPrematureArchive(TestCase):
         self.assertIsNone(premature_archive_hint(ws, "M9"))  # 当前 = M1
 
 
+class TestAlignCheckpoint(TestCase):
+    def test_existing_report_without_align_pass_marker_is_rejected(self) -> None:
+        """ocr2-182：已存在、非桩的报告缺 align-pass marker ⇒ 不得认作 seal-eligible（fail-closed）。"""
+        import datetime
+
+        ws = _ws()
+        _mk_task(ws)
+        today = datetime.date.today().isoformat()
+        rep = ws / "docs" / "reviews" / f"{today}-M1-align.md"
+        rep.write_text("# 人工填的报告\n\n结论：通过\n", encoding="utf-8")   # 无 stub、无 pass marker
+        with mock.patch("k3dge.engine.align._align_run_gates", return_value=None), \
+                mock.patch("k3dge.engine.align.gates.actions", return_value=["full_matrix"]):
+            ok, msg, _ = run_milestone_alignment(ws, "M1")
+        self.assertFalse(ok)
+        self.assertIn("缺 align-pass marker", msg)
+
+
+class TestPruneFinished(TestCase):
+    def test_non_object_state_file_is_not_fatal(self) -> None:
+        """ocr2-209：账本顶层非对象 ⇒ 当"无单可清"，不 AttributeError。"""
+        from k3dge.engine.audit_flow import STATE_REL, prune_finished
+
+        ws = _ws()
+        (ws / STATE_REL).write_text('["x"]', encoding="utf-8")
+        self.assertEqual(prune_finished(ws), {"pruned": 0})
+
+    def test_malformed_job_entries_are_skipped(self) -> None:
+        """ocr2-210：坏元素不得终止整个清理循环。"""
+        from k3dge.engine.audit_flow import STATE_REL, prune_finished
+
+        ws = _ws()
+        (ws / STATE_REL).write_text(json.dumps({"jobs": ["bad", 7]}), encoding="utf-8")
+        self.assertEqual(prune_finished(ws), {"pruned": 0})
+
+
 class TestClosureNote(TestCase):
     def test_note_records_final_version_and_merged_wording(self) -> None:
         from k3dge.engine import seal_flow
@@ -507,6 +542,57 @@ class TestAuditChecklist(TestCase):
         _mk_task(ws)
         ac.build_checklist(ws, "M1")
         self.assertTrue((ws / ".agent" / "audit_checklist.json").is_file())
+
+    def test_blank_report_ids_do_not_collapse_pending(self) -> None:
+        """ocr2-201：空白 ID 不得坍缩成同一个 `""` 成员而少报待修。"""
+        ws = _ws()
+        _mk_task(ws)
+        hdr = ("| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
+               "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
+        rows = "".join("| | d | s | p | t | x | loc | 待修 | - | - | - | - |\n" for _ in range(3))
+        (ws / "docs" / "reviews" / "2026-09-27-M1-external-audit.md").write_text(hdr + rows,
+                                                                                encoding="utf-8")
+        data = ac.build_checklist(ws, "M1")
+        self.assertEqual(data["closure"]["audit"]["pending"], 3, data["closure"])
+
+    def test_verify_budget_is_scoped_to_explicit_milestone(self) -> None:
+        """ocr2-202：显式里程碑的预算/快照不得被当前指针（M1）改写而清零。"""
+        ws = _ws()
+        _mk_task(ws)
+        ac.reset_for_audit(ws, "M2")
+        ac.bump_verify_attempt(ws, "M2")
+        self.assertEqual(ac.get_verify_attempts(ws, "M2"), 1)
+        self.assertEqual(ac.get_verify_attempts(ws, "M1"), 0)
+
+    def test_write_uses_unique_temp_not_fixed_name(self) -> None:
+        """ocr2-204：写快照用唯一临时名（mkstemp），不再抢固定 `.tmp`。"""
+        import tempfile as _tf
+
+        ws = _ws()
+        _mk_task(ws)
+        made: list = []
+        real = _tf.mkstemp
+
+        def spy(*a, **k):
+            fd, name = real(*a, **k)
+            made.append(name)
+            return fd, name
+
+        with mock.patch.object(_tf, "mkstemp", side_effect=spy):
+            ac.build_checklist(ws, "M1")
+        self.assertTrue(made, "快照写入未走唯一临时名（并发会互抢）")
+
+    def test_corrupt_verify_attempts_degrades_to_zero(self) -> None:
+        """ocr2-203：投影里的 null/非数字字段退化为 0，不得让审计环崩。"""
+        ws = _ws()
+        _mk_task(ws)
+        ac.build_checklist(ws, "M1")
+        p = ws / ".agent" / "audit_checklist.json"
+        data = json.loads(p.read_text(encoding="utf-8"))
+        data["verify_attempts"] = None
+        p.write_text(json.dumps(data), encoding="utf-8")
+        self.assertEqual(ac.get_verify_attempts(ws, "M1"), 0)
+        self.assertEqual(ac.bump_verify_attempt(ws, "M1"), 1)
 
 
 class TestReportTask(TestCase):
@@ -955,3 +1041,54 @@ class TestSealFlowEdges(TestCase):
             ok3, note3 = _rewrite_leftover_links(ws, "2026-09-02-M11-audit.md", "archive/M13/c.md")
         self.assertFalse(ok3)
         self.assertIn("写不进", note3)
+
+
+class TestLeftoverNewlineGuard(TestCase):
+    """已有 LEFTOVERS.md 不以换行收尾时不得把新行并到旧行尾（ocr2-270）。"""
+
+    def test_no_final_newline_inserts_separator(self) -> None:
+        ws = _ws()
+        p = ws / "docs" / "reviews" / "2026-09-01-M1-x.md"
+        p.write_text(_AUDIT, encoding="utf-8")
+        lp = ws / "docs" / "reviews" / "LEFTOVERS.md"
+        lp.write_text("| ID | 报告 |\n| X | [x](x.md) |", encoding="utf-8")   # 无收尾换行
+        _ensure_leftovers(ws, _AUDIT, p)
+        text = lp.read_text(encoding="utf-8")
+        self.assertIn("A2", text)
+        self.assertNotIn("| ## 有意留", text)          # 未与前一行黏连
+        self.assertIn("## 有意留", text)
+
+
+class TestClosedJobEvidenceContainment(TestCase):
+    """账里的报告路径不得逃出工作区（ocr2-271）。"""
+
+    def test_path_escape_is_rejected(self) -> None:
+        from k3dge.engine.milestone_audit import _closed_job_evidence
+
+        with tempfile.TemporaryDirectory() as d:
+            ok, msg = _closed_job_evidence(
+                Path(d), {"report": "../secret.md", "baseline": "b"}, "fresh")
+            self.assertFalse(ok)
+            self.assertIn("越界", msg)
+
+
+class TestRoleOptAndAuditMode(TestCase):
+    """坏 pipeline.toml 出声；`_audit_mode` 委托 `_role_opt`（ocr2-272/273）。"""
+
+    def test_bad_toml_warns_but_defaults(self) -> None:
+        from k3dge.engine.milestone_audit import _role_opt
+
+        ws = _ws()
+        (ws / ".agent" / "pipeline.toml").write_text("this = = =\n", encoding="utf-8")
+        err = io.StringIO()
+        with mock.patch("sys.stderr", err):
+            self.assertEqual(_role_opt(ws, "audit", "mode", "oneshot"), "oneshot")
+        self.assertIn("WARN", err.getvalue())
+
+    def test_audit_mode_reads_same_value(self) -> None:
+        from k3dge.engine.milestone_audit import _audit_mode
+
+        ws = _ws()
+        (ws / ".agent" / "pipeline.toml").write_text(
+            '[roles.audit]\nmode = "bundle"\n', encoding="utf-8")
+        self.assertEqual(_audit_mode(ws), "bundle")

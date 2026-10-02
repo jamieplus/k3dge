@@ -85,7 +85,7 @@ def test_read_only_does_not_touch_state(tmp_path, monkeypatch):
     `logs.md`、`logsbackup/x.json` 一并放行；③注释点名"不得产侧车 .k3dge/next.json"，
     却没有任何断言——写进**已存在**的 `.k3dge/` 在集合差里根本不可见。
     """
-    ws = _ws(tmp_path, "")
+    ws = _ws(tmp_path, '"tasks_all_done", "guides_filled", "docs_normalized"')
     (ws / ".k3dge").mkdir()                      # 先有侧车目录：写它里面的东西集合差看不见
     (ws / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
     (ws / "docs" / "tasks" / "2026-09-01-M10-idea-x.md").write_text(
@@ -99,8 +99,13 @@ def test_read_only_does_not_touch_state(tmp_path, monkeypatch):
 
     before = snap()
     assert any(k.startswith("docs/tasks/") for k in before), "既有票没建出来，快照对账无从谈起"
-    with redirect_stdout(io.StringIO()):
+    buf = io.StringIO()
+    with redirect_stdout(buf):
         main(["milestone", "seal-check", "M10"])
+    out = buf.getvalue()
+    # ocr2-412：空 preconditions 下闸求值零次，快照只审了空转——声明真闸并钉住求值发生。
+    assert "0/0 通过" not in out, f"清单一条闸都没求值 ⇒ 快照只审到了空转：{out[-500:]}"
+    assert "tasks_all_done" in out and "guides_filled" in out, out[-800:]
     after = snap()
     changed = {k for k in before.keys() & after.keys() if before[k] != after[k]}
     assert not changed, f"只读命令改了既有文件：{sorted(changed)}"

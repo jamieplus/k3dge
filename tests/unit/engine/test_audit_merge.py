@@ -203,3 +203,41 @@ def test_union_pins_refuses_binary(tmp_path):
     (ws / "src" / "a.py").write_bytes(b"\xff\xfe\x00binary")
     u = am.union_pins(ws, b, "src/a.py")
     assert not u["ok"] and "非 UTF-8" in u["detail"], u
+
+
+def test_manifest_non_object_fails_clear(tmp_path):
+    """ocr2-211：外部包 manifest 顶层非对象 / apply_order 非列表 ⇒ 结构化拒绝，不抛 AttributeError。"""
+    ws = _ws(tmp_path, "x = 1\ny = 2\n")
+    b = make_bundle(tmp_path / "a")
+    (b / "manifest.json").write_text('["not", "object"]', encoding="utf-8")
+    res = am.merge_into(ws, b)
+    assert res["ok"] is False and "顶层不是对象" in res["detail"], res
+    b2 = make_bundle(tmp_path / "b")
+    (b2 / "manifest.json").write_text('{"apply_order": 3, "pins": {"in_code": false}}',
+                                      encoding="utf-8")
+    res2 = am.merge_into(ws, b2)
+    assert res2["ok"] is False and "apply_order 不是列表" in res2["detail"], res2
+
+
+def test_merge_does_not_fall_back_to_pins_contaminated_code(tmp_path, monkeypatch):
+    """ocr2-212：反向钉后的中间树缺文件 ⇒ 记 missing，不回落含钉的 `code/`（会重复写钉）。"""
+    ws = _ws(tmp_path, "x = 1\ny = 2\n")
+    bundle = make_bundle(tmp_path / "b")
+    base_root = tmp_path / "base"
+    (base_root / "src").mkdir(parents=True)
+    (base_root / "src" / "a.py").write_text("# k3dit:pending old-1\nx = 1\ny = 2\n", encoding="utf-8")
+    mid_root = tmp_path / "mid"
+    mid_root.mkdir()          # 反向 pins 后 a.py 不存在
+    monkeypatch.setattr(am, "_owned_replay", lambda b, **k: {"ok": True, "root": str(base_root)})
+    monkeypatch.setattr(am, "replay_to_baseline", lambda b, **k: {"ok": True, "root": str(mid_root)})
+    res = am.merge_into(ws, bundle)
+    assert res["missing"] == ["src/a.py"], res
+    assert res["merged"] == {}, res
+
+
+def test_union_pins_missing_code_file_fails_clear(tmp_path):
+    """ocr2-213：包 `code/` 缺 rel ⇒ `{ok:False}` 契约，不裸 FileNotFoundError。"""
+    b = make_bundle(tmp_path)
+    ws = _ws(tmp_path, "x = 1\ny = 2\n")
+    res = am.union_pins(ws, b, "src/missing.py")
+    assert res["ok"] is False and "缺该文件" in res["detail"], res

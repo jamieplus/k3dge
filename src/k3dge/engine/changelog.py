@@ -43,7 +43,10 @@ def _try(workspace: Path, *args: str):
     import subprocess
 
     try:
-        return subprocess.run(["git", *args], cwd=str(workspace), capture_output=True, text=True)
+        # git 的 log 输出是 UTF-8（`i18n.logOutputEncoding`）：`text=True` 默认按 locale
+        # 解码，非 UTF-8 locale 下非 ASCII subject 会乱码或抛 UnicodeDecodeError（ocr2-223）。
+        return subprocess.run(["git", *args], cwd=str(workspace), capture_output=True,
+                              text=True, encoding="utf-8", errors="replace")
     except OSError:
         return None
 
@@ -54,7 +57,8 @@ def _git(workspace: Path, *args: str) -> str:
     # **失败要出声**：把"区间内没有提交"（rc=0、空输出）与"previous_tag 不存在/git 故障"（rc≠0）分开。
     # 旧行为把两者都压成 "" ⇒ 边界 tag 误删时封版写一条通用行、静默丢掉整段 CHANGELOG（ocr-057）。
     try:
-        r = subprocess.run(["git", "-C", str(workspace), *args], capture_output=True, text=True)
+        r = subprocess.run(["git", "-C", str(workspace), *args], capture_output=True,
+                           text=True, encoding="utf-8", errors="replace")
     except OSError as exc:
         raise RuntimeError(f"git 不可用：{exc}") from exc
     if r.returncode != 0:
@@ -94,9 +98,18 @@ def build_notes_from_range(workspace: Path, previous_tag: str = "") -> tuple:
         import subprocess
 
         cands = []
+        # `merge-base --is-ancestor X HEAD` 对 X == HEAD 也返回 0（提交是自身的祖先）：
+        # 最新边界 tag 指向 HEAD 时（封版刚落 tag）必须排除它，否则 `M<n>..HEAD` 为空、
+        # 返回值与"首个里程碑"无法区分，调用方回落 `consume_unreleased` 丢段（ocr2-224）。
+        _head = _try(workspace, "rev-parse", "HEAD")
+        head_sha = (_head.stdout.strip() if _head is not None and _head.returncode == 0 else "")
         for tag in milestone_tags(workspace):
             r = _try(workspace, "merge-base", "--is-ancestor", tag, "HEAD")
             if r is not None and r.returncode == 0:   # 只认是 HEAD 祖先的边界（别的分支的 tag 不算）
+                if head_sha:
+                    t = _try(workspace, "rev-parse", f"{tag}^{{commit}}")
+                    if t is not None and t.returncode == 0 and t.stdout.strip() == head_sha:
+                        continue      # 该 tag 就是 HEAD 自身所在的封版提交 ⇒ 排除
                 cands.append(tag)
         if not cands:
             return "", []

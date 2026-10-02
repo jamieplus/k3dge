@@ -43,7 +43,8 @@ def secret() -> str:
 
 def tree_hash(workspace: Path) -> str:
     r = subprocess.run(
-        ["git", "write-tree"], cwd=str(workspace), capture_output=True, text=True
+        ["git", "write-tree"], cwd=str(workspace), capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
     )
     if r.returncode != 0:
         # git 失败必须出声：空 tree 混进 token ⇒ 生成的行永远验不过，报错还指向"非受管路径"（ocr-038）。
@@ -80,7 +81,9 @@ def windows(when_iso: str) -> List[str]:
     if dt is None:
         return [str(when_iso or "")[:16]]
     base = dt.replace(second=0, microsecond=0)
-    return [base.strftime("%Y-%m-%dT%H:%M"), (base - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M")]
+    return [(base - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M"),
+            base.strftime("%Y-%m-%dT%H:%M"),
+            (base + timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M")]
 
 
 def token(workspace: Path, when_iso: str) -> str:
@@ -96,9 +99,9 @@ def line(workspace: Path, who: str = "") -> str:
         try:
             who = subprocess.run(
                 ["git", "config", "user.name"], cwd=str(workspace),
-                capture_output=True, text=True,
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
             ).stdout.strip()
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             who = ""
         if not who:
             who = getpass.getuser()
@@ -141,7 +144,8 @@ def verify_commit(workspace: Path, h: str) -> Tuple[bool, str]:
                        "非空、不以 - 开头、不含空白".format(h))
 
     def _git(*argv: str) -> str:
-        r = subprocess.run(["git", *argv], cwd=str(workspace), capture_output=True, text=True)
+        r = subprocess.run(["git", *argv], cwd=str(workspace), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
         if r.returncode != 0:
             raise RuntimeError((r.stderr or "").strip() or f"git {' '.join(argv)} failed")
         return r.stdout
@@ -153,29 +157,33 @@ def verify_commit(workspace: Path, h: str) -> Tuple[bool, str]:
         tree = _git("rev-parse", "--verify", f"{sha}^{{tree}}").strip()
         when_iso = _git("show", "-s", "--format=%aI", sha).strip()
         body = _git("log", "-1", "--format=%B", sha)
-    except RuntimeError as exc:
+    except (RuntimeError, UnicodeDecodeError) as exc:
         return False, f"[ATTEST] git 调用失败（{h}）：{exc}"
-    m: Optional[re.Match] = None
+    cands: List[Tuple[str, str, str]] = []
     for ln in body.splitlines():
         m = LINE_RE.match(ln.strip())
         if m:
-            break
-    if not m:
+            cands.append((m.group(1), m.group(2), m.group(3)))
+    if not cands:
         return False, f"[ATTEST] commit {h} missing attestation line"
-    who, when, tok = m.group(1), m.group(2), m.group(3)
-    # 时间绑定：行必须与本提交的**作者时间**同窗（±1 分钟），否则把一条合法行原样搬到另一提交
-    # （同树）即可复用（ocr-005）。用作者时间而非提交者时间：rebase/amend 会改提交者时间但保留
-    # 作者时间 ⇒ 不误杀正常历史重写；攻击者复用须显式改作者时间（留痕）。
-    if window(when_iso) not in windows(when):
-        return False, (f"[ATTEST] commit {h} timestamp mismatch "
-                       "-- attestation line not bound to this commit's author date")
-    expected = [
-        WORDLIST[int(hashlib.sha256(f"{secret()}|{w}|{tree}".encode()).hexdigest(), 16) % len(WORDLIST)]
-        for w in windows(when)
-    ]
-    if tok not in expected:
-        return False, (
-            f"[ATTEST] commit {h} token mismatch "
-            "-- attestation was not produced by the governed path"
-        )
-    return True, f"[ATTEST] commit {h} OK ({who} @ {when})"
+    # 验**所有**形状合法的行（append 侧以"任一合法行"为准）：只取第一行会让正文里
+    # 粘贴的示例/引用行（cherry-pick 注记、squash 残留）遮住真正的 trailer。
+    first_fail = ""
+    for who, when, tok in cands:
+        # 时间绑定：行必须与本提交的**作者时间**同窗（±1 分钟），否则把一条合法行原样搬到另一提交
+        # （同树）即可复用（ocr-005）。用作者时间而非提交者时间：rebase/amend 会改提交者时间但保留
+        # 作者时间 ⇒ 不误杀正常历史重写；攻击者复用须显式改作者时间（留痕）。
+        if window(when_iso) not in windows(when):
+            first_fail = (f"[ATTEST] commit {h} timestamp mismatch "
+                           "-- attestation line not bound to this commit's author date")
+            continue
+        expected = [
+            WORDLIST[int(hashlib.sha256(f"{secret()}|{w}|{tree}".encode()).hexdigest(), 16) % len(WORDLIST)]
+            for w in windows(when)
+        ]
+        if tok not in expected:
+            first_fail = (f"[ATTEST] commit {h} token mismatch "
+                           "-- attestation was not produced by the governed path")
+            continue
+        return True, f"[ATTEST] commit {h} OK ({who} @ {when})"
+    return False, first_fail

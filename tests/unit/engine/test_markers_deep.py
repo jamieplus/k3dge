@@ -138,6 +138,17 @@ class TestParseText(unittest.TestCase):
         self.assertEqual(len(problems), 1)
         self.assertIn("超 80", problems[0])
         self.assertTrue(ms[0].note.endswith("…"))
+        # 精确 cap 语义：cap 内放行、cap+1 截断；截后长度 == cap+1（含 …）
+        at_cap = "x" * 80
+        ms0, p0 = parse_text("src/a.py", f"y = 2  # k3dit:leftover L1 {at_cap}\n",
+                             max_note=80, max_note_pending=500)
+        self.assertEqual(p0, [], p0)
+        self.assertEqual(len(ms0[0].note), 80)
+        over_cap = "x" * 81
+        ms1, p1 = parse_text("src/a.py", f"y = 2  # k3dit:leftover L1 {over_cap}\n",
+                             max_note=80, max_note_pending=500)
+        self.assertEqual(len(p1), 1)
+        self.assertEqual(len(ms1[0].note), 81, ms1[0].note)  # 80 截断 + …
 
     def test_pending_allows_longer_note(self):
         note = "y" * 300
@@ -292,6 +303,17 @@ class TestValidate(unittest.TestCase):
         """规则 2 例外：leftover 随文件走，多宿主不算违规。"""
         ms = [_mk("L", "leftover", file="src/a.py"), _mk("L", "leftover", file="src/b.py")]
         self.assertEqual(validate(Path("."), ms), [])
+
+
+class TestParseSidecarWhy(unittest.TestCase):
+    """`- why:` 是文档承诺的字段，不得被静默丢（ocr2-267）。"""
+
+    def test_why_line_appends_to_note(self):
+        text = "## k3dit:pending R6@repo 说明\n- files: src/a.py\n- why: 因为历史原因\n"
+        ms, _ = parse_sidecar(text)
+        self.assertEqual(len(ms), 1)
+        self.assertIn("src/a.py", ms[0].note)
+        self.assertIn("因为历史原因", ms[0].note)
 
 
 if __name__ == "__main__":

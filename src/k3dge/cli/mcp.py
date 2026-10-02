@@ -451,7 +451,7 @@ def k3dge_milestone_control(
                 "total_tasks": len(tasks),
                 "done_tasks": done_cnt,
                 "pending_tasks": len(tasks) - done_cnt,
-                "tasks": [{"slug": t.slug, "status": t.status, "path": str(t.path.relative_to(ws))} for t in tasks],
+                "tasks": [{"slug": t.slug, "status": t.status, "path": t.path.relative_to(ws).as_posix()} for t in tasks],
             },
         indent=2,
         ensure_ascii=False,

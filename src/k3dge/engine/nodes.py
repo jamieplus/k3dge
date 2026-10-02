@@ -152,20 +152,33 @@ def run_phase(
                 continue
             return False, rej
         if phase == "preconditions":
-            if out:
+            if out is not None:
+                # 契约 `Optional[Rejection|str]`：None＝过。`Rejection` 是 str 子类，
+                # 空消息 falsy ⇒ `if out:` 会把失败读成通过（fail-open，ocr2-287）；
+                # 回调返 `False` 同样是失败（与动作分支 `out is False` 同口径）。
+                if out is False:
+                    return False, gates.rejection(None, nid)
                 # 回调可能自带 Rejection（含自己的 gate_id）；硬编 nid 会把它丢掉，与动作分支的
                 # `gates.rejection(...)` 透传不一致（docstring 声明的返回类型就是 Rejection，ocr-279）
                 return False, gates.rejection(out, nid)
             continue
         # 动作形状宽容：`(ok, out)`（seal 动作）或 `Optional[str]`（align 动作，None＝过）
-        if isinstance(out, tuple):
-            ok, payload = out
-        elif out is None or out is True:
-            ok, payload = True, ""
-        elif out is False:
-            ok, payload = False, ""
-        else:
-            ok, payload = False, out
+        try:
+            if isinstance(out, tuple):
+                ok, payload = out
+            elif out is None or out is True:
+                ok, payload = True, ""
+            elif out is False:
+                ok, payload = False, ""
+            else:
+                ok, payload = False, out
+        except (TypeError, ValueError) as exc:
+            # 长度≠2 的元组解包失败也要经正规化（ocr2-288），不抛裸 ValueError。
+            rej = gates.rejection(f"{type(exc).__name__}: {exc}", nid)
+            if on_error(workspace, nid) == "continue":
+                collected.append(str(rej))
+                continue
+            return False, rej
         if ok:
             collected.append(str(payload or ""))
             continue

@@ -200,5 +200,56 @@ class TestDeclaredFactsSelfCheck(unittest.TestCase):
         self.assertEqual(hook.missing_declared_facts("SOMETHING_NEW", {}, gate_facts), [])
 
 
+class TestSchemaGateFailClosedWithoutDeclaration(unittest.TestCase):
+    """`gate_facts` 不可用时档位不得一律降为 warn（ocr2-246）。"""
+
+    def test_block_code_stays_block(self) -> None:
+        from k3dge.engine import doc_gate
+
+        ps, pr = doc_gate._load_pure()
+        self.assertIsNotNone(ps)
+        files = ["docs/tasks/2026-09-16-fix-x.md"]
+        blobs = {"docs/tasks/2026-09-16-fix-x.md": (TASK_GOOD + "<<<<<<< HEAD\n").encode()}
+        orig = doc_gate._staged_bytes
+        doc_gate._staged_bytes = lambda rel: blobs.get(rel)
+        try:
+            errs, warns = doc_gate.run_schema_gate(files, ps, pr, None)
+        finally:
+            doc_gate._staged_bytes = orig
+        self.assertTrue(any("MD_CONFLICT_MARKER" in e for e in errs), (errs, warns))
+
+    def test_warn_fallback_synced_with_declaration(self) -> None:
+        from k3dge.engine import doc_gate, gate_facts
+
+        declared = {c for c, d in gate_facts.GATE_FACTS.items()
+                    if d.get("severity") in ("warn", "observe")}
+        self.assertEqual(doc_gate._WARN_FALLBACK, frozenset(declared))
+
+
+class TestCheckOneUsesIndex(unittest.TestCase):
+    """doc-gate 看的是 **index**，不是工作树（ocr2-244）。"""
+
+    def test_untracked_readme_does_not_satisfy_gate(self) -> None:
+        import tempfile
+
+        from k3dge.engine import doc_gate
+
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            td = ws / "docs" / "memo"
+            td.mkdir(parents=True)
+            (td / "README.md").write_text("# r\n", encoding="utf-8")      # 只在工作树
+            (td / "AUTHORING.md").write_text("# a\n", encoding="utf-8")
+            prev, doc_gate.WS = doc_gate.WS, ws
+            orig = doc_gate._staged_present
+            doc_gate._staged_present = lambda rel: False                  # index 里啥都没有
+            try:
+                errs = doc_gate.check_one("docs/memo/x.md")
+            finally:
+                doc_gate._staged_present = orig
+                doc_gate.WS = prev
+            self.assertTrue(errs, errs)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -15,10 +15,11 @@ def _git_available() -> bool:
     旧夹具直接炸栈——读起来像产品回归。这里探测后由类级 skipUnless 显式跳过。"""
     if not shutil.which("git"):
         return False
-    import tempfile as _tf
-    with _tf.TemporaryDirectory() as d:        # 探针目录随用随清（裸 mkdtemp＝泄漏）
+    with tempfile.TemporaryDirectory() as d:        # 探针目录随用随清（裸 mkdtemp＝泄漏）
+        # ocr2-423：探针也必须带隔离 env，否则宿主 GIT_DIR/坏系统配置让探针失败 ⇒
+        # 整类 skip，t-048…t-051 全变 no-op 还绿。探针与执行同环境才同结论。
         r = subprocess.run(["git", "init", "-q", "-b", "branch-probe", d],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, env=_env(), timeout=60)
     return r.returncode == 0
 
 
@@ -64,10 +65,23 @@ def _init(repo: Path) -> None:
 @unittest.skipUnless(_git_available(), "需要 git（`init -b` 要求 ≥2.28）")
 class TestArchitectureFreshness(unittest.TestCase):
     def setUp(self) -> None:
+        # ocr2-424/425：隔离只做到夹具 `_git` 不够——被测的 `seal._git` 继承 ambient
+        # env（`git -C ws …` 无 env=）。hook/CI 导出的 GIT_DIR 会把断言读到真仓，
+        # 首个里程碑用例空转绿。全轮测试共享同一份净化 env（patcher 在此，不在 _git 内）。
+        self._old_env = dict(os.environ)
+        for _k in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_CONFIG"):
+            os.environ.pop(_k, None)
+        os.environ["GIT_CONFIG_GLOBAL"] = os.devnull
+        os.environ["GIT_CONFIG_NOSYSTEM"] = "1"
+        self.addCleanup(self._restore_env)
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self.repo = Path(self._tmp.name) / "repo"
         _init(self.repo)
+
+    def _restore_env(self) -> None:
+        os.environ.clear()
+        os.environ.update(self._old_env)
 
     def tearDown(self) -> None:
         self._tmp.cleanup()

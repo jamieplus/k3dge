@@ -62,13 +62,23 @@ def _snapshot(workspace: Path, milestone_id: str) -> dict:
     pending_total = 0
     if found:
         from k3dge.engine.audit_report import _parse_audit_stats
+        from k3dge.engine.report_table import _OPEN_ALIASES
 
         _st = _parse_audit_stats(found[1])
         # 状态列与验证列可以是**同一条** finding（reconcile 明写"不动状态列"）⇒ 相加会双计（ocr-207）。
-        _ids = set(str(i) for i in (_st.get("_ids_待修") or []))
+        # 空白 ID 会坍缩成同一个 `""` 成员 ⇒ pending 少报（ocr2-201）：一律用
+        # `(ID or 报告行号)` 做键——同一行两列同键仍只计一次，空白行互不相撞。
+        _ids = set()
         if rows:
-            _ids |= set(str(r.get("ID", "")) for _i, r in rows
-                        if any(m in str(r.get("验证") or "") for m in ESCALATION_MARKERS))
+            for idx, r in rows:
+                _rid = str(r.get("ID", "")).strip() or f"line{idx + 1}"
+                _stv = str(r.get("状态") or "").strip()
+                if _stv == "待修" or _stv in _OPEN_ALIASES:
+                    _ids.add(_rid)
+                if any(m in str(r.get("验证") or "") for m in ESCALATION_MARKERS):
+                    _ids.add(_rid)
+        else:
+            _ids = set(str(i).strip() or f"line{_n}" for _n, i in enumerate(_st.get("_ids_待修") or []))
         pending_total = len(_ids)
     closure = {
         "audit": {
@@ -83,6 +93,15 @@ def _snapshot(workspace: Path, milestone_id: str) -> dict:
         "closure": closure,
         "closed": audit_closed(workspace, milestone_id),
     }
+
+
+def _coerce_attempts(v: object) -> int:
+    """投影数字字段的手工/损坏值（null/字符串）⇒ 退化成 0，不让审计环崩（ocr2-203）。"""
+    try:
+        n = int(str(v).strip() if isinstance(v, str) else v)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+    return max(0, n)
 
 
 def build_checklist(workspace: Path, milestone_id: Optional[str] = None) -> dict:
@@ -101,7 +120,7 @@ def build_checklist(workspace: Path, milestone_id: Optional[str] = None) -> dict
         "tasks_hash": h,
         "generated_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
         "audit_started_at": (prev or {}).get("audit_started_at") if keep else None,
-        "verify_attempts": (prev or {}).get("verify_attempts", 0) if keep else 0,
+        "verify_attempts": _coerce_attempts((prev or {}).get("verify_attempts", 0)) if keep else 0,
     }
     data.update(_snapshot(workspace, mid))
     _write(workspace, data)
@@ -162,27 +181,57 @@ def reset_for_audit(workspace: Path, milestone_id: Optional[str] = None) -> dict
     return data
 
 
-def get_verify_attempts(workspace: Path) -> int:
-    return int(ensure_checklist(workspace).get("verify_attempts", 0))
+def get_verify_attempts(workspace: Path, milestone_id: Optional[str] = None) -> int:
+    return _coerce_attempts(ensure_checklist(workspace, milestone_id).get("verify_attempts", 0))
 
 
-def bump_verify_attempt(workspace: Path) -> int:
-    data = ensure_checklist(workspace)
-    data["verify_attempts"] = int(data.get("verify_attempts", 0)) + 1
-    _write(workspace, data)
-    return int(data["verify_attempts"])
+def bump_verify_attempt(workspace: Path, milestone_id: Optional[str] = None) -> int:
+    # 计数器 read-modify-write 在并发调用下会丢增量（ocr2-204）：尽力拿进程间锁串行化；
+    # 拿不到锁（无 fcntl/Windows）时仍按旧路径走（预算可能少计，但不崩）。
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _locked():
+        try:
+            import fcntl
+
+            _lp = _path(workspace).with_name(_path(workspace).name + ".lock")
+            with open(_lp, "a+b") as _lf:
+                fcntl.flock(_lf.fileno(), fcntl.LOCK_EX)
+                yield
+        except (ImportError, OSError):
+            yield
+
+    with _locked():
+        data = ensure_checklist(workspace, milestone_id)
+        data["verify_attempts"] = _coerce_attempts(data.get("verify_attempts", 0)) + 1
+        _write(workspace, data)
+        return int(data["verify_attempts"])
 
 
-def reset_verify_attempts(workspace: Path) -> None:
-    data = ensure_checklist(workspace)
+def reset_verify_attempts(workspace: Path, milestone_id: Optional[str] = None) -> None:
+    data = ensure_checklist(workspace, milestone_id)
     data["verify_attempts"] = 0
     _write(workspace, data)
 
 
 def _write(workspace: Path, data: dict) -> None:
+    import os
+    import tempfile
+
     p = _path(workspace)
     p.parent.mkdir(parents=True, exist_ok=True)
     # 原子写：半截 JSON 会被 read_checklist 当"文件不存在"⇒ 状态/预算静默归零（ocr-209）。
-    tmp = p.with_name(p.name + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    tmp.replace(p)
+    # 固定名 `.tmp` 在并发调用下互抢（先 replace 者搬走文件，后者 FileNotFoundError，ocr2-204）⇒
+    # 唯一临时名。
+    fd, name = tempfile.mkstemp(dir=str(p.parent), prefix=p.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+        Path(name).replace(p)
+    except BaseException:
+        try:
+            Path(name).unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise

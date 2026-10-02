@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -26,20 +27,54 @@ def _now() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
 
 
+def _acquire_lock(path: Path) -> "int | None":
+    """Best-effort exclusive lock on a sidecar `.lock` (returns fd, or None).
+
+    `emit()` runs in several OS processes against the same workspace (git hooks,
+    CLI, MCP server). Without serialising append+rotate, a rotator's rename can
+    unlink an inode another writer holds — that writer's events vanish silently
+    (ocr2-251). No fcntl (Windows) ⇒ skip locking rather than fail.
+    """
+    try:
+        import fcntl
+    except ImportError:  # pragma: no cover - non-POSIX
+        return None
+    try:
+        fd = os.open(str(path.with_name(path.name + ".lock")), os.O_CREAT | os.O_RDWR, 0o644)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        return fd
+    except OSError:
+        return None
+
+
 def emit(workspace: Path, evt: str, **data: Any) -> None:
     """Append one event line. Never raises."""
+    lock_fd = None
     try:
         path = workspace / _EVENTS_REL
         path.parent.mkdir(parents=True, exist_ok=True)
-        entry: dict[str, Any] = {"ts": _now(), "evt": evt}
-        entry.update(data)
+        lock_fd = _acquire_lock(path)     # 串行化 append+rotate（ocr2-251）
+        entry: dict[str, Any] = dict(data)
+        # 调用方经 `**data` 传进来的 `ts`/`evt` 不得覆盖引擎生成的权威字段
+        #（否则事件时间线/类型被调用方改写还无人能辨，ocr2-249）。
+        entry["ts"] = _now()
+        entry["evt"] = evt
         # `default=str`：调用方随时可能传 Path/datetime/set（通用 **data 接口）⇒ 别让 json.dumps 抛（ocr-074）。
         line = json.dumps(entry, ensure_ascii=False, default=str)
         with open(path, "a", encoding="utf-8") as f:
             f.write(line + "\n")
         _rotate(path)
-    except Exception:      # 纯诊断日志：任何失败都不得阻塞主命令路径（docstring 承诺，ocr-074）
-        pass
+    except Exception as exc:      # 纯诊断日志：任何失败都不得阻塞主命令路径（docstring 承诺，ocr-074）
+        # 吞可以，但不得无声：整条事件流消失还 exit 0，消费者会把"没事件"读成"没发生"（ocr2-250）。
+        import sys as _sys
+
+        print(f"[events] WARN: 写入失败（{type(exc).__name__}: {exc}）⇒ 本条事件丢失", file=_sys.stderr)
+    finally:
+        if lock_fd is not None:
+            try:
+                os.close(lock_fd)          # 关闭即释放 flock
+            except OSError:
+                pass
 
 
 def _rotate(path: Path) -> None:
@@ -52,11 +87,17 @@ def _rotate(path: Path) -> None:
             return
         kept = lines[-_KEEP_LINES:]
         # 原子替换：截断与写完之间被杀（hook 被 Ctrl-C / 超时）不再清空整份日志（ocr-075）。
-        tmp = path.with_name(path.name + ".tmp")
-        tmp.write_text("\n".join(kept) + "\n", encoding="utf-8")
-        tmp.replace(path)
+        # 临时名**按进程**唯一：固定的 `events.jsonl.tmp` 会被并发 rotator 互相覆盖，
+        # 各自 rename ⇒ 中间 append 的事件丢失（ocr2-251）。
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write("\n".join(kept) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
     except OSError:
         pass
+
 
 
 def read_events(workspace: Path, last: int = 20) -> list[dict[str, Any]]:

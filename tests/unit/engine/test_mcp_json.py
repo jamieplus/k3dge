@@ -53,6 +53,8 @@ class TestMcpJson(unittest.TestCase):
         with TemporaryDirectory() as d:
             ws = Path(d)
             (ws / _MCP_CONFIG_REL).write_text("", encoding="utf-8")
+            self.assertIsNone(load_mcp_document(ws))   # 空文件 ⇒ 文档 None（与坏 JSON 同脸）
+            self.assertEqual(load_mcp_endpoints(ws), {})
             names, err = self._names_capture(ws)
             self.assertEqual(names, set())
             self.assertIn("WARN", err)
@@ -63,6 +65,8 @@ class TestMcpJson(unittest.TestCase):
             for bad in ("[]", '"text"', "123"):
                 with self.subTest(root=bad):
                     (ws / _MCP_CONFIG_REL).write_text(bad, encoding="utf-8")
+                    self.assertIsNone(load_mcp_document(ws), f"根非对象应 None：{bad}")
+                    self.assertEqual(load_mcp_endpoints(ws), {}, f"根非对象端点应 {{}}：{bad}")
                     names, err = self._names_capture(ws)
                     self.assertEqual(names, set(), f"根非对象被读成缺失（{bad}）⇒ peer 闸静默跳过")
                     self.assertIn("WARN", err)
@@ -97,11 +101,64 @@ class TestMcpJson(unittest.TestCase):
             self.assertEqual(load_mcp_document(ws), doc)   # 顶层非 mcpServers 键整体透传
 
 
-def test_module_reads_through_the_shared_constant() -> None:
-    """写侧/读侧同路径（防 t-148 的"文件名孤岛"回潮）：写进常量所指的路，loader 才读得到。"""
-    with TemporaryDirectory() as d:
-        ws = Path(d)
-        p = ws / _MCP_CONFIG_REL
-        p.write_text(json.dumps({"mcpServers": {"a": {}}}), encoding="utf-8")
-        assert mcp_server_names(ws) == {"a"}
-        assert mcp_json_mod._MCP_CONFIG_REL == ".mcp.json"
+    def test_module_reads_through_the_shared_constant(self) -> None:
+        """写侧/读侧同路径（防 t-148 的"文件名孤岛"回潮）：写进常量所指的路，loader 才读得到。"""
+        with TemporaryDirectory() as d:
+            ws = Path(d)
+            p = ws / _MCP_CONFIG_REL
+            p.write_text(json.dumps({"mcpServers": {"a": {}}}), encoding="utf-8")
+            self.assertEqual(mcp_server_names(ws), {"a"})
+            self.assertEqual(mcp_json_mod._MCP_CONFIG_REL, ".mcp.json")
+
+    def test_writer_constants_agree_with_reader(self) -> None:
+        """单源钉：写侧硬编码不得与读侧常量漂移（t-148 文件名孤岛的真病灶）。"""
+        from k3dge.engine import pipeline_runner as pr_mod
+        self.assertEqual(pr_mod._MCP_CONFIG_REL, _MCP_CONFIG_REL)
+        # mcp_peers 写侧用字面量 ".mcp.json"：钉住它仍等于读侧常量
+        import pathlib as _pl
+        peers_src = (_pl.Path(__file__).resolve().parents[3]
+                     / "src" / "k3dge" / "cli" / "mcp_peers.py").read_text(encoding="utf-8")
+        self.assertIn('".mcp.json"', peers_src)
+        self.assertEqual(_MCP_CONFIG_REL, ".mcp.json")
+
+    def test_end_to_end_writer_then_loader(self) -> None:
+        """端到端：经写侧常量路径写入后，读侧 loader 必须读回同一 server。"""
+        with TemporaryDirectory() as d:
+            ws = Path(d)
+            (ws / _MCP_CONFIG_REL).write_text(
+                json.dumps({"mcpServers": {"e2e": {"command": "x"}}}), encoding="utf-8")
+            self.assertEqual(mcp_server_names(ws), {"e2e"})
+            self.assertIn("e2e", load_mcp_endpoints(ws))
+
+
+class TestStatFailureIsNotAbsence(unittest.TestCase):
+    """`stat` 失败不是"文件缺失"（ocr2-268）。"""
+
+    def test_directory_entry_is_present_not_missing(self) -> None:
+        with TemporaryDirectory() as d:
+            ws = Path(d)
+            (ws / _MCP_CONFIG_REL).mkdir()
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                names = mcp_server_names(ws)
+            self.assertEqual(names, set())            # 存在但不是普通文件 ⇒ 空集+WARN，不是 None
+            self.assertIn("WARN", err.getvalue())
+
+
+class TestProbePeerWhitespace(unittest.TestCase):
+    """探测用净化后的 id，而不是原始 `pid`（ocr2-269）。"""
+
+    def test_whitespace_pid_probes_with_sanitized_name(self) -> None:
+        from k3dge.engine.mcp_json import probe_peer_mcp
+
+        with TemporaryDirectory() as d:
+            parent = Path(d)
+            ws = parent / "main"
+            ws.mkdir()
+            peer = parent / "foo"
+            (peer / "src" / "foo").mkdir(parents=True)
+            (peer / "src" / "foo" / "mcp.py").write_text("", encoding="utf-8")
+            probe, mod, py_path = probe_peer_mcp(ws, " foo ")
+            self.assertIsNotNone(probe)
+            self.assertEqual(mod, "foo.mcp")
+            self.assertIsNotNone(py_path)

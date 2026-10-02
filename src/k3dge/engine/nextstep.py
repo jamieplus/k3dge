@@ -128,6 +128,12 @@ STATE_OPTIONS: dict = {
     # 兜底态：闸/动作拒绝且其 gate_id 不在 `GATE_NEXT` 路由表内。原文照登，不猜。
     "rejected": {
         "priority": 3,"fact": "操作被拒（原因见上）", "pointers": ["AGENTS.md §12", "k3dge milestone status <id>"]},
+    # 路由自身坏了（`lifecycle_next` 取处理点时抛）：不得渲染成"没待办"（ocr2-178）。
+    # 机器面（`status --json` `.next` / MCP）靠它与 `None` 区分"坏了"与"没事"。
+    "routing_error": {
+        "priority": 1,
+        "fact": "处理点路由异常（见 reasons），本轮无法判定是否有待办；这不是“没事”",
+        "pointers": ["AGENTS.md §12"]},
     # `new_domain` is a cross-cutting trigger the hard gate does not turn red on
     # but has a file-level signal. Architecture/overview updates are intentionally
     # NOT a hook — they are done inside the milestone closure note (ADR-0004).
@@ -177,9 +183,11 @@ class NextStep:
     question: Optional[str] = None
     reasons: Optional[list] = None
     pointers: Optional[list] = None
+    rules: Optional[str] = None
 
     @classmethod
-    def from_state(cls, state: str, milestone: str, *, pending: Optional[int] = None, reasons: Optional[list] = None) -> "NextStep":
+    def from_state(cls, state: str, milestone: str, *, pending: Optional[int] = None,
+                   reasons: Optional[list] = None, rules: Optional[str] = None) -> "NextStep":
         opt = STATE_OPTIONS.get(state, {})
         if not opt:
             # 未知 state 静默当空声明 ⇒ 投出"没有下一步"的假象，与"确实没有待办"不可分（438）
@@ -193,8 +201,11 @@ class NextStep:
             fact=opt.get("fact"),
             options=list(opt["options"]) if opt.get("options") else None,
             question=opt.get("question"),
-            reasons=reasons,
-            pointers=opt.get("pointers"),
+            # 拷贝：`reasons` 是调用方的列表、`pointers` 是模块级 STATE_OPTIONS 的列表，
+            # 按引用交出去，任何消费者原地改动都污染单一源（ocr2-281）。
+            reasons=list(reasons) if reasons else None,
+            pointers=list(opt.get("pointers") or []) or None,
+            rules=rules,
         )
 
     def _fill(self, text: Optional[str]) -> Optional[str]:
@@ -203,6 +214,14 @@ class NextStep:
         out = text.replace("<id>", self.milestone)
         if self.pending is not None:
             out = out.replace("<n>", str(self.pending))
+        if self.rules is not None:
+            out = out.replace("<rules>", self.rules)
+        # 未解析的占位符不得静默进投影（"里程碑 M7 审计发现 <n> 项待修"）：`<n>`/`<rules>`
+        # 是可选 kwarg，漏传时旧实现把字面量印给操作者（ocr2-282）。出声。
+        import re as _re
+
+        if _re.search(r"<[a-z_]+>", out):
+            print(f"[NEXT] WARN: 投影残留未解析占位符：{out!r}", file=sys.stderr)
         return out
 
     def filled_options(self) -> list:
@@ -307,6 +326,11 @@ def _upsert(workspace: Path, ns: NextStep) -> list:
             if r_ not in merged:
                 merged.append(r_)
         card["reasons"] = merged
+    for _k in ("pending", "pointers", "question"):
+        # 新卡没设的字段（`render_mcp` 在 None/空时直接省键，ocr2-283）从旧卡继承，
+        # 否则第二块同态卡会把上一块的 pending/pointers/question 静默清掉。
+        if _k not in card and _k in prev:
+            card[_k] = prev[_k]
     by_state[ns.state] = card
     cards = sorted(by_state.values(), key=_prio)     # 同 439：外来 card 的 priority 未必可比
     return cards
@@ -315,7 +339,8 @@ def _upsert(workspace: Path, ns: NextStep) -> list:
 def emit(workspace: Path, ns: NextStep, *, stream: Optional[TextIO] = None) -> str:
     """追加/更新本轮的处理点并打印这一块（单点调用用；多源汇总用 `emit_all`）。"""
     cards = _upsert(workspace, ns)
-    _write_cards(workspace, cards, cards[0]["state"] if cards else None)
+    primary = next((c.get("state") for c in cards if isinstance(c, dict) and c.get("state")), None)
+    _write_cards(workspace, cards, primary)
     from k3dge.engine import events
     events.emit(workspace, "next", state=ns.state, milestone=ns.milestone)
     text = ns.render_cli()
@@ -332,6 +357,19 @@ def _prio(card: dict) -> int:
         return 5
 
 
+def _merge_reasons(old: Optional[list], new: Optional[list]) -> Optional[list]:
+    """同 state 两卡的 reasons 并集合并（保序、去重；任一为空即取另一方）。"""
+    if not old:
+        return list(new) if new else old
+    if not new:
+        return list(old)
+    merged = list(old)
+    for _r in new:
+        if _r not in merged:
+            merged.append(_r)
+    return merged
+
+
 def emit_all(workspace: Path, steps: list, *, stream: Optional[TextIO] = None) -> list:
     """一轮的**多处理点**：按 priority 稳定排序后打印，侧车写全量 + `primary`。
 
@@ -342,7 +380,12 @@ def emit_all(workspace: Path, steps: list, *, stream: Optional[TextIO] = None) -
     seen = {}
     for ns in steps:
         if ns is not None:
-            seen[ns.state] = ns          # 同 state 去重（后到者胜）
+            prev_ns = seen.get(ns.state)
+            if prev_ns is not None and getattr(prev_ns, "reasons", None):
+                # 同轮同 state 去重不能整条替换（ocr2-285）：先并 reasons，
+                # 否则先落地的 seal_ready blocker reasons 会被后到的裸卡抹掉。
+                ns.reasons = _merge_reasons(prev_ns.reasons, ns.reasons)
+            seen[ns.state] = ns          # 同 state 去重（后到者胜，reasons 已合并）
     order = list(STATE_OPTIONS)
     ordered = sorted(seen.values(),
                      key=lambda n: (n.priority, order.index(n.state) if n.state in order else len(order)))
@@ -351,6 +394,10 @@ def emit_all(workspace: Path, steps: list, *, stream: Optional[TextIO] = None) -
     # 先落地的处理点（审计/封板判定、前一个 hook 的拒绝）被整片抹掉（ocr-275）。
     by_state = {c.get("state"): c for c in (load_all(workspace) or []) if isinstance(c, dict)}
     for c in cards:
+        prev_c = by_state.get(c.get("state")) or {}
+        if isinstance(prev_c.get("reasons"), list) and prev_c["reasons"]:
+            # 与 `_upsert` 同口径：已 persist 的同态卡 reasons 要合并而非覆盖（ocr2-285）。
+            c["reasons"] = _merge_reasons(prev_c["reasons"], c.get("reasons"))
         by_state[c.get("state")] = c
     merged = sorted(by_state.values(),
                     key=lambda c: (_prio(c),
@@ -372,9 +419,13 @@ def load_all(workspace: Path) -> list:
         return []
     try:
         data = json.loads(raw)
-    except ValueError:
+    except ValueError as exc:
+        # 损坏的侧车不能报成"本轮无处理点"（ocr2-286）：缺文件才静默，坏内容必须出声。
+        print(f"[nextstep] WARN: 侧车解析失败（{type(exc).__name__}: {exc}）⇒ 本轮提示不可信",
+              file=sys.stderr)
         return []
     if not isinstance(data, dict):
+        print("[nextstep] WARN: 侧车顶层不是对象 ⇒ 本轮提示不可信", file=sys.stderr)
         return []
     if isinstance(data.get("next"), list):
         return [c for c in data["next"] if isinstance(c, dict)]

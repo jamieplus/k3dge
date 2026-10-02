@@ -155,8 +155,19 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
         # 包缺/坏 manifest（外部交付包完全可能）⇒ fail-clear 且**清掉**刚建的重放树（ocr-049）。
         shutil.rmtree(Path(rep["root"]), ignore_errors=True)
         return _fail(f"manifest.json 不可读/不可解析：{exc}", excluded=excluded)
-    order = [str(x) for x in (facts.get("apply_order") or [])]
-    pins_in_code = bool((facts.get("pins") or {}).get("in_code"))
+    # manifest 来自不可信交付包：合法 JSON 但非对象/字段形状不对时 `.get` 会抛
+    # AttributeError/TypeError，且重放树会泄漏（ocr2-211）⇒ 先验形状再用。
+    if not isinstance(facts, dict):
+        shutil.rmtree(Path(rep["root"]), ignore_errors=True)
+        return _fail(f"manifest.json 顶层不是对象（{type(facts).__name__}）", excluded=excluded)
+    _raw_order = facts.get("apply_order") or []
+    if not isinstance(_raw_order, list):
+        shutil.rmtree(Path(rep["root"]), ignore_errors=True)
+        return _fail(f"manifest.json apply_order 不是列表（{type(_raw_order).__name__}）",
+                      excluded=excluded)
+    order = [str(x) for x in _raw_order]
+    _raw_pins = facts.get("pins") or {}
+    pins_in_code = bool(_raw_pins.get("in_code")) if isinstance(_raw_pins, dict) else False
     # "修复后树"（fix 合并的 theirs）怎么取：
     #   inplace + 有 pins.patch ⇒ `code/` 是"基线+修复+**钉**" ⇒ 先把钉反向掉 ⇒ 得"基线+修复"；
     #   否则（artifact，或无 pins.patch）⇒ `code/` 本身就是"基线+修复" ⇒ **直接用它**。
@@ -183,10 +194,20 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
         conflicts: List[str] = []
         missing: List[str] = []
         for rel in fix_only or fix_rels:
-            theirs = mid_root / rel if (mid_root / rel).is_file() else theirs_root / rel
-            if not theirs.is_file():
-                missing.append(rel)
-                continue
+            if need_pins_replay:
+                # 中间树是"基线+修复"（钉已反向掉）：它里面缺 `rel` 说明反向钉删掉了该文件 ⇒
+                # 回落含钉的 `code/` 会把钉当修复侧改动合进来（再正向 apply pins.patch ⇒ 同一枚钉写两遍，
+                # ocr-050/ocr2-212）。记 missing，不静默降级。
+                _theirs = mid_root / rel
+                if not _theirs.is_file():
+                    missing.append(rel)
+                    continue
+                theirs = _theirs
+            else:
+                theirs = mid_root / rel if (mid_root / rel).is_file() else theirs_root / rel
+                if not theirs.is_file():
+                    missing.append(rel)
+                    continue
             # code-6（报告）：**base 存在而 ours 缺失** ⇒ 记 `missing` 并跳过（原实现把缺失侧写成空文件，
             # 三方皆空会合出 rc=0/text="" ⇒ 调用方以为"合并成功但内容为空"）。base 缺失而 ours 在（fix 新增
             # 文件）是正常情形，继续合。
@@ -228,10 +249,17 @@ def patch_rels(bundle: Path, name: str) -> Set[str]:
         return set()
     out: Set[str] = set()
     for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
-        if not line.startswith("+++ b/"):
+        rel = ""
+        if line.startswith("+++ b/"):
+            rel = line[6:].strip()
+        elif line.startswith("--- a/"):
+            # 删除型补丁的声明只在 `---` 侧（`+++` 是 /dev/null）：只认 `+++` 会把删除
+            # 静默丢出触及集（ocr2-194/195）。
+            rel = line[6:].strip()
+        else:
             continue
-        rel = line[6:].strip()
-        if not rel or rel.startswith("/") or ".." in Path(rel).parts or re.match(r"^[A-Za-z]:", rel):
+        if (not rel or rel == "/dev/null" or rel.startswith("/")
+                or ".." in Path(rel).parts or re.match(r"^[A-Za-z]:", rel)):
             continue
         out.add(rel)
     return out
@@ -256,7 +284,13 @@ def union_pins(workspace: Path, bundle: Path, rel: str) -> Dict[str, Any]:
         a, b, c = tmp / "ours", tmp / "base", tmp / "theirs"
         a.write_bytes((workspace / rel).read_bytes() if (workspace / rel).is_file() else b"")
         b.write_bytes((Path(base["root"]) / rel).read_bytes() if (Path(base["root"]) / rel).is_file() else b"")
-        c.write_bytes((Path(bundle) / "code" / rel).read_bytes())
+        # 包的 code/ 里缺 `rel`（删除/半包）时裸 read_bytes 会抛 FileNotFoundError，跳出
+        # `{ok, text, detail}` 契约（ocr2-213）⇒ fail-clear。
+        _bundle_rel = Path(bundle) / "code" / rel
+        if not _bundle_rel.is_file():
+            return {"ok": False, "text": "",
+                    "detail": f"{rel}: 包内 code/ 缺该文件（删除/半包），钉并集无法做，需人工处理"}
+        c.write_bytes(_bundle_rel.read_bytes())
         # 钉是文本标注：任一输入非 UTF-8（二进制）时 `decode("replace")` 会把字节换成 U+FFFD，
         # 调用方再 `write_text(utf-8)` 写回 ⇒ 二进制文件被静默改写损坏（ocr2-046）。直接拒，不合二进制。
         for _p in (a, b, c):

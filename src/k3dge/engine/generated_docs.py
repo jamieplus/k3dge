@@ -38,7 +38,7 @@ def render_manual_docs_content(
             iface = doc_cache[domain]
         else:
             iface = contract.collect_domain_interface(workspace / src, manifest, workspace, include_doc=True)
-        lines.append(f"## {domain} — `{src}`")
+        lines.append(f"## {_head(domain)} — `{_head(src)}`")
         lines.append("")
         if iface.strip():
             # `iface` 含 docstring 首行原文（`# doc: ...`），里面出现 ``` 就会**提前关围栏**，
@@ -74,7 +74,13 @@ def _replace_between_all(content: str, start: str, end: str, replacement: str) -
     """Replace every start..end span with a single replacement (first occurrence position)."""
     if start not in content or end not in content:
         return None
-    s = content.index(start)
+    # 锚定在**第一个真有配对 end 的 start**：散文/代码围栏里引用的落单标记若在前，
+    # 旧实现从它起删 ⇒ 真块被删、生成表写到示例位置，还报成功（ocr2-262）。
+    s = content.find(start)
+    while s != -1 and content.find(end, s + len(start)) == -1:
+        s = content.find(start, s + 1)
+    if s == -1:
+        return None
     # remove all further duplicate spans (search from after the first start)
     while True:
         s2 = content.find(start, s + len(start))
@@ -102,6 +108,16 @@ def _layout_block(manifest: Manifest) -> str:
         desc = cfg.get("description", "")
         rows.append(f"| {_cell(domain)} | `{_cell(src)}` | `{_cell(spec)}` | {_cell(desc)} |")
     return f"{LAYOUT_START}\n{header}\n" + "\n".join(rows) + f"\n{LAYOUT_END}"
+
+
+def _head(v: object) -> str:
+    """api.md 标题行专用净化：`_cell`（去换行/`|`/`<>`）+ 去反引号。
+
+    标题直接拼 `domain`/`src` 原串：含换行的域名撕开标题行、含反引号的 src
+    提前闭合行内代码段 ⇒ 任意 Markdown 注入进 `docs/generated/api.md`，
+    而新鲜度闸拿同一份渲染当 canonical（ocr2-261）。
+    """
+    return _cell(v).replace("`", "'").strip()
 
 
 def _cell(v: object) -> str:

@@ -35,6 +35,17 @@ class Prompt:
             return False  # injected answers => deterministic, never block
         return bool(getattr(self.in_stream, "isatty", lambda: False)())
 
+    def _parse(self, ans, default_yes: bool) -> bool:
+        """注入答案与实时输入的**同一解析口径**：空输入＝采纳默认（ocr2-296）。
+
+        旧注入分支 `str(ans) in ("y","yes")` 把"直接回车"恒判为否，与实时路径
+        （line 81 空回车取默认）语义相反 ⇒ 测的是另一套逻辑。
+        """
+        s = str(ans).strip().lower()
+        if not s:
+            return default_yes
+        return s in ("y", "yes")
+
     def ask(self, question: str, *, countdown=None, default_yes=False) -> bool:
         default = "Y/n" if default_yes else "y/N"
         if _has_countdown(countdown):
@@ -53,8 +64,14 @@ class Prompt:
             else:
                 ans = self.answers[self._ai]
             self._ai += 1
-            return str(ans).strip().lower() in ("y", "yes")
+            return self._parse(ans, default_yes)
         if not self.isatty():
+            # 非交互通道自动取默认是**代用户作答**（ocr2-297）：必须出声，
+            # 否则无人值守的封板/审计确认在日志里不留痕。
+            import sys
+
+            print(f"[PROMPT] WARN: 非交互输入 ⇒ 按默认 {'Y' if default_yes else 'N'} "
+                  f"回答：{question[:120]}", file=sys.stderr)
             return default_yes
         try:
             if _has_countdown(countdown):

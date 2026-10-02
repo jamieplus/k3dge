@@ -428,3 +428,22 @@ class TestFactsAreProducedNotParsed(unittest.TestCase):
             (arch / "x.md").write_text("# 归档但没写去向标记\n", encoding="utf-8")
             self.assertEqual(pure_refs.find_unguarded_archives(ws, ["docs/memo/archive/x.md"]),
                              [("ARCHIVE_NO_DEST", "docs/memo/archive/x.md")])
+
+
+class TestDeclaredInvalidSeverity(unittest.TestCase):
+    """已声明但 severity 非法的 code 不得被静默升成 block（ocr2-255）。"""
+
+    def test_invalid_declared_severity_is_warn_and_loud(self):
+        import contextlib
+        import io
+
+        code = "__OCR2_255_INVALID__"
+        gate_facts.GATE_FACTS[code] = {"severity": "blockk", "fix": "judgment"}
+        try:
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                sev = gate_facts.severity(code)
+        finally:
+            gate_facts.GATE_FACTS.pop(code, None)
+        self.assertEqual(sev, "warn")
+        self.assertIn("WARN", err.getvalue())

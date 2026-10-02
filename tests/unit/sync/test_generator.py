@@ -125,7 +125,11 @@ class TestGenerator(unittest.TestCase):
         assert "WARN" in err.getvalue() and "跳过该域" in err.getvalue()
 
     def test_atomic_write_does_not_truncate_target_on_failure(self) -> None:
-        """就地 `write_text` 先截断；崩在半路把受管事实源留在空/半截状态（341）。"""
+        """就地 `write_text` 先截断；崩在半路把受管事实源留在空/半截状态（341）。
+
+        实现改用 `mkstemp` 的 fd 直写（ocr2-186：不要关 fd 再按名重开）后，判据改核
+        **性质**：载荷先写进同目录的兄弟临时件，再 `replace` 顶上；target 从不被就地写。
+        """
         from unittest import mock
 
         from k3dge.engine.atomic import atomic_write_text
@@ -135,26 +139,111 @@ class TestGenerator(unittest.TestCase):
         target = ws / "spec.md"
         target.write_text("原文\n", encoding="utf-8")
 
-        # 只桩"写目标本身"是不够的：真实现根本不碰 target，所以原地实现的截断也不会被暴露。
-        # 这里核的是**性质**：载荷先写进同目录的兄弟临时件，再 os.replace 顶上。
-        written: list = []
-        real = Path.write_text
+        replaced: list = []
+        real_replace = Path.replace
 
-        def spy(self, data, *a, **k):
-            written.append(self.name)
-            return real(self, data, *a, **k)
+        def spy_replace(self, dst, *a, **k):
+            replaced.append((self.name, str(dst)))
+            return real_replace(self, dst, *a, **k)
 
-        with mock.patch.object(Path, "write_text", spy):
+        with mock.patch.object(Path, "replace", spy_replace):
             atomic_write_text(target, "新内容\n")
-        assert written and all(n != target.name for n in written), written   # 从不就地写 target
+        # 源恒为同目录临时件，dst 才是 target ⇒ 从不就地写 target
+        assert replaced, replaced
+        assert all(src != target.name for src, _dst in replaced), replaced
+        assert any(dst == str(target) for _src, dst in replaced), replaced
         assert target.read_text(encoding="utf-8") == "新内容\n"
-        assert not [p for p in ws.iterdir() if p.name.endswith(".tmp")] or \
-            all(p.name != target.name for p in ws.iterdir())
+        assert not [p for p in ws.iterdir() if p.name.startswith("." + target.name)]
 
-        with mock.patch.object(Path, "write_text", side_effect=OSError("disk full")):
+        # 写阶段失败（fd 写不下去）⇒ target 保持旧内容，临时件清理干净
+        with mock.patch("os.fdopen", side_effect=OSError("disk full")):
             with self_raises(OSError):
                 atomic_write_text(target, "半截")
         assert target.read_text(encoding="utf-8") == "新内容\n"
+        assert not [p for p in ws.iterdir() if p.name.startswith("." + target.name)]
+
+    def test_atomic_write_cleans_tmp_on_keyboard_interrupt(self) -> None:
+        """ocr2-187：`except Exception` 接不住 KeyboardInterrupt ⇒ 临时件会永久残留。"""
+        from unittest import mock
+
+        from k3dge.engine.atomic import atomic_write_text
+
+        ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
+        target = ws / "spec.md"
+        target.write_text("原文\n", encoding="utf-8")
+        with mock.patch("os.fdopen", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                atomic_write_text(target, "半截")
+        assert target.read_text(encoding="utf-8") == "原文\n"
+        assert not [p for p in ws.iterdir() if p.name.startswith("." + target.name)], \
+            "KeyboardInterrupt 后临时件残留"
+
+    def test_identical_interface_still_refreshes_hash(self) -> None:
+        """ocr2-342：markers 在、生成块逐字节相同 ⇒ 仍须刷哈希/日期，不得静默 return None。"""
+        import re as _re
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".agent").mkdir()
+            (root / ".agent" / "manifest.json").write_text(json.dumps({
+                "package_root": "src",
+                "domains": {"core": {"src": "src/core", "spec": "docs/specs/core/spec.md"}},
+                "ignore": []}, ensure_ascii=False), encoding="utf-8")
+            (root / "src" / "core").mkdir(parents=True)
+            (root / "src" / "core" / "mod.py").write_text("def foo(x: int) -> int:\n    return x\n",
+                                                          encoding="utf-8")
+            (root / "docs" / "specs" / "core").mkdir(parents=True)
+            spec = root / "docs" / "specs" / "core" / "spec.md"
+            spec.write_text(SPEC, encoding="utf-8")
+
+            sync_all(root)
+            good = spec.read_text(encoding="utf-8")
+            iface = contract.collect_domain_interface(root / "src" / "core")
+            h = contract.compute_hash(iface)
+            # 只改哈希行（接口块保持逐字节相同）⇒ 修复前 sync 会静默返回 None 永远不愈合
+            spec.write_text(_re.sub(r"sha256:[0-9a-f]+", "sha256:" + "0" * 64, good),
+                            encoding="utf-8")
+            sync_all(root)
+            self.assertIn(f"sha256:{h}", spec.read_text(encoding="utf-8"))
+
+    def test_registry_domains_step_precollects_only_requested(self) -> None:
+        """ocr2-343b：`sync --domain x` 的注册表预采只覆盖本轮目标域。"""
+        from unittest import mock
+
+        from k3dge.sync.generator import _sync_registry
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".agent").mkdir()
+            (root / ".agent" / "manifest.json").write_text(json.dumps({
+                "package_root": "src",
+                "domains": {
+                    "core": {"src": "src/core", "spec": "docs/specs/core/spec.md"},
+                    "other": {"src": "src/other", "spec": "docs/specs/other/spec.md"},
+                }, "ignore": []}, ensure_ascii=False), encoding="utf-8")
+            for dom in ("core", "other"):
+                (root / "src" / dom).mkdir(parents=True)
+                (root / "src" / dom / "m.py").write_text("def f():\n    return 1\n", encoding="utf-8")
+                (root / "docs" / "specs" / dom).mkdir(parents=True)
+                (root / "docs" / "specs" / dom / "spec.md").write_text(
+                    SPEC.replace("core", dom), encoding="utf-8")
+
+            real = contract.collect_domain_interface
+            seen: list = []
+
+            def spy(src_dir, *a, **k):
+                seen.append(str(src_dir))
+                return real(src_dir, *a, **k)
+
+            ctx = {"workspace": root, "manifest": Manifest.load(root),
+                   "domains": ["core"], "changed": []}
+            with mock.patch.object(contract, "collect_domain_interface", side_effect=spy):
+                ok, _msg = _sync_registry()["sync_domains"](ctx)
+            self.assertTrue(ok)
+            # core 采两次（clean + doc），other 一次都不采
+            self.assertFalse([s for s in seen if "other" in s], seen)
+
 
 class self_raises:
     def __init__(self, exc):

@@ -109,14 +109,26 @@ def compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]:
         return (True, reasons)
     srcs = [workspace / f for f in files if f.startswith("src/") and f.endswith(".py")]
     if srcs:
-        depths = [_max_control_depth(p) for p in srcs]
+        # 已删除/移走的路径（`D src/foo.py`）不在盘上：`_max_control_depth` 会回 None ⇒
+        # 纯删除也会报"C2 盲区"（ocr2-215/217）。只扫存在的文件；缺失的不计入盲区。
+        existing = [p for p in srcs if p.is_file()]
+        depths = [_max_control_depth(p) for p in existing]
         unparsed = sum(1 for d in depths if d is None)
         depth = max((d for d in depths if d is not None), default=0)
         if depth >= c2_max:
             reasons.append(f"C2 嵌套：触及 src/ 控制流 AST 深度最大 {depth} ≥ {c2_max}")
         if unparsed:
             reasons.append(f"C2 盲区：{unparsed} 个触及文件不可解析（语法未过/读失败）")
-    vol = [f for f in files if f.startswith("src/") or f.startswith("docs/specs/")]
+    try:
+        from k3dge.engine.diff import get_changed_files as _committed_changed
+
+        vol_files: Optional[List[str]] = _committed_changed(workspace)
+    except Exception:
+        vol_files = None
+    # "体积"是"自上次审计以来的改动量"：只看未提交工作区会让每次 commit 把计数清零 ⇒
+    # 按任务提交的里程碑永远攒不够阈值（ocr2-216）。用 committed 窗口 + 工作区的并集。
+    vol = [f for f in (vol_files if vol_files is not None else files)
+           if f.startswith("src/") or f.startswith("docs/specs/")]
     if len(vol) >= vol_max:
         reasons.append(f"体积：变更 {len(vol)} 个 src/specs 文件 ≥ {vol_max}")
     # NOTE: overview.md staleness is intentionally NOT an audit trigger —

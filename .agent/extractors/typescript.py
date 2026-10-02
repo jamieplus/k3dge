@@ -104,8 +104,13 @@ def _load_language():
         if _LANGUAGE is None:
             try:
                 lang = Language(_grammar.language_typescript())
+            except AttributeError as exc:
+                raise ImportError("tree-sitter-typescript grammar 缺 language_typescript: " + str(exc)) from exc
             except TypeError:
-                lang = Language(_grammar.language_typescript(), "typescript")  # type: ignore[call-arg]
+                try:
+                    lang = Language(_grammar.language_typescript(), "typescript")  # type: ignore[call-arg]
+                except (TypeError, AttributeError) as exc:
+                    raise ImportError("tree-sitter-typescript grammar unusable: " + str(exc)) from exc
             except (ValueError, RuntimeError) as exc:
                 raise ImportError("tree-sitter-typescript grammar unusable: " + str(exc)) from exc
             _LANGUAGE = lang

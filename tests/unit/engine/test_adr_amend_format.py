@@ -33,6 +33,17 @@ Date: 2026-08-25
 REPO_ADR_SCHEMA = Path(__file__).resolve().parents[3] / "docs" / "adr" / ".schema.json"
 
 
+def _repo_codes() -> dict:
+    """ocr2-417：按名断言必须走船上 schema 的真实供码，不能传 `codes={}` 钉硬编码缺省——
+    否则权威 schema 改名后 seal 报新码、fixer 对不上旧码，全文件还绿。"""
+    import json as _json
+
+    data = _json.loads(REPO_ADR_SCHEMA.read_text(encoding="utf-8"))
+    codes = data.get("codes")
+    assert isinstance(codes, dict) and codes, "权威 schema 必须声明 codes"
+    return codes
+
+
 def _ws(tmp_path: Path, body: str) -> Path:
     """最小 ADR 仓：**复制仓内权威 `.schema.json`**（t-057）。
 
@@ -105,14 +116,15 @@ def test_wrapped_footnote_and_gapped_minor_are_fixed():
         "[^🅰2.1]: 修改：乙",
         "[^🅰2.4]: 修改：乙的第一处\n续行掉进正文\n[^🅰2.1]: 修改：乙的第二处",
     )
-    codes = {c for c, _, _ in check_amend({"enabled": True}, {}, "0001-t.md", bad)}
+    codes = {c for c, _, _ in check_amend({"enabled": True}, _repo_codes(), "0001-t.md", bad)}
     assert "ADR_FOOTNOTE_LINE" in codes
     assert "ADR_FOOTNOTE_SEQ" in codes
     fixed, applied = _fix("docs/adr/0001-t.md", bad, ["ADR_FOOTNOTE_LINE", "ADR_FOOTNOTE_SEQ"])
     assert applied == ["ADR_FOOTNOTE_LINE", "ADR_FOOTNOTE_SEQ"]
-    assert "续行掉进正文" in fixed.splitlines()[-2] or any(
-        ln.startswith("[^🅰2.1]:") and "续行掉进正文" in ln for ln in fixed.splitlines())
-    again = {c for c, _, _ in check_amend({"enabled": True}, {}, "0001-t.md", fixed)}
+    # ocr2-418：首析取在未修 `bad` 里已为真（`[-2]` 行就是续行）⇒ 修没修都绿；
+    # 且 fixer 若吐短文档 `splitlines()[-2]` 直接 IndexError。只留判别式，附 fixed 作 messsage。
+    assert any(ln.startswith("[^🅰2.1]:") and "续行掉进正文" in ln for ln in fixed.splitlines()), fixed
+    again = {c for c, _, _ in check_amend({"enabled": True}, _repo_codes(), "0001-t.md", fixed)}
     assert "ADR_FOOTNOTE_LINE" not in again
     assert "ADR_FOOTNOTE_SEQ" not in again
     # 重编号映射按**出现序**逐个钉死（t-056）：旧断言的 `[^🅰2.1] in 段2` 在
@@ -145,13 +157,13 @@ def test_same_section_split_across_amends_is_blocked():
         "🅰1.1 🅰2.1 🅰3.1",
     )
     assert any(c == "ADR_AMEND_SPLIT" and "§2.9.6" in msg
-               for c, msg, _ in check_amend({"enabled": True}, {}, "0001-t.md", three))
+               for c, msg, _ in check_amend({"enabled": True}, _repo_codes(), "0001-t.md", three))
     same_day = _accepted(
         "  - 🅰1 | Core Maintainer | 2026-09-26 | §2.5 补哈希\n"
         "  - 🅰2 | Core Maintainer | 2026-09-26 | §2.5 补空补丁\n",
         "🅰1.1 🅰2.1",
     )
-    assert any(c == "ADR_AMEND_SPLIT" for c, _, _ in check_amend({"enabled": True}, {}, "0001-t.md", same_day))
+    assert any(c == "ADR_AMEND_SPLIT" for c, _, _ in check_amend({"enabled": True}, _repo_codes(), "0001-t.md", same_day))
 
 
 def test_later_invariant_on_the_same_section_is_not_a_split():
@@ -163,14 +175,14 @@ def test_later_invariant_on_the_same_section_is_not_a_split():
         "  - 🅰2 | Core Maintainer | 2026-09-26 | §2.3 传输链\n",
         "🅰1.1 🅰2.1",
     )
-    assert not any(c == "ADR_AMEND_SPLIT" for c, _, _ in check_amend({"enabled": True}, {}, "0001-t.md", later))
+    assert not any(c == "ADR_AMEND_SPLIT" for c, _, _ in check_amend({"enabled": True}, _repo_codes(), "0001-t.md", later))
 
 
 def test_proposed_adr_must_not_carry_amend_trail():
     from k3dge.engine.pure_schema import check_amend
 
     bad = GOOD.replace("Status: Accepted", "Status: Proposed")
-    got = check_amend({"enabled": True}, {}, "0001-t.md", bad)
+    got = check_amend({"enabled": True}, _repo_codes(), "0001-t.md", bad)
     assert any(c == "ADR_AMEND_DRAFT" for c, _, _ in got)
     clean = GOOD.replace("Status: Accepted", "Status: Proposed").replace(
         "Amended-by:\n  - 🅰1 | Core Maintainer | 2026-09-20 | 第一处\n  - 🅰2 | Core Maintainer | 2026-09-22 | 第二处\n",
@@ -184,7 +196,7 @@ def test_proposed_adr_must_not_carry_amend_trail():
     clean = re.sub(r"(?m)^\[\^🅰\d+\.\d+\]:.*\n", "", clean)
     clean = re.sub(r"\[\^🅰\d+\.\d+\]", "", clean)
     assert "[^🅰" not in clean and "修改：" not in clean, repr(clean)
-    assert check_amend({"enabled": True}, {}, "0001-t.md", clean) == []
+    assert check_amend({"enabled": True}, _repo_codes(), "0001-t.md", clean) == []
 
 
 def test_schema_block_gates_the_check():

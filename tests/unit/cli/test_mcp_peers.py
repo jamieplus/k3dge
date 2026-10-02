@@ -50,11 +50,55 @@ def test_probe_distinguishes_missing_corrupt_and_empty(tmp_path) -> None:
         else:
             assert not (ws / ".mcp.json").exists()    # "缺文件"分支真的没有历史残留
         err = io.StringIO()
-        with contextlib.redirect_stderr(err):
+        sout = io.StringIO()
+        # ocr2-407①：诊断必须绑定传入的 workspace，不能指到进程 CWD 的真仓。
+        # ocr2-407②：json=True 时机器可读流走 stdout——早退路径 stdout 必须空，
+        # 否则人类诊断污染 JSON 消费方；只听 stderr 会漏检。
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(sout):
             rc = cmd_mcp_probe(args, ws)
         text = err.getvalue()
         assert rc == 1
         assert expect in text, (expect, text)
+        assert str(ws / ".mcp.json") in text, (str(ws), text)
+        assert sout.getvalue() == "", f"早退路径 stdout 必须空（json 通道污染）：{sout.getvalue()!r}"
         for other in needles:
             if other != expect:
                 assert other not in text, (expect, other, text)
+
+
+def test_sync_peers_rejects_non_table_peers(tmp_path) -> None:
+    """ocr2-175：`[[peers]]`/`peers.x=true` 不得让整条合并 AttributeError 崩掉。"""
+    from k3dge.cli import mcp_peers as mp
+
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".mcp.json").write_text("{}", encoding="utf-8")
+    err = mp._sync_peers_into_mcp(tmp_path, {"peers": [{"x": 1}]})
+    assert err is not None and "不是表" in err, err
+
+
+def test_warn_missing_peers_survives_malformed_peer(tmp_path) -> None:
+    """ocr2-176：坏 peer 不得连坐其余 peer 的告警（调用方吞异常 ⇒ 循环内绝不能抛）。"""
+    import contextlib
+    import io
+
+    from k3dge.cli import mcp_peers as mp
+
+    (tmp_path / ".mcp.json").write_text("{}", encoding="utf-8")
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        mp._warn_missing_peer_servers(
+            tmp_path, {"peers": {"bad": True, "k3dit": {"enabled": True}}})
+    text = err.getvalue()
+    assert "形状不对" in text, text
+    assert "k3dit" in text, text
+
+
+def test_cmd_mcp_sync_qualifies_success_when_peers_skipped(tmp_path, capsys) -> None:
+    """ocr2-177：跳过 peer 合并时成功行必须自述 k3dge-only，不得裸报 synced。"""
+    from k3dge.cli import mcp_peers as mp
+
+    (tmp_path / ".agent").mkdir(parents=True, exist_ok=True)
+    rc = mp.cmd_mcp_sync(tmp_path)
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "k3dge only" in out, out

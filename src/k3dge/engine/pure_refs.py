@@ -60,14 +60,16 @@ def inside_workspace(workspace: Path, ref: str) -> bool:
 def strip_fences(text: str) -> str:
     """Remove fenced code blocks (example refs inside them are not real refs)."""
     out: List[str] = []
-    in_fence: Optional[str] = None
+    in_fence: Optional[tuple] = None  # (marker_char, open_len)
     for line in text.splitlines():
         m = re.match(r"^(`{3,}|~{3,})", line)
         if m:
-            fence = m.group(1)[0] * 3
+            marker = m.group(1)
+            # CommonMark：关围栏必须同字符且长度 ≥ 开围栏（ocr2-301）。
+            # 旧实现一律折成 3 字符 ⇒ 4 反引号块里的 3 反引号示例行提前闭合。
             if in_fence is None:
-                in_fence = fence
-            elif line.startswith(in_fence):
+                in_fence = (marker[0], len(marker))
+            elif line.startswith(marker[0] * in_fence[1]) and marker[0] == in_fence[0]:
                 in_fence = None
             continue
         if in_fence is None:
@@ -309,17 +311,18 @@ def check_markdown_text(text: str, rel: str) -> List[Ref]:
     out: List[Ref] = []
     # 围栏闭合用与 `strip_fences` **同一套状态机**（按标记类型分别数奇偶会把 ``` 块里的单条 ~~~ 示例
     # 误判未闭合；缩进/引用前缀的定义两处也要一致，ocr-101）。
-    in_fence: Optional[str] = None
+    # 关围栏必须同字符且长度 ≥ 开围栏（ocr2-301），与 `strip_fences` 同口径。
+    in_fence: Optional[tuple] = None
     for ln in text.splitlines():
         m = re.match(r"^(`{3,}|~{3,})", ln)
         if m:
-            fence = m.group(1)[0] * 3
+            marker = m.group(1)
             if in_fence is None:
-                in_fence = fence
-            elif ln.startswith(in_fence):
+                in_fence = (marker[0], len(marker))
+            elif ln.startswith(marker[0] * in_fence[1]) and marker[0] == in_fence[0]:
                 in_fence = None
     if in_fence is not None:
-        out.append(("MD_FENCE_UNCLOSED", f"{rel}: unclosed {in_fence} code fence"))
+        out.append(("MD_FENCE_UNCLOSED", f"{rel}: unclosed {in_fence[0] * 3} code fence"))
     # conflict markers: ======= only counts inside an open <<<<<<< block
     # (bare ======= lines are legal setext headings)；先在**去围栏**的文本上扫（示例不是真冲突，ocr-102）。
     in_conflict = False
@@ -661,7 +664,9 @@ def check_task_closure_record(rel: str, text: str) -> List[Ref]:
         return []
     if Path(rel).name in AUX_NAMES:   # 零依赖层：不 import milestone_files
         return []
-    lines = text.splitlines()
+    # 围栏里的示例 `## 结案` 不是真实结案段（ocr2-302）：先去围栏再判，
+    # 与本模块其余正文检查同口径。
+    lines = strip_fences(text).splitlines()
     empty_at = None
     for i, ln in enumerate(lines):
         # 前缀匹配：允许标题带限定词（`## 落地（2026-09-19，①-⑥ 全部执行）` 也算数）

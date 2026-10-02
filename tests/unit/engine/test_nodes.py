@@ -160,6 +160,17 @@ class TestRunPhase(_WsBodyMixin, unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(out, "")
 
+    def test_missing_op_is_indistinguishable_from_empty_noop(self) -> None:
+        """已知缺口（ocr2-496）：op 拼错/`[checks.<op>]` 整段缺失同样返回 `(True, "")`，
+        与"显式声明空列表"同形——"配置整体丢失"静默读成绿灯。现状如实钉死，
+        改成 fail-closed 拒未配置 op 时必须先翻此测。"""
+        ws = self._ws_with('[checks.demo]\npreconditions = []\n')
+        ok_missing, out_missing = nodes.run_phase(ws, "seel", "preconditions", {}, {})
+        self.assertTrue(ok_missing)
+        self.assertEqual(out_missing, "")
+        self.assertEqual((ok_missing, out_missing), (True, ""),
+                         "未配置 op 与显式空声明同值＝缺口仍在")
+
     def test_actions_accept_both_shapes(self):
         """`(ok, out)`（seal 动作）与 `Optional[str]`（align 动作）都要能跑。"""
         ws = self._ws_with('[checks.demo]\nactions = ["tuple_ok", "str_ok"]\n')
@@ -196,6 +207,10 @@ class TestRunPhase(_WsBodyMixin, unittest.TestCase):
         映射成 continue（归档失败不再阻断 seal），本测先红。本仓 archive 声明的
         就是 rollback——两侧都钉。
         """
+        # 声明侧：删掉 pipeline.toml 里的 [nodes.archive] 段必须红（缺省侧恒为 rollback）
+        repo_decl = (_REPO / ".agent" / "pipeline.toml").read_text(encoding="utf-8")
+        self.assertIn("[nodes.archive]", repo_decl, "archive 声明段缺失＝只剩缺省在撑")
+        self.assertIn('on_error = "rollback"', repo_decl)
         self.assertEqual(nodes.on_error(_REPO, "archive"), "rollback")
         ws = self._ws_with('[checks.demo]\nactions = ["boom", "after"]\n'
                            '[nodes.boom]\nkind = "fact"\non_error = "rollback"\n')
@@ -242,9 +257,24 @@ class TestRepoRegistriesUseTheSingleExecutor(unittest.TestCase):
 
     @staticmethod
     def _is_gates_list_call(node: ast.AST) -> bool:
-        return (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        # 直接形 gates.preconditions/actions
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
                 and isinstance(node.func.value, ast.Name) and node.func.value.id == "gates"
-                and node.func.attr in ("preconditions", "actions"))
+                and node.func.attr in ("preconditions", "actions")):
+            return True
+        # 别名形 from gates import actions 后裸调 actions(...)
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id in ("preconditions", "actions")):
+            return True
+        # g = gates 后 g.actions(...)
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr in ("preconditions", "actions")):
+            return True
+        return False
+
+    def _iter_has_gates_call(self, it: ast.AST) -> bool:
+        """iter 子树里是否含 gates 列表调用（BoolOp/Call/Subscript/NamedExpr 包装全算）。"""
+        return any(self._is_gates_list_call(n) for n in ast.walk(it))
 
     def _dispatch_sites(self, root: Path) -> set:
         sites = set()
@@ -264,10 +294,12 @@ class TestRepoRegistriesUseTheSingleExecutor(unittest.TestCase):
                         if isinstance(t, ast.Name):
                             bound.add(t.id)
             for node in ast.walk(tree):
-                it = node.iter if isinstance(node, (ast.For, ast.comprehension)) else None
+                it = None
+                if isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
+                    it = node.iter
                 if it is None:
                     continue
-                if not (self._is_gates_list_call(it)
+                if not (self._iter_has_gates_call(it)
                         or (isinstance(it, ast.Name) and it.id in bound)):
                     continue
                 fn = "module"
@@ -285,6 +317,32 @@ class TestRepoRegistriesUseTheSingleExecutor(unittest.TestCase):
                       "正向检查：单一执行器的循环还在 nodes.run_phase（守卫别瞎）")
         offenders = sorted(sites - self._ALLOWED)
         self.assertEqual(offenders, [], "出现未钉住的分派循环——编排必须走 nodes.run_phase")
+        # scripts/ 同样不得绕过执行器另起分派循环
+        scripts_root = _REPO / "scripts"
+        if scripts_root.is_dir():
+            script_sites = self._dispatch_sites(scripts_root)
+            self.assertEqual(sorted(script_sites), [],
+                             f"scripts/ 出现 gates 分派循环：{sorted(script_sites)}")
+
+    def test_guard_catches_wrapped_iter_forms(self) -> None:
+        """守卫必须看 iter 子树（ocr2-498）：`or []`/`list()`/切片/海象包装不得绕过。"""
+        import textwrap
+        samples = [
+            "for gid in (gates.actions(ws, op) or []):\n    pass\n",
+            "for gid in list(gates.actions(ws, op)):\n    pass\n",
+            "for gid in (ids := gates.actions(ws, op)):\n    pass\n",
+            "async def f():\n    async for gid in gates.actions(ws, op):\n        pass\n",
+        ]
+        for src in samples:
+            tree = ast.parse(textwrap.dedent(src))
+            found = False
+            for node in ast.walk(tree):
+                it = None
+                if isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
+                    it = node.iter
+                if it is not None and self._iter_has_gates_call(it):
+                    found = True
+            self.assertTrue(found, f"包装形未被守卫识别：{src!r}")
 
 
 class TestSatisfiesAndRejectionShape(_WsBodyMixin, unittest.TestCase):
@@ -318,6 +376,16 @@ class TestSatisfiesAndRejectionShape(_WsBodyMixin, unittest.TestCase):
                                   {"g_custom": lambda ctx: gates.Rejection("MY_GATE", "nope")}, {})
         self.assertFalse(ok)
         self.assertEqual(getattr(rej, "gate_id", None), "MY_GATE")
+
+    def test_empty_message_rejection_still_fails(self) -> None:
+        """空消息 Rejection 不得被读成通过（ocr2-499）：Rejection 是 str 子类，
+        空串 falsy，`if out:` 会误判。生产已修成 `is not None` + rejection() 兜底。"""
+        ws = self._ws_with('[checks.seal]\npreconditions = ["g_empty"]\n')
+        ok, rej = nodes.run_phase(ws, "seal", "preconditions",
+                                  {"g_empty": lambda ctx: gates.Rejection("MY_GATE", "")}, {})
+        self.assertFalse(ok, "空消息拒绝被当成通过＝fail-open 回潮")
+        self.assertEqual(getattr(rej, "gate_id", None), "MY_GATE")
+        self.assertTrue(str(rej).strip(), "空失败必须被赋予默认原因，不许留空")
 
     def test_precondition_plain_string_falls_back_to_node_id(self):
         ws = self._ws_with('[checks.seal]\npreconditions = ["g_txt"]\n')

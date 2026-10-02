@@ -107,3 +107,41 @@ def test_next_persist_emits_next_event():
         assert len(got) == 1
         assert got[0]["evt"] == "next"
         assert got[0]["state"] == "seal_ready"
+
+
+class TestRotateSerialization:
+    """旋转不得与并发 append 互相吞事件（ocr2-251）。"""
+
+    def test_acquire_lock_is_exclusive(self):
+        import os
+
+        try:
+            import fcntl
+        except ImportError:
+            import pytest
+
+            pytest.skip("fcntl unavailable")
+        import pytest
+
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "events.jsonl"
+            fd1 = events._acquire_lock(p)
+            assert fd1 is not None
+            try:
+                fd2 = os.open(str(p.with_name(p.name + ".lock")), os.O_RDWR)
+                try:
+                    with pytest.raises(BlockingIOError):
+                        fcntl.flock(fd2, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                finally:
+                    os.close(fd2)
+            finally:
+                os.close(fd1)
+
+    def test_rotate_leaves_no_fixed_tmp(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "events.jsonl"
+            p.write_text("\n".join(str(i) for i in range(events._MAX_LINES + 5)) + "\n",
+                         encoding="utf-8")
+            events._rotate(p)
+            # 固定 `.tmp` 名是并发 rotator 互相覆盖的根因（ocr2-251）
+            assert not (p.with_name(p.name + ".tmp")).exists()

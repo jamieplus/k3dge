@@ -50,6 +50,27 @@ class TestValidateMilestoneId(unittest.TestCase):
                 self.assertFalse((ws / ".agent" / "milestone").exists(),
                                  "拒了但盘已写＝半落地")
 
+    def test_non_string_id_is_rejected_as_milestone_error(self) -> None:
+        """非 str id 不得泄 TypeError（ocr2-490）：MCP/ frontmatter 不做类型校验，
+        公开契约是"一切拒绝都是 MilestoneError"。"""
+        for bad in (123, 0, None, True, ["M1"], {"m": "M1"}, Path("M1")):
+            with self.subTest(bad=bad):
+                err = _validate_milestone_id(bad)  # type: ignore[arg-type]
+                self.assertTrue(err, f"必须拒：{bad!r}")
+                self.assertIsInstance(err, str)
+        for bad in (123, None, ["M1"], Path("M1")):
+            with self.subTest(bad=bad), tempfile.TemporaryDirectory() as d:
+                ws = Path(d)
+                with self.assertRaises(MilestoneError):
+                    set_current_milestone(ws, bad)  # type: ignore[arg-type]
+                try:
+                    set_current_milestone(ws, bad)  # type: ignore[arg-type]
+                except MilestoneError:
+                    pass
+                except TypeError:
+                    self.fail(f"非 str {bad!r} 泄出 TypeError 而非 MilestoneError")
+                self.assertFalse((ws / ".agent" / "milestone").exists())
+
     def test_accepts_normal_ids(self):
         for ok in ("M1", "M10", "M1.2", "M1-x", "M1_x", "adhoc", "0", "a1"):
             self.assertIsNone(_validate_milestone_id(ok), f"must accept: {ok!r}")
@@ -124,6 +145,14 @@ class TestCursor(unittest.TestCase):
             target.write_text("M7\n", encoding="utf-8")
             (link / "milestone").symlink_to(target)
             self.assertEqual(get_current_milestone(ws), "M7")
+            # 写侧必须穿透链接写目标，不得替换链接本身（ocr2-491）
+            set_current_milestone(ws, "M8")
+            self.assertTrue((link / "milestone").is_symlink(), "bump/set 把链接换成了普通文件")
+            self.assertEqual(target.read_text(encoding="utf-8").strip(), "M8")
+            self.assertEqual(get_current_milestone(ws), "M8")
+            self.assertEqual(bump_milestone(ws), "M9")
+            self.assertTrue((link / "milestone").is_symlink())
+            self.assertEqual(target.read_text(encoding="utf-8").strip(), "M9")
 
     def test_unreadable_cursor_raises_not_silent_m0(self):
         """ocr-086 三案之一：游标**读不出**（非 UTF-8 / OSError）必须抛（t-184）。
@@ -203,6 +232,43 @@ class TestBump(unittest.TestCase):
             bump_milestone(ws)
             # 新进程语义：重读盘上值
             self.assertEqual(get_current_milestone(ws), "M1")
+
+
+class TestBumpLocking(unittest.TestCase):
+    """bump 的读-改-写必须持排它锁（丢失更新，ocr2-280）。"""
+
+    def test_read_modify_write_holds_lock(self):
+        import os
+
+        try:
+            import fcntl
+        except ImportError:
+            self.skipTest("fcntl unavailable")
+
+        from k3dge.engine import milestone_pointer as mp
+
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            seen = {}
+            real_get = mp.get_current_milestone
+
+            def spy(w):
+                lock = ws / ".agent" / "milestone.lock"
+                fd = os.open(str(lock), os.O_RDWR)
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    seen["locked"] = False
+                except BlockingIOError:
+                    seen["locked"] = True
+                finally:
+                    os.close(fd)
+                return real_get(w)
+
+            from unittest import mock
+
+            with mock.patch.object(mp, "get_current_milestone", spy):
+                mp.bump_milestone(ws)
+            self.assertTrue(seen.get("locked"), "bump 读-改-写未持排它锁")
 
 
 if __name__ == "__main__":

@@ -25,6 +25,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -298,15 +299,23 @@ def _tool_env(workspace: Path, argv0: List[str]) -> Dict[str, str]:
     env = {**os.environ}
     try:
         repo = Path(argv0[0]).resolve()
+        # argv0 可能是文件（`<repo>/.venv/bin/k3dit`）：先跳到其目录再往上找，
+        # 否则第一次迭代检查的是文件自身（`<bin>/pyproject.toml` 永不存在），白烧一次，
+        # `range(3)` 之后 `repo` 停在未验证过的祖先上就判"工具审自己"（ocr2-191）。
+        if repo.is_file():
+            repo = repo.parent
+        found_marker = False
         for _ in range(3):      # <repo>/.venv/bin/k3dit → <repo>
             if (repo / "pyproject.toml").is_file() or (repo / ".git").exists():
+                found_marker = True
                 break
             repo = repo.parent
-        if repo.resolve() == Path(workspace).resolve():
+        # 只在**真找到工具仓标识**时才判自审：仅靠 3 层父目录相等会把恰好装有 k3dit 的
+        # 外部被审仓认成工具自仓 ⇒ 状态落被审仓 ⇒ DIRTY_TREE（ocr2-192）。
+        if found_marker and repo.resolve() == Path(workspace).resolve():
             return env          # 工具审自己：保持仓库内状态（连续性优先）
     except OSError:             # pragma: no cover
         pass
-    root = tool_state_dir(workspace)
     root = tool_state_dir(workspace)
     bad = _harden_state_root(root)          # code-9：拿不到干净的状态目录 ⇒ **别把子进程放出去**
     if bad:
@@ -405,8 +414,13 @@ def bundle_digest(bundle: Path) -> str:
     bundle = Path(bundle)
     rows: List[str] = []
     for p in sorted(bundle.rglob("*")):
-        if p.is_file():
-            rows.append(f"{p.relative_to(bundle).as_posix()}:{hashlib.sha256(p.read_bytes()).hexdigest()}")
+        try:
+            if p.is_file():
+                rows.append(f"{p.relative_to(bundle).as_posix()}:{hashlib.sha256(p.read_bytes()).hexdigest()}")
+        except OSError:
+            # 摘要阶段在补丁已落树后跑：读失败（权限/坏符号链接）不得抛 traceback，
+            # 记占位让调用方拿到结构化失败。
+            rows.append(f"{p.relative_to(bundle).as_posix()}:UNREADABLE")
     return hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()
 
 
@@ -441,9 +455,30 @@ def _escaping_rels(patch: Path) -> List[str]:
     except OSError:      # pragma: no cover
         return out
     for line in lines:
-        if not line.startswith("+++ b/"):
+        # `+++` 与 `---` 都要扫：删除型补丁的逃逸目标在 `--- a/...`（`+++` 是 /dev/null），
+        # 只扫 `+++ b/` 会漏删补丁；且 git apply 失败是 APPLY_CHECK_FAILED，不在结构错误集里 ⇒
+        # 坏包会静默退到三路合并而不是报 APPLY_PATH_ESCAPE（ocr2-194/195）。
+        rel = ""
+        if line.startswith("+++ "):
+            body = line[4:].strip()
+            if body == "/dev/null":
+                continue
+            if body.startswith("b/"):
+                rel = body[2:].strip()
+            else:
+                continue
+        elif line.startswith("--- "):
+            body = line[4:].strip()
+            if body == "/dev/null":
+                continue
+            if body.startswith("a/"):
+                rel = body[2:].strip()
+            else:
+                continue
+        else:
             continue
-        rel = line[6:].strip()
+        if not rel:
+            continue
         if rel.startswith("/") or any(part == ".." for part in Path(rel).parts) or re.match(r"^[A-Za-z]:", rel):
             out.append(rel)
     return sorted(set(out))
@@ -632,6 +667,9 @@ def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry
     wt = tmp / "wt"
     rc, out = _git(workspace, "worktree", "add", "--detach", "-q", str(wt), "HEAD")
     if rc != 0:
+        # 早退也在 try/finally 之前 ⇒ 先清半截 worktree 登记 + tmp，否则失败重试不断堆积临时目录。
+        _git(workspace, "worktree", "remove", "--force", str(wt))
+        shutil.rmtree(tmp, ignore_errors=True)
         return {"ok": False, "error": "WORKTREE_UNAVAILABLE", "detail": out.strip()[-200:]}
     try:
         res = audit_merge.merge_into(wt, bundle, exclude=exclude or ())
@@ -751,15 +789,27 @@ def _post_apply_check(root: Path, workspace: Path) -> dict:
     try:
         # 声明取自**被审仓**的 pipeline.toml，且可能等 stdin/等锁/跑全量测试 ⇒ 必须有墙钟；
         # 此前无 timeout 也无进程组隔离，卡住就是整个 consume 无限挂（与本模块"墙钟掐断+抢救"纪律不一致，ocr-204）。
-        rc = subprocess.run(["/bin/sh", "-c", cmd], cwd=root, capture_output=True,
-                            timeout=3600, start_new_session=True)
-    except subprocess.TimeoutExpired:
-        return {"cmd": cmd, "ok": False, "rc": 124,
-                "detail": "post_apply_check 超时（>3600s）⇒ 视为未通过，不落地"}
+        # `start_new_session=True` + `subprocess.run(timeout=...)` 只杀直接子进程（/bin/sh），
+        # 它 spawn 的孙进程（pytest workers、sync/index 写者）会留下来在回滚后继续写树 ⇒
+        # 与 `_run` 同口径：Popen + communicate(timeout) + killpg（ocr2-198/199）。
+        proc = subprocess.Popen(["/bin/sh", "-c", cmd], cwd=root,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                start_new_session=True)
     except OSError as exc:
         return {"cmd": cmd, "ok": False, "rc": 127, "detail": f"post_apply_check 不可执行：{exc}"}
-    tail = ((rc.stdout or b"") + (rc.stderr or b"")).decode("utf-8", "replace").strip()[-400:]
-    return {"cmd": cmd, "ok": rc.returncode == 0, "rc": rc.returncode, "detail": tail}
+    try:
+        stdout, stderr = proc.communicate(timeout=3600)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except (OSError, ProcessLookupError):
+            pass
+        stdout, stderr = proc.communicate()
+        return {"cmd": cmd, "ok": False, "rc": 124,
+                "detail": "post_apply_check 超时（>3600s，已杀进程组）⇒ 视为未通过，不落地"}
+    rc = proc.returncode
+    tail = ((stdout or b"") + (stderr or b"")).decode("utf-8", "replace").strip()[-400:]
+    return {"cmd": cmd, "ok": rc == 0, "rc": rc, "detail": tail}
 
 
 #: 升级标记（写在报告**验证**列；k3ge 自己写、自己读 ⇒ 单源）：
@@ -913,7 +963,18 @@ def commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str
     if rc != 0:
         # 失败后树停在 staged 态 ⇒ 下一轮 `apply_bundle` 被自家 `DIRTY_TREE` 挡死、要人工 `git reset`（ocr-205）。
         _git(workspace, "reset", "-q", "--", *files)
-        return "", f"git commit 失败（本轮已退回未暂存）：{out.strip()[-400:]}"
+        # `git reset` 只退索引：本次新增的未跟踪文件（报告/投影）会留下 ⇒ 下一轮仍被 DIRTY_TREE 拦。
+        # 把其中"未跟踪"的删掉（已跟踪的已退回 HEAD，无需动）。
+        for rel in files:
+            lr, _ = _git(workspace, "ls-files", "--error-unmatch", "--", rel)
+            if lr != 0:
+                try:
+                    p = workspace / rel
+                    if p.is_file() or p.is_symlink():
+                        p.unlink()
+                except OSError:
+                    pass
+        return "", f"git commit 失败（本轮已退回未暂存并清理新增文件）：{out.strip()[-400:]}"
     rc, out = _git(workspace, "rev-parse", "HEAD")
     return (out.strip() if rc == 0 else ""), ""
 

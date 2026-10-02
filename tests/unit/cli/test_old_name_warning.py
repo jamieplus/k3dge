@@ -32,9 +32,11 @@ def test_multiple_offenders_keep_document_order_and_are_stripped():
     msg = ("docs: 修名\n\n"
            "k3ge 作为消费方\n\n"
            "    - k3ge 缩进正文行\n\n"
+           "    - k3ge 缩进正文行\n\n"      # ocr2-408：逐字重复——去重实现会在此现形
            "k3ge 又一处裸写")
     assert old_name_warnings(msg) == ["k3ge 作为消费方",
                                       "- k3ge 缩进正文行",
+                                      "- k3ge 缩进正文行",   # 不去重：两次都出现
                                       "k3ge 又一处裸写"]
 
 

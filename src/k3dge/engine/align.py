@@ -121,6 +121,11 @@ def run_milestone_alignment(workspace: Path, milestone_id: str) -> Tuple[bool, s
             # （ocr2-033；正是 ocr-197 要防的事）。fail-closed，不覆盖。
             return False, f"[ALIGN] 报告存在但不可读（{exc}），拒绝覆盖（防抹掉人工结论）", tasks
         if _prev and _ALIGN_STUB_MARKER not in _prev:
+            if _align_pass_marker(milestone_id) not in _prev:
+                return False, (
+                    f"[ALIGN] 已有报告但缺 align-pass marker（{review_file.name}）"
+                    "——拒绝认作 seal-eligible（fail-closed），请重跑 align 生成新报告"
+                ), tasks
             return True, (
                 f"[ALIGN] Full Matrix verification PASS for milestone '{milestone_id}'.\n"
                 f"  Kept human-filled review: docs/reviews/{review_file.name}"

@@ -37,9 +37,17 @@ def _report_kind(name: str, text: str) -> str:
     （ADR-0004 §2.1.10、ADR-0006 sidecar）。
     """
     low = name.lower()
-    if _QUALITY_MARKER_RE.search(text) or low.endswith("-quality.md"):
+    # 文件名后缀是作者显式声明的权威类名 ⇒ 优先（ocr2-214）。
+    if low.endswith("-quality.md"):
         return "quality"
-    if _SCAN_MARKER_RE.search(text) or low.endswith("-scan.md"):
+    if low.endswith("-scan.md"):
+        return "scan"
+    # 正文 marker 只在文件头部（frontmatter/首 5 行注释）查：12 列表格里引用示例串是常态
+    # （`docs/reviews/2026-09-29-M11-ocr-scan.md` 表格里原样写了 quality marker），全文搜会错桶。
+    head = "\n".join((text or "").splitlines()[:5])
+    if _QUALITY_MARKER_RE.search(head):
+        return "quality"
+    if _SCAN_MARKER_RE.search(head):
         return "scan"
     return "audit"
 

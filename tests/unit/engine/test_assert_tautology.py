@@ -139,6 +139,34 @@ class TestPredicate(unittest.TestCase):
         )
         self.assertEqual(_hits(src), [(4, "literal_true")])
 
+    def test_is_identity_is_not_fooled_by_alias_substitution(self) -> None:
+        # ocr2-183: `is` 是同一性比较；文本级别名替换后 AST 相同 ≠ 运行时同一对象。
+        self.assertEqual(_hits("a = []\nassert a is []\n"), [])
+        # 替换前就同引用的 `x is x` 仍要报（真恒真）。
+        self.assertEqual(_hits("assert x is x\n"), [(1, "self_compare")])
+
+    def test_def_time_side_effects_in_defaults_and_bases_clear_aliases(self) -> None:
+        # ocr2-184: def/class 语句执行期会求值默认参数/基类/关键字，副作用须清别名。
+        default_mutates = (
+            "a = ck['axes']\n"
+            "def _f(x=ck.pop('axes')):\n"
+            "    pass\n"
+            "assert a == ck['axes']\n"
+        )
+        self.assertEqual(_hits(default_mutates), [])
+        base_mutates = (
+            "a = ck['axes']\n"
+            "class C(ck.pop('axes')):\n"
+            "    pass\n"
+            "assert a == ck['axes']\n"
+        )
+        self.assertEqual(_hits(base_mutates), [])
+
+    def test_annotation_side_effect_clears_aliases(self) -> None:
+        # ocr2-185: AnnAssign 会求值 annotation；带副作用的注解须先失效别名。
+        src = "a = ck['axes']\nx: ck.pop('axes') = None\nassert a == ck['axes']\n"
+        self.assertEqual(_hits(src), [])
+
     def test_syntax_error_returns_empty(self) -> None:
         self.assertEqual(_hits("def ("), [])
 

@@ -90,7 +90,13 @@ def _ensure_leftovers(workspace: Path, text: str, report_path: Path) -> None:
     if not ids:
         return
     leftover_path = workspace / "docs" / "reviews" / "LEFTOVERS.md"
-    existing = leftover_path.read_text(encoding="utf-8") if leftover_path.is_file() else ""
+    try:
+        existing = leftover_path.read_text(encoding="utf-8") if leftover_path.is_file() else ""
+    except (OSError, UnicodeDecodeError) as exc:
+        # 坏编码/读不出不得以非拒绝异常中止整个审计腿；出声后跳过登记（ocr2-270）。
+        print(f"[milestone_audit] WARN: LEFTOVERS.md 不可读（{type(exc).__name__}）⇒ 本次不登记有意留",
+              file=__import__("sys").stderr)
+        return
     new_lines = []
     for rid in ids:
         marker = f"| {rid} |"
@@ -102,7 +108,14 @@ def _ensure_leftovers(workspace: Path, text: str, report_path: Path) -> None:
     block = "\n".join(new_lines) + "\n"
     if "## 有意留" not in existing:
         block = "\n## 有意留（审计有意保留，非待修）\n" + block
-    leftover_path.write_text(existing + block, encoding="utf-8")
+    # 确保已有内容以换行收尾，否则 `existing + block` 会把第一条并到上一行末尾，
+    # 下一轮 `marker in existing` 再也匹配不到（重复登记，ocr2-270）。
+    if existing and not existing.endswith("\n"):
+        existing += "\n"
+    # 原子替换：并发审计各读旧态再追加会互相覆盖（ocr2-270）。
+    tmp = leftover_path.with_name(leftover_path.name + ".tmp")
+    tmp.write_text(existing + block, encoding="utf-8")
+    tmp.replace(leftover_path)
 
 
 def _git_is_ancestor(workspace: Path, anc: str, desc: str) -> bool:
@@ -181,7 +194,12 @@ def _closed_job_evidence(workspace: Path, job: dict, fresh_baseline: str) -> Tup
     rel = str(job.get("report") or "")
     if not rel:
         return False, "账里没有报告路径"
-    path = workspace / rel
+    # `rel` 来自 gitignored 的 `audit_jobs.json`（非权威）：绝对路径/`..` 会让
+    # `workspace / rel` 逃出仓外，任意可读文件都能"认证"里程碑（ocr2-271）。
+    _rel_p = Path(rel)
+    if _rel_p.is_absolute() or ".." in _rel_p.parts:
+        return False, f"账里报告路径越界（{rel}）"
+    path = workspace / _rel_p
     if not path.is_file():
         return False, f"报告不在盘上（{rel}）"
     try:
@@ -211,12 +229,35 @@ def _role_opt(workspace: Path, role: str, key: str, default: str) -> str:
     except ModuleNotFoundError:      # pragma: no cover
         import tomli as tomllib      # type: ignore
 
+    import sys as _sys
+
+    src = workspace / ".agent" / "pipeline.toml"
     try:
-        data = tomllib.loads((workspace / ".agent" / "pipeline.toml").read_text(encoding="utf-8"))
-        val = (data.get("roles", {}).get(role) or {}).get(key)
-        return str(val) if val not in (None, "") else default
-    except Exception:
+        text = src.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return default                         # 缺文件是合法的"走缺省"
+    except (OSError, UnicodeDecodeError) as exc:
+        # 有而读不出不得静默降级（ADR-0004 §2.1.11）——出声后走缺省（ocr2-272）。
+        print(f"[milestone_audit] WARN: {src.name} 不可读（{type(exc).__name__}）⇒ {role}.{key} 走缺省",
+              file=_sys.stderr)
         return default
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        # 拼错的 TOML 旧实现被静默当"没声明"⇒ 未跑的审计看起来像配好的审计（ocr2-272）。
+        print(f"[milestone_audit] WARN: {src.name} 解析失败（{exc}）⇒ {role}.{key} 走缺省",
+              file=_sys.stderr)
+        return default
+    roles = data.get("roles")
+    if roles is not None and not isinstance(roles, dict):
+        print(f"[milestone_audit] WARN: [roles] 不是表 ⇒ {role}.{key} 走缺省", file=_sys.stderr)
+        return default
+    val = (roles or {}).get(role)
+    if val is not None and not isinstance(val, dict):
+        print(f"[milestone_audit] WARN: [roles.{role}] 不是表 ⇒ {key} 走缺省", file=_sys.stderr)
+        return default
+    got = (val or {}).get(key)
+    return str(got) if got not in (None, "") else default
 
 
 def _audit_mode(workspace: Path, role: str = "audit") -> str:
@@ -224,17 +265,11 @@ def _audit_mode(workspace: Path, role: str = "audit") -> str:
 
     名称纪律：不得叫 `scaffold`——该词已指 `templates/scaffold.py` 的脚手架生成工具
     （`k3dge init` 调用），一词两义违反 `docs/adr/AUTHORING.md` 术语规则。
-    """
-    try:
-        try:
-            import tomllib
-        except ModuleNotFoundError:  # pragma: no cover
-            import tomli as tomllib  # type: ignore
 
-        data = tomllib.loads((workspace / ".agent" / "pipeline.toml").read_text(encoding="utf-8"))
-        return str((data.get("roles") or {}).get(role, {}).get("mode", "oneshot")).lower()
-    except Exception:
-        return "oneshot"
+    **单一读取**：委托 `_role_opt`，不再自持一份 read/parse ⇒ 校验（`run_audit_flow`）
+    与派发看到同一个值，消除 TOCTOU 与"校验说 bundle、派发说 oneshot"的分叉（ocr2-273）。
+    """
+    return _role_opt(workspace, role, "mode", "oneshot").lower()
 
 
 def _reject_step(

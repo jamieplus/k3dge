@@ -49,7 +49,10 @@ class Rejection(str):
 def rejection(message: Any, fallback_gate_id: str) -> Rejection:
     """把动作/闸的失败返回值正规化为 `Rejection`（已是 Rejection 则原样透传）。"""
     if isinstance(message, Rejection):
-        return message
+        if str(message).strip():
+            return message
+        gid = message.gate_id or fallback_gate_id
+        return Rejection(gid, f"({gid} 判定为失败，但未给出原因)")
     gid = getattr(message, "gate_id", None) or fallback_gate_id
     text = "" if message is None else str(message)
     if not text.strip():
@@ -132,6 +135,20 @@ def _merge_section(data: Dict[str, Any], raw: Dict[str, Any]) -> None:
             for kind, decl in vals.items():
                 if isinstance(decl, dict):
                     data.setdefault("checks", {}).setdefault(kind, {}).update(decl)
+                else:
+                    # `checks.<kind>` 写成标量/列表（如 `seal = ["full_matrix"]`）旧实现静默丢、
+                    # 回落 DEFAULTS ⇒ 声明的编排单元没生效还无人知道（ocr2-256）。出声，不猜。
+                    import sys as _sys
+
+                    print(f"[gates] WARN: checks.{kind} 不是表（{type(decl).__name__}）⇒ 忽略该覆盖",
+                          file=_sys.stderr)
+        elif section not in ("audit_trigger", "search", "markers", "output", "nodes", "checks"):
+            # `[gates.*]` 下的拼写错误（`[gates.marker]`）会建幽灵键而预期阈值保持缺省：
+            # 覆盖静默无效（ocr2-256）。出声，不收编。
+            import sys as _sys
+
+            print(f"[gates] WARN: 未知段 '{section}'（不在阈值/编排词表里）⇒ 忽略该覆盖",
+                  file=_sys.stderr)
         else:
             data.setdefault(section, {}).update(vals)
 
@@ -155,11 +172,28 @@ def load(workspace: Path) -> Dict[str, Any]:
     # [gates.<name>] 的内容即阈值段本身（audit_trigger/search/markers/output），平铺合并
     if isinstance(raw.get("gates"), dict):
         _merge_section(data, raw["gates"])
+    elif "gates" in raw:
+        # `gates = []` / 顶层误置（`[markers]` 而非 `[gates.markers]`）旧实现静默跑缺省，
+        # 声明以为生效（ocr2-257）。出声，不猜。
+        import sys as _sys
+
+        print(f"[gates] WARN: 'gates' 不是表（{type(raw.get('gates')).__name__}）⇒ 忽略该覆盖",
+              file=_sys.stderr)
     # [nodes.<id>]：编排节点的属性声明（kind/on_error/on_rerun/needs/produces）
     if isinstance(raw.get("nodes"), dict):
         _merge_section(data, {"nodes": raw["nodes"]})
+    elif "nodes" in raw:
+        import sys as _sys
+
+        print(f"[gates] WARN: 'nodes' 不是表（{type(raw.get('nodes')).__name__}）⇒ 忽略该覆盖",
+              file=_sys.stderr)
     if isinstance(raw.get("checks"), dict):
         _merge_section(data, {"checks": raw["checks"]})
+    elif "checks" in raw:
+        import sys as _sys
+
+        print(f"[gates] WARN: 'checks' 不是表（{type(raw.get('checks')).__name__}）⇒ 忽略该覆盖",
+              file=_sys.stderr)
     return data
 
 
@@ -169,21 +203,50 @@ def legacy_config_present(workspace: Path) -> bool:
 
 
 def get(workspace: Path, section: str, key: str) -> Any:
-    """读某闸的某阈值（含缺省）。调用方普遍 `int(gates.get(...))` ⇒ 绝不返回 None（ocr-247）。"""
+    """读某闸的某阈值（含缺省）。调用方普遍 `int(gates.get(...))` ⇒ 绝不返回 None。"""
     sec = load(workspace).get(section)
     sec = sec if isinstance(sec, dict) else {}
     val = sec.get(key, DEFAULTS.get(section, {}).get(key))
     if val is None:
-        import sys
-
-        print(f"[gates] WARN: '{section}.{key}' 无值且缺省也没有 ⇒ 返回 0", file=sys.stderr)
-        return 0
+        # `0` 不是中性兜底：`markers.max_note=0`/`audit_trigger.volume_max=0` 让**一切**超限
+        #（红风暴），`output.default_lines=0` 静默不输出。缺省表声明"必须完整"⇒ 走到这里
+        # 一定是 key 拼错（配置或调用方），出声拒绝比静默改语义好（ocr2-258）。
+        raise KeyError(f"[gates] 未知键 {section}.{key}：既不在声明面也不在 DEFAULTS")
     return val
+
+
+def _as_list(decl: Any, key: str, kind: str) -> list:
+    """`preconditions`/`stages_*`/`actions` 的形状安全取值（ocr2-259/ocr2-260）。
+
+    - 缺失/显式空列表 ⇒ `[]`（调用方"无前置"语义不变）
+    - 字符串（如 `preconditions = "adr_landed"`，最自然的 TOML 误写）⇒ `[val]`：
+      旧 `list("adr_landed")` 炸成 11 个单字符闸 id，报一堆 `unknown_gate_id`
+    - 数字/布尔等不可迭代 ⇒ WARN + `[]`：旧实现从 `run_phase` 的 per-node `try`
+      之前抛裸 `TypeError`，走不到结构化 `Rejection`/`[NEXT]` 路径
+    """
+    if not isinstance(decl, dict):
+        return []
+    val = decl.get(key, [])
+    if isinstance(val, list):
+        return list(val)
+    if isinstance(val, str):
+        import sys as _sys
+
+        print(f"[gates] WARN: checks.{kind}.{key} 是字符串 ⇒ 按单元素处理（{val!r}）",
+              file=_sys.stderr)
+        return [val]
+    if val is None:
+        return []
+    import sys as _sys
+
+    print(f"[gates] WARN: checks.{kind}.{key} 不是列表（{type(val).__name__}）⇒ 按空处理",
+          file=_sys.stderr)
+    return []
 
 
 def preconditions(workspace: Path, kind: str) -> list:
     """某编排单元（`check`/`align`/`seal`）的前置闸 id 列表。"""
-    return list(load(workspace).get("checks", {}).get(kind, {}).get("preconditions", []))
+    return _as_list(load(workspace).get("checks", {}).get(kind, {}), "preconditions", kind)
 
 
 def stages(workspace: Path, kind: str, phase: str) -> list:
@@ -194,7 +257,7 @@ def stages(workspace: Path, kind: str, phase: str) -> list:
     （交 `run_action` 走 mcp→cli→manual/skip 传输链）。
     """
     decl = load(workspace).get("checks", {}).get(kind, {})
-    return list(decl.get(f"stages_{phase}", []))
+    return _as_list(decl, f"stages_{phase}", kind)
 
 
 def all_stage_refs(workspace: Path) -> list:
@@ -205,11 +268,13 @@ def all_stage_refs(workspace: Path) -> list:
         if not isinstance(decl, dict):
             continue
         for key, val in decl.items():
-            if key.startswith("stages_") and isinstance(val, list):
-                out.extend(str(v) for v in val)
+            # 与 `stages()` 同一形状口径：字符串声明的外部步以前在这里被跳过、
+            # 在运行时又炸成单字符 ref（"声明空转"检查与运行口径分叉，ocr2-260）。
+            if key.startswith("stages_"):
+                out.extend(_as_list(decl, key, kind))
     return out
 
 
 def actions(workspace: Path, kind: str) -> list:
     """某编排单元的**内部**动作 id 列表。"""
-    return list(load(workspace).get("checks", {}).get(kind, {}).get("actions", []))
+    return _as_list(load(workspace).get("checks", {}).get(kind, {}), "actions", kind)

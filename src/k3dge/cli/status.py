@@ -14,7 +14,11 @@ from typing import Any, Dict, Optional
 from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.manifest import Manifest, ManifestError
 from k3dge.engine.milestone_files import _is_doc_aux
+from k3dge.engine.state_machine import TaskState
 from k3dge.engine.task_index import parse_frontmatter
+
+#: done 词表单源（ocr2-180）：不得在这里再硬编码一份 "done"。
+_DONE_VALUE = TaskState.DONE.value
 
 
 
@@ -82,7 +86,15 @@ def lifecycle_next(workspace: Path) -> Any:
     except Exception as exc:  # routing 不得拖垮 status，但**也不得把"坏了"渲染成"没待办"（389）**
         print(f"[STATUS] WARN: [NEXT] 路由异常（{type(exc).__name__}: {exc}）⇒ 本轮不投影处理点",
               file=sys.stderr)
-        return None
+        # `None` 与"确实没待办"是同一个值，机器面（`--json` `.next` / MCP）无法区分 ⇒
+        # 投专用态，harness 可据此告警而不是静默当"没事"（ocr2-178）。
+        try:
+            mid = get_current_milestone(workspace)
+        except Exception:
+            mid = ""
+        return nextstep.NextStep.from_state(
+            "routing_error", mid, reasons=[f"{type(exc).__name__}: {exc}"]
+        )
 
 
 def workspace_status(workspace: Path) -> Dict[str, Any]:
@@ -97,12 +109,19 @@ def workspace_status(workspace: Path) -> Dict[str, Any]:
     except ManifestError as exc:
         return {"ok": False, "error": "ManifestInvalid", "message": str(exc)}
 
-    report = ConsistencyEngine(workspace).evaluate()
-    drift = [
-        {"domain": v.domain, "symbol_diff": (v.detail or {}).get("symbol_diff")}
-        for v in report.violations
-        if v.rule_id == "CONTRACT_DRIFT"
-    ]
+    try:
+        report = ConsistencyEngine(workspace).evaluate()
+        drift = [
+            {"domain": v.domain, "symbol_diff": (v.detail or {}).get("symbol_diff")
+             if isinstance(v.detail, dict) else None}
+            for v in report.violations
+            if v.rule_id == "CONTRACT_DRIFT"
+        ]
+    except Exception as exc:
+        # 核心扫描（evaluate/drift 展平）抛了 ⇒ 按 docstring 承诺回 error 形，
+        # 不让 traceback 逸出（MCP `_err` 闭集会被打破，ocr2-179）。
+        return {"ok": False, "error": "StatusScanFailed",
+                "message": f"consistency scan failed ({type(exc).__name__}: {exc})"}
     pipeline_path = workspace / ".agent" / "pipeline.toml"
     pipeline = {"configured": pipeline_path.exists(), "issues": []}
     if pipeline_path.exists():
@@ -123,12 +142,15 @@ def workspace_status(workspace: Path) -> Dict[str, Any]:
                 txt = p.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
                 continue   # 坏编码的 task 文件只跳过这一张，不让 status 整体崩栈（ocr-032）
-            fm = parse_frontmatter(txt) or {}
-            m = re.search(r"-\s+\*\*Status\*\*:\s*([\w-]+)", txt)
+            try:
+                fm = parse_frontmatter(txt) or {}
+            except Exception:
+                fm = {}
+            m = re.search(r"-\s+\*\*Status\*\*:\s*([\w-]+)", txt, re.IGNORECASE)
             # 值必须小写比较（`parse_frontmatter` 只 lower 键，`Status: Done` 在这里会≠done ⇒ 与引擎
             # `_scan_task_dir` 判定漂移，同一票 status/`[NEXT]`/MCP 三个出口给相反结论，ocr-188）
-            status = str(fm.get("status") or (m.group(1) if m else "")).strip().lower()
-            if status != "done":
+            status = str(fm.get("status") or (m.group(1) if m else "") or "unknown").strip().lower()
+            if status != _DONE_VALUE:
                 # 标题复用引擎单源 TITLE_RE（`^#\s+(.+)$` MULTILINE）：原 `#\s*(.+)` 无锚定，
                 # 会命中二级标题/代码注释里的 `#`，三处出口标题不一致（ocr-189）。
                 from k3dge.engine.task_index import TITLE_RE
@@ -144,6 +166,20 @@ def workspace_status(workspace: Path) -> Dict[str, Any]:
 
     from k3dge.engine import state_machine, task_dag
 
+    try:
+        dag = task_dag.summary(workspace)
+    except Exception as exc:
+        dag = {"error": f"task_dag failed ({type(exc).__name__}: {exc})"}
+    try:
+        sm = state_machine.summary()
+    except Exception as exc:
+        sm = {"error": f"state_machine failed ({type(exc).__name__}: {exc})"}
+    try:
+        ns = lifecycle_next(workspace)
+    except Exception as exc:  # 双保险：lifecycle_next 内部已自保，这里只防签名漂移
+        print(f"[STATUS] WARN: [NEXT] 投影失败（{type(exc).__name__}: {exc})", file=sys.stderr)
+        ns = None
+
     return {
         "domains": sorted(manifest.domains),
         "gate_passed": report.passed,
@@ -151,8 +187,8 @@ def workspace_status(workspace: Path) -> Dict[str, Any]:
         "drift": drift,
         "pipeline": pipeline,
         "unfinished_tasks": unfinished,
-        "task_dag": task_dag.summary(workspace),
-        "state_machine": state_machine.summary(),
-        "next": (ns.render_mcp() if (ns := lifecycle_next(workspace)) is not None else None),
+        "task_dag": dag,
+        "state_machine": sm,
+        "next": (ns.render_mcp() if ns is not None else None),
         "cache": cache_observability(workspace),
     }

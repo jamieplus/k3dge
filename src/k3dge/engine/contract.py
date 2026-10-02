@@ -229,6 +229,9 @@ def _load_dropin_extractors(root: Path) -> None:
         if mod_name in sys.modules or str(plug_file) in _PLUGIN_ATTEMPTED:
             continue
         _PLUGIN_ATTEMPTED.add(str(plug_file))
+        # import 时 `register_extractor()` 先执行、后半模块再抛 ⇒ 半注册的 extractor
+        # 留在 `_EXTRACTORS` 里认领文件却抽不出接口（ocr2-225）。失败即回滚本文件加进去的。
+        _depth = len(_EXTRACTORS)
         try:
             spec_obj = importlib.util.spec_from_file_location(mod_name, plug_file)
             if spec_obj is None or spec_obj.loader is None:
@@ -237,6 +240,7 @@ def _load_dropin_extractors(root: Path) -> None:
             sys.modules[mod_name] = mod
             spec_obj.loader.exec_module(mod)
         except Exception as exc:  # noqa: BLE001 — one bad file must not block the rest
+            del _EXTRACTORS[_depth:]
             sys.modules.pop(mod_name, None)
             print(f"[WARN][EXTRACTOR] skipping '{plug_file.name}': {exc}", file=sys.stderr)
 
@@ -333,7 +337,13 @@ def _iface_import(node, allow: Optional[set]) -> List[str]:
         name = alias.asname or alias.name
         if not _is_public(name) or not _wanted(allow, name):
             continue
-        out.append(f"from {module} import {name}")
+        # 只画别名会丢 re-export 目标：`from .legacy import Api as Foo` 与
+        # `from .legacy import NewImpl as Foo` 序列化成同一行，换目标不触哈希（ocr2-226）。
+        # `_symbol_name` 本就按别名键（`" as "` 处理），值里保留原名不影响键。
+        if alias.asname and alias.asname != alias.name:
+            out.append(f"from {module} import {alias.name} as {alias.asname}")
+        else:
+            out.append(f"from {module} import {name}")
     return out
 
 
@@ -414,8 +424,9 @@ def collect_domain_interface(
                             chunks.append(f"# {file_path.name}\n{iface}")
                         else:
                             chunks.append(iface)
-                    _claimed = True
-                    break          # 只有真拿到接口才认领这个 extractor
+                        _claimed = True
+                        break          # 只有真拿到接口才认领这个 extractor（空串不认领，
+                                       # 让后面的 extractor 还有机会；ocr2-228）
                 except ImportError as exc:
                     # 依赖缺失 ≠ 认领成功：`break` 会让该文件谁都没计（合同只覆盖一部分还判"一致"），
                     # 也没给别的 extractor 机会；至少出声（ocr-225）。

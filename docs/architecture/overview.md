@@ -157,6 +157,7 @@ stateDiagram-v2
 | priority | state | 有选项 | 含义 |
 | --- | --- | --- | --- |
 | 1 | `escalated` | 否 | verify 连续 >3 次未闭环 ⇒ 转人工 |
+| 1 | `routing_error` | 否 | 处理点路由异常，本轮无法判定是否有待办（不是“没事”） |
 | 1 | `pending_findings` | 是 | `k3dit:pending` 钉未处置 |
 | 2 | `audit_open` | 是 | 审计有待修，环未闭环 |
 | 2 | `doc_fix` | 是 | docs 有可确定修偏差（封板前置 `docs_normalized` 会拦） |

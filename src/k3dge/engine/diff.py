@@ -22,7 +22,11 @@ def _try_run(cmd: List[str], cwd: Path) -> subprocess.CompletedProcess:
     unconverted OSError crashed `k3dge check` instead of reporting GIT_UNAVAILABLE.
     """
     try:
-        return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+        # `-z` + `core.quotePath=false` 产的是原始字节路径（UTF-8）：按 locale 解码在
+        # C/ASCII locale 或 Windows cp1252 下对非 ASCII 路径抛 UnicodeDecodeError，
+        # 而它不是 OSError ⇒ 逃出转 GitError 的口径，直接崩 `k3dge check`（ocr2-229）。
+        return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
+                              encoding="utf-8", errors="replace")
     except OSError as exc:
         raise GitError(f"{' '.join(cmd[:2])} could not be executed: {exc}") from exc
 
@@ -107,8 +111,10 @@ def _parse_porcelain_z(status: str) -> List[str]:
         if "R" in xy or "C" in xy:
             if i < len(toks):      # rename/copy：下一 token 是原路径，跳过，取新路径
                 i += 1
-        if path.strip():
-            files.append(path.strip())
+        # `-z` 下 `e[3:]` 已是精确路径：`.strip()` 会吃掉首尾空格的合法文件名
+        # （`?? draft .md` 被错配 ⇒ 域归属丢失），只判空、不改内容（ocr2-230）。
+        if path:
+            files.append(path)
     return files
 
 
@@ -130,17 +136,17 @@ def get_changed_files(workspace: Path) -> List[str]:
     base = os.environ.get("K3DGE_BASE_SHA", "").strip()
     if not base:
         base = resolve_base(workspace)
-    elif base.startswith("-") or any(c.isspace() for c in base):
+    elif base.startswith("-") or any(c.isspace() for c in base) or ".." in base or ":" in base:
         # K3DGE_BASE_SHA 来自 CI 环境：`-` 开头会被 git 当选项、含空白会裂参；非法 rev 又只报成
-        # GIT_UNAVAILABLE（配置错误伪装成环境故障，ocr-229）。显式拒。
-        raise GitError(f"K3DGE_BASE_SHA 非法（不得以 - 开头或含空白）：{base!r}")
+        # GIT_UNAVAILABLE（配置错误伪装成环境故障，ocr-229）。`..`/`:` 会被 revparser 解成
+        # 区间/路径语法而静默改 diff 范围（ocr2-231；合法 ref 名本来就不含这两者）。
+        raise GitError(f"K3DGE_BASE_SHA 非法（不得以 - 开头或含空白/`..`/`:`）：{base!r}")
     if base != "HEAD":
         committed = _run(
-            ["git", "-c", "core.quotePath=false", "diff", "--name-only", "-z", f"{base}...HEAD"],
+            ["git", "-c", "core.quotePath=false", "diff", "--name-only", "-z", f"{base}...HEAD", "--"],
             workspace,
         ).split("\0")
         for path in committed:
-            path = path.strip()
             if path and path not in seen:
                 seen.add(path)
                 files.append(path)
@@ -153,7 +159,6 @@ def get_changed_files(workspace: Path) -> List[str]:
             workspace,
         ).split("\0")
         for path in tracked:
-            path = path.strip()
             if path and path not in seen:
                 seen.add(path)
                 files.append(path)

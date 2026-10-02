@@ -182,3 +182,48 @@ def test_stale_shaped_line_is_refreshed_not_kept():
     out = append_to_message(ws, stale, who="t")
     assert "wrongword" not in out and "2020-01-01" not in out
     assert PREFIX in out
+
+
+def test_windows_tolerance_is_symmetric_around_the_minute() -> None:
+    """ocr2-188：署名行时间容差必须对称（±1 分钟），不能只容同分钟与更早一分钟。"""
+    from k3dge.engine.attest import windows
+
+    assert windows("2026-01-01T00:05:30Z") == [
+        "2026-01-01T00:04", "2026-01-01T00:05", "2026-01-01T00:06"]
+
+
+def test_verify_commit_survives_non_ascii_under_ascii_locale(monkeypatch) -> None:
+    """ocr2-189：git 输出 UTF-8，但 `text=True` 按 locale 解码；ASCII locale 不得崩栈。"""
+    import locale
+
+    ws = _repo()
+    (ws / "a.txt").write_text("x\n", encoding="utf-8")
+    _gitc(ws, "add", "-A")
+    msg = append_to_message(ws, "feat: x\n\n作者：José", who="José")
+    m = re.search(r"@ (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z", msg)
+    assert m, msg
+    _gitc(ws, "-c", "user.name=José", "-c", "user.email=t@t",
+          "commit", "-q", "--no-verify", "-m", msg,
+          env_extra={"GIT_AUTHOR_DATE": m.group(1) + "Z",
+                     "GIT_COMMITTER_DATE": m.group(1) + "Z"})
+    monkeypatch.setattr(locale, "getencoding", lambda: "ascii")
+    ok, out = verify_commit(ws, _head(ws))     # 不得抛 UnicodeDecodeError
+    assert ok, out
+
+
+def test_verify_commit_accepts_later_valid_line_after_shaped_decoy() -> None:
+    """ocr2-190：正文里靠前的形状合法但无效的行不得遮住真正的 trailer。"""
+    ws = _repo()
+    (ws / "a.txt").write_text("x\n", encoding="utf-8")
+    _gitc(ws, "add", "-A")
+    msg = append_to_message(ws, "feat: x", who="t")
+    m = re.search(r"@ (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z", msg)
+    assert m, msg
+    decoy = "k3dge-commit: t @ 2020-01-01T00:00:00Z #wrongword"
+    body = msg.replace(PREFIX, decoy + "\n" + PREFIX, 1)
+    _gitc(ws, "-c", "user.name=t", "-c", "user.email=t@t",
+          "commit", "-q", "--no-verify", "-m", body,
+          env_extra={"GIT_AUTHOR_DATE": m.group(1) + "Z",
+                     "GIT_COMMITTER_DATE": m.group(1) + "Z"})
+    ok, out = verify_commit(ws, _head(ws))
+    assert ok, out

@@ -56,6 +56,10 @@ def set_current_milestone(workspace: Path, milestone_id: str) -> None:
         raise MilestoneError(err)
     p = _milestone_file(workspace)
     p.parent.mkdir(parents=True, exist_ok=True)
+    # 符号链接游标：rename 到链接位会替换链接本身、留下真实目标 stale（ocr2-491）。
+    # 写穿目标，链接保持不动。
+    dest = p.resolve() if p.is_symlink() else p
+    dest.parent.mkdir(parents=True, exist_ok=True)
     # 原子写：游标留下半行（`M1`→`M`）会让下次读走"内容非法"分支，与 bump 的读-改-写
     # 叠加成不可恢复的回退（ocr-270）。
     # 固定 `.tmp` 名可预测：`.agent/` 可被同仓其他进程写时，预置同名 symlink 可把写带到别处
@@ -63,11 +67,11 @@ def set_current_milestone(workspace: Path, milestone_id: str) -> None:
     import os as _os
     import tempfile as _tf
 
-    _fd, _name = _tf.mkstemp(dir=str(p.parent), prefix=p.name + ".", suffix=".tmp")
+    _fd, _name = _tf.mkstemp(dir=str(dest.parent), prefix=dest.name + ".", suffix=".tmp")
     try:
         with _os.fdopen(_fd, "w", encoding="utf-8") as _f:
             _f.write(milestone_id + "\n")
-        Path(_name).replace(p)
+        Path(_name).replace(dest)
     except Exception:
         try:
             Path(_name).unlink(missing_ok=True)
@@ -76,20 +80,63 @@ def set_current_milestone(workspace: Path, milestone_id: str) -> None:
         raise
 
 
+def _cursor_lock(workspace: Path):
+    """Exclusive advisory lock around the cursor's read-modify-write.
+
+    `bump_milestone` runs from the CLI, git hooks and the persistent MCP server
+    against one workspace — two overlapping seals both read M10 and both write
+    M11 (lost update). No fcntl (Windows) ⇒ no-op context manager.
+    """
+    import contextlib
+    import os
+    try:
+        import fcntl
+    except ImportError:  # pragma: no cover - non-POSIX
+        fcntl = None
+
+    @contextlib.contextmanager
+    def _cm():
+        fd = None
+        if fcntl is not None:
+            lock_path = _milestone_file(workspace).with_name("milestone.lock")
+            try:
+                lock_path.parent.mkdir(parents=True, exist_ok=True)
+                fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o644)
+                fcntl.flock(fd, fcntl.LOCK_EX)
+            except OSError:
+                if fd is not None:
+                    with contextlib.suppress(OSError):
+                        os.close(fd)
+                fd = None
+        try:
+            yield
+        finally:
+            if fd is not None:
+                with contextlib.suppress(OSError):
+                    os.close(fd)          # 关闭即释放
+    return _cm()
+
+
 def bump_milestone(workspace: Path) -> str:
     """M0 → M1 → M2 …; writes new cursor and returns it."""
-    cur = get_current_milestone(workspace)
-    m = re.match(r"^M(\d+)$", cur)
-    if not m:
-        # 不再生成 `-next` 链（可无界增长、且脱离 M<数字> 契约让扫描恒空，ocr-087）。
-        raise MilestoneError(f"游标 '{cur}' 非 M<数字> 形态，拒绝推进（请人工修正游标）")
-    nxt = f"M{int(m.group(1)) + 1}"
-    set_current_milestone(workspace, nxt)
-    return nxt
+    with _cursor_lock(workspace):
+        cur = get_current_milestone(workspace)
+        m = re.match(r"^M(\d+)$", cur)
+        if not m:
+            # 不再生成 `-next` 链（可无界增长、且脱离 M<数字> 契约让扫描恒空，ocr-087）。
+            raise MilestoneError(f"游标 '{cur}' 非 M<数字> 形态，拒绝推进（请人工修正游标）")
+        nxt = f"M{int(m.group(1)) + 1}"
+        set_current_milestone(workspace, nxt)
+        return nxt
 
 
 def _validate_milestone_id(milestone_id: str) -> Optional[str]:
     """Return an error message if `milestone_id` is unsafe as a path component."""
+    if not isinstance(milestone_id, str):
+        return (
+            f"Invalid milestone id {milestone_id!r}: must be str, "
+            "got non-string (MCP JSON-RPC/ frontmatter 不做类型校验， traceback 不得外泄）"
+        )
     if milestone_id and ".." in Path(str(milestone_id)).parts:
         return f"Invalid milestone id '{milestone_id}': 不得含 '..'（它是路径分量）"
     if not milestone_id or not _SAFE_MILESTONE_ID_RE.fullmatch(milestone_id):

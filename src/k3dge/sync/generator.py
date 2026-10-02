@@ -91,7 +91,16 @@ def sync_domain(
     if content == original:
         # 接口块**没落位**（既无 k3dge:interfaces markers、也无 Public Interfaces 标题）⇒ 不得写
         # 哈希/日期：否则闸拿"哈希行 == 现采"判绿，而 spec 接口块实际缺失且永不自愈（ocr-123）。
-        return None
+        # 但 `_replace_between_all` 在"markers 在、生成块与现存逐字节相同"时也返回原串（ocr2-342）：
+        # 此时落位成功、内容已是最新，只需刷哈希/日期行，不得静默 return None（否则 verify 永红、
+        # sync 永不自愈的死锁，且无任何 WARN）。
+        if (contract.INTERFACE_START in original and contract.INTERFACE_END in original) or \
+                PUBLIC_INTERFACES_RE.search(original):
+            content = original
+        else:
+            print(f"[sync] WARN: 域 {domain} 的接口块没落位（缺 k3dge:interfaces markers 与 Public Interfaces 标题）"
+                  "⇒ 只跳过本域（哈希/日期不行）", file=sys.stderr)
+            return None
     # 哈希/日期行必须真落位：`sub` 零匹配时静默无事发生，但接口块已重写、函数还返回
     # spec_path（成功形）⇒ 闸拿"哈希行 == 现采"判绿，而日期/哈希实际没更新（ocr2-090）。
     content, n_hash = HASH_LINE_RE.subn(
@@ -159,9 +168,13 @@ def _sync_registry():
         # （docstring 变动不得动哈希）
         from k3dge.engine.pure_refs import inside_workspace
 
+        targets = list(ctx["domains"]) if ctx.get("domains") else list(manifest.domains)
+        # 只采本轮目标域：全量预采会让 `--domain x` 重扫整个仓库的 src 树（ocr2-343b）。
+        wanted = {d for d in targets if d in manifest.domains}
         iface_cache: dict[str, str] = {}
         doc_cache: dict[str, str] = {}
-        for d, cfg in manifest.domains.items():
+        for d in wanted:
+            cfg = manifest.domains[d]
             src = cfg.get("src", "")
             if src:
                 # `sync_domain` 单域有 `inside_workspace` 守卫，这里批量预采也要同口径（ocr2-091）：
@@ -171,10 +184,11 @@ def _sync_registry():
                           file=sys.stderr)
                     continue
                 src_dir = ws / Path(src)
+                #  clean 接口与 doc 版语义不同（后者逐文件前插 `# <name>` + docstring 首行），
+                # 文本剥离不可靠 ⇒ 仍采两次，但只采本轮目标域（ocr2-343）。
                 iface_cache[d] = contract.collect_domain_interface(src_dir, manifest, ws)
                 doc_cache[d] = contract.collect_domain_interface(src_dir, manifest, ws, include_doc=True)
         ctx["doc_cache"] = doc_cache
-        targets = list(ctx["domains"]) if ctx.get("domains") else list(manifest.domains)
         for domain in targets:
             if domain not in manifest.domains:
                 continue

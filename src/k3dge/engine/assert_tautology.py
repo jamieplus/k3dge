@@ -159,6 +159,12 @@ def _self_compare(node: ast.AST, aliases: Dict[str, ast.AST]) -> bool:
         return False
     if not all(isinstance(op, _SAME_OPS) for op in node.ops):
         return False
+    if any(isinstance(op, ast.Is) for op in node.ops):
+        # `is` 是同一性比较：别名替换是文本级 AST 相等，不是运行时同一对象。
+        # `a = []; assert a is []` 替换后两边 AST 相同但断言恒假，不得报"恒真"。
+        # 只有替换前已相同的 `x is x`（同一引用自比）才报。
+        if len({_dump(node.left), *(_dump(c) for c in node.comparators)}) != 1:
+            return False
     return _same_after_subst([node.left, *node.comparators], aliases)
 
 
@@ -307,13 +313,24 @@ def _statement(stmt: ast.stmt, aliases: Dict[str, ast.AST], found: List[Tuple[in
     if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
         aliases.pop(stmt.name, None)
         _block(stmt.body, {}, found)
-        if any(_mutates(dec) for dec in stmt.decorator_list):
+        _side = list(stmt.decorator_list)
+        if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            _side += list(stmt.args.defaults) + [d for d in stmt.args.kw_defaults if d is not None]
+        else:
+            _side += list(stmt.bases) + [kw.value for kw in stmt.keywords]
+            _tp = getattr(stmt, "type_params", None)
+            if _tp:
+                _side += list(_tp)
+        if any(_mutates(d) for d in _side):
             aliases.clear()
         return
     if isinstance(stmt, ast.Assign) and _simple_pure(stmt):
         aliases[stmt.targets[0].id] = stmt.value
         return
     if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+        if stmt.annotation is not None and _mutates(stmt.annotation):
+            aliases.clear()
+            return
         if stmt.value is not None and _is_pure(stmt.value):
             aliases[stmt.target.id] = stmt.value
         elif stmt.value is not None:

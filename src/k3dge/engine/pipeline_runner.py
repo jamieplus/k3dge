@@ -343,11 +343,21 @@ def _run_cli(workspace: Path, command: str, timeout: int, io,
             import signal
 
             try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except OSError:      # pragma: no cover - 进程已退
-                proc.kill()
+                if os.name == "posix":
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                else:  # Windows 无 killpg/SIGKILL：直接杀子进程（ocr2-289）
+                    proc.kill()
+            except (OSError, AttributeError, ValueError):
+                try:
+                    proc.kill()
+                except (OSError, AttributeError, ValueError):
+                    pass
             so, se = proc.communicate()
-            return TransportResult(False, "cli", f"timeout after {timeout}s（整个进程组已终止）")
+            out = ((so or "") + (se or "")).strip()
+            detail = f"timeout after {timeout}s（进程已终止）"
+            if out:
+                detail += f": {out[:500]}"
+            return TransportResult(False, "cli", detail)
         out = (so or "") + (se or "")
         if proc.returncode == 0:
             return TransportResult(True, "cli", out.strip() or "ok", payload=out.strip())
@@ -416,6 +426,10 @@ def run_action(
             continue
         try:                          # `timeout = "60s"` / 表 / bool 都不该让执行器抛（ocr-282）
             timeout = int(t.get("timeout", timeout_default))
+            if timeout <= 0:
+                # `false`/`0` 会旁路 ocr-282 守卫并让每次真实传输瞬间超时 ⇒
+                # 静默降级 manual ⇒ 可封板（ocr2-290）：非正数与非法值同处理。
+                raise ValueError(f"non-positive timeout {timeout!r}")
         except (TypeError, ValueError):
             timeout = int(timeout_default) if str(timeout_default).isdigit() else 120
             print(f"[PEER] WARN: action '{action_ref}' 的 timeout 非法（{t.get('timeout')!r}）⇒ 用 {timeout}s",

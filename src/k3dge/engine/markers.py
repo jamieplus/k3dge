@@ -50,7 +50,7 @@ MARKER_RE_MD = re.compile(
     re.M,
 )
 _SCAN_SUFFIXES = frozenset(
-    {".py", ".md", ".js", ".ts", ".tsx", ".go", ".rs", ".java", ".rb", ".toml", ".yaml", ".yml", ".php", ".kt", ".swift", ".c", ".h", ".cc", ".sh"}
+    {".py", ".md", ".html", ".js", ".ts", ".tsx", ".go", ".rs", ".java", ".rb", ".toml", ".yaml", ".yml", ".php", ".kt", ".swift", ".c", ".h", ".cc", ".sh"}
 )
 _SKIP_DIR_PARTS = ("archive", ".git", ".venv", "node_modules", "__pycache__")
 # note 上限按 kind：pending 只活在线上、ff 前去钉剥净不上主干，可放宽到 500（够 value/design 理据）；
@@ -98,12 +98,34 @@ def _iter_scan_files(workspace: Path, roots: Sequence[str]) -> Iterable[Tuple[st
             yield rel, p
 
 
-def head_block_end(lines: Sequence[str]) -> int:
-    """首个连续注释块（含空行）的结束行号（0-based 开区间）。允许 shebang/encoding。"""
+def head_block_end(lines: Sequence[str], *, md_host: bool = False) -> int:
+    """首个连续注释块（含空行）的结束行号（0-based 开区间）。允许 shebang/encoding。
+
+    `md_host=True`（`.md`/`.html`）时 `#` 是标题不是注释：`#` 开头不再算注释行，
+    否则 head block 会越过所有前置标题，`@file` 的"头块内"约束被架空（ocr2-265）。
+    md 的 YAML front matter（首行 `---` … 闭合 `---`）计入头块，否则 front matter
+    后的合法 `@file` HTML 注释会被判越界。
+    """
     i = 0
+    if md_host and lines and lines[0].strip() == "---":
+        i = 1
+        while i < len(lines) and lines[i].strip() != "---":
+            i += 1
+        if i < len(lines):
+            i += 1        # 越过闭合 `---`
+        else:
+            return len(lines)   # 未闭合：整份都算头（不误判位置）
     while i < len(lines):
         stripped = lines[i].strip()
-        if not stripped or _COMMENT_LINE_RE.match(lines[i]):
+        if not stripped:
+            i += 1
+            continue
+        if md_host:
+            if stripped.startswith("<!--"):
+                i += 1
+                continue
+            break
+        if _COMMENT_LINE_RE.match(lines[i]):
             i += 1
             continue
         break
@@ -136,7 +158,8 @@ def _line_index(text: str, pos: int) -> int:
 def parse_text(rel: str, text: str, *, max_note: int = _MAX_NOTE,
                max_note_pending: int = _MAX_NOTE_PENDING) -> Tuple[List[Marker], List[str]]:
     lines = text.splitlines()
-    hb = head_block_end(lines)
+    md_host = rel.endswith((".md", ".html"))
+    hb = head_block_end(lines, md_host=md_host)
     markers: List[Marker] = []
     problems: List[str] = []
     rx = MARKER_RE_MD if rel.endswith((".md", ".html")) else MARKER_RE
@@ -191,8 +214,12 @@ def parse_sidecar(text: str) -> Tuple[List[Marker], List[str]]:
                 problems.append(f"{SIDECAR}:{i} 条目缺 @repo 作用域")
             cur = Marker(SIDECAR, i, m.group("kind"), m.group("id"), "repo", (m.group("note") or "").strip())
             markers.append(cur)
-        elif raw.startswith("- files:") and cur is not None:
-            cur.note = (cur.note + " | " + raw.split(":", 1)[1].strip()).strip("| ")
+        elif cur is not None and (
+            raw.startswith("- files:") or raw.startswith("- why:")
+        ):
+            # 文档承诺 `- files:`/`- why:` 两行都带进 note；旧实现只收 `- files:` ⇒
+            # 理由被静默丢，进不了账本/报告投影（ocr2-267）。保留原文标签一起并进去。
+            cur.note = (cur.note + " | " + raw.strip()).strip("| ")
     return markers, problems
 
 

@@ -122,8 +122,16 @@ def _sync_peers_into_mcp(workspace: Path, cfg: dict) -> Optional[str]:
         # 覆写会静默丢掉用户内容；拒改比"修好"安全。
         return f".mcp.json 的 mcpServers 非对象（{type(data['mcpServers']).__name__}）⇒ 跳过写盘（不覆盖用户内容）"
     changed = False
-    for pid, pcfg in cfg.get("peers", {}).items():
-        if pid == "k3dge" or not pcfg.get("enabled", True):
+    peers = cfg.get("peers", {})
+    # `pipeline.toml` 是用户可编辑的外部输入：`[[peers]]`（数组表）或 `peers.x = true`
+    # 会让下面的 `.items()`/`.get()` 抛 AttributeError（ocr2-175）⇒ 先验形状。
+    if not isinstance(peers, dict):
+        return f"pipeline.toml 的 [peers] 不是表（{type(peers).__name__}）⇒ 跳过 peer 合并（不覆盖用户内容）"
+    for pid, pcfg in peers.items():
+        if pid == "k3dge" or not isinstance(pcfg, dict) or not pcfg.get("enabled", True):
+            if isinstance(pcfg, dict) is False and pid != "k3dge":
+                _peer_fallback_warn(pid, f"peers.{pid} 形状不对（{type(pcfg).__name__}，期望表）⇒ 跳过该 peer",
+                                    "audit_default.md")
             continue
         probe, mod, py_path = probe_peer_mcp(workspace, pid)
         if probe is None or mod is None:
@@ -157,11 +165,24 @@ def _sync_peers_into_mcp(workspace: Path, cfg: dict) -> Optional[str]:
 def _warn_missing_peer_servers(workspace: Path, cfg: dict) -> None:
     """Warn for enabled pipeline peers absent from .mcp.json (no sibling / not synced)."""
     servers = _mcp_servers(workspace)
-    for pid, pcfg in cfg.get("peers", {}).items():
-        if pid == "k3dge" or not pcfg.get("enabled", True):
-            continue
-        if pid not in servers:
-            _peer_fallback_warn(pid, "enabled in pipeline.toml but missing in .mcp.json (no sibling or not synced via 'k3dge mcp sync')", _peer_fallback(pcfg))
+    peers = cfg.get("peers", {})
+    # 与 `_sync_peers_into_mcp` 同口径：坏形状不得让整轮告警静默消失（ocr2-176）。
+    # 这里的唯一调用方（milestone-align）吞掉所有异常 ⇒ 循环内绝不能抛。
+    if not isinstance(peers, dict):
+        _peer_fallback_warn("peers", f"[peers] 形状不对（{type(peers).__name__}，期望表）⇒ 无法逐项告警",
+                            "audit_default.md")
+        return
+    for pid, pcfg in peers.items():
+        try:
+            if pid == "k3dge" or not isinstance(pcfg, dict) or not pcfg.get("enabled", True):
+                if pid != "k3dge" and not isinstance(pcfg, dict):
+                    _peer_fallback_warn(pid, f"peers.{pid} 形状不对（{type(pcfg).__name__}，期望表）",
+                                        "audit_default.md")
+                continue
+            if pid not in servers:
+                _peer_fallback_warn(pid, "enabled in pipeline.toml but missing in .mcp.json (no sibling or not synced via 'k3dge mcp sync')", _peer_fallback(pcfg))
+        except Exception as exc:  # 单个坏 peer 不得连坐其余 peer 的告警
+            _peer_fallback_warn(str(pid), f"检查失败（{type(exc).__name__}: {exc}）", "audit_default.md")
 
 
 def cmd_mcp_sync(workspace: Path) -> int:
@@ -174,8 +195,12 @@ def cmd_mcp_sync(workspace: Path) -> int:
     # Peer merging from pipeline.toml is best-effort; report if pipeline is unreadable
     # tomllib is 3.11+, tomli is fallback for 3.10; neither present → skip peer merging gracefully
     tomllib_mod = _load_tomllib()
+    peer_note = ""
     if tomllib_mod is None:
         _peer_fallback_warn("pipeline", "tomllib/tomli not available (py<3.11 without tomli)", "skip peer merging, keep k3dge only")
+        # 降级路也印 "synced" + exit 0 会让只读 stdout/rc 的 CI 以为 peer 已合入（ocr2-177）⇒
+        # 成功行必须限定范围（k3dge-only），降级原因留在 stderr 告警里。
+        peer_note = " (k3dge only; peer merging skipped: no tomllib/tomli)"
     else:
         cfg_path = workspace / ".agent" / "pipeline.toml"
         if cfg_path.is_file():
@@ -193,7 +218,8 @@ def cmd_mcp_sync(workspace: Path) -> int:
                 return 1
         else:
             _peer_fallback_warn("pipeline", ".agent/pipeline.toml not found", "keep k3dge only")
-    print(f"[MCP] synced {workspace / '.mcp.json'}")
+            peer_note = " (k3dge only; peer merging skipped: no pipeline.toml)"
+    print(f"[MCP] synced {workspace / '.mcp.json'}{peer_note}")
     return 0
 
 

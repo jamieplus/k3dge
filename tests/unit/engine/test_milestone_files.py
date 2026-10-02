@@ -1,5 +1,6 @@
 """milestone_files: 文件名/评审文件谓词——重点锁 M1 不匹配 M10 的 token 语义。"""
 import unittest
+from pathlib import Path
 
 from k3dge.engine.milestone_files import (
     _filename_milestone,
@@ -89,11 +90,15 @@ class TestIsReviewAux(unittest.TestCase):
         """`_is_review_aux` 自带 `startswith(".")` 支路（**第二份点文件规则**，t-157）——
         旧测从未穿过它；且"review aux ⊇ doc aux"靠手列名字，`_DOC_AUX_NAMES` 添新成员
         不会有人记得补这边。点文件补测＋**结构派生**的超集断言。"""
+        from k3dge.engine.milestone_files import _DOC_AUX_NAMES
         self.assertTrue(_is_review_aux(".keep"))
         self.assertTrue(_is_review_aux(".schema.json"))          # 点开头文件名（下发目录里常见）
-        for name in ("README.md", "AUTHORING.md", "_template.md", ".DS_Store"):
+        # 结构派生：生产常量的每个成员都必须被 review aux 覆盖（新增成员即自动被钉）
+        for name in set(_DOC_AUX_NAMES) | {"README.md", "AUTHORING.md", "_template.md", ".DS_Store"}:
             self.assertTrue(_is_doc_aux(name), name)
             self.assertTrue(_is_review_aux(name), f"review aux 必须覆盖 doc aux：{name}")
+        for name in _DOC_AUX_NAMES:
+            self.assertTrue(_is_review_aux(name), f"_DOC_AUX_NAMES 新增 {name!r} 未被 review 覆盖")
 
     def test_includes_doc_aux_plus_leftovers(self):
         for n in ("README.md", "AUTHORING.md", "_template.md", "LEFTOVERS.md", "leftovers.md"):
@@ -109,8 +114,7 @@ class TestAliasAgreesWithSingleSource(unittest.TestCase):
     同改）；这里先把"同一函数"钉成契约——有人复制出第二份判据即红。"""
 
     def test_alias_is_the_same_object_as_pure_impl(self) -> None:
-        import inspect
-
+        from k3dge.engine import milestone_files as mf_mod
         from k3dge.engine import pure_refs
 
         # 调 wrapper 与调 pure 对同一样本必须同判（行为超集），且别名内部直达 pure 实现
@@ -119,8 +123,11 @@ class TestAliasAgreesWithSingleSource(unittest.TestCase):
         for text, mid in samples:
             self.assertEqual(_has_milestone_token(text, mid),
                              pure_refs.has_milestone_token(text, mid), (text, mid))
-        src = inspect.getsource(_has_milestone_token)
-        self.assertIn("pure_refs.has_milestone_token", src, "委托断了？别名不得长出第二判据")
+        # 结构断言：别名必须就是同一对象或其 __wrapped__/闭包直达 pure 符号，
+        # 复制出第二份判据（即使 docstring 提到 pure）即红
+        self.assertIs(_has_milestone_token, pure_refs.has_milestone_token,
+                      "别名必须与 pure 实现是同一对象，复制判据即漂移")
+        self.assertIs(mf_mod._has_milestone_token, pure_refs.has_milestone_token)
 
 
 class TestFilenameMilestone(unittest.TestCase):
@@ -139,6 +146,108 @@ class TestFilenameMilestone(unittest.TestCase):
     def test_embedded_not_matched(self):
         # 需要边界分隔：XM10Y 不算
         self.assertIsNone(_filename_milestone("XM10Y.md"))
+
+    def test_filename_token_boundary_agrees_with_token_predicate(self) -> None:
+        """交叉一致：`_filename_milestone` 与 token 谓词的边界类分歧必须显式钉死。
+        文件名类窄（无空白/`/`），token 类宽（含空白/`/`）——含空格的 living 报告名
+        会走 body 回退，改窄/改宽任一侧都必须先翻此测。"""
+        from k3dge.engine import pure_refs
+        # 共同子集：两侧都认的必须一致
+        for name, mid in [("2026-09-16-M10-fix-x.md", "M10"), ("M7-quality.md", "M7"),
+                          ("2026-09-16-fix-x.md", "M10")]:
+            tok = pure_refs.has_milestone_token(name, mid)
+            fn = _filename_milestone(name)
+            if fn is None:
+                self.assertFalse(tok, f"{name!r} 文件名无里程碑但 token 命中 {mid}")
+            else:
+                self.assertTrue(tok, f"{name!r} 文件名抽出 {fn} 但 token 否认 {mid}")
+        # 已知分歧：空格/`/` 在 token 侧算边界、文件名侧不算——显式钉住现状
+        self.assertTrue(pure_refs.has_milestone_token("2026-09-16 M10 audit.md", "M10"))
+        self.assertIsNone(_filename_milestone("2026-09-16 M10 audit.md"),
+                          "空格分隔文件名现状不抽取（改动需同步修调用方回退）")
+        self.assertTrue(pure_refs.has_milestone_token("a/M10/b", "M10"))
+        self.assertIsNone(_filename_milestone("a/M10/b"),
+                          "`/` 分隔现状文件名侧不认（调用方走 body 回退）")
+
+
+class TestAuxCaseInsensitive(unittest.TestCase):
+    """小写脚手架不得当内容（ocr2-274）。"""
+
+    def test_lowercase_scaffolding_is_aux(self):
+        for n in ("readme.md", "ReadMe.MD", "authoring.md", "_Template.md"):
+            self.assertTrue(_is_doc_aux(n), n)
+            self.assertTrue(_is_review_aux(n), n)
+
+    def test_leftovers_any_case_is_review_aux(self):
+        self.assertTrue(_is_review_aux("LEFTOVERS.md"))
+        self.assertTrue(_is_review_aux("Leftovers.MD"))
+
+
+def _git_repo(ws: Path) -> None:
+    import subprocess
+
+    def g(*a: str) -> None:
+        r = subprocess.run(["git", "-C", str(ws), *a], capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError(f"git {' '.join(a)} 失败：{(r.stderr or r.stdout).strip()}")
+
+    g("init", "-q")
+    g("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "seed")
+
+
+class TestMilestoneTagShape(unittest.TestCase):
+    """裸年份 tag 不是里程碑边界（ocr2-276）。"""
+
+    def test_bare_year_excluded(self):
+        import tempfile
+
+        from k3dge.engine.milestone_files import milestone_tags
+
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            _git_repo(ws)
+            import subprocess
+
+            subprocess.run(["git", "-C", str(ws), "tag", "M10"], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(ws), "tag", "2024"], check=True, capture_output=True)
+            tags = milestone_tags(ws)
+            self.assertIn("M10", tags)
+            self.assertNotIn("2024", tags)
+
+    def test_git_failure_warns_not_silent(self):
+        import contextlib
+        import io
+        import tempfile
+
+        from k3dge.engine.milestone_files import milestone_tags
+
+        with tempfile.TemporaryDirectory() as d:
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                tags = milestone_tags(Path(d))          # 非 git 仓
+            self.assertEqual(tags, {})
+            self.assertIn("WARN", err.getvalue())
+
+
+class TestTasksAfterBoundaryKeyCase(unittest.TestCase):
+    """frontmatter 键/值大小写 + `*.md` 目录（ocr2-278）。"""
+
+    def test_uppercase_key_and_md_dir(self):
+        import subprocess
+        import tempfile
+
+        from k3dge.engine.milestone_files import tasks_after_boundary
+
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            (ws / "docs" / "tasks").mkdir(parents=True)
+            _git_repo(ws)
+            subprocess.run(["git", "-C", str(ws), "tag", "M10"], check=True, capture_output=True)
+            (ws / "docs" / "tasks" / "a-dir.md").mkdir()          # 同名目录：必须跳过
+            (ws / "docs" / "tasks" / "2026-09-20-M10-late.md").write_text(
+                "---\nMilestone: M10\nstatus: idea\n---\n# t\n", encoding="utf-8")
+            rows = tasks_after_boundary(ws)
+            self.assertEqual([r[0] for r in rows], ["docs/tasks/2026-09-20-M10-late.md"])
 
 
 if __name__ == "__main__":

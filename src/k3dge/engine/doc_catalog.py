@@ -89,16 +89,15 @@ def _headers(text: str) -> Dict[str, str]:
     return {k.strip(): v.strip() for k, v in _HEADER_RE.findall(text)}
 
 
-def _card_id(typ: str, path: Path, filename_re: Optional[re.Pattern[str]] = None) -> str:
+def _card_id(typ: str, path: Path) -> str:
+    # `filename_re` 形参已删：没有任何调用方传 schema 的文件名模式（ocr2-234），
+    # 留着等于"假装处理了 schema 捕获组与 stem 不一致的情形"。id 口径＝stem（+adr/incidents
+    # 特例），与 `pure_schema.check_filename` 无组时回落 stem 的口径一致。
     if typ == "adr":
         m = re.match(r"^(\d{4})-", path.name)
         return f"ADR-{m.group(1)}" if m else path.stem
     if typ == "incidents":
         return path.stem
-    if filename_re is not None:
-        m = filename_re.match(path.name)
-        if m and m.lastindex:
-            return m.group(1)
     return path.stem
 
 
@@ -234,8 +233,10 @@ def list_docs(
 def where_doc(workspace: Path, ident: str, *, include_retired: bool = True) -> List[dict]:
     """按 id 解析路径。**默认含退役面**——退役号要能查到"曾是/去向"，而不是 not found。"""
     rows = list_docs(workspace, ident=ident, include_retired=include_retired)
-    if rows or not include_retired:
+    if rows or include_retired:
         return rows
+    # `include_retired=False` 的严格现行面没命中 ⇒ 放宽到退役面再找一次（"曾是/去向"）。
+    # 旧条件 `rows or not include_retired` 在 False+空命中时直接返回空，兜底永不可达（ocr2-235）。
     return list_docs(workspace, ident=ident, include_retired=True)
 
 
@@ -430,7 +431,12 @@ def _boundary_task_violations(workspace: Path) -> List[Violation]:
 
     try:
         rows = _mf.tasks_after_boundary(workspace)
-    except Exception:  # 非 git 仓 / git 不可用 ⇒ 无事实可报，不假装有
+    except Exception as exc:  # 非 git 仓 / git 不可用 ⇒ 无事实可报，不假装有
+        # 空转成"零违例"与"真干净"不可分：至少出声，让调用方知道这轮没查（ocr2-237）。
+        import sys as _sys
+
+        print(f"[doc_catalog] WARN: 边界票检查未完成（{type(exc).__name__}: {exc}）⇒ 跳过该项",
+              file=_sys.stderr)
         return []
     return [
         Violation("TASK_MILESTONE_AFTER_BOUNDARY", msg, file_path=rel,
@@ -469,17 +475,18 @@ def validate_docs(workspace: Path, types: Optional[Iterable[str]] = None) -> Lis
         seen: dict[str, List[str]] = {}
         for path in iter_managed_files(workspace, typ, include_archive=False):
             violations.extend(_validate_file(workspace, typ, path, schema, seen))
-        if schema.get("filename") and "(" in str(schema.get("filename")):
-            for ident, names in seen.items():
-                if len(names) > 1:
-                    rel = names[0]
-                    violations.append(
-                        Violation(
-                            _code(schema, "unique"),
-                            f"id collision {ident}: {', '.join(names)}",
-                            file_path=rel,
-                        )
+        # 唯一性是 id 的契约，不是正则形状的契约：无捕获组的模式回落 stem 作 ident，
+        # 不同子目录同名文件照样撞车。旧条件 `"(" in filename_pattern` 让这类碰撞永不报（ocr2-238）。
+        for ident, names in seen.items():
+            if len(names) > 1:
+                rel = names[0]
+                violations.append(
+                    Violation(
+                        _code(schema, "unique"),
+                        f"id collision {ident}: {', '.join(names)}",
+                        file_path=rel,
                     )
+                )
     # 边界之后新增的票仍挂在已封里程碑上（advisory）：一次算，不放类型循环里
     if types is None or "tasks" in wanted:
         violations.extend(_boundary_task_violations(workspace))
@@ -537,6 +544,12 @@ def analyze_adr_coverage(workspace: Path) -> dict:
     """
     cards = [c for c in build_docs_index(workspace)["docs"] if c.get("type") == "adr"]
     ids = {c["id"] for c in cards}
+    # 退役面默认不在现行视图里：合法退役 ADR 的引用会被判 `pointer_dangling`（"缺失"），
+    # 而它在寻址面（`where_doc` 默认含退役面）是可解析的 ⇒ 应为 `pointer_stale`（ocr2-239）。
+    retired_cards = [c for c in build_docs_index(workspace, include_retired=True)["docs"]
+                     if c.get("type") == "adr"]
+    retired_ids = {c["id"] for c in retired_cards} - ids
+    retired_ids |= {c["id"] for c in retired_ledger_cards(workspace)}
     live = {
         c["id"]
         for c in cards
@@ -549,10 +562,16 @@ def analyze_adr_coverage(workspace: Path) -> dict:
             if rid == c["id"]:
                 continue
             if rid not in ids:
-                findings.append(
-                    {"type": "pointer_dangling", "severity": "warn", "a": c["id"], "b": rid,
-                     "detail": f"{c['id']} references missing {rid}"}
-                )
+                if rid in retired_ids:
+                    findings.append(
+                        {"type": "pointer_stale", "severity": "warn", "a": c["id"], "b": rid,
+                         "detail": f"{c['id']} cites retired {rid} as current"}
+                    )
+                else:
+                    findings.append(
+                        {"type": "pointer_dangling", "severity": "warn", "a": c["id"], "b": rid,
+                         "detail": f"{c['id']} references missing {rid}"}
+                    )
             elif rid not in live:
                 findings.append(
                     {"type": "pointer_stale", "severity": "warn", "a": c["id"], "b": rid,

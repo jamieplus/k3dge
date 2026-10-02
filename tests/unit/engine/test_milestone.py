@@ -191,6 +191,8 @@ class TestMilestone(unittest.TestCase):
         self.assertTrue((self.ws / "docs/tasks/archive/M9/2026-08-22-a.md").exists())
         self.assertTrue((self.ws / "docs/tasks/archive/M9/2026-08-22-b.md").exists())
         self.assertFalse((self.ws / "docs/tasks/2026-08-22-a.md").exists())
+        self.assertFalse((self.ws / "docs/tasks/2026-08-22-b.md").exists(),
+                         "b.md 仍在原地＝部分归档通过了只钉 a.md 的断言")
         self.assertTrue((self.ws / "docs/reviews/archive/M9/2026-08-23-M9-align.md").exists())
         self.assertFalse((self.ws / "docs/reviews/2026-08-23-M9-align.md").exists())
         self.assertTrue((self.ws / "docs/reviews/2026-08-23-M8-align.md").exists())
@@ -289,6 +291,15 @@ class TestMilestone(unittest.TestCase):
             ok, msg = seal_milestone(self.ws, "M22")
         self.assertFalse(ok)
         self.assertIn("rollback incomplete", msg)
+        # 状态断言：回滚失败的半截现场必须可见——两任务仍在 archive，原位缺失
+        self.assertTrue((self.ws / "docs/tasks/archive/M22/a.md").exists()
+                        or (self.ws / "docs/tasks/archive/M22/2026-08-24-a.md").exists()
+                        or list((self.ws / "docs/tasks/archive/M22").glob("*a*")),
+                        "回滚失败后 archive 内应残留 a")
+        self.assertTrue(list((self.ws / "docs/tasks/archive/M22").glob("*")),
+                        "回滚失败后 archive 不应被清空")
+        self.assertFalse((self.ws / "docs/tasks/a.md").exists())
+        self.assertFalse((self.ws / "docs/tasks/b.md").exists())
 
     def test_seal_rejects_review_without_align_pass(self) -> None:
         _write_task(self.ws / "docs/tasks/x.md", "done", "M13")

@@ -55,25 +55,14 @@ def _table_rows(text: str) -> Tuple[Optional[List[str]], List[Dict[str, str]], i
 
     第三项用于检出**畸形行**（单源解析器按契约"跳过列数不符的行"，消费侧要把它**报出来**而不是忽略）。
     """
+    from k3dge.engine.report_table import malformed_rows
+
     header, rows = parse_rows(text)
     if header is None:
         return None, [], 0
-    count = 0
-    seen_header = False
-    for line in (text or "").splitlines():
-        s = line.strip()
-        if not s.startswith("|"):
-            if seen_header:
-                break
-            continue
-        cells = [c.strip() for c in s.strip().strip("|").split("|")]
-        if not seen_header:
-            if all(h in cells for h in ("ID", "状态")):
-                seen_header = True
-            continue
-        if "".join(cells).strip() == "" or set("".join(cells)) <= set("-: "):
-            continue
-        count += 1
+    # 畸形行计数委托单源 `malformed_rows`（ocr2-218）：手写扫描会与解析器口径漂移
+    # （strip 管道符/全空行/分隔符行的处理各写一份 ⇒ 误报或漏报畸形行）。
+    count = len(rows) + len(malformed_rows(text))
     return header, [dict(zip(header, [c for c in r.values()])) for _, r in rows], count
 
 
@@ -105,8 +94,15 @@ def strip_markers(text: str, rel: str) -> str:
     from k3dge.engine.markers import MARKER_RE, MARKER_RE_MD
 
     rx = MARKER_RE_MD if rel.endswith((".md", ".html")) else MARKER_RE
-    keep = [line for line in text.splitlines() if not rx.match(line.lstrip())]
-    return "".join(line + "\n" for line in keep)
+    # 按 `\n` 切（不是 `splitlines()`）：后者还会按 `\v \f \x1c-\x1e \x85 \u2028 \u2029` 断行
+    # 并吞掉 `\r\n` 的 `\r`，重拼时全变成 `\n` ⇒ 哈希链对 CRLF/无尾换行文件永远对不上（ocr2-219）。
+    ends_nl = text.endswith("\n")
+    parts = text.split("\n")
+    keep = [line for line in parts if not rx.match(line.lstrip())]
+    out = "\n".join(keep)
+    if ends_nl and not out.endswith("\n"):
+        out += "\n"
+    return out
 
 
 def replay_to_baseline(bundle: Path, dest: Optional[Path] = None,
@@ -119,8 +115,18 @@ def replay_to_baseline(bundle: Path, dest: Optional[Path] = None,
     返回 {ok, root, detail}；失败时 `root` 为空。
     """
     facts = _read_json(Path(bundle) / "manifest.json") or {}
-    order = [str(x) for x in (facts.get("apply_order") or [])]
-    pins_in_code = bool((facts.get("pins") or {}).get("in_code"))
+    # manifest 是外部交付包：合法 JSON 但顶层非对象（list/str/int）时 `.get` 会抛
+    # AttributeError，逸出 `{ok,...}` 契约（ocr2-211，merge_into 的同类守卫在重放后才到）。
+    if not isinstance(facts, dict):
+        return {"ok": False, "root": "", "replay": [],
+                "detail": f"manifest.json 顶层不是对象（{type(facts).__name__}）"}
+    _raw_order = facts.get("apply_order") or []
+    if not isinstance(_raw_order, list):
+        return {"ok": False, "root": "", "replay": [],
+                "detail": f"manifest.json apply_order 不是列表（{type(_raw_order).__name__}）"}
+    order = [str(x) for x in _raw_order]
+    _raw_pins = facts.get("pins") or {}
+    pins_in_code = bool(_raw_pins.get("in_code")) if isinstance(_raw_pins, dict) else False
     code = Path(bundle) / "code"
     if not code.is_dir():
         return {"ok": False, "root": "", "detail": "包内无 code/（无法重放基线）"}
@@ -128,11 +134,30 @@ def replay_to_baseline(bundle: Path, dest: Optional[Path] = None,
     if dest:
         # 调用方传的任意路径**绝不 rmtree**：误传工作区/主干目录就是不可逆数据丢失，且
         # `ignore_errors=True` 会连失败都吞掉（ocr-218）。只接受不存在或空的目录。
-        if work.exists() and any(work.iterdir()):
+        # 非目录（已存在普通文件）时 `work.iterdir()` 会抛 NotADirectoryError 逸出
+        # `{ok,...}` 契约（ocr2-220）⇒ 先验形状。
+        try:
+            is_dir = work.is_dir()
+            non_empty = is_dir and any(work.iterdir())
+        except OSError as exc:
+            return {"ok": False, "root": "", "replay": [],
+                    "detail": f"dest 不可用（{exc}），拒绝重放：{work}"}
+        if work.exists() and not is_dir:
+            return {"ok": False, "root": "", "replay": [],
+                    "detail": f"dest 已存在且不是目录，拒绝清空：{work}"}
+        if non_empty:
             return {"ok": False, "root": "", "replay": [],
                     "detail": f"dest 非空目录，拒绝清空：{work}"}
     elif work.exists():
         shutil.rmtree(work, ignore_errors=True)
+    # 调用方传的 dest **绝不 rmtree**（ocr2-221）：只有自建临时目录才拥有清理权。
+    _owns = dest is None
+
+    def _fail_clean(detail: str, *, replay: list) -> Dict[str, Any]:
+        if _owns:
+            shutil.rmtree(work, ignore_errors=True)
+        return {"ok": False, "root": "", "replay": replay, "detail": detail}
+
     work.mkdir(parents=True, exist_ok=True)
     for child in work.iterdir():
         if child.is_dir():
@@ -148,13 +173,10 @@ def replay_to_baseline(bundle: Path, dest: Optional[Path] = None,
         try:
             r = subprocess.run(cmd, cwd=work, capture_output=True, env=env, check=False)
         except OSError as exc:
-            shutil.rmtree(work, ignore_errors=True)
-            return {"ok": False, "root": "", "replay": [], "detail": f"git 不可用：{exc}"}
+            return _fail_clean(f"git 不可用：{exc}", replay=[])
         if r.returncode != 0:   # 环境故障不得伪装成"产物不合格"（反向应用失败/哈希链不通过，ocr-219）
-            shutil.rmtree(work, ignore_errors=True)
-            return {"ok": False, "root": "", "replay": [],
-                    "detail": f"重放树初始化失败（git {cmd[1]} rc={r.returncode}）："
-                              + (r.stderr or b"").decode("utf-8", "replace")[:160]}
+            return _fail_clean(f"重放树初始化失败（git {cmd[1]} rc={r.returncode}）："
+                               + (r.stderr or b"").decode("utf-8", "replace")[:160], replay=[])
     if only is not None:      # `only`＝只反向这些补丁（合并器用它拿"语义层修复后"的中间树）
         replay = [p for p in order if p in set(only)]
     else:
@@ -166,15 +188,12 @@ def replay_to_baseline(bundle: Path, dest: Optional[Path] = None,
         # 补丁名来自**不可信**的 `manifest.json`（外部包）⇒ 白名单 + 不得含路径分隔/`..`，
         # 否则 `bundle / "../../x"` 会让本进程读/应用包外的文件（ocr-054）。
         if name not in _ALLOWED_PATCHES or Path(name).name != name:
-            shutil.rmtree(work, ignore_errors=True)
-            return {"ok": False, "root": "", "replay": replay,
-                    "detail": f"非法补丁名（路径穿越？）：{name!r}"}
+            return _fail_clean(f"非法补丁名（路径穿越？）：{name!r}", replay=replay)
         rc = subprocess.run(["git", "apply", "-R", "-p1", str(Path(bundle) / name)],
                             cwd=work, capture_output=True, env=env)
         if rc.returncode != 0:
-            shutil.rmtree(work, ignore_errors=True)
-            return {"ok": False, "root": "", "replay": replay,
-                    "detail": f"反向应用 {name} 失败：{(rc.stderr or b'').decode('utf-8', 'replace')[:200]}"}
+            return _fail_clean(f"反向应用 {name} 失败：{(rc.stderr or b'').decode('utf-8', 'replace')[:200]}",
+                               replay=replay)
     return {"ok": True, "root": str(work), "replay": replay, "detail": ""}
 
 
@@ -362,9 +381,15 @@ def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed:
         errors.append(f"未闭环（消费侧算）：{unclosed[:5]}{'…' if len(unclosed) > 5 else ''}")
 
     # ---- 内容哈希链（反向重放） ----
-    pins_in_code = bool((facts.get("pins") or {}).get("in_code"))
-    hash_res = _replay_hashes(bundle) if (bundle / "code").is_dir() else {
-        "ok": True, "checked": 0, "mismatched": [], "skipped_pin_files": [], "detail": "包内无 code/（跳过）"}
+    # `code/` 缺席不得豁免哈希链（ocr2-222）：`replay_to_baseline` 把它当硬失败，
+    # 这里给 `ok: True` 会让内容完全不可验的包通过消费侧闸。无 code/ ⇒ 报错。
+    hash_res: Dict[str, Any]
+    if (bundle / "code").is_dir():
+        hash_res = _replay_hashes(bundle)
+    else:
+        hash_res = {"ok": False, "checked": 0, "mismatched": [], "skipped_pin_files": [],
+                    "detail": "包内无 code/（无法重放基线，内容哈希链不可核）"}
+        errors.append("内容哈希链不通过：包内无 code/（无法重放基线）")
     accepted: List[str] = []
     if not hash_res.get("ok"):
         # `baseline` 的语义层口径随产出方版本变过（旧版把"提到钉的文档行"也 strip）⇒ 旧包在**文档**上必然

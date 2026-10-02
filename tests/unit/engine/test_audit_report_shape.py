@@ -76,3 +76,18 @@ def test_finding_table_is_contiguous(path: Path) -> None:
         shadow = [j + 1 for j in range(i, len(lines)) if re.match(r"^\| [a-z]+-\d+ \|", lines[j])]
         assert not shadow, f"{path.name}: 表被非表行打断后仍有数据行 {shadow[:5]}——把说明节挪到表外"
 
+
+def test_report_kind_prefers_suffix_and_head_only_marker() -> None:
+    """ocr2-214：文件名后缀权威；marker 只在文件首部查，正文表格里的引用示例不得翻桶。"""
+    from k3dge.engine.audit_report import _report_kind
+
+    # 后缀优先：正文里引用了 quality 示例也不得把 `-scan.md` 翻成 quality
+    body = "# 报告\n\n" + "\n".join(f"行 {i}" for i in range(10))
+    body += "\n<!-- k3dge:kind: quality -->\n"
+    assert _report_kind("2026-09-29-M11-ocr-scan.md", body) == "scan"
+    # 无后缀时，marker 落在首部（前 5 行）才认
+    assert _report_kind("foo.md", "<!-- k3dge:kind: quality -->\n正文") == "quality"
+    assert _report_kind("foo.md", body) == "audit"
+    # 默认是审计类
+    assert _report_kind("2026-x-audit.md", "正文") == "audit"
+

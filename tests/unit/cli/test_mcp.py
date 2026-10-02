@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import tempfile
 import unittest
@@ -21,6 +22,21 @@ class TestMcp(unittest.TestCase):
             )
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"], "InvalidAction")
+
+    def test_milestone_status_paths_use_forward_slashes(self) -> None:
+        """ocr2-174：milestone_control 的 task path 必须走归一化（正斜杠），与其它出口一致。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".agent").mkdir()
+            (root / ".agent" / "milestone").write_text("M1\n", encoding="utf-8")
+            (root / "docs" / "tasks").mkdir(parents=True)
+            (root / "docs" / "tasks" / "2026-01-01-M1-x.md").write_text(
+                "# X\n- **Status**: done\n- **Milestone**: M1\n", encoding="utf-8")
+            payload = json.loads(mcp.k3dge_milestone_control("status", "M1", workspace_path=d))
+        self.assertTrue(payload.get("tasks"), payload)
+        for t in payload["tasks"]:
+            self.assertNotIn("\\", t["path"])
+            self.assertIn("/", t["path"])
 
     def test_domain_spec_unregistered(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -160,7 +176,14 @@ class TestMcp(unittest.TestCase):
                 在 git<2.28 / safe.directory / 无身份环境下失败照样往下跑，最后
                 align 红在无关处或绿得什么都没验；`capture_output` 还把 git 的
                 stderr 吞光。失败消息必须带 stderr。"""
-                r = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
+                # ocr2-402：与宿主 git 配置隔离 + 限时，否则 gpgsign/hook 可把套件挂死。
+                import os as _os
+                env = dict(_os.environ)
+                env["GIT_CONFIG_GLOBAL"] = "/dev/null"
+                env["GIT_CONFIG_SYSTEM"] = "/dev/null"
+                env["GIT_TERMINAL_PROMPT"] = "0"
+                r = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
+                                   env=env, timeout=60)
                 self.assertEqual(r.returncode, 0, f"git {' '.join(args)} 失败：{r.stderr[-300:]}")
                 return r.stdout
 
@@ -181,6 +204,14 @@ class TestMcp(unittest.TestCase):
 
 
 class TestAuditPromptRouting(unittest.TestCase):
+    def setUp(self) -> None:
+        # ocr2-403：路由断言不得读真仓——切到空临时 CWD，免得断言随机器而变。
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self._old_cwd = os.getcwd()
+        os.chdir(self._tmp.name)
+        self.addCleanup(os.chdir, self._old_cwd)
+
     def test_is_doc_scope(self) -> None:
         self.assertTrue(mcp._is_doc_scope("docs/adr/0001.md"))
         self.assertTrue(mcp._is_doc_scope("adr"))
@@ -216,7 +247,9 @@ class TestAuditPromptRouting(unittest.TestCase):
         self.assertNotIn("\r", out)
         self.assertNotIn("\x00", out)
         self.assertNotIn("\x1b", out)
-        self.assertIn("\n", out) and self.assertIn("\t", out)   # 行界/缩进是排版，留
+        # ocr2-404：`assertIn(...) and assertIn(...)` 里后半永不执行——拆成两条。
+        self.assertIn("\n", out)
+        self.assertIn("\t", out)   # 行界/缩进是排版，留
 
     def test_routing_with_evil_snippet_adds_no_stray_fence(self) -> None:
         """端到端：注入形状进真路由后，围栏计数必须与良性对照**相等**——防注入
@@ -234,13 +267,24 @@ class TestAuditPromptRouting(unittest.TestCase):
         out = mcp._harden_prompt_text("`\x00``")
         self.assertNotIn("```", out)
 
+    def test_protocol_fallback_uses_pinned_workspace_not_cwd(self) -> None:
+        """ocr2-403：fallback 路由必须读传入的 workspace，不能随测试进程 CWD 漂到真仓。"""
+        with tempfile.TemporaryDirectory() as d:
+            proto, fell_back, reason = mcp._audit_protocol_with_fallback(workspace_path=d)
+            self.assertIsInstance(proto, str)
+            self.assertIsInstance(fell_back, bool)
+            self.assertIsInstance(reason, str)
+            # 空沙箱无 k3dit 兄弟 ⇒ 必走 fallback，且文本不得指向真仓路径
+            self.assertTrue(fell_back)
+            repo = str(Path(__file__).resolve().parents[3])
+            self.assertNotIn(repo, proto)
+            self.assertNotIn(repo, reason)
+
     def test_protocol_fallback_returns_tuple_on_bad_workspace(self) -> None:
         """越界 workspace 下 `_audit_protocol_with_fallback` 必须回传 tuple（ocr2-026）。
 
         旧实现直接回传 JSON 串，调用方 `proto, fell_back, reason = ...` 解包即崩。
         """
-        import os
-
         os.environ["K3DGE_MCP_ROOT"] = "/tmp/mcp-root"
         try:
             proto, fell_back, reason = mcp._audit_protocol_with_fallback(
@@ -260,10 +304,12 @@ def test_server_alive_under_mcp2():
 
     import k3dge.cli.mcp as km
 
-    if km.FastMCP is None or type(km.mcp).__name__ == "_DummyMCP":
+    if km.FastMCP is None:
         import pytest
 
         pytest.skip("mcp package not installed in this env")
+    # ocr2-405：降级成 _DummyMCP 必须红，不能绿跳（历史回归就是长期 DEAD 还全绿）。
+    assert type(km.mcp).__name__ != "_DummyMCP", "mcp 服务退化成 _DummyMCP ⇒ 不得静默放行"
     tools = {x.name for x in asyncio.run(km.mcp.list_tools())}
     assert "k3dge_check" in tools and "k3dge_status" in tools, tools
     uris = {r.uri for r in asyncio.run(km.mcp.list_resources())}
@@ -353,10 +399,19 @@ class TestMcpPrompter(unittest.TestCase):
         self.assertEqual(p.answers, [])
         self.assertFalse(p.isatty())
 
-        p.in_stream = _NoStdin()
-        fake_stdout = io.StringIO()
-        with contextlib.redirect_stdout(fake_stdout):
-            ans = p.ask("Proceed?")               # 注入答案耗尽 ⇒ 按默认（fail-closed）回
+        # ocr2-406：旧 `_NoStdin` 哨兵永不触发（answers 分支直接返回、非 tty 提前返回）。
+        # 钉真通道：裸 input()/sys.stdin/in_stream 任何一处被读都必须炸。
+        import unittest.mock as mock
+
+        p.in_stream = mock.Mock()
+        p.in_stream.isatty.return_value = False
+        p.in_stream.readline.side_effect = AssertionError("MCP 出口不得读 in_stream")
+        with mock.patch("builtins.input",
+                        side_effect=AssertionError("MCP 出口不得调裸 input()")):
+            with mock.patch.object(sys, "stdin", new=_NoStdin()):
+                fake_stdout = io.StringIO()
+                with contextlib.redirect_stdout(fake_stdout):
+                    ans = p.ask("Proceed?")               # 注入答案耗尽 ⇒ 按默认（fail-closed）回
         self.assertEqual(fake_stdout.getvalue(), "", "ask() 往 stdout 写字节＝污染 JSON-RPC 通道")
         self.assertFalse(ans, "非交互出口的兜底必须是**未确认**")
 

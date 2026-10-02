@@ -604,9 +604,19 @@ def is_declared(code: str) -> bool:
 
 def severity(code: str) -> str:
     """档位唯一源：查表；未声明按 `DEFAULT_SEVERITY`。消费者不得自己判档位。"""
-    decl = GATE_FACTS.get(code) or {}
-    sev = str(decl.get("severity") or DEFAULT_SEVERITY)
-    return sev if sev in SEVERITIES else DEFAULT_SEVERITY
+    decl = GATE_FACTS.get(code)
+    if decl is None:
+        return DEFAULT_SEVERITY
+    sev = str(decl.get("severity") or "")
+    if sev in SEVERITIES:
+        return sev
+    # 已声明的 code 写错/漏写 severity：**不得**静默升成 block（把 warn 闸变成硬失败）。
+    # `DEFAULT_SEVERITY` 只属于"未声明"；这里出声并按最保守的**非阻断**档处理（ocr2-255）。
+    import sys
+
+    print(f"[gate_facts] WARN: {code} 声明的 severity={decl.get('severity')!r} 非法 ⇒ 按 warn 处理",
+          file=sys.stderr)
+    return "warn"
 
 
 def fill(template: str, facts: Optional[Dict[str, Any]]) -> str:

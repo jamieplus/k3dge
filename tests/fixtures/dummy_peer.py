@@ -47,7 +47,10 @@ def _state_path() -> _Path:
 
 
 _STATE_FILE = _state_path()
-_LOCK_FILE = _Path(str(_STATE_FILE) + ".lock")
+_LOCK_FILE = _Path(str(_state_path()) + ".lock")
+# NOTE(ocr2-390): 上面两行只是导入时刻的快照（兼容旧断言）；真正的读写路径
+# 必须每次调用 `_state_path()` 现场解析，见 `_load_jobs`/`_save_jobs`/`_state_lock`。
+# 否则测试/引擎在 import 之后再设置 DUMMY_PEER_STATE 会静默写到旧路径。
 _MAX_JOBS = 200                      # 桩也被跨进程反复跑；不回收就无界增长
 
 
@@ -59,11 +62,11 @@ def _load_jobs() -> dict:
     之后它们的 collect 永远 NOT_FOUND（t-010）。形状也必须校：合法 JSON 但不是对象
     （`[]`/`null`/`42`）此前原样返回，`jobs[job_id] = {...}` 当场 TypeError。
     """
-    if _STATE_FILE.is_symlink():
+    if _state_path().is_symlink():
         # 符号链接＝有人把账本指到别处（或被抢注）：宁可拒跑也不顺着它读写
-        raise RuntimeError(f"dummy peer: 状态文件是符号链接，拒用（{_STATE_FILE}）")
+        raise RuntimeError(f"dummy peer: 状态文件是符号链接，拒用（{_state_path()}）")
     try:
-        raw = _STATE_FILE.read_text(encoding="utf-8")
+        raw = _state_path().read_text(encoding="utf-8")
     except FileNotFoundError:
         return {}
     except OSError as exc:
@@ -71,6 +74,9 @@ def _load_jobs() -> dict:
     data = _json_loads(raw)                       # 坏 JSON ⇒ 抛错，不再冒充空账
     if not isinstance(data, dict):
         raise RuntimeError(f"dummy peer: 作业账不是对象（{type(data).__name__}）")
+    for _k, _v in data.items():                   # ocr2-391：条目也必须是对象
+        if not isinstance(_v, dict):              # {"abc123": 5} 否则 collect 侧 AttributeError
+            raise RuntimeError(f"dummy peer: 作业账条目不是对象（{_k!r}）")
     return data
 
 
@@ -81,11 +87,24 @@ def _save_jobs(jobs: dict) -> None:
     两个缺陷相乘就是"作业凭空消失"。顺带按插入序裁到 `_MAX_JOBS`，避免无界增长。
     """
     items = list(jobs.items())[-_MAX_JOBS:]
-    tmp = _Path(str(_STATE_FILE) + f".{os.getpid()}.tmp")
+    state = _state_path()                         # ocr2-390：现场解析，不用导入快照
+    tmp = _Path(str(state) + f".{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
     fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        fh.write(_json_dumps(dict(items), ensure_ascii=False))
-    os.replace(tmp, _STATE_FILE)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(_json_dumps(dict(items), ensure_ascii=False))
+            fh.flush()
+            try:
+                os.fsync(fh.fileno())
+            except OSError:
+                pass
+    except BaseException:
+        try:
+            tmp.unlink()                           # ocr2-392：失败不留 .tmp，否则同 pid 复用撞 O_EXCL
+        except OSError:
+            pass
+        raise
+    os.replace(tmp, state)
 
 
 import contextlib
@@ -97,14 +116,17 @@ def _state_lock():
 
     两个并发 `dummy_submit` 读同一快照、各加自己那条、后写者赢 ⇒ 先提交那个的 job_id
     从没落账，它的 collect 永远 NOT_FOUND（`uuid4` 只保证不撞 key，救不了读改写）。
-    Windows 没有 fcntl：退化成尽力而为（桩在 POSIX 下跑主链路；这里不假装有锁）。
+    Windows 没有 fcntl：直接拒跑（ocr2-393：静默无锁会伪造 ok，必须 fail-loud）。
     """
     try:
         import fcntl
     except ImportError:                                  # pragma: no cover - Windows
-        yield
-        return
-    with open(_LOCK_FILE, "a+") as fh:
+        raise RuntimeError("dummy peer: 本平台无 fcntl，锁不可用 ⇒ 拒跑（不伪装 ok）")
+    lock = _Path(str(_state_path()) + ".lock")    # ocr2-390/394：现场解析 + 与 state 同 guard
+    if lock.is_symlink():
+        raise RuntimeError(f"dummy peer: 锁文件是符号链接，拒用（{lock}）")
+    fd = os.open(str(lock), os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    with os.fdopen(fd, "a+") as fh:
         fcntl.flock(fh, fcntl.LOCK_EX)
         try:
             yield
@@ -133,7 +155,7 @@ def dummy_submit(baseline: str = "", scope: str = "", milestone_id: str = "",
     # 逐字符扫完才因长度被拒；错误消息也补上"小写十六进制/长度"，大写粘贴不再无从下手。
     bl = str(baseline or "").strip()
     len_ok = len(bl) in (40, 64)
-    hex_ok = bool(bl) and all(c in "0123456789abcdef" for c in bl)
+    hex_ok = len_ok and all(c in "0123456789abcdef" for c in bl)
     if not (len_ok and hex_ok):
         return json.dumps(
             {"ok": False, "error": "BAD_BUNDLE",

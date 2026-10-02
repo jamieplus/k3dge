@@ -84,6 +84,7 @@ def _seal_review_gate(workspace: Path, milestone_id: str, tasks: List[MilestoneT
     stub_reviews = []
     missing_pass = []
     incomplete_reviews: list[Path] = []
+    unreadable: list[Path] = []
     pass_mark = _align_pass_marker(milestone_id)
     if reviews_dir.exists():
         for f in reviews_dir.iterdir():
@@ -95,7 +96,10 @@ def _seal_review_gate(workspace: Path, milestone_id: str, tasks: List[MilestoneT
                 continue
             try:
                 content = f.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
+            except (OSError, UnicodeDecodeError):
+                # 权限拒绝/竞态删除不能穿透闸函数（ocr2-307），也不能静默当"缺报告"：
+                # 记不可读，缺匹配时一并报出。
+                incomplete_reviews.append(f)
                 continue
             if not content.strip():
                 continue

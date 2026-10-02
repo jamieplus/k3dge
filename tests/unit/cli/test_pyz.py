@@ -35,7 +35,22 @@ def _stage(tmp_path: Path) -> Path:
     shutil.copytree(_ROOT / "src", root / "src", ignore=_IGNORE)
     shutil.copytree(_ROOT / "scripts", root / "scripts", ignore=_IGNORE)
     shutil.copy2(_ROOT / "pyproject.toml", root / "pyproject.toml")
+    # ocr2-409：`_stage` 已把 __pycache__/*.pyc/.DS_Store 滤掉 ⇒ 构建器侧 filter
+    # 删了也照样绿。把派生垃圾种回 staged 树，唯一能挡住它的就是 builder 的 filter。
+    (root / "src" / "k3dge" / "__pycache__").mkdir(parents=True, exist_ok=True)
+    (root / "src" / "k3dge" / "__pycache__" / "planted.pyc").write_bytes(b"\x00" * 16)
+    (root / "src" / "k3dge" / ".DS_Store").write_bytes(b"junk")
     return root
+
+
+def _scrubbed_env() -> dict:
+    """ocr2-410：运行时调用剥掉宿主泄漏——src 布局的 PYTHONPATH/可编辑安装会让
+    坏包照样 rc==0（`from k3dge...` 回落到宿主副本）；K3DGE_* 会改变 check 行为。"""
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("PYTHONPATH", "PYTHONHOME", "K3DGE_MCP_ROOT",
+                        "K3DGE_ALLOW_EXTERNAL_WORKSPACE", "__PYVENV_LAUNCHER__")}
+    env.pop("PYTHONSAFEPATH", None)
+    return env
 
 
 def test_pyz_builder_and_runtime(tmp_path: Path) -> None:
@@ -52,11 +67,13 @@ def test_pyz_builder_and_runtime(tmp_path: Path) -> None:
     assert "__main__.py" in names, "入口必须是仓内 src/__main__.py（zipapp --main 模板不 sys.exit）"
     junk = [n for n in names if "__pycache__" in n or n.endswith((".pyc", ".DS_Store"))]
     assert junk == [], f"派生垃圾随单件外发：{junk[:5]}"
+    planted = [n for n in names if "planted" in n]
+    assert planted == [], f"种回的垃圾进了包＝builder filter 已死：{planted}"
 
     ctx = f"pyz={out} cwd={tmp_path} exe={sys.executable}"
     r = subprocess.run([sys.executable, str(out), "--help"], capture_output=True,
                        text=True, encoding="utf-8", errors="replace",
-                       cwd=str(tmp_path), timeout=60)          # t-021：有界 + 钉死编码
+                       cwd=str(tmp_path), timeout=60, env=_scrubbed_env())  # t-021 + ocr2-410
     assert r.returncode == 0, ctx + "\n--- stdout ---\n" + r.stdout + "\n--- stderr ---\n" + r.stderr
     # t-023①逐行匹配：metavar `{check,…,check-msg,…}` 与隐藏命令的 `==SUPPRESS==` 都不算数。
     line = next((l for l in r.stdout.splitlines() if re.match(r"^\s+check(\s|$)", l)), None)
@@ -69,6 +86,20 @@ def test_pyz_builder_and_runtime(tmp_path: Path) -> None:
     empty.mkdir()
     r2 = subprocess.run([sys.executable, str(out), "check"], capture_output=True,
                         text=True, encoding="utf-8", errors="replace",
-                        cwd=str(empty), timeout=60)
-    assert r2.returncode != 0, (ctx + "：空目录 check 竟退出 0——main() 返回码被吞，"
-                                      "下游拿 .pyz 当闸会常绿")
+                        cwd=str(empty), timeout=60, env=_scrubbed_env())
+    # ocr2-411：`!= 0` 太弱（ZipImportError/缺模块/SyntaxError/argparse exit 2 都非零）；
+    # 基线（INC-20261001-REG-zipapp-main-drops-exit-code）是进程内 rc == 1，钉死它。
+    assert r2.returncode == 1, (ctx + f"：空目录 check 退出 {r2.returncode} 而非 1——"
+                               "main() 返回码没到达进程（崩溃形失败也会非零，不能当通过）\n" +
+                               r2.stdout[-500:] + "\n" + r2.stderr[-500:])
+
+
+def test_pyz_builder_rejects_sensitive_files(tmp_path: Path) -> None:
+    """ocr2-409 后半：敏感件（.env/*.key）守卫的拒收路径——不种就永远不知道它还活着。"""
+    root = _stage(tmp_path)
+    (root / "src" / ".env").write_text("SECRET=x\n", encoding="utf-8")
+    build = subprocess.run(["sh", str(root / "scripts" / "build-pyz.sh")],
+                           cwd=str(root), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=300,
+                           env={**os.environ, "PYTHON": sys.executable})
+    assert build.returncode != 0, "src/ 含 .env 还打出包＝敏感件守卫已死"

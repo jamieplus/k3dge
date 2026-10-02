@@ -30,7 +30,7 @@ def _porcelain_paths(stdout_z: str) -> list:
         i += 1
         if not rec.strip():
             continue
-        code, path = rec[:2], rec[3:].strip()
+        code, path = rec[:2], rec[3:]
         if code[:1] in ("R", "C"):
             i += 1                      # 下一条＝原始路径（改动面只认新路径）
         if path:
@@ -180,9 +180,13 @@ def _collect_hints(workspace: Path) -> list:
 
         dev = doc_fix.scan(workspace)
         if dev:
-            ns = nextstep.NextStep.from_state("doc_fix", get_current_milestone(workspace) or "")
-            ns.fact = (ns.fact or "").replace("<n>", str(len(dev))).replace(
-                "<rules>", "、".join(sorted({d["rule"] for d in dev})))
+            # `<n>`/`<rules>` 走 from_state 的占位符通道，不再对 fact 做散文替换（ocr2-282）。
+            ns = nextstep.NextStep.from_state(
+                "doc_fix", get_current_milestone(workspace) or "",
+                pending=len(dev),
+                rules="、".join(sorted({d["rule"] for d in dev})),
+            )
+            ns.fact = ns._fill(ns.fact)   # 与 [NEXT]/MCP 投影同源（同一 `_fill`）
             steps.append(ns)
     except Exception:
         pass
@@ -230,7 +234,12 @@ def cmd_check(args: argparse.Namespace) -> int:
     # top-level tasks are all done, surface it so the operator can choose to seal.
     # Non-blocking and informational only (ADR-0004 §2.1.2 revised).
     if code == 0:
-        _emit_all_hints(workspace, sys.stderr)   # 三类汇总，按 priority 排序
+        try:
+            _emit_all_hints(workspace, sys.stderr)   # 三类汇总，按 priority 排序
+        except Exception as exc:
+            # hint 是纯信息面：它崩了不得把已通过的 gate 翻成异常/非零（ocr2-172）。
+            print(f"[NEXT] WARN: hint 生成失败（{type(exc).__name__}: {exc}），gate 结论不受影响",
+                  file=sys.stderr)
     return code
 
 

@@ -143,3 +143,15 @@ def test_legacy_gates_toml_is_detected():
         assert gates.legacy_config_present(ws) is True
         # 且它**不再生效**（声明面只有一处）
         assert gates.preconditions(ws, "seal")[0] == "tasks_all_done"
+
+
+class TestUnknownKeyFailsLoud:
+    """未知键不得静默返回 0（会翻转闸语义，ocr2-258）。"""
+
+    def test_unknown_key_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = _ws(d)
+            import pytest
+
+            with pytest.raises(KeyError):
+                gates.get(ws, "audit_trigger", "typo_key")

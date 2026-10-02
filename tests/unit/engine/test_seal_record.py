@@ -260,6 +260,67 @@ class TestAuditEvidence(TestCase):
             encoding="utf-8")
         self.assertFalse(audit_flow.audit_evidence(ws, "M10")["sealed"])
 
+    def test_uppercase_baseline_is_still_sealed(self) -> None:
+        """ocr2-208：基线大小写不敏感（写侧允许大写，读侧不得因大小写判未封）。"""
+        from k3dge.engine.audit_flow import audit_evidence
+
+        ws = _repo()
+        sha = _git(ws, "rev-parse", "HEAD")
+        _git(ws, "-c", "user.name=t", "-c", "user.email=t@t", "tag", "-a", "M10", "-m",
+             format_seal_trailers("M10", sha.upper(), "k3dit@seat", "closed"), "HEAD")
+        self.assertTrue(audit_evidence(ws, "M10")["sealed"])
+
+    def test_tag_annotation_must_match_requested_milestone(self) -> None:
+        """ocr2-207：第二载体（tag 注解）的 `seal-milestone` 必须等于本轮，与提交 trailer 同闸。"""
+        from k3dge.engine.audit_flow import audit_evidence
+
+        ws = _repo()
+        sha = _git(ws, "rev-parse", "HEAD")
+        _git(ws, "-c", "user.name=t", "-c", "user.email=t@t", "tag", "-a", "M10", "-m",
+             format_seal_trailers("M9", sha, "k3dit@seat", "closed"), "HEAD")
+        self.assertFalse(audit_evidence(ws, "M10")["sealed"])
+
+    def test_unreadable_tag_reports_error_not_only_unsealed(self) -> None:
+        """ocr2-206：tag 读不出来（坏 ref/对象缺失）必须带 error，不得静默判"未封"。"""
+        from unittest import mock
+
+        from k3dge.engine.audit_flow import audit_evidence
+
+        ws = _repo()
+
+        class _R:
+            def __init__(self, rc, out="", err=""):
+                self.returncode, self.stdout, self.stderr = rc, out, err
+
+        def fake(cmd, **k):
+            if "--git-dir" in cmd:
+                return _R(0, ".git\n")
+            if "rev-parse" in cmd and "--verify" in cmd:
+                return _R(128, "", "fatal: bad object")
+            return _R(0, "", "")
+
+        with mock.patch("subprocess.run", side_effect=fake):
+            ev = audit_evidence(ws, "M10")
+        self.assertFalse(ev["sealed"])
+        self.assertIn("tag 读不出", ev.get("error", ""), ev)
+
+    def test_non_ascii_git_output_survives_ascii_locale(self) -> None:
+        """ocr2-205：`git for-each-ref` 输出非 ASCII 时按 UTF-8 解码，ASCII locale 不崩栈。"""
+        import locale
+
+        from k3dge.engine.audit_flow import audit_evidence
+
+        ws = _repo()
+        _git(ws, "-c", "user.name=t", "-c", "user.email=t@t", "tag", "-a", "M10", "-m",
+             "备注：中文", "HEAD")
+        orig = locale.getencoding
+        locale.getencoding = lambda: "ascii"
+        try:
+            ev = audit_evidence(ws, "M10")      # 不得抛 UnicodeDecodeError
+        finally:
+            locale.getencoding = orig
+        self.assertIsInstance(ev, dict)
+
 
 class TestGuideStubScanIgnoresMentions(unittest.TestCase):
     """桩判定只认真桩：代码块/行内代码里**提到**标记不得把已写好的文档判成未填（guides_filled）。"""

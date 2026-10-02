@@ -66,7 +66,9 @@ def _rewrite_leftover_links(workspace: Path, filename: str, new_href: str) -> Tu
     if updated == text:
         return True, ""
     try:
-        leftovers.write_text(updated, encoding="utf-8")
+        tmp = leftovers.with_name(leftovers.name + ".tmp")
+        tmp.write_text(updated, encoding="utf-8")
+        tmp.replace(leftovers)
     except OSError as exc:
         return False, f"LEFTOVERS.md 写不进（{type(exc).__name__}）⇒ {filename} 的链接未改写"
     return True, ""

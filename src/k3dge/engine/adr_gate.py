@@ -148,8 +148,9 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
                         "——拒绝自取代（会让生效决策从活跃目录消失）")
             try:
                 old_text = target.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
+            except OSError as exc:
+                return (f"[SEAL REJECTED] {target.name} 不可读（{exc}）"
+                        "——无法验证/应用 Supersession，拒绝通过（fail-closed）")
             if _is_superseded(old_text, my_id) and target.parent.name == "obsolete":
                 continue
             marked = _mark_superseded(old_text, my_id)

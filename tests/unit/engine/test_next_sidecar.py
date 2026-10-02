@@ -8,6 +8,7 @@ from pathlib import Path
 
 from k3dge.engine.nextstep import (
     NextStep,
+    _prio,
     begin_run,
     emit,
     emit_all,
@@ -114,6 +115,7 @@ def test_legacy_and_malformed_sidecars_are_survivable():
         "no_priority": {"next": [dict(card)], "primary": "seal_ready"},
         "null_priority": {"next": [dict(card, priority=None)], "primary": "seal_ready"},
         "string_priority": {"next": [dict(card, priority="4")], "primary": "seal_ready"},
+        "non_numeric_string": {"next": [dict(card, priority="high")], "primary": "seal_ready"},
         "non_dict_entries": {"next": ["junk", dict(card), 42], "primary": "seal_ready"},
     }
     for name, payload in shapes.items():
@@ -133,6 +135,13 @@ def test_legacy_and_malformed_sidecars_are_survivable():
             ordered = load_all(ws)
             assert len(ordered) == 2, (name, ordered)
             assert ordered[0]["state"] == "pending_findings", (name, ordered)  # priority 1 必在前
+            if name == "string_priority":
+                # "4" 可 coercion ⇒ 按 4 排在 pending_findings(1) 之后、seal_ready 之前无歧义
+                assert _prio({"priority": "4"}) == 4, "数字串应 coerce 成 4"
+            if name == "non_numeric_string":
+                # 非数字串走 ValueError 兜底 ⇒ 按 5（排在 pending_findings 之后）
+                assert _prio({"priority": "high"}) == 5, "非数字串必须兜底 5"
+                assert ordered[1]["priority"] == "high", (name, ordered)
     with tempfile.TemporaryDirectory() as d:
         ws = Path(d)
         p = ws / ".k3dge" / "next.json"
@@ -186,6 +195,10 @@ def test_emit_all_merges_with_cards_already_landed_this_run():
         # 平级 tie 不锁（同上），但 primary 必须是现存卡里 priority 最小者
         prim = load_all(ws)[0]
         assert prim["priority"] == min(c["priority"] for c in load_all(ws))
+        persisted = load_persisted(ws)
+        assert persisted["priority"] == min(c["priority"] for c in load_all(ws)), (
+            f"primary 独立字段必须指向合并后最小 priority 卡，拿到 {persisted}")
+        assert persisted["state"] == prim["state"]
         assert not (ws / ".k3dge" / "next.json.tmp").exists()
 
 

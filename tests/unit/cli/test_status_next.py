@@ -62,8 +62,10 @@ def test_lifecycle_next_warns_when_routing_breaks(ws: Path) -> None:
     with mock.patch("k3dge.engine.milestone_pointer.get_current_milestone", return_value="M9"), \
             mock.patch("k3dge.engine.milestone_audit.scan_pending_findings", boom), \
             contextlib.redirect_stderr(err):
-        assert st.lifecycle_next(ws) is None
+        ns = st.lifecycle_next(ws)
     boom.assert_called_once()
+    # ocr2-178：路由坏了不得渲染成"没待办"（None）⇒ 投专用态，机器面可区分。
+    assert ns is not None and ns.state == "routing_error", ns
     text = err.getvalue()
     assert "WARN" in text, "把'路由坏了'渲染成'没有下一步'"
     assert "boom" in text, text
@@ -83,3 +85,53 @@ def test_seal_ready_for_reuses_precomputed_scans() -> None:
     assert ns.state == "seal_ready"
     unmet.assert_not_called()
     tasks.assert_not_called()
+
+
+def test_workspace_status_returns_error_shape_when_scan_raises(ws: Path) -> None:
+    """ocr2-179：核心扫描抛错时两个出口都要拿到 error 形，不得逸出 traceback。"""
+    with mock.patch.object(st, "cache_observability", return_value=None), \
+            mock.patch.object(st, "ConsistencyEngine") as eng:
+        eng.return_value.evaluate.side_effect = RuntimeError("boom")
+        out = st.workspace_status(ws)
+    assert out["ok"] is False and out["error"] == "StatusScanFailed", out
+    assert "boom" in out["message"], out
+
+
+def test_workspace_status_done_vocabulary_is_single_source_and_case_insensitive(ws: Path) -> None:
+    """ocr2-180：`done` 词表取自引擎单源；正文 `Status` 匹配须忽略大小写。"""
+    tasks = ws / "docs" / "tasks"
+    tasks.mkdir(parents=True)
+    (tasks / "T1-x.md").write_text("# T1\n\n- **STATUS**: Done\n", encoding="utf-8")
+    with mock.patch.object(st, "cache_observability", return_value=None):
+        out = st.workspace_status(ws)
+    assert out["unfinished_tasks"] == [], out
+    (tasks / "T2-y.md").write_text("# T2\n\n- **Status**: in-progress\n", encoding="utf-8")
+    with mock.patch.object(st, "cache_observability", return_value=None):
+        out2 = st.workspace_status(ws)
+    assert [t["task"] for t in out2["unfinished_tasks"]] == ["T2-y"], out2
+
+
+def test_lifecycle_next_scans_once_for_whole_render(ws: Path) -> None:
+    """ocr2-413：上面的短路只钉了 `seal_ready_for` 自己——如果 `lifecycle_next`
+    在调用点漏传 `unmet=`/`tasks=`，高频 status 路径照样双扫而上测仍绿。
+    穿过真 `st.lifecycle_next` 钉：整轮渲染里两扫描各恰一次，且 kwargs 透传。"""
+    from k3dge.engine import nextstep
+
+    sentinel_tasks = [{"path": "t.md"}]
+    with mock.patch("k3dge.engine.milestone_pointer.get_current_milestone",
+                    return_value="M9"), \
+            mock.patch("k3dge.engine.milestone_audit.scan_pending_findings",
+                       return_value=(0, [])), \
+            mock.patch("k3dge.engine.seal.unmet_seal_preconditions",
+                       return_value=[]) as unmet, \
+            mock.patch("k3dge.engine.task_index.scan_milestone_tasks",
+                       return_value=sentinel_tasks) as tasks, \
+            mock.patch.object(nextstep, "seal_ready_for",
+                              wraps=nextstep.seal_ready_for) as srf:
+        ns = st.lifecycle_next(ws)
+    assert ns is not None and ns.state == "seal_ready", ns
+    unmet.assert_called_once()
+    tasks.assert_called_once()
+    srf.assert_called_once()
+    assert srf.call_args.kwargs.get("unmet") == []
+    assert srf.call_args.kwargs.get("tasks") == sentinel_tasks

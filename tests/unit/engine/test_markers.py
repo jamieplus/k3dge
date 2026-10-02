@@ -34,8 +34,13 @@ def test_scope_placement_rules():
     ws = _ws({"src/c.py": "# 许可头\n# k3dit:pending A-3@file 头级问题\n\ndef g():\n    pass\n",
               "src/d.py": "import os\n# k3dit:pending A-4@file 错位@file\n"})
     ms, problems = K.extract(ws)
+    ids = {m.id for m in ms}
+    # 正向钉：两枚都必须被提取到，否则下面的 problems 断言是 vacuous
+    assert {"A-3", "A-4"} <= ids, f"提取缺失，scope 判定无从谈起：{ids}"
     assert not [x for x in problems if "A-3" in x]
     assert [x for x in problems if "A-4" in x and "头部注释块" in x]
+    # 全集钉死：回归成"只报 A-4"或"多报"都红
+    assert sorted(ids) == ["A-3", "A-4"], ids
 
 
 def test_prose_examples_never_self_match():
@@ -94,6 +99,12 @@ def test_attrs_v2_parsed():
 def test_scan_backward_shape_open_kinds_counted():
     ws = _ws({"src/a.py": "# k3dit:leftover A-8 有意留\nz=1\n",
               "src/f.py": "def h():\n    # k3dit:pending A-9 x\n    pass\n"})
+    ms, _ = K.extract(ws)
+    ids = {m.id for m in ms}
+    # 归因钉：两枚都必须先被提取，否则 count==1 是"什么都没数"而非"leftover 不计"
+    assert {"A-8", "A-9"} <= ids, f"extract 未见两枚，exclusion 无归因：{ids}"
+    kinds = {m.id: m.kind for m in ms}
+    assert kinds.get("A-8") == "leftover" and kinds.get("A-9") == "pending", kinds
     count, samples = scan_pending_findings(ws)
     assert count == 1 and samples == ["src/f.py#A-9"]   # leftover 不计；pending 计
 

@@ -56,17 +56,28 @@ _AUX_FALLBACK = frozenset({
     "SUMMARY.md", "LEFTOVERS.md", "leftovers.md",
 })
 
+#: Fallback warn/observe set when `gate_facts` is unavailable (kept in sync by test).
+#: Anything NOT in here defaults to **block** (mirrors `gate_facts.DEFAULT_SEVERITY`):
+#: the doc-gate must not let block-tier codes through just because its own table failed
+#: to load (ocr2-246).
+_WARN_FALLBACK = frozenset({
+    "DOCS_TOML_KEY_UNKNOWN", "ARCHIVE_NO_DEST", "ORPHAN_SCAN", "ORPHAN_TEST",
+    "ORPHAN_SPEC", "TASK_MILESTONE_AFTER_BOUNDARY", "DUP_CHECK", "ORPHAN_ADR",
+})
+
 
 def _git_names(*filters: str) -> list[str]:
     """`git diff --cached --name-only` 的稳解析：`-z`（NUL 分隔）+ `core.quotePath=false`（非 ASCII 路径
     不再被引号/八进制转义 ⇒ 不会被 `startswith("docs/")` 漏检）；git 失败**抛错**，不当"无文件"放行（ocr-067/068）。"""
     out = subprocess.run(
         ["git", "-c", "core.quotePath=false", "diff", "--cached", "--name-only", "-z", *filters],
-        cwd=WS, capture_output=True, text=True,
+        cwd=WS, capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     if out.returncode != 0:
         raise RuntimeError(f"git diff --cached 失败：{(out.stderr or '').strip()[:200]}")
-    return [p for p in out.stdout.split("\0") if p.strip()]
+    # `-z` 下 token 已是精确路径：`p.strip()` 过滤会丢掉首尾带空白的合法路径，
+    # 只剔除末尾空 token（ocr2-243）。
+    return [p for p in out.stdout.split("\0") if p != ""]
 
 
 def staged_files() -> list[str]:
@@ -101,9 +112,10 @@ def check_one(rel: str) -> list[str]:
     errs: list[str] = []
     rm = type_dir / "README.md"
     am = type_dir / AUTHORING
-    if not rm.exists():
+    # 查 **index**（将提交的内容），不是工作树：未暂存的 README 不算数（ocr2-244）。
+    if not _staged_present(f"docs/{domain}/README.md"):
         errs.append(f"{rm.relative_to(WS)}: missing — every docs subdir must have a README.md")
-    if not am.exists():
+    if not _staged_present(f"docs/{domain}/{AUTHORING}"):
         errs.append(f"{am.relative_to(WS)}: missing — every docs subdir must have AUTHORING.md")
     return errs
 
@@ -148,6 +160,30 @@ def _staged_bytes(rel: str) -> bytes | None:
     """Staged blob content (what will actually commit), not the worktree."""
     out = subprocess.run(["git", "show", f":{rel}"], cwd=WS, capture_output=True)
     return out.stdout if out.returncode == 0 else None
+
+
+def _staged_present(rel: str) -> bool:
+    """该路径是否在 **index** 里（将随本次提交落地），而非只在工作树。
+
+    旧 `check_one` 用 `Path.exists()` 看工作树：未跟踪/未暂存的 README 也能满足闸，
+    提交出去的 `docs/<type>/` 反而缺 README（下游 `k3dge init` 依赖的保证，ocr2-244）。
+
+    git 不可用（非仓/无 git）时回落工作树存在性——工具坏不得阻断提交（与 `_load_pure` 同口径）。
+    """
+    try:
+        out = subprocess.run(["git", "cat-file", "-e", f":{rel}"], cwd=WS, capture_output=True)
+    except OSError:
+        return (WS / rel).exists()
+    if out.returncode == 0:
+        return True
+    try:
+        probe = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
+                               cwd=WS, capture_output=True)
+    except OSError:
+        return (WS / rel).exists()
+    if probe.returncode != 0:
+        return (WS / rel).exists()
+    return False
 
 
 def _type_of(rel: str) -> str:
@@ -196,10 +232,11 @@ def _run_schema_gate(files: list[str], pure_schema, pure_refs, gate_facts=None) 
 
     def _add(code: str, msg: str, where: str = "", facts: dict | None = None) -> None:
         if gate_facts is None:
-            # 声明面不可用 ⇒ 无法区分 block/warn：按**非阻断**处理并显式降级（本模块的口径是
-            # "工具坏不得阻断所有提交"；把 ORPHAN_TEST 这类 warn 码悄悄升成 block 正是反例，ocr-237）。
-            print(f"[k3dge schema] WARN: gate_facts 不可用 ⇒ {code} 按非阻断处理", file=sys.stderr)
-            sev = "warn"
+            # 声明面不可用：用**内置的 warn/observe 小集合**分流，其余默认 block（与
+            # `gate_facts.DEFAULT_SEVERITY` 同口径）。旧实现一律降为 warn ⇒ 结构性非法
+            # 文档（block 档）在工具坏时静默放行（ocr2-246）。
+            print(f"[k3dge schema] WARN: gate_facts 不可用 ⇒ {code} 按内置档位处理", file=sys.stderr)
+            sev = "warn" if code in _WARN_FALLBACK else "block"
         else:
             sev = gate_facts.severity(code)
         text = ""

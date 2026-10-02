@@ -152,7 +152,10 @@ def _fix_incident_id(text: str) -> str:
 
 def _fix_amend_order(text: str) -> str:
     """补 `🅰N |` 前缀 + 按 append 序（升序）重排 `Amended-by` 列表（确定性）。"""
-    m = re.search(r"^Amended-by:\s*\n((?:\s+-.*\n)+)", text, re.M)
+    # 检测端 `((?:\s+-.*(?:\n|$))+)` 认"行尾即 EOF 无换行"的块：修复端必须同口径，
+    # 否则"检出→修不动→写盘（仅末换行变了）→报已修"，同一码要跑两遍（ocr2-240）。
+    # 重复编号排序修不动：`_fix` 只收真改了文本的规则，不会谎报 applied。
+    m = re.search(r"^Amended-by:\s*\n((?:\s+-.*(?:\n|$))+)", text, re.M)
     if not m:
         return text
     entries = [ln.rstrip("\n") for ln in m.group(1).splitlines() if ln.strip()]
@@ -320,16 +323,35 @@ def apply(workspace: Path, *, dry_run: bool = False) -> Dict[str, object]:
         if new == text or not applied:
             remaining += len(codes)      # 检测到但无可改（理论不可达，保守计）
             continue
+        # 本遍修不完的码不得计零：重算改后文本的残留（如 EOF 的 amend 块、多定义 marker），
+        # 否则"一遍里半修半留"的文件被报成 remaining=0，而 scan/seal 照样红（ocr2-241）。
+        leftover = _codes(rel, new.replace("\r\n", "\n").replace("\r", "\n"))
+        if "\r" in new and "MD_CRLF" in FIXABLE_RULES:
+            leftover = list(dict.fromkeys(leftover + ["MD_CRLF"]))
+        remaining += len(leftover)
         if not dry_run:
             try:
-                # 就地 `open(p,"w")` 先把文件截成 0 再写：写途中被杀/磁盘满 ⇒ 半份 Markdown 且无备份（ocr-235）。
-                tmp = p.with_name(p.name + ".k3dge-tmp")
-                with open(tmp, "w", encoding="utf-8", newline="") as fh:
-                    fh.write(new)
-                tmp.replace(p)
+                # 确定性临时名 + 无 fsync + 继承 tmp 权限 + 只清 OSError：并发 doc fix 共用
+                # 同一 `.k3dge-tmp` 会互相覆盖半写内容，崩溃/断电丢半截文件，还顺手改权限（ocr2-242）。
+                import os as _os
+                import tempfile as _tf
+
+                _fd, _tmp = _tf.mkstemp(dir=str(p.parent), prefix=".k3dge-", suffix=".tmp")
+                try:
+                    with _os.fdopen(_fd, "w", encoding="utf-8", newline="") as fh:
+                        fh.write(new)
+                        fh.flush()
+                        _os.fsync(fh.fileno())
+                    try:
+                        _os.chmod(_tmp, p.stat().st_mode & 0o777)
+                    except OSError:
+                        pass
+                    _os.replace(_tmp, p)
+                except BaseException:
+                    with contextlib.suppress(OSError):
+                        _os.unlink(_tmp)
+                    raise
             except OSError:
-                with contextlib.suppress(OSError):
-                    p.with_name(p.name + ".k3dge-tmp").unlink(missing_ok=True)
                 remaining += len(codes)
                 continue
         for rule in applied:

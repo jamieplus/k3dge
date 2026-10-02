@@ -26,7 +26,10 @@ _SIGN_KEYS = ("审计人", "透镜来源", "基线")
 # 手写报告里最常见的未填形态，旧表漏了它们 ⇒ `- **审计人**: ...` 被当真实署名放行。
 # 判据是**子串**，标记本身不得是真实值可能包含的普通词（`<` 会拒 HTML 式署名——可接受：
 # 锚点要求纯值）。
-_SIGN_PLACEHOLDER_MARKS = ("状态快照", "待填", "TBD", "<", "{{", "…", "...", "TODO", "N/A")
+# `…`/`...` 例外（ocr2-294）：真值里夹带省略号是本仓既有署名习惯（哈希截断），只做
+# 子串拒判会把合格报告当占位拒掉 ⇒ 这两项只在"值本身只剩残渣"时才算未填。
+_SIGN_PLACEHOLDER_MARKS = ("状态快照", "待填", "TBD", "<", "{{", "TODO", "N/A")
+_SIGN_PUNCT_ONLY_MARKS = ("…", "...")
 
 
 def sign_missing(text: str) -> list:
@@ -34,7 +37,18 @@ def sign_missing(text: str) -> list:
     out = []
     for key in _SIGN_KEYS:
         val = _field(text, key)
-        if not val or any(m in val for m in _SIGN_PLACEHOLDER_MARKS):
+        if not val:
+            out.append(key)
+            continue
+        folded = val.lower()
+        if any(m.lower() in folded for m in _SIGN_PLACEHOLDER_MARKS):
+            # 大小写折叠后比对：`tbd`/`n/a` 与 `TBD`/`N/A` 同判（ocr2-293）。
+            out.append(key)
+            continue
+        residue = val
+        for m in _SIGN_PUNCT_ONLY_MARKS:
+            residue = residue.replace(m, "")
+        if not residue.strip(" \t-|:.："):
             out.append(key)
     return out
 

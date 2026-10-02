@@ -37,6 +37,16 @@ def _sealed_root(test: unittest.TestCase, receipt: "str | None", *,
     stub = root / ".venv" / "bin" / "k3dge"
     stub.write_text("#!/bin/sh\nexit 41\n", encoding="utf-8")
     stub.chmod(0o755)
+    # ocr2-396：gate.py 在 nt 下读 `.venv/Scripts/k3dge.exe`（gate.py:84），只铺 bin
+    # 在 Windows 上桩永远找不到 ⇒ rc 断言随机器而变；按平台补齐另一轨的桩。
+    scripts_dir = root / ".venv" / "Scripts"
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+    win_stub = scripts_dir / "k3dge.exe"
+    win_stub.write_text("#!/bin/sh\nexit 41\n", encoding="utf-8")
+    try:
+        win_stub.chmod(0o755)
+    except OSError:
+        pass
     return root
 
 
@@ -84,8 +94,10 @@ class TestPyprojectOnlyPolicy(unittest.TestCase):
         return _sealed_root(self, receipt, policy_source="git+x")
 
     def _run(self, track, root):
+        # ocr2-397：缺 bash 时返回 None 而不是抛 SkipTest——抛会中止整个方法，
+        # py 轨（只需要 sys.executable）将永远跑不到；调用方逐轨 subTest + continue。
         if track == "sh" and not shutil.which("bash"):
-            self.skipTest("gate.sh 轨需要 bash（sh track）")
+            return None
         env = dict(os.environ)
         env.pop("K3DGE_SOURCE", None)
         cmd = (["bash", "scripts/gate.sh", "version"] if track == "sh"
@@ -93,31 +105,78 @@ class TestPyprojectOnlyPolicy(unittest.TestCase):
         return subprocess.run(cmd, cwd=root, capture_output=True, text=True, env=env, timeout=60)
 
     def test_mismatch_from_pyproject_exits_2_both_tracks(self) -> None:
+        skipped = []
         for track in ("sh", "py"):
-            r = self._run(track, self._fixture("git+y"))
-            self.assertEqual(r.returncode, 2, f"{track}: {r.stderr[-300:]}")
-            self.assertIn("MISMATCH", r.stderr, track)
+            # ocr2-397：每轨独立 subTest——sh 缺 bash 时 skip 不得吞掉 py 轨；
+            # 任一轨失败也不得中断另一轨。
+            with self.subTest(track=track):
+                r = self._run(track, self._fixture("git+y"))
+                if r is None:
+                    skipped.append(track)
+                    continue
+                self.assertEqual(r.returncode, 2, f"{track}: {r.stderr[-300:]}")
+                self.assertIn("MISMATCH", r.stderr, track)
+        if skipped:
+            self.skipTest(f"无 bash，{skipped} 轨未跑；其余轨已断言")
 
     def test_matching_pyproject_policy_passes_the_gate(self) -> None:
+        skipped = []
         for track in ("sh", "py"):
-            r = self._run(track, self._fixture("git+x"))
-            self.assertNotIn("MISMATCH", r.stdout + r.stderr, track)
-            # 政策放行才会去 exec 入口；41 来自 fixture 里的桩 ⇒ 证明"闸没拦、执行了"，
-            # 而不是把断言押在下游 CLI 的退出码上（那会随装了哪个 k3dge 而变）。
-            self.assertEqual(r.returncode, 41,
-                             f"{track} 未走到执行入口（政策被误拦？）：{(r.stdout + r.stderr)[-200:]}")
+            with self.subTest(track=track):
+                r = self._run(track, self._fixture("git+x"))
+                if r is None:
+                    skipped.append(track)
+                    continue
+                self.assertNotIn("MISMATCH", r.stdout + r.stderr, track)
+                # 政策放行才会去 exec 入口；41 来自 fixture 里的桩 ⇒ 证明"闸没拦、执行了"，
+                # 而不是把断言押在下游 CLI 的退出码上（那会随装了哪个 k3dge 而变）。
+                # ocr2-396：fixture 同时铺 bin/k3dge 与 Scripts/k3dge.exe，
+                # gate.py 按平台解析的那一侧恒有桩，41 与平台无关。
+                self.assertEqual(r.returncode, 41,
+                                 f"{track} 未走到执行入口（政策被误拦？）：{(r.stdout + r.stderr)[-200:]}")
 
     def test_missing_receipt_is_refused_both_tracks(self) -> None:
+        skipped = []
         for track in ("sh", "py"):
-            root = self._fixture("git+x")
-            (root / ".venv" / "k3dge-source.txt").unlink()
-            r = self._run(track, root)
-            self.assertEqual(r.returncode, 2, f"{track}: {r.stderr[-300:]}")
-            self.assertIn("缺失", r.stderr, track)
+            with self.subTest(track=track):
+                root = self._fixture("git+x")
+                (root / ".venv" / "k3dge-source.txt").unlink()
+                r = self._run(track, root)
+                if r is None:
+                    skipped.append(track)
+                    continue
+                self.assertEqual(r.returncode, 2, f"{track}: {r.stderr[-300:]}")
+                self.assertIn("缺失", r.stderr, track)
+        if skipped:
+            self.skipTest(f"无 bash，{skipped} 轨未跑；其余轨已断言")
+
+    def test_empty_receipt_is_refused_both_tracks(self) -> None:
+        """ocr2-398：空/纯空白收据＝无证据，必须拒（exit 2），不能当"没声明"放行。"""
+        skipped = []
+        for receipt in ("", " \n"):
+            for track in ("sh", "py"):
+                with self.subTest(receipt=repr(receipt), track=track):
+                    root = self._fixture("git+x")
+                    (root / ".venv" / "k3dge-source.txt").write_text(receipt, encoding="utf-8")
+                    r = self._run(track, root)
+                    if r is None:
+                        skipped.append(track)
+                        continue
+                    self.assertEqual(r.returncode, 2,
+                                     f"{track} receipt={receipt!r}: {(r.stdout + r.stderr)[-300:]}")
+        if skipped:
+            self.skipTest(f"无 bash，{sorted(set(skipped))} 轨未跑；其余轨已断言")
 
     def test_ps1_shares_the_decision_markers(self) -> None:
         """`gate.ps1` 本机不可跑（无 pwsh），但判据文案与比较方式必须同轨（347/345/346）。"""
         ps1 = (ROOT / "scripts" / "gate.ps1").read_text(encoding="utf-8")
         for m in ("k3dge-source", "MISMATCH", "缺失", "Resolve-PhysPath"):
             self.assertIn(m, ps1, f"gate.ps1 缺判据标记：{m}")
-        self.assertIn("-cne", ps1, "来源一致性是字面比较，不得用大小写不敏感的 -ne")
+        # ocr2-399：`-cne` 也出现在注释里，子串断言抓不住比较符退化；
+        # 钉真表达式，并确认代码行里没有大小写不敏感的 `-ne` 比较。
+        self.assertIn("$w -cne $r", ps1, "gate.ps1 真比较必须是大小写敏感的 -cne")
+        code_lines = [ln for ln in ps1.splitlines() if not ln.lstrip().startswith("#")]
+        code = "\n".join(code_lines)
+        import re as _re
+        self.assertIsNone(_re.search(r"(?<![a-z])-ne\b", code),
+                          "gate.ps1 代码行出现大小写不敏感 -ne 比较")

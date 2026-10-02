@@ -75,8 +75,9 @@ def audit_evidence(workspace: Path, milestone_id: str) -> dict:
 
     def _run(*args: str):
         try:
-            return subprocess.run(["git", "-C", str(workspace), *args], capture_output=True, text=True)
-        except OSError:
+            return subprocess.run(["git", "-C", str(workspace), *args], capture_output=True, text=True,
+                                  encoding="utf-8", errors="replace")
+        except (OSError, UnicodeDecodeError):
             return None
 
     # "仓里没有封版证据"与"证据读不出来（git 故障）"必须分开（ocr-045）：后者给 error 字段，
@@ -86,9 +87,16 @@ def audit_evidence(workspace: Path, milestone_id: str) -> dict:
         return {"tag": "", "trailers": {}, "sealed": False,
                 "error": "git 不可用" if gd is None else (gd.stderr or "not a git repository").strip()}
     tag = ""
+    err = ""
     rv = _run("rev-parse", "--verify", "--quiet", f"refs/tags/{milestone_id}^{{commit}}")
     if rv is not None and rv.returncode == 0:
         tag = rv.stdout.strip()
+    elif rv is None:
+        err = "git 不可用（tag 读不出）"
+    elif not (rv.returncode == 1 and not (rv.stderr or "").strip()):
+        # `--verify --quiet` 下"tag 不存在"是 rc=1 且无 stderr；其余失败（坏 ref/对象缺失/pack 损坏）
+        # 是"读不出来"，必须报 error 而不是"未封"（ocr2-206）。
+        err = f"tag 读不出（git rev-parse rc={rv.returncode}）：{(rv.stderr or '').strip()[:160]}"
     trailers: dict = {}
     if tag:
         # **因果绑定 + 有界**：封版提交必在基线 tag 之后 ⇒ 只在 `tag..HEAD` 找带 trailer 的提交，
@@ -104,11 +112,24 @@ def audit_evidence(workspace: Path, milestone_id: str) -> dict:
                 if cand.get("seal-milestone") == milestone_id:
                     trailers = cand
                     break
+        elif not err:
+            err = ("提交 trailer 读不出"
+                   f"（git log rc={getattr(lg, 'returncode', '?')}）：{(getattr(lg, 'stderr', '') or '').strip()[:160]}"
+                   if lg is not None else "git 不可用（提交 trailer 读不出）")
         if not trailers:
             # 第二载体：tag 注解正文（**零改动封版**没有提交可挂 ⇒ 记录只在注解里）
             rf = _run("for-each-ref", "--format=%(contents)", f"refs/tags/{milestone_id}")
             if rf is not None and rf.returncode == 0:
-                trailers = _parse_trailers(rf.stdout)
+                cand2 = _parse_trailers(rf.stdout)
+                # 与提交 trailer 路径同闸：`seal-milestone` 必须等于本轮（ocr2-207），
+                # 否则别的轮次的注解会被算成本轮封版。
+                if cand2.get("seal-milestone") == milestone_id:
+                    trailers = cand2
+                # 注解里是别轮的四键 ⇒ 不是本轮证据，当"无证据"（sealed=False），不报错。
+            elif not err:
+                err = ("tag 注解读不出"
+                       f"（git for-each-ref rc={getattr(rf, 'returncode', '?')}）"
+                       if rf is not None else "git 不可用（tag 注解读不出）")
     def _real(v: object) -> bool:
         # `seal.format_seal_trailers` 对缺失字段写 `-` ⇒ 四键齐全但全是占位的残缺记录也"键存在"
         # （本函数的定位恰恰是判据，必须核**值**，ocr-210）。
@@ -118,9 +139,15 @@ def audit_evidence(workspace: Path, milestone_id: str) -> dict:
     sealed = bool(tag) and set(trailers) >= set(SEAL_TRAILER_KEYS) and all(
         _real(trailers.get(k)) for k in SEAL_TRAILER_KEYS)
     base = str(trailers.get("audit-baseline") or "").strip()
-    if sealed and base and tag and not base.startswith(tag[:len(base)] if len(base) >= 7 else tag[:7]):
-        sealed = False      # trailer 的基线与边界 tag 不同指 ⇒ 记录与 tag 不是一对（因果未绑定）
-    return {"tag": tag, "trailers": trailers, "sealed": sealed}
+    if sealed and base and tag:
+        from k3dge.engine.seal import _same_commit
+
+        if not _same_commit(tag, base):
+            sealed = False      # trailer 的基线与边界 tag 不同指 ⇒ 记录与 tag 不是一对（因果未绑定）
+    out: dict = {"tag": tag, "trailers": trailers, "sealed": sealed}
+    if err:
+        out["error"] = err
+    return out
 
 
 def _parse_trailers(text: str) -> dict:
@@ -146,13 +173,22 @@ def prune_finished(workspace: Path) -> Dict[str, object]:
     from k3dge.engine import worktree
 
     try:
-        jobs = (json.loads((workspace / STATE_REL).read_text(encoding="utf-8")) or {}).get("jobs") or []
+        raw = json.loads((workspace / STATE_REL).read_text(encoding="utf-8"))
     except (OSError, ValueError):
+        return {"pruned": 0}
+    # STATE_REL 是运行态投影（可被手改/半写）：顶层非对象 ⇒ 当"无单可清"，不崩（ocr2-209）。
+    if not isinstance(raw, dict):
+        return {"pruned": 0}
+    jobs = raw.get("jobs") or []
+    if not isinstance(jobs, list):
         return {"pruned": 0}
     terminal = {"collected", "done", "failed", "retired", "closed", "merged"}
     pruned = 0
     for j in jobs:
-        jid = str((j or {}).get("job_id") or "")
+        # 元素形状同样不可信：坏元素跳过，不终止整个清理循环（ocr2-210）。
+        if not isinstance(j, dict):
+            continue
+        jid = str(j.get("job_id") or "")
         if not jid or str(j.get("state") or "") not in terminal:
             continue
         try:

@@ -47,9 +47,23 @@ def mcp_server_names(workspace: Path) -> Optional[Set[str]]:
     - **正常表** ⇒ 键集合。
     """
     p = workspace / _MCP_CONFIG_REL
-    if not p.is_file():
-        return None
+    # `is_file()` 把**一切** `stat` 失败（EACCES、悬空链接、`.mcp.json` 是目录）
+    # 都报 False ⇒ 坏配置被当"文件缺失"（`None`）静默关掉 peer 闸（ocr2-268）。
+    # 只有 FileNotFoundError 才是合法的"缺失"。
+    import stat as _stat
     import sys
+    try:
+        st = p.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        print(f"[mcp_json] WARN: .mcp.json 无法 stat（{type(exc).__name__}）"
+              "⇒ 按『无 server』处理（peer 闸会照常比对）", file=sys.stderr)
+        return set()
+    if not _stat.S_ISREG(st.st_mode):
+        print("[mcp_json] WARN: .mcp.json 存在但不是普通文件 ⇒ 按『无 server』处理",
+              file=sys.stderr)
+        return set()
 
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
@@ -95,8 +109,8 @@ def probe_peer_mcp(workspace: Path, pid: str) -> Tuple[Optional[Path], Optional[
     mod: Optional[str] = None
     root: Optional[Path] = None
     for cand_mod, cand_root in (
-        (f"{pid}.mcp", probe / "src"), (f"{pid}.cli.mcp", probe / "src"),
-        (f"{pid}.mcp", probe), (f"{pid}.cli.mcp", probe),
+        (f"{comp}.mcp", probe / "src"), (f"{comp}.cli.mcp", probe / "src"),
+        (f"{comp}.mcp", probe), (f"{comp}.cli.mcp", probe),
     ):
         rel = cand_mod.split(".")
         if (cand_root.joinpath(*rel[:-1]) / "mcp.py").is_file():

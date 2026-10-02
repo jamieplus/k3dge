@@ -106,11 +106,14 @@ class Manifest:
     @classmethod
     def load(cls, workspace: Path) -> "Manifest":
         path = workspace / MANIFEST_PATH
-        if not path.exists():
-            return cls({"domains": {}, "ignore": []})
         try:
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
+        except FileNotFoundError:
+            # 只有"真缺失"才回默认空 manifest：`Path.exists()` 把一切 `stat` 失败
+            #（EACCES/ELOOP/悬空链接）都报 False，读失败会被当"文件没有"静默吃掉
+            # 默认域，下游报 `NO_DOMAINS` 而不是真正的权限问题（ocr2-263）。
+            return cls({"domains": {}, "ignore": []})
         except json.JSONDecodeError as exc:
             raise ManifestError(f"invalid JSON in {MANIFEST_PATH}: {exc}") from exc
         except (OSError, UnicodeDecodeError) as exc:
@@ -160,10 +163,14 @@ class Manifest:
             # `p.match` 也只到同名 ⇒ `"src/gen"` 这种目录忽略**静默失效**；而 basename 匹配
             # 又会过度匹配（任意层级的同名文件）。统一加"目录前缀"这一路（427）。
             core = pat.rstrip("/")
+            # `PurePath.match` 是右锚定的：多段模式 `"docs/specs"` 会命中任意深度的
+            # `"vendor/docs/specs"`，再经目录前缀分支把底下文件全忽略 ⇒ 工作区相对的忽略
+            # 规则静默放大到任意深度（ocr2-264）。多段模式只走 workspace 根锚定的 `core`
+            # 分支；`match` 仅保留给单段模式（与 `fnmatch(p_name, pat)` 同口径）。
             if (
                 fnmatch.fnmatch(path_posix, pat)
                 or fnmatch.fnmatch(p_name, pat)
-                or p.match(pat)
+                or ("/" not in core and p.match(pat))
                 or (core and (path_posix == core or path_posix.startswith(core + "/")))
             ):
                 return True

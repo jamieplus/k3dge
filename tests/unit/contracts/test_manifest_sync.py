@@ -14,6 +14,14 @@ MANIFEST = ROOT / ".agent" / "manifest.json"
 SPECS_DIR = ROOT / "docs" / "specs"
 
 
+def _is_relative(path: Path, base: Path) -> bool:
+    try:
+        path.relative_to(base)
+        return True
+    except ValueError:
+        return False
+
+
 class TestManifestSpecsFullSync(unittest.TestCase):
     def setUp(self) -> None:
         # 存在性/可解析性在 setUp 里**出干净的红**（t-028）：旧写法 `json.loads(read_text)`
@@ -71,13 +79,26 @@ class TestManifestSpecsFullSync(unittest.TestCase):
 
     def test_no_orphan_spec_dirs(self) -> None:
         # 旧写法在 `docs/specs` 缺失/被改名时抛裸 FileNotFoundError：契约测试"崩"而不是"红"，
-        # CI 里只看到 traceback，看不出是域路由漂了（t-031）。
+        # CI 里只见 traceback，看不出是域路由漂了（t-031）。
         self.assertTrue(SPECS_DIR.is_dir(), f"spec 根目录不存在：{SPECS_DIR}")
         registered = set()
         for domain, cfg in self.domains.items():
-            spec = cfg.get("spec")
-            self.assertIsInstance(spec, str, f"domain '{domain}' 的 spec 不是字符串：{spec!r}")
-            registered.add((ROOT / spec).parent.name)
+            # ocr2-414：循环内无 subTest ⇒ 第一个坏域抛断言即中断整轮；
+            # cfg 非映射时 `cfg.get` 抛 AttributeError 裸栈 ⇒ 必须先验映射再取键。
+            with self.subTest(domain=domain):
+                self.assertIsInstance(cfg, dict,
+                                      f"domain '{domain}' 注册的不是对象：{cfg!r}")
+                self.assertIn("spec", cfg, f"domain '{domain}' 缺 spec 键")
+                spec = cfg["spec"]
+                self.assertIsInstance(spec, str, f"domain '{domain}' 的 spec 不是字符串：{spec!r}")
+                # ocr2-415：只取 `.parent.name` 会漏判/误判——嵌套路径登记内层名（假阳性），
+                # 落在 specs 之外的改名/串位被同名目录顶名认领（假阴性），空值退化成无关名。
+                # 先断言解析后确实落在 SPECS_DIR 之下，再用相对首段登记。
+                resolved = (ROOT / spec).resolve()
+                self.assertTrue(_is_relative(resolved, SPECS_DIR.resolve()),
+                                f"domain '{domain}' 的 spec 落在 docs/specs 之外：{spec}")
+                rel = resolved.relative_to(SPECS_DIR.resolve())
+                registered.add(rel.parts[0])
         actual = {p.name for p in sorted(SPECS_DIR.iterdir())
                   if p.is_dir() and p.name != "_template"}
         orphans = actual - registered
@@ -93,6 +114,13 @@ class TestManifestSpecsFullSync(unittest.TestCase):
 
         for domain, cfg in self.domains.items():
             with self.subTest(domain=domain):
+                # ocr2-416：直接 `cfg["spec"]` 在坏 manifest 下抛裸 TypeError/KeyError
+                # （error 而非 clean red），且本用例是唯一读正文的——先验形状再读盘。
+                self.assertIsInstance(cfg, dict,
+                                      f"domain '{domain}' 注册的不是对象：{cfg!r}")
+                self.assertIn("spec", cfg, f"domain '{domain}' 缺 spec 键")
+                self.assertIsInstance(cfg["spec"], str,
+                                      f"domain '{domain}' 的 spec 不是字符串：{cfg['spec']!r}")
                 spec_path = ROOT / cfg["spec"]
                 self.assertTrue(spec_path.is_file(),
                                 f"spec 文件缺失：{cfg['spec']}")   # 显式红，不是 read_text 的 FileNotFoundError

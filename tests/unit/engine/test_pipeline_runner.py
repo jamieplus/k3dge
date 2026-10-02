@@ -132,7 +132,12 @@ class DowngradeIsLoud(unittest.TestCase):
             logged = (ws / "logs" / "k3dge.log").read_text(encoding="utf-8")
             self.assertIn("PRE-EXISTING LINE", logged)  # the trail is appended, not overwritten
             self.assertIn("WARN[DOWNGRADE]", logged)
+            # 顺序钉：追加不得重写旧行（先旧后新），否则"append-only"审计链已断
+            self.assertLess(logged.index("PRE-EXISTING LINE"), logged.index("WARN[DOWNGRADE]"),
+                            "新记录必须追加在旧行之后")
             self.assertTrue(res.ok)  # manual is a legal landing spot
+            self.assertEqual(res.provider, "manual", "降级落点必须标 manual，否则独立审计保证丢失")
+            self.assertFalse(res.skipped, "manual 落点不得标 skipped")
             self.assertEqual(len(res.downgrades), 1)        # mcp 失败降级一次，不重复记
             self.assertIn("mcp", res.downgrades[0])
             self.assertIn("manual", res.downgrades[0])

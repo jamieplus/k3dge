@@ -38,6 +38,19 @@ def _block(text) -> str:
         if stripped.startswith("#"):
             indent = s[: len(s) - len(stripped)]
             s = indent + "\\" + stripped   # 保留缩进，转义 `#`：不再是标题，B-T-D 结构闸仍数到自己的四节
+        elif stripped.startswith(">"):
+            # 引用块里的 `#` 标题仍渲染为 H2（ocr2-299）：转义前导 `>`，结构闸只数 `^\s*#`。
+            indent = s[: len(s) - len(stripped)]
+            s = indent + "\\" + stripped
+        elif stripped != "" and set(stripped) <= set("=-") and len(stripped) >= 3:
+            # setext 下划线行（`===`/`---`）：上一行文本会被渲染成真 H1/H2（ocr2-299）。
+            indent = s[: len(s) - len(stripped)]
+            s = indent + "\\" + stripped
+        elif stripped.startswith("```") or stripped.startswith("~~~"):
+            # 围栏标记原样穿透 ⇒ 后面的 `## 2./3./4.` 被吞进代码块，且产物触发
+            # `MD_FENCE_UNCLOSED` 阻塞闸（ocr2-300）：转义首符，不再是围栏。
+            indent = s[: len(s) - len(stripped)]
+            s = indent + "\\" + stripped
         out.append(s[:2000])
     return "\n".join(out)[:20000]
 

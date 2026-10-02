@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:4a935c0a22bf5ecc3cc9e3b155e155aecd334e7dd9aaaf3fa6dd27af4a22c7c6`
+- **Contract Hash**: `sha256:3079d55e454cd934255246332b245e5aaa65b4e815dec395da5f408aad0b0646`
 - **Last Updated**: 2026-10-02
 
 ## 1. Domain Boundary & Responsibilities
@@ -114,9 +114,9 @@ build_checklist(workspace: Path, milestone_id: Optional[str]=None) -> dict
 read_checklist(workspace: Path, milestone_id: Optional[str]=None) -> Optional[dict]
 ensure_checklist(workspace: Path, milestone_id: Optional[str]=None) -> dict
 reset_for_audit(workspace: Path, milestone_id: Optional[str]=None) -> dict
-get_verify_attempts(workspace: Path) -> int
-bump_verify_attempt(workspace: Path) -> int
-reset_verify_attempts(workspace: Path) -> None
+get_verify_attempts(workspace: Path, milestone_id: Optional[str]=None) -> int
+bump_verify_attempt(workspace: Path, milestone_id: Optional[str]=None) -> int
+reset_verify_attempts(workspace: Path, milestone_id: Optional[str]=None) -> None
 from __future__ import annotations
 from pathlib import Path
 from typing import Dict
@@ -164,7 +164,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
-from k3dge.engine.report_table import REPORT_STATUSES
+from k3dge.engine.report_table import STATUSES as REPORT_STATUSES
 from k3dge.engine.report_table import TABLE_HEADER
 from k3dge.engine.report_table import parse_rows
 REPORT_COLUMNS = tuple(TABLE_HEADER.split('|'))
@@ -387,7 +387,7 @@ class Marker
     prio: str = ''
     type: str = ''
     key(self) -> Tuple[str, str]
-head_block_end(lines: Sequence[str]) -> int
+head_block_end(lines: Sequence[str], *, md_host: bool=False) -> int
 parse_text(rel: str, text: str, *, max_note: int=_MAX_NOTE, max_note_pending: int=_MAX_NOTE_PENDING) -> Tuple[List[Marker], List[str]]
 parse_sidecar(text: str) -> Tuple[List[Marker], List[str]]
 extract(workspace: Path, roots: Sequence[str]=('src', 'docs')) -> Tuple[List[Marker], List[str]]
@@ -450,7 +450,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 from typing import TextIO
-STATE_OPTIONS: dict = {'normal': {'priority': 9, 'fact': '常规提交门禁通过', 'pointers': ['AGENTS.md §12']}, 'pending_findings': {'priority': 1, 'fact': '代码/文档里有 findings 钉（`k3dit:pending`）未处置；怎么处置由你决定', 'options': ['修完删 `k3dit:pending <ID>` 标记', '有意留 → 改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）', '本轮不处理（钉仍在，下次照旧提示）'], 'pointers': ['peer_contract §8', 'k3dge ADR-0025']}, 'audit_suggested': {'priority': 4, 'fact': '里程碑 <id> 命中审计触发条件（reason 见上）；审与不审由你决定', 'options': ['k3dge milestone audit <id>（必审，待修=0 才谈封板）', '不审，继续干活（触发条件仍在，下次照旧提示）'], 'pointers': ['k3dge ADR-0004 §2.1.5', 'k3dge milestone audit <id>']}, 'seal_ready': {'priority': 4, 'fact': '里程碑 <id> 形式闸与票已齐；是否收这一章由你决定（seal 会跑：预审 → 审计 → 收摊）', 'fact_blocked': '里程碑 <id> 形式闸未齐（见 reasons）；先修完再 seal（seal 会跑：预审 → 审计 → 收摊）', 'fact_with_blockers': '；预审待办：<blockers>', 'question': '里程碑 <id>：封板？', 'options': ['k3dge milestone seal <id>（预审 → 审计 → 归档+版本+指针）', '不封（里程碑继续挂着，当普通提交结束）'], 'pointers': ['k3dge ADR-0004 §2.1.9', 'docs/reviews/']}, 'doc_fix': {'priority': 2, 'fact': 'docs/ 有 <n> 处**可确定修**的规约偏差（<rules>）；改与不改由你决定（不改则封板前置 `docs_normalized` 会拦）', 'options': ['k3dge doc fix --dry-run（先看要改哪里）', 'k3dge doc fix（按闭集规则改；改完自己 review diff 再提交）', '不处理（偏差留着，封板前会被闸拦）'], 'pointers': ['docs/tasks/AUTHORING.md', 'k3dge ADR-0022 §2.2']}, 'audit_open': {'priority': 2, 'fact': '里程碑 <id> 审计发现 <n> 项待修，环未闭环；由谁修由你决定', 'question': '里程碑 <id>：<n> 项待修，agent 修？', 'options': ['agent 修 → 修完重跑 k3dge milestone audit <id>（重审）', '不由 agent 修 → stop / 转人工干预'], 'pointers': ['k3dge ADR-0022', 'k3dge milestone audit <id>']}, 'escalated': {'priority': 1, 'fact': 'verify 连续 >3 次未闭环，已转人工干预（k3dge milestone audit-submit <id> 或人工复核）', 'pointers': ['k3dge milestone audit-submit <id>', 'docs/incidents/']}, 'sealed': {'priority': 9, 'fact': '已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑', 'pointers': ['docs/reviews/*-closure.md', 'k3dge ADR-0004 §2.1.4']}, 'seal_declined': {'priority': 9, 'fact': '已放弃封板（当普通提交结束）', 'pointers': ['AGENTS.md §12']}, 'rejected': {'priority': 3, 'fact': '操作被拒（原因见上）', 'pointers': ['AGENTS.md §12', 'k3dge milestone status <id>']}, 'new_domain': {'priority': 4, 'fact': '新建 src/ 域未在 manifest 注册（硬闸不红，但有文件级信号）', 'options': ['补 manifest + spec + tests，再 k3dge sync 回写契约哈希', '有意不注册 → 在 manifest `ignore` 里声明'], 'pointers': ['k3dge ADR-0005 §2.8', 'k3dge sync']}}
+STATE_OPTIONS: dict = {'normal': {'priority': 9, 'fact': '常规提交门禁通过', 'pointers': ['AGENTS.md §12']}, 'pending_findings': {'priority': 1, 'fact': '代码/文档里有 findings 钉（`k3dit:pending`）未处置；怎么处置由你决定', 'options': ['修完删 `k3dit:pending <ID>` 标记', '有意留 → 改成 `k3dit:leftover <ID>` 指针（处置仍以 12 列报告 + tasks 为准，标记只是指针）', '本轮不处理（钉仍在，下次照旧提示）'], 'pointers': ['peer_contract §8', 'k3dge ADR-0025']}, 'audit_suggested': {'priority': 4, 'fact': '里程碑 <id> 命中审计触发条件（reason 见上）；审与不审由你决定', 'options': ['k3dge milestone audit <id>（必审，待修=0 才谈封板）', '不审，继续干活（触发条件仍在，下次照旧提示）'], 'pointers': ['k3dge ADR-0004 §2.1.5', 'k3dge milestone audit <id>']}, 'seal_ready': {'priority': 4, 'fact': '里程碑 <id> 形式闸与票已齐；是否收这一章由你决定（seal 会跑：预审 → 审计 → 收摊）', 'fact_blocked': '里程碑 <id> 形式闸未齐（见 reasons）；先修完再 seal（seal 会跑：预审 → 审计 → 收摊）', 'fact_with_blockers': '；预审待办：<blockers>', 'question': '里程碑 <id>：封板？', 'options': ['k3dge milestone seal <id>（预审 → 审计 → 归档+版本+指针）', '不封（里程碑继续挂着，当普通提交结束）'], 'pointers': ['k3dge ADR-0004 §2.1.9', 'docs/reviews/']}, 'doc_fix': {'priority': 2, 'fact': 'docs/ 有 <n> 处**可确定修**的规约偏差（<rules>）；改与不改由你决定（不改则封板前置 `docs_normalized` 会拦）', 'options': ['k3dge doc fix --dry-run（先看要改哪里）', 'k3dge doc fix（按闭集规则改；改完自己 review diff 再提交）', '不处理（偏差留着，封板前会被闸拦）'], 'pointers': ['docs/tasks/AUTHORING.md', 'k3dge ADR-0022 §2.2']}, 'audit_open': {'priority': 2, 'fact': '里程碑 <id> 审计发现 <n> 项待修，环未闭环；由谁修由你决定', 'question': '里程碑 <id>：<n> 项待修，agent 修？', 'options': ['agent 修 → 修完重跑 k3dge milestone audit <id>（重审）', '不由 agent 修 → stop / 转人工干预'], 'pointers': ['k3dge ADR-0022', 'k3dge milestone audit <id>']}, 'escalated': {'priority': 1, 'fact': 'verify 连续 >3 次未闭环，已转人工干预（k3dge milestone audit-submit <id> 或人工复核）', 'pointers': ['k3dge milestone audit-submit <id>', 'docs/incidents/']}, 'sealed': {'priority': 9, 'fact': '已封板（归档+版本+指针）；收摊在压缩上下文：见 docs/reviews/*-closure.md → 更新设计文档 → 提交里程碑', 'pointers': ['docs/reviews/*-closure.md', 'k3dge ADR-0004 §2.1.4']}, 'seal_declined': {'priority': 9, 'fact': '已放弃封板（当普通提交结束）', 'pointers': ['AGENTS.md §12']}, 'rejected': {'priority': 3, 'fact': '操作被拒（原因见上）', 'pointers': ['AGENTS.md §12', 'k3dge milestone status <id>']}, 'routing_error': {'priority': 1, 'fact': '处理点路由异常（见 reasons），本轮无法判定是否有待办；这不是“没事”', 'pointers': ['AGENTS.md §12']}, 'new_domain': {'priority': 4, 'fact': '新建 src/ 域未在 manifest 注册（硬闸不红，但有文件级信号）', 'options': ['补 manifest + spec + tests，再 k3dge sync 回写契约哈希', '有意不注册 → 在 manifest `ignore` 里声明'], 'pointers': ['k3dge ADR-0005 §2.8', 'k3dge sync']}}
 GATE_NEXT: dict = {'audit_report_missing': ('rejected', 'audit_missing'), 'audit_noop': ('rejected', 'audit_noop'), 'audit_degraded_unsigned': ('rejected', 'audit_degraded_unsigned'), 'audit_open_declined': ('rejected', 'audit_open_declined'), 'tasks_all_done': ('rejected', 'tasks_pending')}
 REJECTION_FACTS: dict = {'audit_missing': '审计缺失：先落盘报告（k3dge milestone audit-submit <id>）或 k3dge milestone audit <id>', 'audit_noop': '审计未真跑：这一跳被跳过或失败——空转不得当闭环（k3dge ADR-0004 §2.1.11）；检查传输链/透镜可达后重跑 k3dge milestone audit <id>', 'audit_degraded_unsigned': '审计降级到 manual 但报告无署名/来源——降级不静默：补署名后可记 degraded-manual（k3dge ADR-0004 §2.1.11）', 'audit_open_declined': 'stop / 转人工干预（待修未修复且 agent 拒绝修复）', 'tasks_pending': '票据未全 done：先干活或改挂里程碑，再谈 align/seal'}
 class NextStep
@@ -463,8 +463,9 @@ class NextStep
     question: Optional[str] = None
     reasons: Optional[list] = None
     pointers: Optional[list] = None
+    rules: Optional[str] = None
     @classmethod
-    from_state(cls, state: str, milestone: str, *, pending: Optional[int]=None, reasons: Optional[list]=None) -> 'NextStep'
+    from_state(cls, state: str, milestone: str, *, pending: Optional[int]=None, reasons: Optional[list]=None, rules: Optional[str]=None) -> 'NextStep'
     filled_options(self) -> list
     render_cli(self) -> str
     render_mcp(self) -> dict
@@ -599,7 +600,7 @@ check_sections_when(sections_when: Optional[Dict[str, Any]], codes: Dict[str, An
 check_sections(sections: Optional[List[str]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
 check_section_ordering(enabled: Any, codes: Dict[str, Any], filename: str, text: str) -> List[Check]
 check_frontmatter(fm_spec: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str, schema_rel: str='.schema.json') -> List[Check]
-check_headers(hdr_spec: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
+check_headers(hdr_spec: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str, schema_rel: str='.schema.json') -> List[Check]
 check_index_ref(index_text: str, token: str, codes: Dict[str, Any], index_rel: str, filename: str) -> List[Check]
 check_amend(block: Any, codes: Dict[str, Any], filename: str, text: str) -> List[Check]
 check_content(schema: Dict[str, Any], filename: str, text: str, ident: str, schema_rel: str='.schema.json') -> List[Check]
@@ -651,7 +652,7 @@ from typing import Optional
 from typing import Tuple
 from k3dge.engine import gates
 from k3dge.engine.align import run_milestone_alignment
-from k3dge.engine import seal_mod
+from k3dge.engine import seal as seal_mod
 from k3dge.engine.seal import seal_milestone
 from k3dge.engine.seal import seal_preconditions_error
 run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False, no_version_bump: bool=False) -> Tuple[str, str]

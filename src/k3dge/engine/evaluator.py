@@ -292,7 +292,7 @@ class ConsistencyEngine:
 
         try:
             out = subprocess.run(
-                ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
+                ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMRD"],
                 cwd=self.workspace_root,
                 capture_output=True,
                 text=True,
@@ -331,7 +331,7 @@ class ConsistencyEngine:
                 events.emit(self.workspace_root, "gate_fail", violations=1)
                 return GateReport(
                     passed=False,
-                    violations=(Violation("GIT_UNAVAILABLE", str(exc),
+                    violations=(Violation("GIT_UNAVAILABLE", f"git unavailable: {exc}",
                                           file_path="",
                                           detail={"reason": str(exc)}),),
                 )
@@ -540,7 +540,12 @@ class ConsistencyEngine:
                                     detail={"asset": f"src/k3dge/templates/assets/{asset}", "repo": rel},
                                 )
                             )
-                    except (OSError, UnicodeDecodeError):
+                    except (OSError, UnicodeDecodeError) as exc:
+                        # 读不出/坏编码就 `continue` ⇒ 锁对的那一半静默失守，漂移闸假绿（ocr2-248）。
+                        out.append(Violation(
+                            "TEMPLATE_DRIFT", f"{rel} 不可读（{type(exc).__name__}）⇒ 无法比对字节锁",
+                            file_path=rel,
+                            detail={"asset": f"src/k3dge/templates/assets/{asset}", "repo": rel}))
                         continue
                 # Budget warning: AGENTS.md microkernel should stay <80 lines (self-host only, not a gate)
                 try:

@@ -326,3 +326,49 @@ def test_hash_chain_binds_multiple_files(tmp_path):
     res = av.verify_bundle_local(make_bundle(tmp_path, extra_file=True))
     assert res["ok"], _errors(res)
     assert res["hash"]["checked"] == 2, res["hash"]
+
+
+def test_strip_markers_is_byte_preserving_for_crlf_and_missing_newline():
+    """ocr2-219：`splitlines()`+`\\n` 重拼会改 CRLF/无尾换行 ⇒ 哈希链永远对不上。"""
+    assert av.strip_markers("a\r\nb\r\n", "x.py") == "a\r\nb\r\n"
+    assert av.strip_markers("a\nb", "x.py") == "a\nb"
+
+
+def test_table_rows_reports_malformed_rows_via_single_source():
+    """ocr2-218：畸形行必须经 `report_table.malformed_rows` 计数，不与解析器口径漂移。"""
+    good = ("| code-1 | 2026-09-27 | 中 | P1 | 正确性 | 说明 | src/a.py:1 | "
+            "已修 | 处置 | 验证 | | |\n")
+    bad = "| bad | row |\n"
+    header, rows, count = av._table_rows(_HEADER + good + bad)
+    assert header is not None and len(rows) == 1
+    assert count == 2, (rows, count)   # 1 有效行 + 1 畸形行
+
+
+def test_replay_rejects_existing_regular_file_dest(tmp_path):
+    """ocr2-220：`dest` 是已存在普通文件 ⇒ 结构化拒绝，不抛 NotADirectoryError。"""
+    b = make_bundle(tmp_path)
+    dest = tmp_path / "not_a_dir"
+    dest.write_text("x", encoding="utf-8")
+    res = av.replay_to_baseline(b, dest=dest)
+    assert res["ok"] is False and "不是目录" in res["detail"], res
+
+
+def test_replay_never_rmtrees_caller_supplied_dest(tmp_path):
+    """ocr2-221：失败清理只能动自建临时目录，绝不删调用方传入的 dest。"""
+    b = make_bundle(tmp_path)
+    (b / "fix.patch").write_text("garbage not a patch\n", encoding="utf-8")
+    dest = tmp_path / "caller_dir"
+    dest.mkdir()
+    res = av.replay_to_baseline(b, dest=dest)
+    assert res["ok"] is False
+    assert dest.is_dir(), "调用方传入的 dest 被 rmtree（不可逆数据丢失）"
+
+
+def test_bundle_without_code_dir_is_not_waived(tmp_path):
+    """ocr2-222：`code/` 缺席不得豁免内容哈希链（replay 把它当硬失败）。"""
+    import shutil
+
+    b = make_bundle(tmp_path)
+    shutil.rmtree(b / "code")
+    res = av.verify_bundle_local(b)
+    assert res["ok"] is False and "无 code/" in _errors(res), _errors(res)

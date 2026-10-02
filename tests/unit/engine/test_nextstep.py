@@ -223,9 +223,12 @@ def _tmp_ws(test: unittest.TestCase) -> Path:
     return ws
 
 
-def _base_ws(mid="M7"):
+def _base_ws(mid="M7", test=None):
     ws = Path(tempfile.mkdtemp())
-    atexit.register(shutil.rmtree, ws, True)
+    if test is not None:
+        test.addCleanup(shutil.rmtree, ws, ignore_errors=True)
+    else:
+        atexit.register(shutil.rmtree, ws, True)
     (ws / ".agent").mkdir()
     (ws / ".agent" / "manifest.json").write_text(
         '{"package_root":"src","domains":{"engine":{"src":"src/k3dge/engine"}}}', encoding="utf-8"
@@ -241,14 +244,14 @@ def _base_ws(mid="M7"):
 
 class TestAuditTrigger(TestCase):
     def test_all_tasks_done_suggests_audit(self) -> None:
-        ws = _base_ws()
+        ws = _base_ws(test=self)
         with mock.patch.object(audit_trigger, "_git_changed_files", return_value=[]):
             suggested, reasons = audit_trigger.compute_audit_suggestion(ws)
         self.assertTrue(suggested)
         self.assertTrue(any("账齐" in r for r in reasons))
 
     def test_pending_task_no_suggestion(self) -> None:
-        ws = _base_ws()
+        ws = _base_ws(test=self)
         (ws / "docs" / "tasks" / "2026-09-01-M7-fix-y.md").write_text(
             "# Y\n- **Status**: in-progress\n- **Milestone**: M7\n", encoding="utf-8"
         )
@@ -257,22 +260,38 @@ class TestAuditTrigger(TestCase):
         self.assertFalse(suggested)
 
     def test_volume_signal(self) -> None:
-        ws = _base_ws()
+        ws = _base_ws(test=self)
         files = [f"src/k3dge/engine/f{i}.py" for i in range(8)]
         with mock.patch.object(audit_trigger, "_git_changed_files", return_value=files):
             suggested, reasons = audit_trigger.compute_audit_suggestion(ws)
         self.assertTrue(suggested)
         self.assertTrue(any("体积" in r for r in reasons))
 
+    def test_deleted_src_file_does_not_trigger_c2_blindspot(self) -> None:
+        """ocr2-215/217：已删除的 src 路径（`D src/foo.py`）不得被当成"不可解析文件"。"""
+        ws = _base_ws(test=self)
+        with mock.patch.object(audit_trigger, "_git_changed_files", return_value=["src/gone.py"]):
+            _, reasons = audit_trigger.compute_audit_suggestion(ws)
+        self.assertFalse(any("C2 盲区" in r for r in reasons), reasons)
+
+    def test_volume_uses_committed_window_union(self) -> None:
+        """ocr2-216：体积取 committed 窗口 ∪ 工作区，按任务提交不得把计数清零。"""
+        ws = _base_ws(test=self)
+        committed = [f"src/k3dge/engine/f{i}.py" for i in range(8)]
+        with mock.patch.object(audit_trigger, "_git_changed_files", return_value=[]), \
+                mock.patch("k3dge.engine.diff.get_changed_files", return_value=committed):
+            _, reasons = audit_trigger.compute_audit_suggestion(ws)
+        self.assertTrue(any("体积" in r for r in reasons), reasons)
+
     def test_doc_desync_is_not_a_trigger(self) -> None:
         # overview.md staleness was removed as an audit trigger (moved to milestone closure).
-        ws = _base_ws()
+        ws = _base_ws(test=self)
         with mock.patch.object(audit_trigger, "_git_changed_files", return_value=["src/k3dge/engine/f.py"]):
             _, reasons = audit_trigger.compute_audit_suggestion(ws)
         self.assertFalse(any("文档不同步" in r or "overview" in r for r in reasons))
 
     def test_existing_report_suppresses(self) -> None:
-        ws = _base_ws()
+        ws = _base_ws(test=self)
         (ws / "docs" / "reviews" / "2026-09-01-M7-audit.md").write_text(
             "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
@@ -284,7 +303,7 @@ class TestAuditTrigger(TestCase):
         self.assertFalse(suggested)
 
     def test_audit_closed(self) -> None:
-        ws = _base_ws()
+        ws = _base_ws(test=self)
         self.assertFalse(audit_trigger.audit_closed(ws, "M7"))
         _clean = (
             "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
@@ -297,7 +316,7 @@ class TestAuditTrigger(TestCase):
 
     def test_milestone_less_report_does_not_close(self) -> None:
         """C-new：无里程碑归属的 12 列报告（如 doc-audit 通稿）不得冒充某里程碑审计闭环。"""
-        ws = _base_ws()
+        ws = _base_ws(test=self)
         _clean = (
             "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
@@ -319,7 +338,7 @@ class TestWorkspaceHints(TestCase):
     def _run_git(self, stdout_z: str):
         from k3dge.cli import main as cli_main
 
-        ws = _base_ws()
+        ws = _base_ws(test=self)
         with mock.patch("subprocess.run") as run:
             run.return_value = mock.MagicMock(stdout=stdout_z, returncode=0)
             hints = cli_main._workspace_hints(ws)
@@ -375,31 +394,42 @@ class TestLifecycleNext(TestCase):
         且预审无"需人先办"时 `[NEXT]` 直接给 `seal_ready`，不再先要一次独立审计。"""
         from k3dge.cli import main as cli_main
 
-        ws = _base_ws()
+        ws = _base_ws(test=self)
         ns = cli_main._lifecycle_next(ws)
         self.assertEqual(ns.state, "seal_ready")
         self.assertIn("预审待办：全绿", ns.render_cli())
 
     def test_seal_ready_when_audit_closed(self) -> None:
+        """审计不参与 lifecycle 选路（status.py:52-54）：seal_ready 只看预审；
+        报告夹具是否干净都不应改变结论——用 patch 把分支钉成确定性。"""
         from k3dge.cli import main as cli_main
 
-        ws = _base_ws()
+        ws = _base_ws(test=self)
         _clean = (
             "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
-            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
             "| A1 | x | s | p | t | d | l | 已修 | - | - | - | - |\n"
         )
         (ws / "docs" / "reviews" / "2026-09-01-M7-audit.md").write_text(_clean, encoding="utf-8")
         (ws / "docs" / "reviews" / "2026-09-01-M7-quality.md").write_text(
             "<!-- k3dge:kind: quality -->\n" + _clean, encoding="utf-8"
         )
-        ns = cli_main._lifecycle_next(ws)
-        self.assertEqual(ns.state, "seal_ready")
+        with mock.patch("k3dge.engine.seal.unmet_seal_preconditions", return_value=[]), \
+             mock.patch("k3dge.engine.task_index.scan_milestone_tasks",
+                        return_value=[{"path": "x.md"}]):
+            ns = cli_main._lifecycle_next(ws)
+            self.assertIsNotNone(ns, "预审全绿+有票必须有 next，否则报告夹具是否被消费无从判断")
+            self.assertEqual(ns.state, "seal_ready")
+            # 对照：删掉报告仍 seal_ready ⇒ 证明报告未被消费（审计不 gate 封板）
+            for p in (ws / "docs" / "reviews").glob("*audit*"):
+                p.unlink()
+            ns2 = cli_main._lifecycle_next(ws)
+            self.assertEqual(ns2.state, "seal_ready")
 
     def test_pending_markers_take_precedence(self) -> None:
         from k3dge.cli import main as cli_main
 
-        ws = _base_ws()
+        ws = _base_ws(test=self)
         src = ws / "src" / "k3dge" / "engine"
         src.mkdir(parents=True)
         (src / "mod.py").write_text("def f():\n    return 1  # k3dit:pending A-11\n", encoding="utf-8")
@@ -413,7 +443,7 @@ class TestIncompleteReport(TestCase):
     def test_incomplete_report_never_closes(self) -> None:
         """未尽项报告（`<!-- k3dge:incomplete -->`）即便 待修=0 也不构成闭环。"""
 
-        ws = _base_ws()
+        ws = _base_ws(test=self)
         _clean = (
             "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
@@ -672,7 +702,7 @@ class TestSidecarAndRejectionShape(TestCase):
         self.assertIn("seal_ready", states)
 
     def test_blocked_seal_fact_comes_from_declaration(self) -> None:
-        ws = _base_ws()
+        ws = _base_ws(test=self)
         with mock.patch("k3dge.engine.seal.unmet_seal_preconditions",
                         return_value=[("tasks_all_done", "还有票未 done")]):
             ns = nextstep.seal_ready_for(ws, "M7")
@@ -700,3 +730,38 @@ class TestSidecarAndRejectionShape(TestCase):
         self.assertEqual(ns.priority, opt["priority"])
         self.assertEqual(ns.pointers, opt["pointers"])
         self.assertEqual(ns.state, "rejected")
+
+
+class TestFromStateDoesNotAlias(TestCase):
+    """`from_state` 交出去的是副本，不是 STATE_OPTIONS/调用方列表的引用（ocr2-281）。"""
+
+    def test_pointers_and_reasons_are_copies(self) -> None:
+        reasons = ["a"]
+        ns = nextstep.NextStep.from_state("seal_ready", "M1", reasons=reasons)
+        reasons.append("b")
+        self.assertEqual(ns.reasons, ["a"])
+        ns.pointers.append("mutated")
+        self.assertNotIn("mutated", nextstep.STATE_OPTIONS["seal_ready"]["pointers"])
+        self.assertNotIn("mutated", nextstep.NextStep.from_state("seal_ready", "M1").pointers)
+
+
+class TestPlaceholderFilling(TestCase):
+    """`<rules>` 是一等占位符；未解析占位符要出声（ocr2-282）。"""
+
+    def test_rules_placeholder_filled(self) -> None:
+        ns = nextstep.NextStep.from_state("doc_fix", "M1", pending=2, rules="MD_CRLF")
+        cli = ns.render_cli()
+        self.assertIn("2", cli)
+        self.assertIn("MD_CRLF", cli)
+        self.assertNotIn("<rules>", cli)
+        self.assertNotIn("<n>", cli)
+
+    def test_unresolved_placeholder_warns(self) -> None:
+        import contextlib
+        import io
+
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            cli = nextstep.NextStep.from_state("audit_open", "M7").render_cli()
+        self.assertIn("<n>", cli)
+        self.assertIn("WARN", err.getvalue())
