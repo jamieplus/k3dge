@@ -14,15 +14,20 @@ if (-not (Test-Path -LiteralPath (Join-Path $Root ".agent"))) {
   exit 1
 }
 # `Set-Location` 是**进程级**副作用：`.sh` 的 `cd` 关在子进程里不泄漏，而本脚本被 `&`/点源调用时
-# 会把调用方的当前位置改掉且永不恢复（376）。Push/Pop + trap ⇒ 任何出口都还原。
+# 会把调用方的当前位置改掉且永不恢复（376）。`trap ... EXIT` 不是合法 PowerShell（trap 只认
+# Break/Continue，EXIT 会被当成错误类型名 ⇒ 静默不执行，ocr2-018）。用 `try/finally` 包住主体，
+# 任何出口（含 `exit 1`）都还原（`exit` 会先跑 `finally`）。
 Push-Location $Root
-trap { Pop-Location } EXIT
+try {
 
 $CONFIG = ".agent/docs.toml"
 # 与 .sh 轨统一：**LF + 无 BOM** 写盘。`Set-Content -Encoding utf8` 在 WinPS 5.1 写 BOM、Windows
 # 上按 `[Environment]::NewLine` 拼 CRLF ⇒ 自家 MD_CRLF/MD_ENCODING（block）会拦自己生成的桩（ocr-161）。
 $UTF8LF = New-Object System.Text.UTF8Encoding($false)
 function Write-TextFile([string]$path, [string[]]$lines) {
+  # 相对路径喂 `[System.IO.File]` 会按**进程** CWD 解析，不是 PowerShell 当前位置（ocr2-019）。
+  # `Push-Location` 只改 provider 位置 ⇒ 必须拼成绝对路径再写，否则文件落到调用方目录。
+  if (-not [System.IO.Path]::IsPathRooted($path)) { $path = Join-Path $Root $path }
   [System.IO.File]::WriteAllText($path, (($lines -join "`n") + "`n"), $UTF8LF)
 }
 $script:Fails = 0
@@ -133,3 +138,4 @@ if ($script:Fails -gt 0) {
 }
 Write-Host "[k3dge] Done. Enabled docs generated under docs/guides/ (existing files not overwritten)."
 Write-Host "        Agent: please fill guide stubs (<!-- k3dge:guide-stub -->) before milestone seal."
+} finally { Pop-Location }

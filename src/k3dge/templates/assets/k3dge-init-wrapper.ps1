@@ -11,5 +11,10 @@ if (-not (Test-Path $Init -PathType Leaf)) {
   [Console]::Error.WriteLine("[k3dge] 找不到 $Init ⇒ 这不是 k3dge 初始化入口所在的项目根（或在别处复制了同名脚本）")
   exit 1
 }
+# 只验存在不够：同名外来 `init.ps1` 会被静默执行（与 .sh 轨同场景，ocr2-104）。认自家头注释固定串。
+if (-not (Get-Content -LiteralPath $Init -TotalCount 5 | Select-String "k3dge-governed project" -Quiet)) {
+  [Console]::Error.WriteLine("[k3dge] $Init 不是 k3dge 下发的初始化脚本（缺 k3dge 标记）⇒ 拒跑，请检查是否与自有脚本同名冲突")
+  exit 1
+}
 & $Init @args
 exit $LASTEXITCODE   # 把 init.ps1 的退出码传给调用方，失败不得被吞（ocr-134）

@@ -73,9 +73,16 @@ fi
 # 证明不了 main() 的返回值到达进程；这条才钉得住"入口 sys.exit"（t-023 的回归面）。
 SMOKEY="$(mktemp -d)"
 PYZ_ABS="$(pwd -P)/$TMP"
-if ( cd "$SMOKEY" && "$PY" "$PYZ_ABS" check >/dev/null 2>&1 ); then
+# `cd` 失败 ⇒ `&&` 短路 ⇒ 子 shell 非零 ⇒ `if` 不进 ⇒ 冒烟"通过"但根本没跑（ocr2-009）。
+# 子 shell 里先 `cd || exit 2`（cd 失败即 2，与"产物退出 0"区分），外层按码判定；清场用绝对路径。
+_smoke_rc=0
+( cd "$SMOKEY" || exit 2; "$PY" "$PYZ_ABS" check >/dev/null 2>&1 ) || _smoke_rc=$?
+rm -rf "$SMOKEY"
+if [ "$_smoke_rc" -eq 0 ]; then
   echo "[build-pyz] 冒烟失败：空目录 check 退出 0——main() 返回码被吞，下游闸会常绿" >&2
-  rm -rf "$SMOKEY"
+  exit 1
+elif [ "$_smoke_rc" -eq 2 ]; then
+  echo "[build-pyz] 冒烟失败：进不去临时目录（没跑到产物）" >&2
   exit 1
 fi
 rm -rf "$SMOKEY"

@@ -12,6 +12,10 @@ if ($env:K3DGE_SOURCE) {
   $K3dgeHome = $env:K3DGE_SOURCE
 } elseif ($ScriptRoot -and (Test-Path -LiteralPath (Join-Path $ScriptRoot "src/k3dge"))) {
   $K3dgeHome = $ScriptRoot
+} elseif ($ScriptRoot -and (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $ScriptRoot) "src/k3dge"))) {
+  # 本脚本住在 `<repo>/scripts/`：`$ScriptRoot/src/k3dge` 恒假，自检永远走不到（ocr2-101）。
+  # 父目录才是仓根，认它。
+  $K3dgeHome = Split-Path -Parent $ScriptRoot
 } else {
   # Stop 偏好下 `Write-Error` 本身就是终止错误 ⇒ 紧随的 `exit 1` 永不执行，调用方拿到未处理异常
   # 而不是干净退出码（379）。写 stderr + 显式退出。
@@ -94,6 +98,9 @@ if ($self) {
   Write-Host "[k3dge] pip install -e .[dev] (self)"
   & $PyVenv -m pip install -q -e ".[dev]"
   if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] pip install 失败 (exit $LASTEXITCODE)"); exit 1 }
+  # self 分支不设 `$InstallTarget` ⇒ 后文收据推导落空，写出空收据（而 gate 现拒空收据，ocr2-102）。
+  # self 装的就是本 checkout，收据记其路径（与 K3DGE_HOME editable 同形）。
+  $InstallTarget = "$K3dgeHome[mcp]"
 } else {
   $InstallFlags = @()
   if ([string]::IsNullOrWhiteSpace($env:K3DGE_SOURCE) -or $env:K3DGE_SOURCE -eq "pypi") {
@@ -132,6 +139,9 @@ if ($self) {
   if ($InstallTarget -eq "k3dge[mcp]") { $srcRec = "pypi" }
   elseif ($InstallTarget -match '^k3dge\[mcp\] @ ') { $srcRec = $InstallTarget -replace '^k3dge\[mcp\] @ ','' }
   else { $srcRec = $InstallTarget -replace '\[mcp\]$','' }
+  # pip 要 `git+` 前缀才认 direct reference，但政策（env/pyproject）里没有它：收据带 `git+`、
+  # gate 只对真实目录归一化 ⇒ URL 永远对不上，假红（ocr2-103）。落盘前去掉，与政策同形。
+  $srcRec = $srcRec -replace '^git\+',''
   # 无 BOM 写收据：`-Encoding utf8` 在 WinPS 5.1 会加 BOM ⇒ 装源字符串比较（gate.py/.sh/.ps1）误判（ocr-132）。
   [System.IO.File]::WriteAllText((Join-Path $Target ".venv/k3dge-source.txt"), $srcRec + "`n", (New-Object System.Text.UTF8Encoding($false)))
 }
