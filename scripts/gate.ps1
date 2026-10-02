@@ -6,7 +6,8 @@ $cmdArgs = if ($args.Count -eq 0) { @("check") } else { $args }
 # K3DGE_SOURCE 统管校验：环境声明的源 vs 本 venv 的装时落盘，不一致即拦。
 # 优先级与 gate.sh / gate.py 同：环境 > 本仓 pyproject [tool.k3dge].source；都没有 = legacy。
 $srcFile = Join-Path $Root ".venv/k3dge-source.txt"
-$want = $env:K3DGE_SOURCE
+# 环境值原样用 ⇒ 纯空白会被当成"已声明政策"（后文 `if ($want)` 非空即真），与 gate.py 的 `.strip()` 不同口径（ocr2-093）。
+$want = if ($null -eq $env:K3DGE_SOURCE) { "" } else { "$($env:K3DGE_SOURCE)".Trim() }
 if ([string]::IsNullOrWhiteSpace($want) -and (Test-Path (Join-Path $Root "pyproject.toml"))) {
   # 原生命令 + Stop 下 `2>$null` 会抛 NativeCommandError ⇒ 临时降为 Continue（WinPS 5.1），失败按"取不到"处理（ocr-144/147）。
   $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -29,9 +30,11 @@ if ([string]::IsNullOrWhiteSpace($want) -and (Test-Path (Join-Path $Root "pyproj
         $want = $Matches[1]; break                                                   # 两种引号 + 允许缩进
       }
     }
-    # 段落存在却没解析到 source ⇒ 政策**声明了但读不懂**，静默按 legacy 跑就是假通过（344）
+    # 段落存在却没解析到 source ⇒ 政策**声明了但读不懂**，静默按 legacy 跑就是假通过（344/ocr2-094）。
+    # 与"收据缺失"同等拒跑，逼调用方修好写法，而不是放行未校验的闸。
     if ($sawSec -and [string]::IsNullOrWhiteSpace($want)) {
-      [Console]::Error.WriteLine("[k3dge-source] WARN: pyproject 有 [tool.k3dge] 段但没解析出 source ⇒ 本轮按 legacy（无来源校验）跑；请检查该行写法")
+      [Console]::Error.WriteLine("[k3dge-source] pyproject 有 [tool.k3dge] 段但没解析出 source ⇒ 拒跑；请检查该行写法")
+      exit 2
     }
   }
 }
@@ -77,9 +80,14 @@ if ($k3dge) {
     [Console]::Error.WriteLine("[k3dge-source] WARN: 政策已声明但 .venv/Scripts/k3dge.exe 缺失 ⇒ 回落全局 k3dge（其来源未经收据校验）：$($k3dge.Source)")
   }
   # 走解析到的那一条（`Get-Command` 可能命中 function/alias/.ps1 垫片；裸名 `& k3dge`
-  # 会**二次解析**，两次未必同一个 ⇒ 且调用没发生时 $LASTEXITCODE 是上一句的陈旧值）（475）
+  # 会**二次解析**，两次未必同一个 ⇒ 且调用没发生时 $LASTEXITCODE 是上一句的陈旧值）（475）。
+  # 非原生命令（function/alias）**不刷新** `$LASTEXITCODE` ⇒ 直接取会拿到前面 `python3` 留下的 0，
+  # 把失败的闸报成通过（ocr2-014）。只对 Application 取码，其余用 `$?` 定 0/1。
   $rc = 0
-  try { & $k3dge.Source @cmdArgs; $rc = $LASTEXITCODE }
+  try {
+    & $k3dge.Source @cmdArgs
+    if ($k3dge.CommandType -eq "Application") { $rc = $LASTEXITCODE } else { $rc = if ($?) { 0 } else { 1 } }
+  }
   catch { [Console]::Error.WriteLine("[k3dge] 无法执行 $($k3dge.Source)：$_"); exit 127 }
   exit $rc
 }
