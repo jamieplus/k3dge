@@ -489,6 +489,22 @@
       "tokens": "审计：open-code-review 单元测试全文件扫描（M11）"
     },
     {
+      "path": "docs/reviews/2026-10-02-M11-align.md",
+      "type": "reviews",
+      "id": "2026-10-02-M11-align",
+      "title": "里程碑对齐与验收报告: M11",
+      "status": "",
+      "tokens": "里程碑对齐与验收报告: M11"
+    },
+    {
+      "path": "docs/reviews/2026-10-02-M11-k3dit-bundle-audit.md",
+      "type": "reviews",
+      "id": "2026-10-02-M11-k3dit-bundle-audit",
+      "title": "外部审计报告（人工提交，milestone M11）",
+      "status": "",
+      "tokens": "外部审计报告（人工提交，milestone M11）"
+    },
+    {
       "path": "docs/specs/_template/spec.md",
       "type": "specs",
       "id": "spec",
