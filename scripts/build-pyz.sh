@@ -36,11 +36,16 @@ fi
 # 模板资产里有 .schema.json 等受版本控制的点文件，ocr-137）。
 # `.DS_Store`/`__pycache__`/`*.pyc` 是**派生垃圾**（Finder/解释器随手重建，拒建＝零收益摩擦、
 # 还把测试绑死在构建机整洁度上）⇒ 从"拒绝"改为"打包时过滤"（见下 create_archive filter）。
-if find src -type f \( -name '.env' -o -name '*.key' -o -name '*.pem' -o -name '*.jsonl' \
-     -o -name '*.db' -o -name '*.sqlite*' \) | grep -q .; then
-  echo "[build-pyz] src/ 含本地/敏感文件，拒绝打包（见上）" >&2
-  find src -type f \( -name '.env' -o -name '*.key' -o -name '*.pem' -o -name '*.jsonl' \
-       -o -name '*.db' -o -name '*.sqlite*' \) >&2
+# 管线退出码取自 `grep`：`find` 失败（不可读/无 find）时输出为空 ⇒ `grep -q .` 回 1 ⇒ 守卫静默通过（ocr2-008）。
+# 先收 `find` 的输出并查它的退出码；失败即拒（fail-closed），不再看 grep。
+# 另补 `.env.local`/`.env.*.local`（精确 `.env` 漏掉真实常见形态）。
+if ! _found="$(find src -type f \( -name '.env' -o -name '.env.local' -o -name '.env.*.local' -o -name '*.key' -o -name '*.pem' -o -name '*.jsonl' -o -name '*.db' -o -name '*.sqlite*' \) 2>/dev/null)"; then
+  echo "[build-pyz] 敏感件扫描的 find 失败（src 不可读/无 find？）⇒ 无法证明干净，拒绝打包" >&2
+  exit 1
+fi
+if [ -n "$_found" ]; then
+  echo "[build-pyz] src/ 含本地/敏感文件，拒绝打包（见下）" >&2
+  printf '%s\n' "$_found" >&2
   exit 1
 fi
 # 产物 shebang 可配（缺省 env python3）；与构建解释器不一致时提示——下游无 `python3` 或版本 < 3.10

@@ -103,7 +103,8 @@ if ($self) {
     $InstallTarget = "$($env:K3DGE_SOURCE)[mcp]"
     $InstallFlags += "-e"
     Write-Host "[k3dge] Installing editable from local path: $env:K3DGE_SOURCE"
-  } elseif ($env:K3DGE_SOURCE -match '^(git\+|https?://(github\.com|gitlab\.com|bitbucket\.org)|.*\.git)') {
+  # 第三分支必须 `$` 锚尾：否则任意含 `.git` 的串都放行（`https://evil.example/k3dge.git`），允许名单成装饰（ocr2-021）。
+  } elseif ($env:K3DGE_SOURCE -match '^(git\+|https?://(github\.com|gitlab\.com|bitbucket\.org)|.*\.git$)') {
     # pip 的 direct reference 要 PEP 440 形式 `git+<url>`：裸 `https://github.com/o/r` 会被 pip
     # 拒（分类正则放行≠语法合法，362）⇒ 归一化补 `git+`。
     $Src = $env:K3DGE_SOURCE

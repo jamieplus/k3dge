@@ -41,7 +41,7 @@ fi
 mkdir -p docs/guides
 
 # README has a base version that always exists; refresh its layout when enabled
-if grep -Eq "^\\s*readme\\s*=\\s*true" "$CONFIG"; then
+if grep -Eq "^[[:space:]]*readme[[:space:]]*=[[:space:]]*true" "$CONFIG"; then
   if [ ! -f "README.md" ]; then
     echo "[k3dge] README.md not found, creating base version..."
     cat > README.md << 'EOF'

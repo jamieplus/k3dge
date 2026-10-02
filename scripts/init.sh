@@ -69,7 +69,9 @@ else
     INSTALL_TARGET="${K3DGE_SOURCE}[mcp]"
     INSTALL_FLAGS=("-e")
     echo "[k3dge] Installing editable from local path: $K3DGE_SOURCE"
-  elif case "$K3DGE_SOURCE" in git+*|https://*github.com*|https://*/*) true ;; *) false ;; esac; then
+  # 子串匹配 `https://*github.com*` 会放行 `https://github.com.evil.tld/`，`https://*/*` 放行任意主机（ocr2-022）。
+  # 与 init.ps1 同口径：只认 `git+` 前缀、三家已知托管商路径前缀、`.git` 后缀。
+  elif case "$K3DGE_SOURCE" in git+*|https://github.com/*|https://gitlab.com/*|https://bitbucket.org/*|*.git) true ;; *) false ;; esac; then
     INSTALL_TARGET="k3dge[mcp] @ ${K3DGE_SOURCE}"
     echo "[k3dge] Installing from VCS source (non-editable): $K3DGE_SOURCE"
   else
