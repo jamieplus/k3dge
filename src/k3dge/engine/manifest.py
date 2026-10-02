@@ -36,7 +36,12 @@ def _require_relative_path(label: str, val: Any) -> str:
         raise ManifestError(f"{label} must not contain '..', got '{val}'")
     # **返回归一化后的路径**：`"./src"`、`"src//core"` 能过校验却以原样存下来，
     # 而下游是纯字符串前缀比较 ⇒ 路由/`package_root` 静默失效（ocr-255）。
-    return "/".join(Path(posix).parts)
+    norm = "/".join(Path(posix).parts)
+    # `"."`/`"./"`/`".//"` 的 parts 为空 ⇒ 归一化成 `""`，空串通过校验却无意义（ocr2-062）。
+    # 空即"当前目录"，下游前缀比较全命中/全不中，看运气。直接拒。
+    if not norm:
+        raise ManifestError(f"{label} must not be empty/dot, got '{val}'")
+    return norm
 
 
 def _parse_ignore(data: Dict[str, Any]) -> List[str]:

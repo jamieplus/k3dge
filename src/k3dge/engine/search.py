@@ -59,8 +59,13 @@ def _domain_src_dirs(workspace: Path) -> List[Path]:
                 p = workspace / src
                 if p.is_dir():
                     dirs.append(p)
-    except Exception:
-        pass
+    except Exception as exc:
+        # manifest 坏了（形状错/键改名）不能静默回落 `src/<pkg>`：回落面与声明面不一致，
+        # 搜到的与闸看的不是同一组文件（ocr2-077）。出声，让调用方知道在用兜底。
+        import sys as _sys
+
+        print(f"[search] WARN: manifest 不可用（{exc}）⇒ 回落 src/<pkg> 发现（可能与声明域不一致）",
+              file=_sys.stderr)
     if not dirs:
         # Fallback: discover any src/<pkg> package tree (no manifest present).
         src = workspace / "src"

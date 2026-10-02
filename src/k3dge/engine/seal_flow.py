@@ -71,15 +71,18 @@ def _report_seat(workspace: Path, milestone_id: str) -> str:
         return ""
 
 
-def _boundary_tag_before(workspace: Path, milestone_id: str) -> str:
-    """最近一个**别人**的边界 tag（`M<n>`；排当前里程碑自己）。无则空串。"""
+def _boundary_tag_before(workspace: Path, milestone_id: str) -> Optional[str]:
+    """最近一个**别人**的边界 tag（`M<n>`；排当前里程碑自己）。无则空串，git 失败则 None。
+
+    git 失败回空串 ⇒ 调用方当"首个里程碑"跳过对账，真失败变假成功（ocr2-075）。必须区分。
+    """
     from k3dge.engine import seal as _seal
     from k3dge.engine.changelog import _tag_number
 
     best = ""
     rc, out = _seal._git(workspace, "tag", "--list", "M*")
     if rc != 0:
-        return ""
+        return None
     for name in out.splitlines():
         name = name.strip()
         if not name or name == milestone_id:
@@ -103,6 +106,8 @@ def _architecture_staleness(workspace: Path, milestone_id: str) -> str:
     from k3dge.engine import seal as _seal
 
     tag = _boundary_tag_before(workspace, milestone_id)
+    if tag is None:
+        return "（列边界 tag 时 git 失败，未能对账架构文档；非首个里程碑，请人工核对）"
     if not tag:
         return "无上一个边界 tag（首个里程碑）：架构文档按现状保留，无需对账"
     rc, out = _seal._git(workspace, "diff", "--name-only", f"{tag}..HEAD")
@@ -359,6 +364,17 @@ def run_seal_flow(
             # 重跑**不得再推一格版号**（旧实现第二次 seal 会静默二次 patch-bump + 再写 CHANGELOG；
             # 09-28 审计 code-7，与 ocr-443「kind/on_rerun 未被执行器强制」同族）
             return True, f"\n  版本: 跳过（{milestone_id} 已封过：边界 tag 已在，重入不重复提版）"
+        # 提版成功但立 tag 失败 ⇒ HEAD 是封版提交却无边界 tag：重跑再提版会 double-bump（ocr2-076）。
+        # 认出"上一轮的封版提交"就跳过提版，直接去立 tag（`_seal_record` 会处理）。
+        try:
+            from k3dge.engine import seal as _seal_mod
+
+            _rc, _head_msg = _seal_mod._git(workspace, "log", "-1", "--format=%s")
+            if _rc == 0 and _head_msg.strip().startswith(f"chore(seal): seal milestone {milestone_id}"):
+                return True, (f"\n  版本: 跳过（HEAD 已是 {milestone_id} 的封版提交但无边界 tag："
+                               f"上一轮提版成功立 tag 失败，重入不重复提版）")
+        except Exception:
+            pass
         try:
             from k3dge.engine.changelog import build_notes_from_range
             from k3dge.engine.version import append_changelog, bump_version, consume_unreleased

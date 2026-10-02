@@ -181,7 +181,10 @@ def strip_pins(workspace: Path, job: str) -> dict:
             out = [ln for i, ln in enumerate(src, 1) if i not in drop]
             try:
                 p.write_text("\n".join(out) + "\n", encoding="utf-8")
-            except OSError:
+            except OSError as exc:
+                # 写回失败 ⇒ 钉还在盘上，但调用方拿到的是"剥离成功"计数，后续 advance 会把未剥离的
+                # pending 钉带进主干（ocr2-088）。进 `suspicious`（人审面），不静默 `continue`。
+                suspicious.append(f"{rel}:写回失败({exc})，钉未剥离")
                 continue
             files.append(rel)
             lines += len(drop)
@@ -341,15 +344,18 @@ def _safe_extractall(tf, dest: Path) -> None:
         return
     except TypeError:  # Python < 3.11.4 / < 3.10.12：filter= 尚不存在
         pass
+    # 无 `filter="data"` 时的前置校验有 TOCTOU：校验在 `extractall` 之前，此时归档里的符号链接
+    # 还没落盘，后续成员经由它解析时校验看不见 ⇒ `link -> /tmp` + `link/payload` 双成员可外逃（ocr2-089）。
+    # 旧 Python 上不做"先验后解"：含任何链接成员直接拒（fail-closed），无链接才做 upfront 校验后解包。
+    # （`dest` 为 fresh 空目录时，无链接 ⇒ `resolve()` 不会穿过不存在的链接，upfront 校验是 sound 的。）
+    for member in tf.getmembers():
+        if member.issym() or member.islnk():
+            raise RuntimeError(f"拒绝含链接归档（旧 Python 无 data 过滤器，无法安全解包）: {member.name}")
     dest_resolved = Path(dest).resolve()
     for member in tf.getmembers():
         target = (dest_resolved / member.name).resolve()
         if not target.is_relative_to(dest_resolved):
             raise RuntimeError(f"拒绝越界解包: {member.name}")
-        if member.issym() or member.islnk():
-            link = (target.parent / member.linkname).resolve()
-            if not link.is_relative_to(dest_resolved):
-                raise RuntimeError(f"拒绝越界链接: {member.name} -> {member.linkname}")
     tf.extractall(dest)
 
 

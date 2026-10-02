@@ -266,8 +266,18 @@ def check_frontmatter(
                     code_for(codes, "frontmatter", "DOC_SCHEMA_INVALID"),
                     f"{key}={val!r} != 声明的唯一值 {rule!r}: {Path(filename).name}", "file"))
         elif isinstance(rule, dict) and ("enum" in rule or "pattern" in rule):
-            ok = _status_ok(val, [str(x) for x in (rule.get("enum") or [])]) if rule.get("enum") \
-                else bool(re.fullmatch(str(rule.get("pattern")), val))
+            # 空 `enum` 是"一个都不许"（falsy 不能滑到 `pattern` 分支，更不能拿 `None` 当字面量比，ocr2-072）。
+            # 用键存在性，不用真值；`pattern` 非法正则 ⇒ 报声明错，不抛 `re.error`。
+            if "enum" in rule:
+                ok = _status_ok(val, [str(x) for x in (rule.get("enum") or [])])
+            else:
+                try:
+                    ok = bool(re.fullmatch(str(rule.get("pattern")), val))
+                except re.error as exc:
+                    out.append((
+                        code_for(codes, "frontmatter", "DOC_SCHEMA_INVALID"),
+                        f"{key} 的 pattern 非法正则（{exc}）：{Path(filename).name}", "schema"))
+                    continue
             if not ok:
                 out.append((
                     code_for(codes, "frontmatter", "DOC_SCHEMA_INVALID"),

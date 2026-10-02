@@ -147,4 +147,7 @@ def audit_closed(workspace: Path, milestone_id: str) -> bool:
     # 截断/畸形行走"解析跳过"口径 ⇒ `待修` 数得出 0 却不代表没有未关项（t-252，ocr-009 同族）
     if stats.get("malformed"):
         return False
+    # 未知/空白状态只进 `_ids_未知状态` 不进数字桶：不查它，"状态写错一行"也能 `待修==0` 假闭环（ocr2-074）。
+    if stats.get("_ids_未知状态"):
+        return False
     return stats["待修"] == 0

@@ -74,8 +74,10 @@ def resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]:
             return action["transports"]
     # 2-part alias: peer.name
     if len(parts) == 2:
-        peer = peers.get(parts[0], {})
-        action = peer.get("actions", {}).get(parts[1])
+        # 3-part 分支有 `isinstance` 守卫，这里裸 `.get`：`peer`/`actions` 非对象时 AttributeError（ocr2-070）。
+        peer = peers.get(parts[0], {}) if isinstance(peers, dict) else {}
+        _acts = peer.get("actions", {}) if isinstance(peer, dict) else {}
+        action = _acts.get(parts[1]) if isinstance(_acts, dict) else None
         if isinstance(action, dict) and action.get("transports"):
             return action["transports"]
         if peer.get("transports"):

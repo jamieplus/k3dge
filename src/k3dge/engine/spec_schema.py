@@ -13,13 +13,16 @@ from typing import List, Optional, Tuple
 #: `SPEC_MISSING_SECTION` 是 block 闸 ⇒ 两类都是假绿面（322）。
 #: §3（State Machine & Invariants）**不在机检集**：它是模板约定，内容由人管（t-249 已登记）。
 _HEADING_PREFIX = r"^##[ \t]+(?:\d+[.)]?[ \t]+)?"
+# 行尾必须锚死：只锚开头 + `\b` 会让 `## 1. Domain Boundary & Responsibilities Extra`
+# 也通过，与"必须是模板 `## N. <全名>` 形状"的承诺不符（ocr2-079）。尾空白容忍，余字不认。
+_HEADING_SUFFIX = r"[ \t]*$"
 REQUIRED_SECTIONS: List[Tuple[str, "re.Pattern[str]"]] = [
     ("Domain Boundary & Responsibilities",
-     re.compile(_HEADING_PREFIX + r"Domain Boundary & Responsibilities\b", re.MULTILINE)),
+     re.compile(_HEADING_PREFIX + r"Domain Boundary & Responsibilities" + _HEADING_SUFFIX, re.MULTILINE)),
     ("Public Interfaces & Type Contracts",
-     re.compile(_HEADING_PREFIX + r"Public Interfaces & Type Contracts\b", re.MULTILINE)),
+     re.compile(_HEADING_PREFIX + r"Public Interfaces & Type Contracts" + _HEADING_SUFFIX, re.MULTILINE)),
     ("Verification Matrix",
-     re.compile(_HEADING_PREFIX + r"Verification Matrix\b", re.MULTILINE)),
+     re.compile(_HEADING_PREFIX + r"Verification Matrix" + _HEADING_SUFFIX, re.MULTILINE)),
 ]
 
 #: 64 位摘要必须**整串**匹配：`{64}` 无边界断言时，128 位（两个 digest 连写/复制多尾字符）

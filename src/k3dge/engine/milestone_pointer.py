@@ -58,9 +58,22 @@ def set_current_milestone(workspace: Path, milestone_id: str) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     # 原子写：游标留下半行（`M1`→`M`）会让下次读走"内容非法"分支，与 bump 的读-改-写
     # 叠加成不可恢复的回退（ocr-270）。
-    tmp = p.with_name(p.name + ".tmp")
-    tmp.write_text(milestone_id + "\n", encoding="utf-8")
-    tmp.replace(p)
+    # 固定 `.tmp` 名可预测：`.agent/` 可被同仓其他进程写时，预置同名 symlink 可把写带到别处
+    # （CWE-59，ocr2-065）。用 `mkstemp`（O_EXCL 独占建，不跟随 symlink）再 replace。
+    import os as _os
+    import tempfile as _tf
+
+    _fd, _name = _tf.mkstemp(dir=str(p.parent), prefix=p.name + ".", suffix=".tmp")
+    try:
+        with _os.fdopen(_fd, "w", encoding="utf-8") as _f:
+            _f.write(milestone_id + "\n")
+        Path(_name).replace(p)
+    except Exception:
+        try:
+            Path(_name).unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
 
 
 def bump_milestone(workspace: Path) -> str:

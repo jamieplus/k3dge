@@ -76,6 +76,10 @@ def parse_rows(
     rows: List[Tuple[int, Dict[str, str]]] = []
     for i in range(hidx + 1, len(lines)):
         s = lines[i].strip()
+        # 空行跳过不截断：表内偶然空行/注释后仍有数据行时，"遇非 `|` 即停"会把后面的
+        # `待修` 行整段丢掉（ocr2-073）。非空非 `|`（正文/注解）才是表结束。
+        if not s:
+            continue
         if not s.startswith("|"):
             break
         cells = _cells(s)
@@ -100,6 +104,9 @@ def malformed_rows(text: str) -> list:
     out: list = []
     for i in range(hidx + 1, len(lines)):
         s = lines[i].strip()
+        # 与 `parse_rows` 同口径：空行跳过不截断（ocr2-073），否则畸形行在空行之后就隐身。
+        if not s:
+            continue
         if not s.startswith("|"):
             break
         cells = _cells(s)

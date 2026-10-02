@@ -40,8 +40,12 @@ def audit_job_ticket_paths(workspace: Path) -> set:
         rel = str(job.get("ticket_task") or "").replace("\\", "/").strip()
         if rel:
             # 指针**保持路径**：降成 basename ⇒ 任何目录下同名文件都被豁免出 `work_pending`
-            # （账本指针在 `docs/tasks/archive/<M>/X.md`、别的目录躺一份 `X.md` 就被误免，329）
-            names.add(rel.lstrip("./"))
+            # （账本指针在 `docs/tasks/archive/<M>/X.md`、别的目录躺一份 `X.md` 就被误免，329）。
+            # `lstrip("./")` 是字符集剥离（`../x` → `docs/...`、`.../f` → `/f`），不是去 `./` 前缀（ocr2-080）。
+            # 只去单个 `./` 前缀；`../`、绝对路径原样留（下游越界检查负责拒，不在这里洗成合法）。
+            if rel.startswith("./"):
+                rel = rel[2:]
+            names.add(rel)
     return names
 
 
@@ -169,7 +173,13 @@ def _scan_task_dir(
     tasks_dir: Path,
     milestone_id: Optional[str] = None,
     status: Optional[str] = None,
+    skipped: Optional[List[Path]] = None,
 ) -> List[TaskIndex]:
+    """扫描任务目录。`skipped`（可选出参）：读不出的票路径。
+
+    跳过读不出的文件能止崩，但被丢的票对调用方不可见 ⇒ 名单变短还无信号（ocr2-081）。
+    stderr WARN 是人看的信号；程序要信号就传 `skipped=[]` 进来收（向后兼容：不传即旧行为）。
+    """
     if not tasks_dir.exists():
         return []
     want_status = status.lower().strip() if status else None
@@ -185,6 +195,8 @@ def _scan_task_dir(
             # 旧只捕 UnicodeDecodeError ⇒ 整份扫描中断，align/seal 现场崩而不是跳过一票（330）
             print(f"[task_index] WARN: 跳过读不出的票 {p}（{type(exc).__name__}: {exc}）",
                   file=sys.stderr)
+            if skipped is not None:
+                skipped.append(p)
             continue
         fm = parse_frontmatter(content)
         if has_frontmatter(content):        # 有块即认块（哪怕空）：不回退正文正则（331）

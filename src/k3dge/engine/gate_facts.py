@@ -43,7 +43,9 @@ class _SafeFacts(dict):
     """缺失键原样留 `{key}`，不抛——文案模板不得因为少一个事实字段就崩掉渲染。"""
 
     def __missing__(self, key):  # noqa: D105
-        return "{" + key + "}"
+        # `key` 可能是非字符串（位置字段 `{0}` ⇒ int；复合 `{a.b}` 不走这里但防御性转字符串），
+        # 直接拼接会抛 TypeError，把"缺键"变成渲染崩（ocr2-061）。
+        return "{" + str(key) + "}"
 
 
 #: code → 声明。`fact`/`options`/`pointers` 支持 `{key}` 占位，由检查器给的 `facts` 填。

@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:52c4adbebe1235badfd040a28bc760d35191bdaeb5df38adb759ba649dec5679`
+- **Contract Hash**: `sha256:32329d055a6e3796593d0c108c44cf9dfeaa035aa4e9e2f0607abc849cf8fee6`
 - **Last Updated**: 2026-10-02
 
 ## 1. Domain Boundary & Responsibilities
@@ -682,7 +682,7 @@ from __future__ import annotations
 from typing import List
 from typing import Optional
 from typing import Tuple
-REQUIRED_SECTIONS: List[Tuple[str, 're.Pattern[str]']] = [('Domain Boundary & Responsibilities', re.compile(_HEADING_PREFIX + 'Domain Boundary & Responsibilities\\b', re.MULTILINE)), ('Public Interfaces & Type Contracts', re.compile(_HEADING_PREFIX + 'Public Interfaces & Type Contracts\\b', re.MULTILINE)), ('Verification Matrix', re.compile(_HEADING_PREFIX + 'Verification Matrix\\b', re.MULTILINE))]
+REQUIRED_SECTIONS: List[Tuple[str, 're.Pattern[str]']] = [('Domain Boundary & Responsibilities', re.compile(_HEADING_PREFIX + 'Domain Boundary & Responsibilities' + _HEADING_SUFFIX, re.MULTILINE)), ('Public Interfaces & Type Contracts', re.compile(_HEADING_PREFIX + 'Public Interfaces & Type Contracts' + _HEADING_SUFFIX, re.MULTILINE)), ('Verification Matrix', re.compile(_HEADING_PREFIX + 'Verification Matrix' + _HEADING_SUFFIX, re.MULTILINE))]
 CONTRACT_HASH_RE = re.compile('\\*\\*Contract Hash\\*\\*:\\s*`?sha256:([0-9a-f]{64})(?![0-9a-f])`?', re.IGNORECASE)
 validate_structure(content: str) -> List[str]
 extract_contract_hash(content: str) -> Optional[str]

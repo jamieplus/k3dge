@@ -92,10 +92,14 @@ def sync_domain(
         # 接口块**没落位**（既无 k3dge:interfaces markers、也无 Public Interfaces 标题）⇒ 不得写
         # 哈希/日期：否则闸拿"哈希行 == 现采"判绿，而 spec 接口块实际缺失且永不自愈（ocr-123）。
         return None
-    content = HASH_LINE_RE.sub(
+    # 哈希/日期行必须真落位：`sub` 零匹配时静默无事发生，但接口块已重写、函数还返回
+    # spec_path（成功形）⇒ 闸拿"哈希行 == 现采"判绿，而日期/哈希实际没更新（ocr2-090）。
+    content, n_hash = HASH_LINE_RE.subn(
         lambda m: f"{m.group(1)} `sha256:{new_hash}`", content
     )
-    content = DATE_LINE_RE.sub(lambda m: f"{m.group(1)} {today}", content)
+    content, n_date = DATE_LINE_RE.subn(lambda m: f"{m.group(1)} {today}", content)
+    if n_hash == 0 or n_date == 0:
+        return None
     atomic_write_text(spec_path, content)      # 就地截断写会把契约事实源留在半截状态（341）
     return spec_path
 
@@ -153,11 +157,19 @@ def _sync_registry():
         ws, manifest = ctx["workspace"], ctx["manifest"]
         # 每域只采一次接口：契约哈希用干净接口，api.md 用含 docstring 的版本
         # （docstring 变动不得动哈希）
+        from k3dge.engine.pure_refs import inside_workspace
+
         iface_cache: dict[str, str] = {}
         doc_cache: dict[str, str] = {}
         for d, cfg in manifest.domains.items():
             src = cfg.get("src", "")
             if src:
+                # `sync_domain` 单域有 `inside_workspace` 守卫，这里批量预采也要同口径（ocr2-091）：
+                # manifest 可被下游改，`..`/绝对路径不拦就扫到仓外。
+                if not inside_workspace(ws, src):
+                    print(f"[sync] WARN: 域 {d} 的 src 越出仓外（{src!r}）⇒ 跳过接口预采",
+                          file=sys.stderr)
+                    continue
                 src_dir = ws / Path(src)
                 iface_cache[d] = contract.collect_domain_interface(src_dir, manifest, ws)
                 doc_cache[d] = contract.collect_domain_interface(src_dir, manifest, ws, include_doc=True)

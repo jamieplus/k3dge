@@ -79,6 +79,12 @@ def _iter_scan_files(workspace: Path, roots: Sequence[str]) -> Iterable[Tuple[st
     for root_rel in roots:
         root = workspace / root_rel
         if not root.exists():
+            # 根不存在就静默跳过 ⇒ 扫描零标记零问题，`src` 改名/写错路径时全绿（ocr2-063）。
+            # 不抛（可选根可能真没有），但必须出声，否则"没扫到"与"扫了没有"无法区分。
+            import sys as _sys
+
+            print(f"[markers] WARN: 扫描根不存在，跳过：{root_rel}（若为主源码目录，请检查路径）",
+                  file=_sys.stderr)
             continue
         for p in sorted(root.rglob("*")):
             if not p.is_file() or p.suffix.lower() not in _SCAN_SUFFIXES:

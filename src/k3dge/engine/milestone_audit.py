@@ -60,6 +60,10 @@ def persist_external_audit_report(
         )
     reviews = workspace / "docs" / "reviews"
     reviews.mkdir(parents=True, exist_ok=True)
+    # 空/纯空白内容 ⇒ 只有表头零数据行，落盘等于"有报告"假象，后续判定（待修计数）全绿（ocr2-064）。
+    # 拒绝空提交，调用方必须给实质内容。
+    if not (content or "").strip():
+        raise ValueError("审计报告内容为空：拒绝落盘空报告（表头零数据行会让判定面误判有报告）")
     norm = (content or "").replace(" ", "")
     if _AUDIT_HEADER.replace(" ", "") not in norm:
         header = (

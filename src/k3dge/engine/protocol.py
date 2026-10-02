@@ -71,6 +71,13 @@ def write_incident(
         safe_slug = f"{safe_slug[:52]}-{sig}"
     safe_slug = safe_slug or "protocol"
     path = inc_dir / f"INC-{date_compact}-protocol-{safe_slug}.md"
+    # 文件名只含日期+slug：同日同 slug 的第二起事件会 `write_text` 截断覆盖，把第一份人可见审计物
+    # 静默丢掉（ocr2-071）。存在即加 `-2`/`-3` 后缀，不覆写。
+    if path.is_file():
+        _n = 2
+        while (inc_dir / f"INC-{date_compact}-protocol-{safe_slug}-{_n}.md").is_file():
+            _n += 1
+        path = inc_dir / f"INC-{date_compact}-protocol-{safe_slug}-{_n}.md"
     # Emits the B-T-D four core sections (docs/README.md) so the file satisfies the
     # INCIDENT_FORM_INVALID gate; sections 2-4 are placeholders for audit backfill.
     body = (

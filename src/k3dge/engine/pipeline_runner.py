@@ -315,12 +315,14 @@ def _cli_command(command: str, arguments: Optional[dict]) -> str:
     仍由命令自身书写），只把**插值**变成单个安全参数。"""
     import shlex
 
-    out = command or ""
-    for k, v in (arguments or {}).items():
-        if v is None:
-            continue
-        out = out.replace("{" + str(k) + "}", shlex.quote(str(v)))
-    return out
+    # 多遍 `replace` 会重扫已插入的文本：若某参数值含 `{别的键}` 字面量（如带花括号的路径），
+    # 后一轮会把它当占位符再替换＝注入（ocr2-068）。单遍正则，一次扫完不回头。
+    import re as _re
+
+    _vals = {str(k): shlex.quote(str(v)) for k, v in (arguments or {}).items() if v is not None}
+    if not _vals:
+        return command or ""
+    return _re.sub(r"\{([^{}]+)\}", lambda m: _vals.get(m.group(1), m.group(0)), command or "")
 
 
 def _run_cli(workspace: Path, command: str, timeout: int, io,
@@ -419,8 +421,10 @@ def run_action(
             print(f"[PEER] WARN: action '{action_ref}' 的 timeout 非法（{t.get('timeout')!r}）⇒ 用 {timeout}s",
                   file=sys.stderr)
         # 下一跳也要过合法集：拼错/缺 provider 的条目会被播报成"降级到 <那个值>"（448）
+        # `provider` 可能是数组/内联表（不可哈希）：`p2 in frozenset` 直接 TypeError（ocr2-069）。
+        # 当前跳有 `isinstance` 守卫，后续跳也要同口径。
         nxt = next((p2 for p2 in (x.get("provider") for x in transports[idx + 1:]
-                                  if isinstance(x, dict)) if p2 in _VALID_PROVIDERS), None)
+                                  if isinstance(x, dict)) if isinstance(p2, str) and p2 in _VALID_PROVIDERS), None)
         if prov == "skip":
             _append_log(workspace, f"[{datetime.datetime.now().astimezone().isoformat(timespec='seconds')}] HARNESS_SKIP: action '{action_ref}' resolved to skip transport")
             return TransportResult(True, "skip", "skipped", skipped=True, downgrades=downgrades)
