@@ -51,6 +51,13 @@ def _block(text) -> str:
             # `MD_FENCE_UNCLOSED` 阻塞闸（ocr2-300）：转义首符，不再是围栏。
             indent = s[: len(s) - len(stripped)]
             s = indent + "\\" + stripped
+        elif re.match(r"^-\s+\*\*[^*]+\*\*\s*[:：]", stripped):
+            # 元信息行（`- **Status**: …`）会以 last-wins 覆盖真实头区（ocr2-512）：
+            # `_headers` 对整篇 `^- **K**: V` 建 last-wins 字典，正文里伪造的
+            # `- **Path**`/`- **Status**` 能改写 build_card 看到的元数据。转义首 `-`，
+            # 使其不再匹配头部模式。
+            indent = s[: len(s) - len(stripped)]
+            s = indent + "\\" + stripped
         out.append(s[:2000])
     return "\n".join(out)[:20000]
 

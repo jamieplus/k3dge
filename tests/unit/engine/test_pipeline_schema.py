@@ -37,28 +37,65 @@ def _mk_cfg(root, toml, mcp_json=None):
     if mcp_json is not None:
         _write(root, ".mcp.json", mcp_json)
 
+def _neutralize_key(body: str, key: str) -> str:
+    """把 `key = <值>` 的值原地换成 `[]`（ocr2-503）。
+
+    只动这两个 stage 键，别把整个 `[checks.audit]` 段（或它的其它键）一起删掉——
+    旧夹具抄行扫描，容忍不了 `[ checks.audit ]`/行尾注释/内联表，且会把表内其它
+    声明一并抹掉，让调用方对着"没人写过的配置"断言绿。这里 brace/引号感知地吃掉
+    多行数组，保留一切别的内容。
+    """
+    import re as _re
+
+    pat = _re.compile(r"(?<![\w])" + _re.escape(key) + r"[ \t]*=")
+    idx = 0
+    while True:
+        m = pat.search(body, idx)
+        if not m:
+            return body
+        i = m.end()
+        depth = 0
+        j = i
+        in_str = None
+        while j < len(body):
+            ch = body[j]
+            if in_str:
+                if ch == "\\":
+                    j += 2
+                    continue
+                if ch == in_str:
+                    in_str = None
+            elif ch in "\"'":
+                in_str = ch
+            elif ch in "[{":
+                depth += 1
+            elif ch in "]}":
+                if depth == 0:
+                    break
+                depth -= 1
+            elif ch == "\n" and depth == 0:
+                break
+            elif ch == "," and depth == 0:
+                break
+            j += 1
+        body = body[:m.end()] + " []" + body[j:]
+        idx = m.end() + 3
+
+
 def _no_audit_stages(root: pathlib.Path) -> None:
     """下游可配路径：在**同一声明面**（pipeline.toml）把审计线两步清空。
 
-    幂等（t-222）：先剥掉任何已存在的 `[checks.audit]` 表再追加。盲 append 的旧形状下，
-    配置本来声明了 `[checks.audit]`、或同一 root 被多个用例各调一次 ⇒ TOML 重复键炸，
-    测就转去断 `PIPELINE_SYNTAX_ERROR` 噪声——验的早已不是本用例声明的意图。
+    幂等（t-222）：重复调用不产生重复 `[checks.audit]` 表。清空只针对
+    `stages_produce`/`stages_verify` 两个键（ocr2-503）：容忍 `[ checks.audit ]`
+    / 行尾注释 / 内联表等合法写法，且保留表内其它声明（否则调用方在验一份
+    没人写过的配置）。
     """
     cfg = root / ".agent" / "pipeline.toml"
     body = cfg.read_text(encoding="utf-8") if cfg.is_file() else ""
-    kept, dropping = [], False
-    for line in body.splitlines():
-        if line.strip() == "[checks.audit]":
-            dropping = True
-            continue
-        if dropping and line.strip().startswith("["):
-            dropping = False
-        if not dropping:
-            kept.append(line)
+    for key in ("stages_produce", "stages_verify"):
+        body = _neutralize_key(body, key)
     cfg.parent.mkdir(parents=True, exist_ok=True)
-    prefix = "\n".join(kept)
-    tail = "\n[checks.audit]\nstages_produce = []\nstages_verify = []\n"
-    cfg.write_text((prefix + "\n" if prefix.strip() else "") + tail, encoding="utf-8")
+    cfg.write_text(body, encoding="utf-8")
 
 
 class TestNoAuditStagesHelper(unittest.TestCase):
@@ -78,7 +115,43 @@ class TestNoAuditStagesHelper(unittest.TestCase):
             _no_audit_stages(root)
             body = (root / ".agent" / "pipeline.toml").read_text(encoding="utf-8")
             self.assertEqual(body.count("[checks.audit]"), 1, body)
+            # ocr2-504：不能只断"表头一次 + 校验绿"——破坏性夹具把 peers 删光也满足。
+            # 钉住必须**存活**的声明与必须被清空的 stage。
+            self.assertIn("[roles.audit]", body)
+            self.assertIn("[peers.k3dit.actions.audit]", body)
+            self.assertIn("[peers.k3dit.actions.verify]", body)
+            self.assertNotIn('stages_produce = ["', body)
             self.assertEqual(validate_pipeline_config(root), [], body)
+            # 幂等且确实清空了（不是"表在而键没动"）
+            try:
+                import tomllib as _toml
+            except ImportError:  # pragma: no cover - py3.10
+                import tomli as _toml  # type: ignore
+            data = _toml.loads(body)
+            self.assertEqual(data["checks"]["audit"]["stages_produce"], [])
+            self.assertEqual(data["checks"]["audit"]["stages_verify"], [])
+
+    def test_no_audit_stages_tolerates_equivalent_spellings(self) -> None:
+        """ocr2-503：`[ checks.audit ]` / 行尾注释 / 内联表都要认，且只清两个键。"""
+        import tempfile
+
+        bodies = [
+            '[checks.audit]   # note\nstages_produce = ["a"]\nstages_verify = ["b"]\n'
+            '[nodes.audit]\nkind = "fact"\n',
+            '[ checks.audit ]\nstages_produce = [\n  "a",\n  "b",\n]\nstages_verify = []\n',
+        ]
+        for body in bodies:
+            with self.subTest(body=body), tempfile.TemporaryDirectory() as d:
+                root = pathlib.Path(d)
+                _write(root, ".agent/pipeline.toml", body)
+                _no_audit_stages(root)
+                out = (root / ".agent" / "pipeline.toml").read_text(encoding="utf-8")
+                self.assertNotIn('"a"', out)
+                self.assertNotIn('"b"', out)
+                if "[nodes.audit]" in body:
+                    self.assertIn("[nodes.audit]", out, "表内其它声明被夹具误删")
+                self.assertNotIn("PIPELINE_SYNTAX_ERROR",
+                                 [c for c, _ in validate_pipeline_config(root)])
 
 
 class TestPipelineSchema(unittest.TestCase):
@@ -269,7 +342,7 @@ class TestPipelineSchema(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as d:
             root = pathlib.Path(d)
-            # 角色 audit 绑定到 dummy 服务；流程引用 audit.produce
+            # 角色 audit 绑定到 dummy 服务；只验"bind 到已注册 server ⇒ 无错"（`[pipelines.*]` 已废）
             _mk_cfg(root,
                      "[roles.audit]\nbind = \"dummy\"\n"
                      "[peers.dummy.actions.produce]\n"
@@ -379,62 +452,6 @@ class TestLegacyConfigGuard(unittest.TestCase):
                      '{"mcpServers": {"k3dge": {"command": "python"}}}')
             self.assertTrue([e for e in validate_pipeline_config(root)
                              if e[0] == "PIPELINE_PEER_UNWIRED"])
-
-
-    def test_role_bind_resolves_to_wired_server(self):
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as d:
-            root = pathlib.Path(d)
-            # 角色 audit 绑定到 dummy 服务；流程引用 audit.produce
-            _mk_cfg(root,
-                     "[roles.audit]\nbind = \"dummy\"\n"
-                     "[peers.dummy.actions.produce]\n"
-                     "transports = [ { provider = \"mcp\", tool = \"dummy_submit\" } ]\n",
-                     '{"mcpServers": {"dummy": {"command": "python"}}}')
-            _no_audit_stages(root)   # 本例只测角色绑定，不涉审计线两步
-            self.assertEqual(validate_pipeline_config(root), [])
-            # bind 指向**声明了 mcp 跳**但未登记的 peer ⇒ 必须红
-            #（规则 2026-09-26 收紧：只有声明 mcp 跳的 peer 才要求在册——纯 cli 的 peer 不必）
-            _mk_cfg(root,
-                     "[roles.audit]\nbind = \"ghost\"\n"
-                     "[peers.ghost.actions.produce]\n"
-                     "transports = [ { provider = \"mcp\", tool = \"ghost_submit\" } ]\n",
-                     '{"mcpServers": {"dummy": {"command": "python"}}}')
-            errs = validate_pipeline_config(root)
-            self.assertTrue(any(c == "PIPELINE_PEER_UNWIRED" and "'audit'" in m and "ghost" in m
-                                for c, m in errs), errs)
-
-
-
-    def test_role_kind_must_be_gate_or_service(self):
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as d:
-            root = pathlib.Path(d)
-            _write(root, ".mcp.json", '{"mcpServers": {"k3che": {"command": "python"}}}')
-            _write(root, ".agent/pipeline.toml",
-                   '[roles.cache]\nbind = "k3che"\nkind = "lucene"\n'
-                   "[peers.k3che.actions.search]\n"
-                   "transports = [ { provider = \"mcp\", tool = \"k3che_search\" } ]\n")
-            errs = validate_pipeline_config(root)
-            self.assertTrue(any("kind must be 'gate' or 'service'" in m for c, m in errs), errs)
-
-    def test_role_kind_service_with_skip_chain_is_valid(self):
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as d:
-            root = pathlib.Path(d)
-            _write(root, ".mcp.json", '{"mcpServers": {"k3che": {"command": "python"}}}')
-            _write(root, ".agent/pipeline.toml",
-                   '[roles.cache]\nbind = "k3che"\nkind = "service"\n'
-                   "[peers.k3che.actions.search]\n"
-                   "transports = [ { provider = \"mcp\", tool = \"k3che_search\" }, { provider = \"skip\" } ]\n")
-            _no_audit_stages(root)   # 本例只测 service 角色 + skip 链
-            self.assertEqual(validate_pipeline_config(root), [])
-
-
-
 
 
 class TestTransportShapeRobustness(unittest.TestCase):

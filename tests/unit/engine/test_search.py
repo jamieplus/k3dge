@@ -58,29 +58,31 @@ class TestSearch(unittest.TestCase):
 
 
 
-@unittest.skipUnless(shutil.which("git"), "gitignore 对齐判据需要 git（缺则跳过，非红）")
-def test_python_search_honors_gitignore():
+class TestPythonSearchGitignore(unittest.TestCase):
     """code-7 残留：兜底对齐 rg——跳过 .gitignore 命中项。
 
-    `init -b main` 要求 git ≥2.28 且与 `_gitignored_prefixes` 无关（仓存在即可）⇒ 去掉（t-267）；
-    缺 git 由装饰器**显式 skip**，不再让最小 CI 镜像报一面无产品回归的红。
+    ocr2-526：收进 TestCase（t-221 同族）——旧模块级函数 `unittest`/直跑不收集、
+    `python -O` 又把裸 `assert` 剥空，gitignore 对齐守卫两处静默失效。
     """
-    import subprocess
 
-    from k3dge.engine.search import _python_search
+    @unittest.skipUnless(shutil.which("git"), "gitignore 对齐判据需要 git（缺则跳过，非红）")
+    def test_python_search_honors_gitignore(self) -> None:
+        import subprocess
 
-    with tempfile.TemporaryDirectory() as d:
-        root = Path(d)
-        r = subprocess.run(["git", "init", "-q"], cwd=str(root), capture_output=True, text=True)
-        assert r.returncode == 0, f"git init 失败：{r.stderr.strip()}"
-        (root / ".gitignore").write_text("ignored/\n", encoding="utf-8")
-        (root / "ignored").mkdir()
-        (root / "ignored" / "a.py").write_text("SECRET_TOKEN = 1\n", encoding="utf-8")
-        (root / "keep.py").write_text("SECRET_TOKEN = 2\n", encoding="utf-8")
-        hits = _python_search(root, "SECRET_TOKEN")
-        files = {h.split(":", 1)[0] for h in hits}
-        assert "keep.py" in files               # 正对照：搜索真的产出了命中
-        assert not any(f.startswith("ignored/") for f in files)
+        from k3dge.engine.search import _python_search
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            r = subprocess.run(["git", "init", "-q"], cwd=str(root), capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, f"git init 失败：{r.stderr.strip()}")
+            (root / ".gitignore").write_text("ignored/\n", encoding="utf-8")
+            (root / "ignored").mkdir()
+            (root / "ignored" / "a.py").write_text("SECRET_TOKEN = 1\n", encoding="utf-8")
+            (root / "keep.py").write_text("SECRET_TOKEN = 2\n", encoding="utf-8")
+            hits = _python_search(root, "SECRET_TOKEN")
+            files = {h.split(":", 1)[0] for h in hits}
+            self.assertIn("keep.py", files)               # 正对照：搜索真的产出了命中
+            self.assertFalse(any(f.startswith("ignored/") for f in files), files)
 
 
 class TestStalenessSignature(unittest.TestCase):
@@ -182,11 +184,21 @@ class TestIndexUnavailableAndFallback(unittest.TestCase):
             outside.write_text("TOPSECRET needle\n", encoding="utf-8")
             (root / "keep.py").write_text("needle here\n", encoding="utf-8")
             os.symlink(str(outside), str(root / "link.py"))
+            # ocr2-527：危险形状是**目录**符号链接——py3.10–3.12 的 `rglob` 会跟进，
+            # 其下普通文件 `is_symlink()` 为 False，内容被读进命中。
+            secret_dir = base / "secrets"
+            secret_dir.mkdir()
+            (secret_dir / "inner.py").write_text("TOPSECRET_DIR needle\n", encoding="utf-8")
+            os.symlink(str(secret_dir), str(root / "linkdir"))
             hits = _python_search(root, "needle")
+            joined = "\n".join(hits)
             files = [h.split(":", 1)[0] for h in hits]
             self.assertIn("keep.py", files, "正对照失手——搜索空转，'忽略链接'是 vacuous")
             self.assertNotIn("link.py", files)
-            self.assertFalse(any("secret_outside" in h for h in hits), hits)
+            # 内容级判据（旧 `any("secret_outside" in h ...)` 恒假：hit 行的 rel 是链接路径，
+            # 从不含仓外文件名）
+            self.assertNotIn("linkdir", joined, "目录符号链接被跟进，越界路径进了命中")
+            self.assertNotIn("TOPSECRET", joined, "仓外内容被读进命中（跟随了符号链接）")
 
     def test_ripgrep_invocation_skips_git(self) -> None:
         """桩换在**模块局部引用**上（t-270）：`search_mod.subprocess` 就是全局 subprocess
@@ -226,6 +238,12 @@ class TestIndexUnavailableAndFallback(unittest.TestCase):
                 got = search_mod._python_search(root, "needle")
             self.assertEqual(got, [])
             self.assertIn("不完整", err.getvalue())
+            # ocr2-528：无补丁正对照——证明同一棵树在正常预算下**真能产出命中**，
+            # 否则 `[]` 分不清"预算到点"与"扫描恒空"（deadline 常数漏加 time.monotonic()
+            # 等回归会给出同一观测）。
+            ok_hits = search_mod._python_search(root, "needle")
+            self.assertTrue(ok_hits, "正常预算下也零命中 ⇒ 本测的负断言是空的")
+            self.assertTrue(any("f0.py" in h for h in ok_hits), ok_hits)
 
     def test_colon_in_filename_keeps_full_path_and_line(self) -> None:
         from k3dge.engine.search import _split_hit_line

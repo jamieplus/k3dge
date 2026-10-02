@@ -286,8 +286,13 @@ class CliTransportShape(unittest.TestCase):
             self.assertTrue(ok_run.ok and marker.exists(),
                             "shell/路径/quoting 本身不通 ⇒ 负断言是 vacuous")
             marker.unlink()
-            res = pr._run_cli(ws, f"( sleep 2; touch {q} ) & sleep 30", 1, pr._NullIO())
+            # ocr2-502：`sleep 30` 在 killpg 回归时会让 communicate() 干等 30s，把
+            # 干净失败拖成 CI job 级超时；10s 已足够越过 1s 超时 + 2.5s 观察窗。
+            res = pr._run_cli(ws, f"( sleep 2; touch {q} ) & sleep 10", 1, pr._NullIO())
             self.assertFalse(res.ok)
+            # 归因：失败必须来自超时（且走了进程组终止支路），不是别的 early return
+            self.assertIn("timeout after 1s", res.detail, res.detail)
+            self.assertIn("进程已终止", res.detail, res.detail)
             time.sleep(2.5)
             self.assertFalse(marker.exists(), "超时后孙进程仍在跑 ⇒ 进程组没被终止")
 

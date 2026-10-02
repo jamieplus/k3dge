@@ -317,6 +317,17 @@ class TestSealFlow(TestCase):
                 encoding="utf-8")
             (ws2 / "pyproject.toml").write_text(
                 '[project]\nname = "x"\nversion = "1.2.3"\n', encoding="utf-8")
+            # ocr2-521：真 `_version_bump` 经 `head_commit` 读 git 事实；ws2 不 init 时
+            # 断言只靠"环境里恰好没有外层仓"成立（TMPDIR 落在有 M1 tag 的仓里就失败）。
+            # 显式立一个受控仓，让分支确定。
+            import subprocess as _sp
+
+            for cmd in (["init", "-q", "-b", "main"],
+                        ["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+                _sp.run(["git", "-C", str(ws2), *cmd], check=True, capture_output=True)
+            _sp.run(["git", "-C", str(ws2), "add", "-A"], check=True, capture_output=True)
+            _sp.run(["git", "-C", str(ws2), "commit", "-q", "-m", "chore: init"],
+                    check=True, capture_output=True)
             with _audit_ok(), _record_ok(), \
                  mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])):
                 with mock.patch("k3dge.engine.seal_flow.seal_preconditions_error", return_value=None):
@@ -995,9 +1006,22 @@ class TestSealFlowEdges(TestCase):
         f = ws / "docs" / "reviews" / "2026-09-01-M11-align.md"
         f.write_text(f"# align\n{_ALIGN_STUB_MARKER}\n", encoding="utf-8")
         err = io.StringIO()
-        with mock.patch.object(Path, "write_text", side_effect=OSError("read-only fs")), \
+        attempted: list = []
+        real_write = Path.write_text
+
+        def fake_write(self, *a, **k):
+            # ocr2-522：按**路径**注入，只让目标 align 报告失败。整进程替换会让
+            # `_strip_align_stub` 将来新增的任一 write_text（sidecar/changelog）先吃到
+            # OSError，WARN 为错因发出而本测照绿。
+            if self == f:
+                attempted.append(self)
+                raise OSError("read-only fs")
+            return real_write(self, *a, **k)
+
+        with mock.patch.object(Path, "write_text", fake_write), \
                 contextlib.redirect_stderr(err):
             seal_flow._strip_align_stub(ws, "M11")      # 旧实现直接抛，冒穿 run_phase
+        self.assertTrue(attempted, "注入没落在目标 align 报告上——WARN 可能来自别的写失败")
         self.assertIn("WARN", err.getvalue())
 
     def test_boundary_tag_ignores_non_milestone_names(self) -> None:

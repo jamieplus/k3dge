@@ -1,6 +1,7 @@
 """pure_schema: stdlib-only enforcement + behavioral parity with the engine."""
 import ast
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -38,22 +39,43 @@ def _stdlib_only(mod_path: Path) -> None:
 
     # 运行期动态导入不产生 ast.Import（t-244）：`importlib.import_module("numpy")`、
     # `__import__("yaml")` 能整体绕过静态扫描，把"零依赖层"变成"只在 CI 里零依赖"。
+    # ocr2-516：必须解析绑定，不能只比三个字面点号名——`from importlib import import_module`
+    # 后裸调 `import_module("yaml")`、别名、`builtins`/`__import__` 重绑，以及
+    # exec/eval/compile 都曾从指缝溜走。
+    dyn_names: set = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module in ("importlib", "builtins"):
+            for a in node.names:
+                if a.name in ("import_module", "__import__"):
+                    dyn_names.add(a.asname or a.name)
+        elif isinstance(node, ast.Import):
+            for a in node.names:
+                if a.name.split(".")[0] in ("importlib", "builtins"):
+                    dyn_names.add(a.asname or a.name.split(".")[0])
+
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         f = node.func
-        fname = f.id if isinstance(f, ast.Name) else (
-            f"{f.value.id}.{f.attr}" if isinstance(f, ast.Attribute)
-            and isinstance(f.value, ast.Name) else "")
-        if fname in ("__import__", "importlib.import_module", "builtins.__import__"):
-            if not node.args:
-                _fail(f"{mod_path.name} 动态导入无可解析目标，纯度不可证")
-            arg0 = node.args[0]
-            if not isinstance(arg0, ast.Constant) or not isinstance(arg0.value, str):
-                _fail(f"{mod_path.name} 的动态导入目标是运行期值，零依赖层不接受")
-            top = arg0.value.split(".")[0]
-            if top not in stdlib and not arg0.value.startswith(allowed_prefixes):
-                _fail(f"{mod_path.name} 运行期导入非 stdlib：{arg0.value!r}")
+        is_dyn = False
+        if isinstance(f, ast.Name):
+            if f.id in ("exec", "eval", "compile"):
+                _fail(f"{mod_path.name} 运行期代码执行 {f.id}() 绕过静态纯度检查")
+            if f.id in dyn_names or f.id in ("__import__", "import_module"):
+                is_dyn = True
+        elif isinstance(f, ast.Attribute):
+            if f.attr in ("import_module", "__import__"):
+                is_dyn = True
+        if not is_dyn:
+            continue
+        if not node.args:
+            _fail(f"{mod_path.name} 动态导入无可解析目标，纯度不可证")
+        arg0 = node.args[0]
+        if not isinstance(arg0, ast.Constant) or not isinstance(arg0.value, str):
+            _fail(f"{mod_path.name} 的动态导入目标是运行期值，零依赖层不接受")
+        top = arg0.value.split(".")[0]
+        if top not in stdlib and not arg0.value.startswith(allowed_prefixes):
+            _fail(f"{mod_path.name} 运行期导入非 stdlib：{arg0.value!r}")
 
 
 class TestPurity(unittest.TestCase):
@@ -122,15 +144,19 @@ class TestCheckFileParity(unittest.TestCase):
                 # 方向①pure→engine；方向②engine 的文件局域输出（file_path 属本件/
                 # schema 件）必须原样来自 pure——引擎独有的跨文件项（索引、ident 台账）
                 # 不在比对集。
-                pure_set = set((c, m) for c, m, _f in pure)
-                eng_set = set((c, m) for c, m, _f in eng)
-                for c, m in pure_set:
-                    self.assertIn((c, m), eng_set,
-                                  f"{path}: pure violation missing in engine: {(c, m)}")
+                pure_set = set(pure)
+                eng_set = set(eng)
+                # ocr2-517：比**完整三元组**（码 + 消息 + file_path）。旧形状只比 (码,消息)，
+                # `_validate_file` 的 `schema_rel if scope=="schema" else rel` 映射被整个跳过，
+                # 映射反转/scope 翻面都照样绿。
+                for c, m, f in pure_set:
+                    self.assertIn((c, m, f), eng_set,
+                                  f"{path}: pure violation missing in engine: {(c, m, f)}")
+                schema_rel = doc_catalog._schema_rel(typ)
                 for c, m, f in eng:
-                    if f in (rel,):        # 归属本文件的 engine 违例
-                        self.assertIn((c, m), pure_set,
-                                      f"{path}: engine 独有文件局域违例（pure 侧没走）: {(c, m)}")
+                    if f in (rel, schema_rel):     # 归属本件/schema 件的 engine 违例
+                        self.assertIn((c, m, f), pure_set,
+                                      f"{path}: engine 独有文件局域违例（pure 侧没走）: {(c, m, f)}")
                 self.assertTrue(ok, f"{path}: 被检文件文件名形状已不合法，本对账失去前提")
                 checked += 1
         self.assertGreater(checked, 20, "parity oracle must cover real files")
@@ -236,17 +262,49 @@ def _run_optimized(tmp_path: Path, flags: list, body: str, bad: Path, good: Path
     return r.returncode, r.stdout, r.stderr
 
 
-def test_purity_guard_raises_even_under_optimized_mode(tmp_path) -> None:
-    """守卫不得用 `assert`：`python -O` 会把它整条剥掉 ⇒ 纯度检查静默失效（t-242）。"""
-    bad = tmp_path / "bad_mod.py"
-    bad.write_text("import sys\nimport requests\n", encoding="utf-8")
-    good = tmp_path / "good_mod.py"
-    good.write_text("import k3dge.engine.pure_refs\nimport sys\n", encoding="utf-8")
-    for flags in ([], ["-O"], ["-OO"]):
-        rc, out, err = _run_optimized(tmp_path, flags, _CHILD_BAD, bad, good)
-        assert rc == 0 and "RAISED" in out, (flags, out, err[-300:])
-        rc2, out2, err2 = _run_optimized(tmp_path, flags, _CHILD_GOOD, bad, good)
-        assert rc2 == 0 and "OK" in out2, (flags, out2, err2[-300:])
+class TestPurityGuardUnderOptimized(unittest.TestCase):
+    """ocr2-518：守卫不得用 `assert`，且必须能被 `unittest` 收集。
+
+    旧形状是模块级 pytest 函数 + 裸 `assert`：`python -O` 下断言整条剥掉，
+    直跑/`python -m unittest` 又不收集函数——t-242 的守卫在两种路径上都是空转。
+    """
+
+    def test_purity_guard_raises_even_under_optimized_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            bad = tmp / "bad_mod.py"
+            bad.write_text("import sys\nimport requests\n", encoding="utf-8")
+            good = tmp / "good_mod.py"
+            good.write_text("import k3dge.engine.pure_refs\nimport sys\n", encoding="utf-8")
+            for flags in ([], ["-O"], ["-OO"]):
+                rc, out, err = _run_optimized(tmp, flags, _CHILD_BAD, bad, good)
+                self.assertTrue(rc == 0 and "RAISED" in out, (flags, out, err[-300:]))
+                rc2, out2, err2 = _run_optimized(tmp, flags, _CHILD_GOOD, bad, good)
+                self.assertTrue(rc2 == 0 and "OK" in out2, (flags, out2, err2[-300:]))
+
+    def test_dynamic_import_aliases_are_not_a_bypass(self) -> None:
+        """ocr2-516：绑定/别名/exec 三类绕过都要被守卫拦下。"""
+        cases = {
+            "from_import": "from importlib import import_module\nimport_module('requests')\n",
+            "alias": "import importlib as im\nim.import_module('requests')\n",
+            "builtins": "import builtins\nbuiltins.__import__('requests')\n",
+            "exec": "exec('import requests')\n",
+            "eval": "eval('__import__(\"requests\")')\n",
+            "compile": "compile('import requests', '<s>', 'exec')\n",
+        }
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            for name, src in cases.items():
+                with self.subTest(case=name):
+                    mod = tmp / f"{name}.py"
+                    mod.write_text(src, encoding="utf-8")
+                    with self.assertRaises(AssertionError, msg=name):
+                        _stdlib_only(mod)
+        # 正对照：合法的 `re.compile`（Attribute，非裸 compile）不得被误伤
+        with tempfile.TemporaryDirectory() as td:
+            mod = Path(td) / "ok.py"
+            mod.write_text("import re\nRE = re.compile('x')\n", encoding="utf-8")
+            _stdlib_only(mod)   # 不得抛
 
 
 

@@ -101,7 +101,11 @@ class TestGenerator(unittest.TestCase):
 
 
     def test_unreadable_spec_warns_instead_of_silent_skip(self) -> None:
-        """非 UTF-8 spec 以前被完全静默吞掉 ⇒ 每轮无声跳过，闸一直红而无定位信息（340）。"""
+        """非 UTF-8 spec 以前被完全静默吞掉 ⇒ 每轮无声跳过，闸一直红而无定位信息（340）。
+
+        ocr2-546：断言改 `self.assert*`（`-O` 不剥），钉**专属**标记 `读不出` + 出错路径，
+        并证明 spec 字节未被改写。
+        """
         import contextlib
         import io
 
@@ -118,11 +122,15 @@ class TestGenerator(unittest.TestCase):
         spec = ws / "docs" / "specs" / "engine" / "spec.md"
         spec.parent.mkdir(parents=True)
         spec.write_bytes(b"\xff\xfe not utf8")
+        before = spec.read_bytes()
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
             got = sync_domain(ws, Manifest.load(ws), "engine")
-        assert got is None
-        assert "WARN" in err.getvalue() and "跳过该域" in err.getvalue()
+        self.assertIsNone(got)
+        text = err.getvalue()
+        self.assertIn("读不出", text)               # 专属分支标记，不用宽泛的 WARN/跳过该域
+        self.assertIn(str(spec), text)              # 出错路径必须点名
+        self.assertEqual(spec.read_bytes(), before, "读不出的 spec 被改写了")
 
     def test_atomic_write_does_not_truncate_target_on_failure(self) -> None:
         """就地 `write_text` 先截断；崩在半路把受管事实源留在空/半截状态（341）。
@@ -149,18 +157,27 @@ class TestGenerator(unittest.TestCase):
         with mock.patch.object(Path, "replace", spy_replace):
             atomic_write_text(target, "新内容\n")
         # 源恒为同目录临时件，dst 才是 target ⇒ 从不就地写 target
-        assert replaced, replaced
-        assert all(src != target.name for src, _dst in replaced), replaced
-        assert any(dst == str(target) for _src, dst in replaced), replaced
-        assert target.read_text(encoding="utf-8") == "新内容\n"
-        assert not [p for p in ws.iterdir() if p.name.startswith("." + target.name)]
+        self.assertTrue(replaced, replaced)
+        self.assertTrue(all(src != target.name for src, _dst in replaced), replaced)
+        self.assertTrue(any(dst == str(target) for _src, dst in replaced), replaced)
+        self.assertEqual(target.read_text(encoding="utf-8"), "新内容\n")
+        self.assertFalse([p for p in ws.iterdir() if p.name.startswith("." + target.name)])
 
         # 写阶段失败（fd 写不下去）⇒ target 保持旧内容，临时件清理干净
         with mock.patch("os.fdopen", side_effect=OSError("disk full")):
-            with self_raises(OSError):
+            with self.assertRaises(OSError):
                 atomic_write_text(target, "半截")
-        assert target.read_text(encoding="utf-8") == "新内容\n"
-        assert not [p for p in ws.iterdir() if p.name.startswith("." + target.name)]
+        self.assertEqual(target.read_text(encoding="utf-8"), "新内容\n")
+        self.assertFalse([p for p in ws.iterdir() if p.name.startswith("." + target.name)])
+
+        # ocr2-547：载荷已写进临时件、`replace` 顶上时失败——target 不得被截断，
+        # 失败路径的临时候选也要清干净（旧夹具在 fd 写前就炸，验不到这一段）。
+        with mock.patch.object(Path, "replace", side_effect=OSError("EIO")):
+            with self.assertRaises(OSError):
+                atomic_write_text(target, "半截")
+        self.assertEqual(target.read_text(encoding="utf-8"), "新内容\n")
+        self.assertFalse([p for p in ws.iterdir() if p.name.startswith("." + target.name)],
+                         "replace 失败后临时件残留")
 
     def test_atomic_write_cleans_tmp_on_keyboard_interrupt(self) -> None:
         """ocr2-187：`except Exception` 接不住 KeyboardInterrupt ⇒ 临时件会永久残留。"""
@@ -243,18 +260,6 @@ class TestGenerator(unittest.TestCase):
             self.assertTrue(ok)
             # core 采两次（clean + doc），other 一次都不采
             self.assertFalse([s for s in seen if "other" in s], seen)
-
-
-class self_raises:
-    def __init__(self, exc):
-        self.exc = exc
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, t, v, tb):
-        assert isinstance(v, self.exc), v
-        return True
 
 
 class TestSyncAbortPropagates(unittest.TestCase):

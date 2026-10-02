@@ -23,7 +23,6 @@ from k3dge.engine.seal import (
     tag_audit_baseline,
 )
 import shutil
-import atexit
 
 
 def _git(ws: Path, *args: str) -> str:
@@ -44,24 +43,35 @@ def _git(ws: Path, *args: str) -> str:
     return r.stdout.strip()
 
 
-def _repo() -> Path:
-    """临时仓必须**脱离任何外层 git 树**。
+class _RepoMixin:
+    """临时仓 helper：**按测**回收 + 按测隔离 `GIT_CEILING_DIRECTORIES`（ocr2-523）。
 
-    `mkdtemp()` 继承 `TMPDIR`；CI 常把 TMPDIR 设在 build 目录下 ⇒ `git -C <ws> status --porcelain`
-    会对**外层仓**成功，于是 `_commit_all` 一路 `git add -A` + commit 污染开发/CI 仓库，
-    测试自己也失（t-274）。`GIT_CEILING_DIRECTORIES` 让 git 不再向上找。
+    旧形状是模块级 `_repo()`：全局改 `os.environ` 且只在 `atexit` 回收——
+    ①覆盖调用方设的 ceiling；②保护是执行顺序的副作用，同进程后续测试跑在残留值下；
+    ③崩溃/中止的 run 里临时仓堆到会话结束。现在每次调用登记 `addCleanup`
+    （rmtree + 还原 env），作用域归调用它的那个测试。
     """
-    root = Path(tempfile.mkdtemp()).resolve()
-    atexit.register(shutil.rmtree, root, True)
-    os.environ["GIT_CEILING_DIRECTORIES"] = str(root.parent)
-    ws = root
-    _git(ws, "init", "-q")
-    _git(ws, "-c", "user.name=t", "-c", "user.email=t@t", "commit",
-         "-q", "--no-verify", "--allow-empty", "-m", "chore: init")
-    return ws
+
+    def _repo(self) -> Path:
+        root = Path(tempfile.mkdtemp()).resolve()
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        prev = os.environ.get("GIT_CEILING_DIRECTORIES")
+        os.environ["GIT_CEILING_DIRECTORIES"] = str(root.parent)
+
+        def _restore() -> None:
+            if prev is None:
+                os.environ.pop("GIT_CEILING_DIRECTORIES", None)
+            else:
+                os.environ["GIT_CEILING_DIRECTORIES"] = prev
+
+        self.addCleanup(_restore)
+        _git(root, "init", "-q")
+        _git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit",
+             "-q", "--no-verify", "--allow-empty", "-m", "chore: init")
+        return root
 
 
-class TestTrailerFormat(TestCase):
+class TestTrailerFormat(_RepoMixin, TestCase):
     def test_roundtrip_is_single_sourced(self) -> None:
         text = format_seal_trailers("M10", "abc1234", "k3dit@seat", "closed")
         parsed = parse_seal_trailers(text)
@@ -76,13 +86,35 @@ class TestTrailerFormat(TestCase):
         self.assertEqual(parse_seal_trailers(format_seal_trailers("M1", "abc", "", ""))["audit-seat"], "-")
 
     def test_parses_git_trailers_output_shape(self) -> None:
-        text = _git(_repo(), "log", "-1", "--format=%(trailers)")  # 不带 trailer 的形态
-        self.assertEqual(parse_seal_trailers(text), {})
+        """ocr2-525：必须走**真 git `%(trailers)` 形状**（首个后续行 4 空格缩进），
+        而不是空串退化成 `parse_seal_trailers("") == {}`。旧夹具仓只有无 trailer 的
+        init 提交、`_git()` 又 strip，`key.strip()` 的缩进分支从未被走。"""
+        ws = self._repo()
+        _git(ws, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--no-verify",
+             "--allow-empty", "-m", "chore: with trailers",
+             "-m", "Seal-milestone: M10\nAudit-baseline: abc1234\nAudit-seat: k3dit@seat\nAudit-result: closed")
+        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_CONFIG")}
+        env["GIT_CONFIG_GLOBAL"] = os.devnull
+        env["GIT_CONFIG_NOSYSTEM"] = "1"
+        r = subprocess.run(["git", "-C", str(ws), "log", "-1", "--format=%(trailers)"],
+                           capture_output=True, text=True, env=env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        raw = r.stdout
+        self.assertIn("Seal-milestone: M10", raw, f"没拿到真 trailer 输出：{raw!r}")
+        parsed = parse_seal_trailers(raw)
+        self.assertEqual(parsed["seal-milestone"], "M10")
+        self.assertEqual(parsed["audit-baseline"], "abc1234")
+        self.assertEqual(parsed["audit-seat"], "k3dit@seat")
+        self.assertEqual(parsed["audit-result"], "closed")
+        # `key.strip()` 的缩进分支（git 在部分形状/版本下续行带 4 空格缩进）显式覆盖
+        indented = parse_seal_trailers("    Seal-milestone: M10\n    Audit-result: closed")
+        self.assertEqual(indented["seal-milestone"], "M10")
+        self.assertEqual(indented["audit-result"], "closed")
 
 
-class TestSealRecord(TestCase):
+class TestSealRecord(_RepoMixin, TestCase):
     def test_commit_carries_trailers_and_tag_points_at_baseline(self) -> None:
-        ws = _repo()
+        ws = self._repo()
         baseline = _git(ws, "rev-parse", "HEAD")
         (ws / "docs" / "tasks" / "archive" / "M10").mkdir(parents=True)
         (ws / "docs" / "tasks" / "archive" / "M10" / "x.md").write_text("# x\n", encoding="utf-8")
@@ -110,7 +142,7 @@ class TestSealRecord(TestCase):
         树根本没动，`rev-list --count == 1` 照样绿：测的是"什么都没发生"，
         不是"该发生的发生了"。返回与 tag 两头都要断。
         """
-        ws = _repo()
+        ws = self._repo()
         baseline = _git(ws, "rev-parse", "HEAD")
         ok, msg = seal_record(ws, "M11", baseline=baseline, result="closed")
         self.assertTrue(ok, msg)
@@ -121,7 +153,7 @@ class TestSealRecord(TestCase):
         """code-7 正面回应：seal 是幂等重入入口。基线不变时重跑 `seal_record`
         ⇒ 不追加第二份提交、边界 tag 不移动 ⇒ git 事实唯一，本地账只是投影
         （声明面 `on_rerun=append` 落的是可重建投影，judged 只读 tag+trailer）。"""
-        ws = _repo()
+        ws = self._repo()
         baseline = _git(ws, "rev-parse", "HEAD")
         (ws / "f.md").write_text("x\n", encoding="utf-8")                 # 第一次制造改动 ⇒ 有封版提交
         ok1, m1 = seal_record(ws, "M12", baseline=baseline, result="closed")
@@ -136,7 +168,7 @@ class TestSealRecord(TestCase):
 
     def test_invalid_id_refuses_before_any_commit(self) -> None:
         """非法里程碑 id 在提交**之前**被拒：不留悬空封版提交（ocr2-311）。"""
-        ws = _repo()
+        ws = self._repo()
         (ws / "f.md").write_text("x\n", encoding="utf-8")     # 脏树 ⇒ 否则无提交可观察
         before = _git(ws, "rev-list", "--count", "HEAD")
         ok, _msg = seal_record(ws, "M 10", baseline=_git(ws, "rev-parse", "HEAD"),
@@ -145,9 +177,9 @@ class TestSealRecord(TestCase):
         self.assertEqual(_git(ws, "rev-list", "--count", "HEAD"), before)   # 无封版提交
 
 
-class TestTagBoundary(TestCase):
+class TestTagBoundary(_RepoMixin, TestCase):
     def test_idempotent_same_target_and_refuses_move(self) -> None:
-        ws = _repo()
+        ws = self._repo()
         first = _git(ws, "rev-parse", "HEAD")
         _git(ws, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--no-verify",
              "--allow-empty", "-m", "chore: second")
@@ -166,7 +198,7 @@ class TestTagBoundary(TestCase):
     def test_refuses_invalid_baseline_and_id(self) -> None:
         """只断布尔会把"git 自己拒了"当"我们的校验生效"（t-277）：`M 10` 这类名字
         git 也拒，校验器删掉测照样绿。逐个钉**是谁说的不**，并证 tag 确实没立。"""
-        ws = _repo()
+        ws = self._repo()
         ok, msg = tag_audit_baseline(ws, "M10", "")
         self.assertFalse(ok)
         self.assertIn("审计基线不可用", msg)
@@ -196,7 +228,7 @@ class TestTagBoundary(TestCase):
         self.assertIn("git", msg.lower())
 
 
-class TestTrailerSanitization(TestCase):
+class TestTrailerSanitization(_RepoMixin, TestCase):
     """外部取来的值不得破坏 trailer 块（ocr-306/307）。"""
 
     def test_newline_and_colon_in_values_keep_four_keys(self) -> None:
@@ -222,13 +254,13 @@ class TestTrailerSanitization(TestCase):
         self.assertFalse(_same_commit(full, "b" * 40))
 
 
-class TestAuditEvidence(TestCase):
+class TestAuditEvidence(_RepoMixin, TestCase):
     """判据只认 git 事实；本地账是投影，**冲突以 git 为准**（ADR-0004 §2.1.10）。"""
 
     def test_absent_tag_means_not_sealed(self) -> None:
         from k3dge.engine.audit_flow import audit_evidence
 
-        ws = _repo()
+        ws = self._repo()
         ev = audit_evidence(ws, "M10")
         self.assertEqual(ev, {"tag": "", "trailers": {}, "sealed": False})
 
@@ -236,7 +268,7 @@ class TestAuditEvidence(TestCase):
         """干净树也要能读回记录：`_commit_all` 不造空提交 ⇒ tag 注解是第二载体。"""
         from k3dge.engine.audit_flow import audit_evidence
 
-        ws = _repo()
+        ws = self._repo()
         baseline = _git(ws, "rev-parse", "HEAD")
         ok, msg = seal_record(ws, "M10", baseline=baseline, seat="k3dit@seat", result="closed")
         self.assertTrue(ok, msg)
@@ -251,7 +283,7 @@ class TestAuditEvidence(TestCase):
         """有 tag 不等于有记录：四键齐才算封版记录（缺键就是缺记录，不猜）。"""
         from k3dge.engine.audit_flow import audit_evidence
 
-        ws = _repo()
+        ws = self._repo()
         _git(ws, "-c", "user.name=t", "-c", "user.email=t@t", "tag", "-a", "M10", "-m", "hand-made", "HEAD")
         ev = audit_evidence(ws, "M10")
         self.assertTrue(ev["tag"])
@@ -261,7 +293,7 @@ class TestAuditEvidence(TestCase):
         """本地账说 `collected`、仓里没有 tag/trailer ⇒ 判"未封"（git 优先）。"""
         from k3dge.engine import audit_flow
 
-        ws = _repo()
+        ws = self._repo()
         (ws / ".agent").mkdir(exist_ok=True)
         (ws / ".agent" / "audit_jobs.json").write_text(
             '{"jobs": [{"job_id": "J1", "role": "audit", "milestone_id": "M10",'
@@ -274,7 +306,7 @@ class TestAuditEvidence(TestCase):
         """ocr2-208：基线大小写不敏感（写侧允许大写，读侧不得因大小写判未封）。"""
         from k3dge.engine.audit_flow import audit_evidence
 
-        ws = _repo()
+        ws = self._repo()
         sha = _git(ws, "rev-parse", "HEAD")
         _git(ws, "-c", "user.name=t", "-c", "user.email=t@t", "tag", "-a", "M10", "-m",
              format_seal_trailers("M10", sha.upper(), "k3dit@seat", "closed"), "HEAD")
@@ -284,7 +316,7 @@ class TestAuditEvidence(TestCase):
         """ocr2-207：第二载体（tag 注解）的 `seal-milestone` 必须等于本轮，与提交 trailer 同闸。"""
         from k3dge.engine.audit_flow import audit_evidence
 
-        ws = _repo()
+        ws = self._repo()
         sha = _git(ws, "rev-parse", "HEAD")
         _git(ws, "-c", "user.name=t", "-c", "user.email=t@t", "tag", "-a", "M10", "-m",
              format_seal_trailers("M9", sha, "k3dit@seat", "closed"), "HEAD")
@@ -296,7 +328,7 @@ class TestAuditEvidence(TestCase):
 
         from k3dge.engine.audit_flow import audit_evidence
 
-        ws = _repo()
+        ws = self._repo()
 
         class _R:
             def __init__(self, rc, out="", err=""):
@@ -320,7 +352,7 @@ class TestAuditEvidence(TestCase):
 
         from k3dge.engine.audit_flow import audit_evidence
 
-        ws = _repo()
+        ws = self._repo()
         _git(ws, "-c", "user.name=t", "-c", "user.email=t@t", "tag", "-a", "M10", "-m",
              "备注：中文", "HEAD")
         orig = locale.getencoding

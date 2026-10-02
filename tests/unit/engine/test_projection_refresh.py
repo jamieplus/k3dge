@@ -80,8 +80,13 @@ class TestProjectionRefresh(unittest.TestCase):
         self.assertIn("| core |", (self.repo / "README.md").read_text(encoding="utf-8"))
 
     def test_symbol_index_is_written(self) -> None:
+        """ocr2-508：不只"文件在"——把**载荷**钉住。`write_symbol_index` 在 `_make_repo`
+        没找到任何源时会愉快地持久化空 `{}`，仅断 is_file() 恰好在投影空转时绿。"""
         _refresh_projections(self.repo)
-        self.assertTrue(search.index_path(self.repo).is_file())
+        idx = search.index_path(self.repo)
+        self.assertTrue(idx.is_file())
+        data = json.loads(idx.read_text(encoding="utf-8"))
+        self.assertIn("foo", data, f"索引存在但没编入 src/core/mod.py 的 foo：{sorted(data)[:8]}")
 
     def test_one_unreadable_projection_does_not_abort_the_rest(self) -> None:
         """某件读前失败只跳过它，其余投影照刷（ocr2-312）。"""
@@ -132,7 +137,15 @@ class TestWhereSelfHeals(unittest.TestCase):
         self.assertEqual([l.line for l in locs], [1], locs)
 
     def test_missing_index_is_built(self) -> None:
-        self.assertTrue(search.where(self.repo, "foo"))
+        """ocr2-509：钉**持久化产物**与前置（缺失），而不是 `where()` 的非空返回。
+        内存扫/兜底路径也能让 `where()` 返回坐标，而索引文件根本没建。"""
+        idx = search.index_path(self.repo)
+        self.assertFalse(idx.exists(), "前置：索引本不存在，否则测不到'建'")
+        locs = search.where(self.repo, "foo")
+        self.assertTrue(locs)
+        self.assertTrue(idx.is_file(), "where() 解析了符号却没把索引落盘")
+        data = json.loads(idx.read_text(encoding="utf-8"))
+        self.assertIn("foo", data, f"落盘的索引是空的/缺 foo：{sorted(data)[:8]}")
 
 
 if __name__ == "__main__":

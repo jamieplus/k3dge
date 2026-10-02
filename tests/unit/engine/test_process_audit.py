@@ -59,6 +59,18 @@ def test_signed_report_passes_the_single_criterion(tmp_path: Path) -> None:
     assert process_audit.sign_missing(text) == []
 
 
+def test_sign_missing_blank_value_does_not_capture_next_anchor(tmp_path: Path) -> None:
+    r"""ocr2-506：fail-open 形状必须走**生产唯一判定** `sign_missing()`，而不只在 `_field` 上。
+    `_report(sign=False)` 整块不写锚点，跨行捕获不可能发生——把 `sign_missing` 里
+    `_field` 换成 `[:：]\s*(.+)`（丢 `re.M`/同行约束）时该夹具照样绿。
+    """
+    text = ("- **审计人**: \n- **透镜来源**: k3dit 工单\n- **基线**: " + "0" * 40 + "\n")
+    assert process_audit.sign_missing(text) == ["审计人"]
+    # 半签报告：只有一部分锚点被填，缺的那部分逐项报
+    partial = ("- **审计人**: k3dit\n- **透镜来源**: \n- **基线**: " + "0" * 40 + "\n")
+    assert process_audit.sign_missing(partial) == ["透镜来源"]
+
+
 def test_unsigned_report_lists_missing_keys(tmp_path: Path) -> None:
     text = _report(tmp_path, sign=False).read_text(encoding="utf-8")
     assert process_audit.sign_missing(text) == list(process_audit._SIGN_KEYS)
@@ -80,13 +92,29 @@ def test_sign_missing_rejects_template_placeholder(tmp_path: Path) -> None:
 
 def test_every_placeholder_mark_is_rejected(tmp_path: Path) -> None:
     """逐个标记测（t-193）：旧测只钉 `状态快照` 一个值，其余标记（含 ocr-288 点名补进来的
-    `...`/TODO/N/A）漂移进元组也不会有测红——把 `_SIGN_PLACEHOLDER_MARKS` **本身**当参数源。"""
+    `...`/TODO/N/A）漂移进元组也不会有测红——把 `_SIGN_PLACEHOLDER_MARKS` **本身**当参数源。
+
+    ocr2-507：旧形状拿标记当输入又当预言（`val` 就是标记，`any(m in val)` 按构造恒真），
+    删掉某个标记时循环静默少跑一项、`len>=6` 仍真——现在把**期望集合显式钉死**，并对
+    **每个 key** 各验一遍（不只是 `基线`）。
+    """
     marks = process_audit._SIGN_PLACEHOLDER_MARKS
-    assert len(marks) >= 6 and all(isinstance(m, str) and m for m in marks), marks
-    for mark in marks:
-        text = (f"- **审计人**: k3dit\n- **透镜来源**: k3dit 工单\n"
-                f"- **基线**: {mark}\n")
-        assert "基线" in process_audit.sign_missing(text), f"标记 {mark!r} 被放行＝占位当实名"
+    assert marks == ("状态快照", "待填", "TBD", "<", "{{", "TODO", "N/A"), \
+        "标记集合变了：本测的预言必须同步改（t-193）"
+    assert all(isinstance(m, str) and m for m in marks), marks
+
+    def _report_with(key: str, value: str) -> str:
+        vals = {"审计人": "k3dit", "透镜来源": "k3dit 工单", "基线": "0" * 40}
+        vals[key] = value
+        return "".join(f"- **{k}**: {v}\n" for k, v in vals.items())
+
+    for key in process_audit._SIGN_KEYS:
+        for mark in marks:
+            text = _report_with(key, mark)
+            assert key in process_audit.sign_missing(text), f"{key}={mark!r} 被放行＝占位当真实值"
+    # 正对照：每个 key 填真值时不得报（证明上面的报缺确实来自占位值）
+    for key in process_audit._SIGN_KEYS:
+        assert process_audit.sign_missing(_report_with(key, "真实值-" + key)) == [], key
 
 
 def test_sign_missing_accepts_filled_anchor(tmp_path: Path) -> None:

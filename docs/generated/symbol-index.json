@@ -182,7 +182,7 @@
   "append_changelog": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 373
+      "line": 389
     }
   ],
   "append_to_message": [
@@ -344,7 +344,7 @@
   "bump_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 320
+      "line": 336
     }
   ],
   "bundle_digest": [
@@ -740,7 +740,7 @@
   "consume_unreleased": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 392
+      "line": 408
     }
   ],
   "count_statuses": [
@@ -1790,7 +1790,7 @@
   "search": [
     {
       "file": "src/k3dge/engine/search.py",
-      "line": 341
+      "line": 359
     }
   ],
   "secret": [
@@ -2088,7 +2088,7 @@
   "write_incident": [
     {
       "file": "src/k3dge/engine/protocol.py",
-      "line": 58
+      "line": 65
     }
   ],
   "write_index_meta": [

@@ -37,7 +37,25 @@ class TestCountdownZero(unittest.TestCase):
             in_stream = _TtyPipe(os.fdopen(r_fd, "r", encoding="utf-8"))
             buf = io.StringIO()
             p = Prompt(in_stream=in_stream, out_stream=buf)
-            self.assertTrue(p.ask("封板?", countdown=0, default_yes=True))
+            # ocr2-510：回归时 `if countdown:` 会落进阻塞 readline（w_fd 故意敞着，
+            # 永不 EOF）——旧夹具在 CI 上挂死成 timeout 而非可诊断失败。把调用放进
+            # 线程并限时，让"阻塞"变成一个带信息的 assert，而不是整套测试超时。
+            import threading
+
+            done = threading.Event()
+            result: dict = {}
+
+            def _run() -> None:
+                try:
+                    result["v"] = p.ask("封板?", countdown=0, default_yes=True)
+                finally:
+                    done.set()
+
+            t = threading.Thread(target=_run, daemon=True)
+            t.start()
+            self.assertTrue(done.wait(5.0),
+                            "countdown=0 阻塞在 readline（回归成 `if countdown:`）——限时内未返回")
+            self.assertTrue(result.get("v"))
             out = buf.getvalue()
             self.assertIn("0s default Y", out)
             self.assertTrue(out.endswith("Y\n"), f"超时支路的回显缺失（走了别的路径？）：{out!r}")

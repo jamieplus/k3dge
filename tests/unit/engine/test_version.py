@@ -110,24 +110,48 @@ class TestVersion(unittest.TestCase):
 
         # 失效点打在写原语上（而非 `Path.write_text`：`_atomic_write` 走 fdopen，
         # 桩错层就会把"注入失败"变成"把目标写成空文件"的假象）。
-        # 顺序＝[pyproject 成功, manifest 失败] ⇒ 回滚重写 pyproject。
-        # 关键：**其余调用走真实写盘**。整桩会把盘上也什么都不写，"回滚成 0.1.0"就成了
-        # 恒真（回滚写错内容、写成新值、干脆不滚都测不出来，t-289）。
+        # ocr2-536：按**路径**注入（manifest）而不是按调用序号——序号版在写序
+        # 变化/新增版本文件时会把故障悄悄挪到别的文件，测试仍绿。
         real = version._atomic_write
         seen: list = []
 
         def flaky(path, text):
             seen.append(str(path))
-            if len(seen) == 2:                      # 第二件＝manifest ⇒ 真失败
-                raise OSError("disk full")
-            real(Path(path), text)                  # 首写与回滚都落真盘
+            if str(path).endswith("manifest.json"):
+                raise OSError("disk full")      # 第二件＝manifest ⇒ 真失败
+            real(Path(path), text)              # 首写与回滚都落真盘
 
         with mock.patch.object(version, "_atomic_write", side_effect=flaky):
             with self.assertRaises(OSError):
                 version.bump_version(self.ws, part="patch")
-        self.assertTrue([x for x in seen[2:] if x.endswith("pyproject.toml")], seen)
-        self.assertEqual(version.get_pyproject_version(self.ws), "0.1.0",
-                         "回滚必须把**盘上内容**改回旧版（不是靠桩没写盘蒙对）")
+        self.assertTrue(any(x.endswith("manifest.json") for x in seen), seen)
+        self.assertTrue([x for x in seen if x.endswith("pyproject.toml")], seen)
+        # ocr2-537：三个镜像文件在盘上都必须是旧版（任一停在半新半旧都红）
+        self.assertEqual(version.get_pyproject_version(self.ws), "0.1.0")
+        self.assertEqual(version.get_manifest_version(self.ws), "0.1.0")
+        self.assertEqual(version.get_init_version(self.ws), "0.1.0")
+
+    def test_bump_rolls_back_earlier_files_when_last_write_fails(self) -> None:
+        """ocr2-537：把失效点挪到**最后一件**（__init__.py）——pyproject/manifest 已写盘，
+        回滚循环若在第一件收手/漏掉尾件就会留下新值，此测必红。"""
+        _write_pyproject(self.ws, "0.1.0")
+        _write_manifest(self.ws, "0.1.0")
+        _write_init(self.ws, "0.1.0")
+        import unittest.mock as mock
+
+        real = version._atomic_write
+
+        def flaky(path, text):
+            if str(path).endswith("__init__.py"):
+                raise OSError("disk full")
+            real(Path(path), text)
+
+        with mock.patch.object(version, "_atomic_write", side_effect=flaky):
+            with self.assertRaises(OSError):
+                version.bump_version(self.ws, part="patch")
+        self.assertEqual(version.get_pyproject_version(self.ws), "0.1.0")
+        self.assertEqual(version.get_manifest_version(self.ws), "0.1.0")
+        self.assertEqual(version.get_init_version(self.ws), "0.1.0")
 
     def test_append_changelog(self) -> None:
         _write_pyproject(self.ws, "0.1.0")
@@ -171,6 +195,33 @@ class TestVersionParsing(unittest.TestCase):
             ws = self._ws(body)
             self.assertEqual(version.get_pyproject_version(ws), "0.1.0", body)
 
+    def test_bump_roundtrips_every_accepted_toml_form(self) -> None:
+        """ocr2-538：读侧认的合法 TOML，写侧必须能 round-trip（旧版行内表直接
+        RuntimeError，缩进版静默拍平）。"""
+        import re as _re
+
+        cases = {
+            "single_quote": ('[project]\nversion = \'0.1.0\'\n',
+                             lambda t: '0.1.1' in t),
+            "indented": ('[project]\n  version = "0.1.0"\n',
+                         lambda t: '  version = "0.1.1"' in t),      # 缩进保留
+            "inline_table": ('project = { name = "x", version = "0.1.0" }\n',
+                             lambda t: 'version = "0.1.1"' in t),
+        }
+        for name, (body, ok) in cases.items():
+            with self.subTest(form=name):
+                ws = self._ws(body)
+                self.assertEqual(version.bump_version(ws, part="patch"), "0.1.1")
+                text = (ws / "pyproject.toml").read_text(encoding="utf-8")
+                self.assertTrue(ok(text), text)
+                self.assertEqual(version.get_pyproject_version(ws), "0.1.1", text)
+                # 无关内容不得丢（行内表的 name 仍在）
+                if name == "inline_table":
+                    self.assertIn('name = "x"', text)
+                # 缩进版的行首空白不得被拍平
+                if name == "indented":
+                    self.assertIsNotNone(_re.search(r"^  version = ", text, _re.M), text)
+
     def test_dynamic_version_reads_as_absent_not_error(self) -> None:
         ws = self._ws('[project]\nname = "x"\ndynamic = ["version"]\n')
         self.assertIsNone(version.get_pyproject_version(ws))
@@ -178,6 +229,19 @@ class TestVersionParsing(unittest.TestCase):
         no_canon = self._ws('[project]\nname = "x"\ndynamic = ["version"]\n', manifest=None)
         with self.assertRaises(FileNotFoundError):            # 真没 canonical ⇒ 明确报错
             version.bump_version(no_canon, part="patch")
+
+    def test_manifest_init_drift_without_pyproject_is_a_violation(self) -> None:
+        """ocr2-539：`validate_versions` 的 `py_v is None and mf_v != init_v` 分支
+        （manifest↔`__init__` 半边，下游 `dynamic = ["version"]` 脚手架依赖它）此前无测。"""
+        ws = self._ws('[project]\nname = "x"\ndynamic = ["version"]\n', '{"version": "0.1.0"}')
+        _write_init(ws, "0.2.0")
+        vs = version.validate_versions(ws)
+        self.assertEqual([v.rule_id for v in vs], ["VERSION_MISMATCH"], vs)
+        self.assertIn("manifest.json=0.1.0", vs[0].message)
+        # 一致时不得报（该分支不是"永远红"）
+        ws2 = self._ws('[project]\nname = "x"\ndynamic = ["version"]\n', '{"version": "0.1.0"}')
+        _write_init(ws2, "0.1.0")
+        self.assertEqual(version.validate_versions(ws2), [])
 
     def test_bump_skips_pyproject_without_version_key(self) -> None:
         ws = self._ws('[project]\nname = "x"\ndynamic = ["version"]\n')

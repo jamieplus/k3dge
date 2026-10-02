@@ -277,9 +277,25 @@ def _collect_version_updates(workspace: Path, new_version: str) -> list:
             new_text, n = _sub_version_in_project(text, new_version)
             if n == 0:
                 relaxed = _VERSION_LINE_RELAXED.search(text)
-                if not relaxed:
-                    raise RuntimeError("Failed to update pyproject.toml version")
-                new_text = text[:relaxed.start()] + f'version = "{new_version}"' + text[relaxed.end():]
+                if relaxed:
+                    # 保留行首缩进（ocr2-538）：`^[ \t]*version` 命中的前导空白不能丢，
+                    # 否则重写会把合法缩进排版静默拍平。
+                    matched = relaxed.group(0)
+                    lead = matched[:len(matched) - len(matched.lstrip(" \t"))]
+                    new_text = (text[:relaxed.start()] + lead + f'version = "{new_version}"'
+                                + text[relaxed.end():])
+                else:
+                    # 行内表 `project = { … version = "…" }`（合法 TOML，读侧认）：
+                    # 写侧必须同口径，否则 bump 抛 RuntimeError（ocr2-538）。
+                    inline = _VERSION_INLINE_RE.search(text)
+                    if inline:
+                        if inline.group(1) is not None:
+                            s, e = inline.span(1)
+                        else:
+                            s, e = inline.span(2)
+                        new_text = text[:s] + new_version + text[e:]
+                    else:
+                        raise RuntimeError("Failed to update pyproject.toml version")
             updates.append((p, new_text))
     mp = _manifest_path(workspace)
     if mp.is_file():

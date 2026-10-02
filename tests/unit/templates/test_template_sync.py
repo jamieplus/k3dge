@@ -35,11 +35,13 @@ class TestTemplateSync(unittest.TestCase):
                 a, b = ASSETS / asset, ROOT / rel
                 self.assertTrue(a.is_file(), f"资产侧缺失：{a}")
                 self.assertTrue(b.is_file(), f"主仓侧缺失：{b}（PAIRS 指向已删/改名的文件？）")
-                # 字节锁的比较必须比**字节**：`read_text()` 无 encoding ⇒ 按 locale 解码，
-                # 跨平台/CI locale 不同时同一对文件会被判"漂移"或掩盖真漂移（t-326）
-                tpl = a.read_text(encoding="utf-8").rstrip("\n")
-                act = b.read_text(encoding="utf-8").rstrip("\n")
-                self.assertEqual(tpl, act, f"{asset} drifted from {rel}")
+                # 字节锁的比较必须比**字节**（ocr2-555）：`read_text()` 的
+                # universal-newline 会把 `\r\n`/`\r` 归一成 `\n`，CRLF/LF 漂移
+                # （core.autocrlf / Windows checkout 的常见产物）会假绿。
+                tpl = a.read_bytes().rstrip(b"\n")
+                act = b.read_bytes().rstrip(b"\n")
+                self.assertEqual(tpl, act,
+                                 f"{asset} 与 {rel} 字节漂移（含行尾）")
 
     # 渲染型模板：无主仓对件（占位由 scaffold 填写后下发）——新资产必须进 PAIRS 或这张表，
     # 手着"四件套"里登记一步（INC-20260827-AST-template-sync-protocols 的病根就是漏登记静默）。

@@ -3,6 +3,7 @@
 import argparse
 import contextlib
 import io
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,41 +19,61 @@ def _task(ws: Path, stem: str, blocking: str = "") -> None:
     (d / f"{stem}.md").write_text(body, encoding="utf-8")
 
 
-def test_critical_path_follows_blocking_chain(tmp_path: Path) -> None:
-    _task(tmp_path, "a", "b")
-    _task(tmp_path, "b", "c")
-    _task(tmp_path, "c")
-    assert task_dag.blocking_cycles(tmp_path)["cyclic"] is False
-    cp = task_dag.critical_path(tmp_path)
-    assert cp["path"] == ["a", "b", "c"] and cp["length"] == 3
+class TestTaskDagCore(unittest.TestCase):
+    """ocr2-531：原为模块级 pytest 函数 + 裸 `assert`——`unittest`/直跑不收集、`-O` 剥断言。
+    折进 TestCase，用 tempfile 赋 `tmp_path` 的等价作用。"""
 
+    def _ws(self) -> Path:
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        return d
 
-def test_blocking_cycle_detected(tmp_path: Path) -> None:
-    _task(tmp_path, "a", "b")
-    _task(tmp_path, "b", "a")
-    assert task_dag.blocking_cycles(tmp_path)["cyclic"] is True
-    assert task_dag.critical_path(tmp_path)["path"] == []
+    def test_critical_path_follows_blocking_chain(self) -> None:
+        ws = self._ws()
+        _task(ws, "a", "b")
+        _task(ws, "b", "c")
+        _task(ws, "c")
+        self.assertIs(task_dag.blocking_cycles(ws)["cyclic"], False)
+        cp = task_dag.critical_path(ws)
+        self.assertEqual(cp["path"], ["a", "b", "c"])
+        self.assertEqual(cp["length"], 3)
+        self.assertIs(cp["cyclic"], False)
 
+    def test_blocking_cycle_detected(self) -> None:
+        ws = self._ws()
+        _task(ws, "a", "b")
+        _task(ws, "b", "a")
+        cyc = task_dag.blocking_cycles(ws)
+        self.assertIs(cyc["cyclic"], True)
+        # ocr2-532：钉**环路径**本身（`_cycles_of` 读 `exc.args[-1]`；回退成 args[0]
+        # 只重复固定标签、真环丢失），并钉退化 critical_path 的 cyclic 标记。
+        self.assertIn("a", cyc.get("detail", ""), cyc)
+        self.assertIn("b", cyc.get("detail", ""), cyc)
+        self.assertNotIn("Cyclic dependencies exist", cyc.get("detail", ""), cyc)
+        cp = task_dag.critical_path(ws)
+        self.assertEqual(cp["path"], [])
+        self.assertEqual(cp["length"], 0)
+        self.assertIs(cp["cyclic"], True)
 
-def test_unknown_blocking_ignored(tmp_path: Path) -> None:
-    _task(tmp_path, "a", "does-not-exist")
-    assert task_dag.blocking_graph(tmp_path)["a"] == []
+    def test_unknown_blocking_ignored(self) -> None:
+        ws = self._ws()
+        _task(ws, "a", "does-not-exist")
+        self.assertEqual(task_dag.blocking_graph(ws)["a"], [])
 
+    def test_summary_scans_graph_once(self) -> None:
+        """summary 从**同一份图**派生环与关键路径（ocr2-320）：只读一次盘。"""
+        g = {"a": ["b"], "b": []}
+        calls = []
 
-def test_summary_scans_graph_once() -> None:
-    """summary 从**同一份图**派生环与关键路径（ocr2-320）：只读一次盘。"""
-    g = {"a": ["b"], "b": []}
-    calls = []
+        def _fake(_ws):
+            calls.append(1)
+            return g
 
-    def _fake(_ws):
-        calls.append(1)
-        return g
-
-    with mock.patch.object(task_dag, "blocking_graph", _fake):
-        s = task_dag.summary(Path("/nonexistent"))
-    assert len(calls) == 1, calls
-    assert s["critical_path"] == ["a", "b"]
-    assert s["blocking_cycles"] == {"cyclic": False}
+        with mock.patch.object(task_dag, "blocking_graph", _fake):
+            s = task_dag.summary(Path("/nonexistent"))
+        self.assertEqual(len(calls), 1, calls)
+        self.assertEqual(s["critical_path"], ["a", "b"])
+        self.assertEqual(s["blocking_cycles"], {"cyclic": False})
 
 
 class TestBlockingDangling(unittest.TestCase):
@@ -81,17 +102,30 @@ class TestBlockingDangling(unittest.TestCase):
             # 指向**开票**的不报（正常依赖）
             self.assertNotIn("2026-09-01-b", " ".join(out["closed"] + out["unknown"]))
 
+    def test_scanner_actually_emits_refs(self):
+        """ocr2-533：正对照——证明 `blocking_dangling` 真的会产出引用事实。
+        否则本仓"零悬空"可能只是"没有一票声明 blocking"。"""
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "docs" / "tasks"
+            p.mkdir(parents=True)
+            (p / "a.md").write_text(
+                "---\nstatus: idea\nblocking: ghost\n---\n# a\n", encoding="utf-8")
+            self.assertEqual(task_dag.blocking_dangling(Path(d)),
+                             {"closed": [], "unknown": ["a → ghost"]})
+
     def test_clean_repo_has_no_dangling(self):
-        """全仓扫描的先提条件**显式断**（t-279）：`parents[3]` 一漂移或装的包没带 docs/ 时，
-        `blocking_dangling` 在 `not d.is_dir()` 上回空 dict——"零悬空"绿得什么都没查。
-        另：这条测把单测绑到票**内容**上（任一真票漂了 blocking 就红）——它是有意的
-        仓库卫生对账，红时先 `k3dge status` 看是哪张票，别改本测。"""
+        """全仓扫描的先提条件**显式断**（t-279 / ocr2-533）：计数必须与被测函数扫的是
+        **同一集合**（顶层非 aux、非 done，走 impl 自己的 `_is_doc_aux` 谓词），
+        并钉住能产出引用的机制（`test_scanner_actually_emits_refs`）。"""
+        from k3dge.engine.milestone_files import _is_doc_aux
+
         repo = Path(__file__).resolve().parents[3]
         tasks = repo / "docs" / "tasks"
         self.assertTrue(tasks.is_dir(), f"根不指本仓（parents[3] 漂了？）：{repo}")
-        n = len([p for p in tasks.glob("**/*.md")
-                 if p.name not in ("README.md", "AUTHORING.md", ".schema.json")])
-        self.assertGreater(n, 10, f"docs/tasks 只有 {n} 份可查——本测在空转")
+        scanned = [p for p in tasks.glob("*.md")
+                   if not _is_doc_aux(p.name) and not p.name.endswith(".done.md")]
+        n = len(scanned)
+        self.assertGreater(n, 0, "docs/tasks 没有可查的开票——本测在空转")
         out = task_dag.blocking_dangling(repo)
         self.assertEqual(out, {"closed": [], "unknown": []})
 
@@ -139,3 +173,7 @@ class TestBlockingDangling(unittest.TestCase):
             self.assertEqual(rc, 0, out_txt)
             self.assertIn("指向不存在的票", out_txt)
             self.assertIn("2026-09-01-a → ghost", out_txt)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -174,10 +174,17 @@ class TestScaffold(unittest.TestCase):
 
     def test_scripts_are_executable(self) -> None:
         scaffold(self.target)
+        # ocr2-553：与 `test_exec_bit_is_restored_on_existing_file` 同策——Windows/
+        # 不承载 exec 位的挂载上 `os.access(X_OK)` 语义不成立，显式 skip 而非误红/误绿。
+        if os.name == "nt":
+            self.skipTest("exec 位语义不适用于 Windows")
         gate = self.target / "scripts" / "gate.sh"
         init = self.target / "k3dge-init.sh"
-        self.assertTrue(os.access(gate, os.X_OK))
-        self.assertTrue(os.access(init, os.X_OK))
+        self.assertTrue(gate.is_file() and init.is_file())
+        if not (os.stat(gate).st_mode & 0o111):
+            self.skipTest("本文件系统不承载 exec 位（挂载选项/umask）")
+        self.assertTrue(os.stat(gate).st_mode & 0o111, "scripts/gate.sh 无执行位")
+        self.assertTrue(os.stat(init).st_mode & 0o111, "k3dge-init.sh 无执行位")
 
     def test_idempotent(self) -> None:
         scaffold(self.target)
@@ -212,12 +219,17 @@ class TestScaffold(unittest.TestCase):
         from k3dge.engine.pipeline_schema import validate_pipeline_config
 
         scaffold(self.target)
+        # ocr2-554：先钉前置——`.agent/pipeline.toml` 必须在，否则 validate 返回 []
+        # 是"没验"而非"绿"；并只调一次（旧写法把结果当 `msg` 参数又算一遍）。
+        self.assertTrue((self.target / ".agent" / "pipeline.toml").is_file(),
+                        "pipeline.toml 未下发 ⇒ 下面的空 codes 是'校验没跑'")
         servers = json.loads((self.target / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]
         self.assertIn("k3dge", servers)
         self.assertIn("k3dit", servers)  # pipeline 绑定的 peer 已登记
         self.assertIn("k3che", servers)
-        codes = [c for c, _ in validate_pipeline_config(self.target)]
-        self.assertNotIn("PIPELINE_PEER_UNWIRED", codes, validate_pipeline_config(self.target))
+        violations = validate_pipeline_config(self.target)
+        codes = [c for c, _ in violations]
+        self.assertNotIn("PIPELINE_PEER_UNWIRED", codes, violations)
 
 
 class TestSlugAndPackageRoot(unittest.TestCase):
@@ -234,9 +246,6 @@ class TestSlugAndPackageRoot(unittest.TestCase):
         from k3dge.templates import scaffold as sc
 
         with self.subTest("parent-escape"):
-            import tempfile
-            from pathlib import Path
-
             with tempfile.TemporaryDirectory() as d:
                 target = Path(d)
                 (target / ".agent").mkdir(parents=True)

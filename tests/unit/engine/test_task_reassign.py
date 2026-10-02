@@ -45,6 +45,19 @@ class TestNameParts(TestCase):
         self.assertEqual(build_task_name(parts, "M11"), "2026-09-20-M11-feat-x_y.done.md")
         self.assertEqual(build_task_name(parts, None), "2026-09-20-feat-x_y.done.md")
 
+    def test_compound_slug_keeps_every_segment(self) -> None:
+        """ocr2-534：slug 自身以类型词开头时不得被吞。旧贪婪 `ms` 把
+        `M10-fix-refactor-x` 拆成 ms=`M10-fix`/type=`refactor`/slug=`x` ⇒ 重挂时
+        `fix-` 段从文件名静默消失（数据丢失）。"""
+        parts = split_task_name("2026-09-20-M10-fix-refactor-x.md")
+        self.assertEqual(parts["ms"], "M10", parts)
+        self.assertEqual(parts["type"], "fix", parts)
+        self.assertEqual(parts["slug"], "refactor-x", parts)
+        self.assertEqual(build_task_name(parts, "M11"), "2026-09-20-M11-fix-refactor-x.md")
+        # 里程碑段本身带 `-` 的合法名仍不能丢段
+        p2 = split_task_name("2026-09-20-M1-x-fix-y.md")
+        self.assertEqual((p2["ms"], p2["type"], p2["slug"]), ("M1-x", "fix", "y"), p2)
+
     def test_unparsable_name_is_none(self) -> None:
         self.assertIsNone(split_task_name("random.md"))
         self.assertIsNone(split_task_name("2026-09-20-M10-unknowntype-x.md"))
@@ -212,12 +225,20 @@ class TestBoundaryNudge(TestCase):
         self.assertEqual(codes, ["TASK_MILESTONE_AFTER_BOUNDARY"])
 
     def test_reassigned_task_is_not_reported(self) -> None:
-        from k3dge.engine import milestone_files
+        from k3dge.engine import doc_catalog, milestone_files
 
         ws = self._repo()
         p = _task(ws, "2026-09-20-M10-feat-late.md")
-        reassign_task_milestone(ws, p, "M11")
+        # 正对照（ocr2-535）：重挂前**确实**被报——否则后面的"清空"可能只是检测空转。
+        self.assertEqual([r[0] for r in milestone_files.tasks_after_boundary(ws)],
+                         ["docs/tasks/2026-09-20-M10-feat-late.md"])
+        self.assertIn("TASK_MILESTONE_AFTER_BOUNDARY",
+                      [v.rule_id for v in doc_catalog.validate_docs(ws, ["tasks"])])
+        ok, msg, _ = reassign_task_milestone(ws, p, "M11")
+        self.assertTrue(ok, msg)                       # 重挂本身必须成功
         self.assertEqual(milestone_files.tasks_after_boundary(ws), [])
+        self.assertNotIn("TASK_MILESTONE_AFTER_BOUNDARY",
+                         [v.rule_id for v in doc_catalog.validate_docs(ws, ["tasks"])])
 
     def test_advisory_never_blocks(self) -> None:
         from k3dge.engine import doc_catalog, gate_facts

@@ -491,7 +491,7 @@ def _similar_task_hints(workspace: Path, title: str, exclude: Optional[Path] = N
 
 #: 任务文件名：`<date>-[<milestone>-]<type>-<slug>[.done].md`（type 是闭集，故能定位段位）
 _TASK_NAME_RE = re.compile(
-    r"^(?P<date>\d{4}-\d{2}-\d{2})-(?:(?P<ms>[A-Za-z0-9._-]+)-)?"
+    r"^(?P<date>\d{4}-\d{2}-\d{2})-(?:(?P<ms>[A-Za-z0-9._-]+?)-)?"
     r"(?P<type>audit|feat|fix|docs|chore|refactor)-(?P<slug>.+?)(?P<done>\.done)?\.md$"
 )
 

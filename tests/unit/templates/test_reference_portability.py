@@ -111,9 +111,10 @@ class TestNextStepPointersPortability(unittest.TestCase):
     def test_no_bare_refs_in_display_strings(self):
         scanned = 0
         for state, opt in STATE_OPTIONS.items():
-            for field in ("fact", "fact_blocked", "fact_with_blockers",
-                          "question", "options", "pointers"):
-                items = self._strings(opt.get(field))
+            # ocr2-552：遍历**整条声明**（不再手列 6 个键）——新增面向下游的字段
+            # （reason/hint/新嵌套层）自动进扫描面。`_strings` 已能规范化任意嵌套容器。
+            for field, value in opt.items():
+                items = self._strings(value)
                 for s in items:
                     scanned += 1
                     self.assertEqual(

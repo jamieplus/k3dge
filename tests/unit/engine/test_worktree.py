@@ -117,7 +117,10 @@ def test_merge_back_ff_and_conflict(tmp_path):
     _commit_on_branch(ws, "clash.py", "branch = 2\n")
     c = W.merge_back(ws, "J1")
     assert not c["ok"] and c["mode"] == "conflict" and "人工" in c["message"]
-    assert _g(ws, "status", "--porcelain").strip() == ""       # merge --abort 干净退出
+    # ocr2-540：冲突发生在**链接工作树**里（rebase --onto），`ws` 的 `merge --ff-only`
+    # 根本不会留下冲突态——查 ws 恒净。必须查工作树是否被 abort 复原。
+    wt = W.worktree_path(ws, "J1")
+    assert _g(wt, "status", "--porcelain").strip() == "", "冲突后工作树未 abort 复原"
 
 
 def test_merge_back_rebase_when_main_moved(tmp_path):

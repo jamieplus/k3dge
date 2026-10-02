@@ -39,7 +39,7 @@ class TestWriteIncident(unittest.TestCase):
         """
         import shutil
 
-        from k3dge.engine.doc_catalog import validate_docs
+        from k3dge.engine.doc_catalog import iter_managed_files, validate_docs
 
         schema_src = pathlib.Path(__file__).resolve().parents[3] / "docs" / "incidents" / ".schema.json"
         self.assertTrue(schema_src.is_file(), f"权威 schema 不在：{schema_src}")
@@ -48,9 +48,17 @@ class TestWriteIncident(unittest.TestCase):
             # t-228：manifest 布置同样多余（validate_docs(types=["incidents"]) 不解析 manifest）
             (root / "docs" / "incidents").mkdir(parents=True)
             shutil.copyfile(schema_src, root / "docs" / "incidents" / ".schema.json")
-            write_incident(root, target="x.md", task_type="audit", task_id="T1", detail="boom")
+            inc = write_incident(root, target="x.md", task_type="audit", task_id="T1", detail="boom")
+            # ocr2-511：正对照——沙箱 incident 必须真在受管面里，否则 [] 可能是"没查"而非"合格"。
+            managed = {p.name for p in iter_managed_files(root, "incidents")}
+            self.assertIn(inc.name, managed,
+                          f"沙箱 incident 没进受管面，[] 是'什么都没查'：{managed}")
             vs = validate_docs(root, types=["incidents"])
             self.assertEqual(vs, [], [f"{v.rule_id}: {v.message}" for v in vs])
+            # 负对照——把文件弄坏，证明这个沙箱里的闸**能红**（否则上面的绿无意义）
+            inc.write_text("# Incidents\n", encoding="utf-8")
+            vs_bad = validate_docs(root, types=["incidents"])
+            self.assertTrue(vs_bad, "坏 incident 在此沙箱仍绿 ⇒ 这条'合格'断言测不到 schema")
 
 
 class TestIncidentSlugAndSanitize(unittest.TestCase):
@@ -79,7 +87,7 @@ class TestIncidentSlugAndSanitize(unittest.TestCase):
         `   ## 2. …`——markdown 认 ≤3 空格缩进的标题，人在 GitHub 上仍看到假 H2。
         计数口径也升级为 `^\s*##`（只看 0 列的旧计数正好看不见缩进伪造）。"""
         detail = ("真现象\n\n## 2. 我伪造的根因\n\n   ## 2. 缩进版伪造\n\n"
-                  "- **Path**: /etc/passwd\n")
+                  "- **Path**: /etc/passwd\n- **Status**: Resolved\n")
         name, body = self._inc(target="a.md", task_type="audit", task_id="T1", detail=detail)
         heads = [ln for ln in body.splitlines() if ln.lstrip().startswith("## ")]
         self.assertEqual(len(heads), 4, f"外部文本造出了额外标题：{heads}")
@@ -89,6 +97,18 @@ class TestIncidentSlugAndSanitize(unittest.TestCase):
         head = body.split("## 1.")[0]
         self.assertEqual(len([ln for ln in head.splitlines() if ln.startswith("- **Path**:")]), 1,
                          "元信息列表必须完整在头区")
+        # ocr2-512：正文区不得留下能被 `_headers`（last-wins）认领的元信息行——否则
+        # 伪造的 `- **Path**`/`- **Status**` 会改写 build_card 读到的真实元数据。
+        import re as _re
+
+        pattern = _re.compile(r"^-\s+\*\*[^*]+\*\*")
+        body_after = body.split("## 1.", 1)[1]
+        raw_meta = [ln for ln in body_after.splitlines() if pattern.match(ln.lstrip())]
+        self.assertEqual(raw_meta, [], f"正文残留可认领的元信息行：{raw_meta}")
+        self.assertIn("\\- **Path**: /etc/passwd", body)
+        from k3dge.engine.doc_catalog import _headers
+
+        self.assertEqual(_headers(body).get("Path"), "a.md", "伪造正文改写/覆盖了真实头区元数据")
 
 
 if __name__ == "__main__":

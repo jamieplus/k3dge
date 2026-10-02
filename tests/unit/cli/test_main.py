@@ -214,9 +214,6 @@ class TestCli(unittest.TestCase):
                 code = main(["check"])
                 self.assertEqual(code, 1)
                 # --json variant should be valid JSON with passed=false
-                import io
-                import contextlib
-
                 buf = io.StringIO()
                 with contextlib.redirect_stdout(buf):
                     code_json = main(["check", "--json"])
@@ -579,10 +576,6 @@ def test_audit_bundle_manual_entry_lands_report_like_the_leg(monkeypatch):
     ab.land_report = lambda w, m, out, **k: (calls.update(extra=list(k.get("extra_files") or []), mid=m)
                                              or {"ok": True, "report": "docs/reviews/x.md", "commit": "c" * 40})
     try:
-        import contextlib
-        import io
-        import tempfile
-
         with tempfile.TemporaryDirectory() as d:
             ws = Path(d)
             (ws / ".agent").mkdir()
@@ -614,10 +607,6 @@ def test_audit_bundle_manual_entry_fails_clear_when_landing_fails(monkeypatch):
     ab.land_report = lambda w, m, out, **k: {"ok": False, "error": "REPORT_PERSIST_FAILED",
                                              "detail": "bad id"}
     try:
-        import contextlib
-        import io
-        import tempfile
-
         with tempfile.TemporaryDirectory() as d:
             ws = Path(d)
             (ws / ".agent").mkdir()

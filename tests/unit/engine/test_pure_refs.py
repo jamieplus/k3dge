@@ -82,9 +82,19 @@ class TestFootnotes(unittest.TestCase):
             self.assertEqual([c for c, _ in out], ["DANGLING_ADR_REF"])
 
     def test_real_adr_footnotes_pair(self):
-        text = (REPO / "docs" / "adr" / "0006-mcp-foreign-harness-injection.md").read_text(encoding="utf-8")
-        out = pure_refs.check_footnotes("docs/adr/0006-mcp-foreign-harness-injection.md", text)
-        self.assertEqual(out, [])
+        """ocr2-513：不再焊死单个 ADR 文件名（改名/退役即 FileNotFoundError）。
+        扫全仓现役 ADR；并显式证明语料非空，否则"全绿"可能只是没扫到东西。"""
+        adr_dir = REPO / "docs" / "adr"
+        self.assertTrue(adr_dir.is_dir(), f"ADR 目录不在：{adr_dir}")
+        checked = 0
+        for p in sorted(adr_dir.glob("*.md")):
+            if p.name in ("README.md", "AUTHORING.md", "_template.md"):
+                continue
+            text = p.read_text(encoding="utf-8")
+            out = pure_refs.check_footnotes(f"docs/adr/{p.name}", text)
+            self.assertEqual(out, [], f"{p.name}: 脚注未配对 {out}")
+            checked += 1
+        self.assertGreater(checked, 5, f"只扫到 {checked} 份 ADR ⇒ 守卫空转")
 
 
 class TestTaskConsistency(unittest.TestCase):
@@ -262,8 +272,16 @@ class TestMarkdown(unittest.TestCase):
     def test_bytes_encoding(self):
         out = pure_refs.check_markdown_bytes("ok\n".encode(), "f.md")
         self.assertEqual(out, [])
-        out = pure_refs.check_markdown_bytes(b"\xff\xfe bad", "f.md")
+        # ocr2-514：真·不可解码字节（旧 `b"\xff\xfe bad"` 是合法 UTF-16LE，测的是
+        # "必须 UTF-8"而非"不可解码"——加 BOM 嗅探后会假失败）。
+        out = pure_refs.check_markdown_bytes(b"\x81\x82\x83", "f.md")
         self.assertTrue(any(c == "MD_ENCODING" for c, _ in out))
+        # 策略显式化：UTF-16 BOM 字节流不是合法 UTF-8 ⇒ 拒（不做 BOM 嗅探）
+        out16 = pure_refs.check_markdown_bytes(b"\xff\xfe bad", "f.md")
+        self.assertTrue(any(c == "MD_ENCODING" for c, _ in out16))
+        # 反之 UTF-8 BOM（\xef\xbb\xbf）是合法 UTF-8 ⇒ 现策放行（U+FEFF 不报编码错）
+        out_bom = pure_refs.check_markdown_bytes("\ufeffok\n".encode("utf-8"), "f.md")
+        self.assertFalse(any(c == "MD_ENCODING" for c, _ in out_bom), out_bom)
         out = pure_refs.check_markdown_bytes(b"a\r\nb\r\n", "f.md")
         self.assertTrue(any(c == "MD_CRLF" for c, _ in out))
 
@@ -648,8 +666,12 @@ class TestTaskClosureRecord(unittest.TestCase):
 
     def test_repo_done_tickets_all_have_a_record(self):
         """自举：本仓每张 done 票都有结案记录（回填后应恒成立）。"""
+        tasks_dir = REPO / "docs" / "tasks"
+        self.assertTrue(tasks_dir.is_dir(), f"tasks 目录不在：{tasks_dir}")   # ocr2-515
+        done_files = sorted(REPO.glob("docs/tasks/*.done.md"))
+        self.assertTrue(done_files, "顶层没有 done 票 ⇒ 本测在空转（路径漂了？）")   # ocr2-515
         offenders = []
-        for p in sorted(REPO.glob("docs/tasks/*.done.md")):
+        for p in done_files:
             rel = f"docs/tasks/{p.name}"
             for code, msg in pure_refs.check_task_closure_record(rel, p.read_text(encoding="utf-8")):
                 offenders.append(msg)
@@ -695,8 +717,12 @@ class TestRetiredAdrDest(unittest.TestCase):
 
     def test_repo_obsolete_has_no_offender(self):
         """自举：本仓现状（obsolete/ 只有 README）⇒ 绿，不误伤。"""
+        obs_dir = REPO / "docs" / "adr" / "obsolete"
+        self.assertTrue(obs_dir.is_dir(), f"obsolete 目录不在：{obs_dir}")   # ocr2-515
+        files = sorted(obs_dir.glob("*.md"))
+        self.assertTrue(files, "obsolete/ 空 ⇒ 本测在空转（目录被搬/改名？）")   # ocr2-515
         offenders = []
-        for p in sorted((REPO / "docs" / "adr" / "obsolete").glob("*.md")):
+        for p in files:
             rel = f"docs/adr/obsolete/{p.name}"
             offenders += [m for _c, m in pure_refs.check_retired_adr_dest(rel, p.read_text(encoding="utf-8"))]
         self.assertEqual(offenders, [])

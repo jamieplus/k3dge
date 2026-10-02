@@ -281,6 +281,24 @@ def _gitignored_prefixes(workspace: Path) -> set:
     return {ln.strip().rstrip("/") for ln in r.stdout.splitlines() if ln.strip()}
 
 
+def _has_symlink_ancestor(root: Path, path: Path) -> bool:
+    """`path` 的任一祖先目录是符号链接（ocr2-527）。
+
+    `Path.rglob("*")` 在 py3.10–3.12 会跟进符号链接目录：`linkdir -> /outside` 下的
+    普通文件 `path.is_symlink()` 为 False，于是越界读仓外内容并与 rg 语义不符。
+    在 3.13+ 默认不跟进，但显式判祖先让行为与 Python 版本无关。
+    """
+    cur = path.parent
+    while cur != root and cur != cur.parent:
+        try:
+            if cur.is_symlink():
+                return True
+        except OSError:
+            return True
+        cur = cur.parent
+    return False
+
+
 def _python_search(workspace: Path, query: str) -> List[str]:
     """rg 缺席时的兜底，刻意对齐 rg 语义：query 当正则（非法正则回退子串）、
     跳过 .git/.venv/venv/node_modules/__pycache__/docs/generated 与 `.gitignore` 项
@@ -301,9 +319,9 @@ def _python_search(workspace: Path, query: str) -> List[str]:
             truncated = True
             break
         rel_parts = path.relative_to(workspace).parts
-        if path.is_symlink():
+        if path.is_symlink() or _has_symlink_ancestor(workspace, path):
             # rg 默认不跟随符号链接（需 `--follow`）：`link -> /etc/passwd` 在兜底路径会被整读，
-            # 既与 rg 语义相反又能越界读仓外（318）
+            # 既与 rg 语义相反又能越界读仓外（318）；目录链接同判（ocr2-527）。
             continue
         if not path.is_file() or set(rel_parts) & skip_dirs or rel_parts[:2] == ("docs", "generated"):
             continue

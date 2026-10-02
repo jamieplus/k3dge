@@ -9,6 +9,7 @@ doc-gate/schema/引用/排查闸全不生效）；同时 `docs/{specs,guides,pro
 """
 
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -50,7 +51,6 @@ class TestHooksReachDownstream(unittest.TestCase):
         shim_dir = Path(self._tmp.name) / "bin"
         shim_dir.mkdir(exist_ok=True)
         shim = shim_dir / "k3dge"
-        import shlex
 
         # 旧写法把解释器与仓路径直接插进 `-c '...'` 的单引号里：路径含 `"`/`'`/空格
         # （venv 建在带引号的目录下并不罕见）就把脚本结构改了，等于测试自己在示范注入面（t-319）。
@@ -101,7 +101,17 @@ class TestHooksReachDownstream(unittest.TestCase):
         for name in ("pre-commit", "commit-msg"):
             p = self.repo / "scripts" / name
             self.assertTrue(p.is_file(), f"{name} 未随 init 下发（D1）")
-            self.assertTrue(os.access(p, os.X_OK), f"{name} 不可执行（git 会静默跳过）")
+        # ocr2-549：`os.access(X_OK)` 在 Windows 对任意存在文件都为真、在无 exec 位的挂载上恒假。
+        # 与 `test_exec_bit_is_restored_on_existing_file` 同策：不承载就显式 skip。
+        if os.name == "nt":
+            self.skipTest("exec 位语义不适用于 Windows")
+        sample = self.repo / "scripts" / "pre-commit"
+        if not (os.stat(sample).st_mode & 0o111):
+            self.skipTest("本文件系统不承载 exec 位（挂载选项/umask）")
+        for name in ("pre-commit", "commit-msg"):
+            p = self.repo / "scripts" / name
+            self.assertTrue(os.stat(p).st_mode & 0o111,
+                            f"{name} 无执行位（git 会静默跳过）")
 
     def test_governance_files_exist_for_every_docs_type(self):
         for typ in ("specs", "guides", "protocols", "architecture", "generated"):
@@ -212,11 +222,16 @@ class TestInitEntrypoints(unittest.TestCase):
         root = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, root, ignore_errors=True)
         (root / "scripts").mkdir()
+        sentinel = root / "ran.flag"
+        # ocr2-550：stub 写哨兵——证明"拒绝"不是"发个 warn 然后照跑"。
         (root / "scripts" / "init.sh").write_text(
-            "#!/usr/bin/env bash\n# k3dge-governed project\ntrue\n", encoding="utf-8")
+            "#!/usr/bin/env bash\n# k3dge-governed project\ntouch " + shlex.quote(str(sentinel)) + "\n",
+            encoding="utf-8")
         w = self._wrapper(root)
         r = subprocess.run([str(w), "/some/other/repo"], capture_output=True, text=True, cwd=root)
-        self.assertIn("K3DGE_SOURCE", r.stderr)      # 365：不接受位置参数，别再给"生效"假象
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)   # 拒绝＝非零退出
+        self.assertIn("K3DGE_SOURCE", r.stderr)                  # 365：不接受位置参数
+        self.assertFalse(sentinel.exists(), "位置参数被拒却仍执行了 init.sh")
 
     def test_wrapper_accepts_genuine_init_without_pipefail_false_alarm(self) -> None:
         """`head|grep -q` + pipefail 会把真 k3dge 脚本 SIGPIPE 误判成外来（ocr2-380）。"""
@@ -390,18 +405,33 @@ class TestTrackHygiene(unittest.TestCase):
     """三轨脚本的进程级副作用与定位假设（ocr-373/375/376/377/378/379）。"""
 
     def test_build_pyz_resolves_through_symlink(self) -> None:
+        """ocr2-551：用**自包含假仓**跑，绝不碰真 checkout。旧测把链接指向真
+        `scripts/build-pyz.sh`，脚本 `cd` 到真仓根并通过验根后在真仓 `mkdir -p dist`
+        才因 PYTHON preflight 中止（污染真实工作树且无人验）。"""
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
+            fake = root / "fake-repo"
+            (fake / "scripts").mkdir(parents=True)
+            shutil.copy2(K3DGE_SRC.parent / "scripts" / "build-pyz.sh",
+                         fake / "scripts" / "build-pyz.sh")
+            (fake / "pyproject.toml").write_text("[project]\nname = 'x'\n", encoding="utf-8")
+            (fake / "src" / "k3dge").mkdir(parents=True)
             bindir = root / "bin"
             bindir.mkdir()
             link = bindir / "build-pyz.sh"
-            link.symlink_to(K3DGE_SRC.parent / "scripts" / "build-pyz.sh")
+            link.symlink_to(fake / "scripts" / "build-pyz.sh")
+            real_dist = K3DGE_SRC.parent / "dist"
+            before = sorted(p.name for p in real_dist.iterdir()) if real_dist.is_dir() else None
             r = subprocess.run(["bash", str(link)], capture_output=True, text=True,
                                env={"PATH": "/usr/bin:/bin", "PYTHON": "definitely-not-a-python"},
                                cwd=root)
-            self.assertTrue(("PYTHON" in r.stderr) or ("不像 k3dge 仓" in r.stderr),
-                            r.stdout + r.stderr)     # 走到 preflight/验根，而不是在错根造 dist
-            self.assertFalse((root / "dist").exists(), "错根上被 mkdir -p dist 造了垃圾")
+            self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn("PYTHON='definitely-not-a-python' 不可执行", r.stderr)
+            # 解析到脚本真实所在仓根（fake），在那里 mkdir dist——
+            # 若错用链接目录，验根会先在别处失败且 fake 仓不会有 dist。
+            self.assertTrue((fake / "dist").is_dir(), "没解析到脚本真实所在仓根")
+            after = sorted(p.name for p in real_dist.iterdir()) if real_dist.is_dir() else None
+            self.assertEqual(after, before, "本 run 改动了真 checkout 的 dist/")
 
     def test_gate_ps1_feeds_absolute_path_to_child(self) -> None:
         ps1 = (ASSETS / "gate.ps1").read_text(encoding="utf-8")

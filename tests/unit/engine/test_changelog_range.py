@@ -208,5 +208,4 @@ def test_perf_prefix_lands_in_the_same_section() -> None:
         assert f"### {section}" in notes, notes
         assert "speed up thing" in notes.split(f"### {section}")[1].split("###")[0], notes
     finally:
-        import shutil
         shutil.rmtree(ws, ignore_errors=True)

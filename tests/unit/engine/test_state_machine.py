@@ -14,10 +14,16 @@ def test_task_fsm_is_complete() -> None:
 
 
 def test_resolve_is_table_driven() -> None:
-    assert sm.resolve(S.IDEA, M.START) == S.IN_PROGRESS
-    assert sm.resolve(S.IN_PROGRESS, M.FINISH) == S.DONE
-    assert sm.resolve(S.DONE, M.START) is None  # 终态没有出边 ⇒ resolve 返回 None（DONE 行不在表里）
-    assert sm.resolve(S.IDEA, M.DEFER) == S.DEFERRED
+    # ocr2-529：逐条复现**全部**声明行（旧测只抽 3/6，IDEA/FINISH、DEFERRED/* 无行为断言——
+    # 某行 target 被换成另一个合法态时表仍确定/无死锁/可达，全绿）。
+    for t in sm.TRANSITIONS:
+        assert sm.resolve(t.source, t.move) is t.target, t
+    # 补：每个**未声明**的 (state, move) 必须返回 None（表↔resolve 双向一致）
+    declared = {(t.source, t.move) for t in sm.TRANSITIONS}
+    for state in sm.TaskState:
+        for move in sm.TaskMove:
+            if (state, move) not in declared:
+                assert sm.resolve(state, move) is None, (state, move)
 
 
 def test_terminal_with_outgoing_is_flagged() -> None:
@@ -69,8 +75,13 @@ def test_new_state_without_registration_fails() -> None:
     # 死锁判据必须用**同一套枚举**验：旧写法另造一个 MoreStates，成员与 TaskState 是
     # 不同对象 ⇒ 每一行都变成"未定义源态/目标态"，`无出边` 其实一条都没产生，
     # 断言是被**错的理由**满足的（t-281）。
-    deadlocked = tuple(t for t in _GOOD if t.source is not S.DEFERRED)
-    v = sm.check_completeness(deadlocked, set(S), sm.TERMINAL_STATES, S.IDEA)
+    # ocr2-530：夹具必须与 docstring 一致——DEFERRED **既不做出边也不做入边**（旧夹具
+    # 只删 source=DEFERRED，仍留 IDEA-DEFER->DEFERRED，与 `test_non_terminal_dead_end`
+    # 同形）。真正"表里没有它任何一行"时，死锁判据要能报出来。
+    unregistered = tuple(t for t in _GOOD
+                         if t.source is not S.DEFERRED and t.target is not S.DEFERRED)
+    assert len(unregistered) == len(_GOOD) - 3, unregistered   # 前置：确实删了所有触及行
+    v = sm.check_completeness(unregistered, set(S), sm.TERMINAL_STATES, S.IDEA)
     assert any(x.startswith("非终态 deferred 无出边") for x in v), v
     assert not [x for x in v if "未定义" in x], v        # 声明集本身没问题
 
