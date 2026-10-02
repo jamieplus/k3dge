@@ -226,10 +226,17 @@ def _replay_hashes(bundle: Path) -> Dict[str, Any]:
             sem = strip_markers(raw, rel)          # **去钉后比语义层**（契约 §8 语法单源）
             if has_marker_line(raw, rel):          # 只按"真匹配到钉行"计数（二进制文件不误标）
                 with_pins.append(rel)
-            # `errors="replace"` 会把坏字节变成 U+FFFD，再编码 ≠ 原字节 ⇒ 非 UTF-8/二进制文件
-            # 的摘要**永远**对不上产出方的值，整包被判"内容不符"（409）
-            got = hashlib.new(algo, sem.encode("utf-8", errors="surrogateescape")).hexdigest()
-            if got == digest:
+            # **两种摘要任一命中即通过**（真跑实证，ocr-220 消费侧另一半）：
+            #  - 产出方的 `baseline.json` 是**原始字节**摘要（真跑：无尾换行的文件 raw 命中、sem 不命中）；
+            #  - 契约 §8 又要求容忍"上一轮留下的钉" ⇒ 去钉语义层也是合法读法。
+            # 旧实现只比 `sem`：`strip_markers` 走 `splitlines()` + 补 `\n`，对**无尾换行**的文件
+            # 会多出一个字节 ⇒ 与产出方的 raw 摘要永远差 1，把 `raw==baseline` 的好包整判
+            # "内容哈希链不通过"（真跑 M11 实证 10 文件全 raw_bytes_match=True 仍被误拒）。
+            # 篡改在同一文件里**追加代码**：raw 与 sem 都会变 ⇒ 两条腿都抓得到，不削弱。
+            # `errors="surrogateescape"`：坏字节无损往返（`errors="replace"` 会变 U+FFFD，摘要必错，409）。
+            got_raw = hashlib.new(algo, raw.encode("utf-8", errors="surrogateescape")).hexdigest()
+            got_sem = hashlib.new(algo, sem.encode("utf-8", errors="surrogateescape")).hexdigest()
+            if got_raw == digest or got_sem == digest:
                 checked += 1
             else:
                 mismatched.append(rel)             # 含钉文件**不豁免**：篡改一样抓得到

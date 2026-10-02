@@ -144,6 +144,26 @@ def test_hash_chain_uses_contract_grammar_and_catches_tampering(tmp_path):
     assert not combo["ok"] and "内容哈希链不通过" in _errors(combo), _errors(combo)
 
 
+def test_hash_chain_accepts_raw_baseline_when_no_final_newline(tmp_path):
+    """产出方 `baseline.json` 是**原始字节**摘要：无尾换行、且**未被任何补丁触及**的文件
+    不能被 `strip_markers` 补的 `\n` 多出一个字节而误判（真跑 M11：10 文件
+    `raw==baseline` 仍被判"哈希链不通过"）。补丁不碰它 ⇒ 重放树原样带出，纯比摘要。
+    """
+    extra, rel = "no trailing newline", "src/b.txt"
+    b = make_bundle(tmp_path, version=2)
+    (b / "code" / rel).write_text(extra, encoding="utf-8")
+    bl = json.loads((b / "baseline.json").read_text(encoding="utf-8"))
+    bl["files"][rel] = hashlib.sha256(extra.encode()).hexdigest()
+    (b / "baseline.json").write_text(json.dumps(bl, ensure_ascii=False), encoding="utf-8")
+    ok = av.verify_bundle_local(b)
+    assert ok["ok"], _errors(ok)
+    assert ok["hash"]["checked"] == 2
+    # 对照：篡改这份无尾换行文件 ⇒ raw 与 sem 都变，仍必须红。
+    (b / "code" / rel).write_text(extra + "\ntampered = 1", encoding="utf-8")
+    bad = av.verify_bundle_local(b)
+    assert not bad["ok"] and "内容哈希链不通过" in _errors(bad), _errors(bad)
+
+
 def test_v2_bundle_is_dual_read_with_sha256(tmp_path):
     """pack v2（SHA-256）双读：布局不变、算法随版本（k3dit ocr-220 的消费侧另一半）。"""
     res = av.verify_bundle_local(make_bundle(tmp_path, version=2))

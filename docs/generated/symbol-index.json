@@ -2016,7 +2016,7 @@
   "verify_bundle_local": [
     {
       "file": "src/k3dge/engine/audit_verify.py",
-      "line": 243
+      "line": 250
     }
   ],
   "verify_commit": [
