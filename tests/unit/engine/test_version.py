@@ -190,5 +190,24 @@ class TestVersionParsing(unittest.TestCase):
         vs = version.validate_versions(ws)
         self.assertTrue(vs, "坏 JSON 的 manifest 让版本闸直接 return []")
         self.assertEqual(vs[0].rule_id, "VERSION_MISMATCH")
+
+    def test_non_table_project_does_not_crash(self) -> None:
+        # `project` 是标量/数组（合法 TOML）时不得抛 AttributeError（ocr2-085）。
+        self.assertIsNone(version._pyproject_version('project = "x"\n'))
+        self.assertIsNone(version._pyproject_version('project = [1, 2]\n'))
+
+    def test_non_object_manifest_returns_none(self) -> None:
+        # `[]`/`"x"`/`1`/`null` 都是合法 JSON 但无 `.get`（ocr2-086）。
+        ws = self._ws('[project]\nname = "x"\nversion = "0.1.0"\n', "[]")
+        self.assertIsNone(version.get_manifest_version(ws))
+
+    def test_bump_writes_project_section_only(self) -> None:
+        # `[tool.x]` 的 version 在前时，不得改错地方（ocr2-087）。
+        ws = self._ws('[tool.x]\nversion = "9.9.9"\n[project]\nname = "x"\nversion = "0.1.0"\n',
+                      '{"version": "0.1.0"}')
+        version.bump_version(ws, part="patch")
+        text = (ws / "pyproject.toml").read_text(encoding="utf-8")
+        self.assertIn('version = "0.1.1"', text)
+        self.assertIn('[tool.x]\nversion = "9.9.9"', text)
 if __name__ == "__main__":
     unittest.main()

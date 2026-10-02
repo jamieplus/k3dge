@@ -182,7 +182,7 @@
   "append_changelog": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 320
+      "line": 351
     }
   ],
   "append_to_message": [
@@ -344,7 +344,7 @@
   "bump_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 267
+      "line": 298
     }
   ],
   "bundle_digest": [
@@ -740,7 +740,7 @@
   "consume_unreleased": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 339
+      "line": 370
     }
   ],
   "count_statuses": [
@@ -936,7 +936,7 @@
   "get_init_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 140
+      "line": 168
     }
   ],
   "get_manifest_resource": [
@@ -954,13 +954,13 @@
   "get_manifest_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 129
+      "line": 156
     }
   ],
   "get_pyproject_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 104
+      "line": 131
     }
   ],
   "get_verify_attempts": [
@@ -972,7 +972,7 @@
   "get_version": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 148
+      "line": 176
     }
   ],
   "grep_docs": [
@@ -1268,7 +1268,7 @@
   "manifest_read_error": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 111
+      "line": 138
     }
   ],
   "mark_task_done": [
@@ -2004,7 +2004,7 @@
   "validate_versions": [
     {
       "file": "src/k3dge/engine/version.py",
-      "line": 156
+      "line": 184
     }
   ],
   "verify_bundle": [

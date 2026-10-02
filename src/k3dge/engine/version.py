@@ -74,6 +74,31 @@ def _atomic_write(path: Path, text: str) -> None:
     atomic_write_text(path, text)
 
 
+def _sub_version_in_project(text: str, new_version: str) -> tuple:
+    """只在 `[project]` 段内替换首个 `version = "…"`，返回 `(new_text, n)`。
+
+    全局首个版本行可能是别的表（如 `[tool.x]` 在前）；守卫只认 `[project].version`，
+    写必须与读同口径，否则改错地方（ocr2-087）。找不到 `[project]` 段或段内无版本行 ⇒ `(text, 0)`。
+    """
+    lines = text.splitlines(keepends=True)
+    in_project, start, end = False, -1, len(lines)
+    for i, ln in enumerate(lines):
+        _s = ln.strip()
+        if _s.startswith("["):
+            if re.match(r"^\[project\]\s*(#.*)?$", _s):
+                in_project, start = True, i
+            elif in_project:
+                end = i
+                break
+    if start < 0:
+        return text, 0
+    seg = "".join(lines[start + 1:end])
+    new_seg, n = _VERSION_RE.subn(f'version = "{new_version}"', seg, count=1)
+    if n == 0:
+        return text, 0
+    return "".join(lines[:start + 1]) + new_seg + "".join(lines[end:]), n
+
+
 def _pyproject_version(text: str) -> str | None:
     """从 pyproject 正文取 `[project] version`（3.11+ 用 tomllib，3.10 用宽容正则）。"""
     try:
@@ -85,7 +110,9 @@ def _pyproject_version(text: str) -> str | None:
             data = tomllib.loads(text)
         except Exception:
             return None
-        v = (data.get("project") or {}).get("version")
+        _proj = data.get("project")
+        # `project` 是合法 TOML 但非表（标量/数组）时 `(.. or {}).get` 抛 AttributeError（ocr2-085）。
+        v = _proj.get("version") if isinstance(_proj, dict) else None
         return str(v) if isinstance(v, str) else None
     m = _VERSION_INLINE_RE.search(text)
     if m:
@@ -132,7 +159,8 @@ def get_manifest_version(workspace: Path) -> str | None:
         return None
     try:
         data = json.loads(_read_utf8(p))
-        return data.get("version")
+        # `[]`/`"x"`/`1`/`null` 都是合法 JSON 但无 `.get`：AttributeError 不在捕获元组里会裸抛（ocr2-086）。
+        return data.get("version") if isinstance(data, dict) else None
     except (json.JSONDecodeError, OSError, ValueError):
         return None
 
@@ -225,7 +253,10 @@ def _collect_version_updates(workspace: Path, new_version: str) -> list:
             # 同口径：当作"pyproject 不持版本"跳过，而不是硬抛 RuntimeError（338）
             pass
         else:
-            new_text, n = _VERSION_RE.subn(f'version = "{new_version}"', text, count=1)
+            # 写目标必须锁定在 `[project]` 段内：全局首个 `version = "…"` 可能是别的表
+            # （如 `[tool.x]` 在 `[project]` 之前），守卫（`_pyproject_version`）只认
+            # `[project].version`，写错地方会改掉无关版本（ocr2-087）。
+            new_text, n = _sub_version_in_project(text, new_version)
             if n == 0:
                 relaxed = _VERSION_LINE_RELAXED.search(text)
                 if not relaxed:
