@@ -203,5 +203,7 @@ def sync_all(workspace: Path, domains: Optional[Sequence[str]] = None) -> Tuple[
     if out:
         print(out)
     if not ok:
-        print(f"[SYNC] 中止：{out}")
+        # 中止**不许**回落成"成功形"返回值：调用方看到 `(changed, docs_updated)` 无法区分
+        # "跑完且无改动"与"中途掐断"，会把掐断报成成功（ocr2-005）。抛出来，各入口按失败处理。
+        raise RuntimeError(f"sync 中止：{out}")
     return ctx["changed"], ctx["docs_updated"]

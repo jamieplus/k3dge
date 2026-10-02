@@ -289,3 +289,19 @@ def test_mark_superseded_refuses_when_no_status_line() -> None:
     assert _mark_superseded("# ADR-0009 x\n\n正文\n", "0026") is None
     out = _mark_superseded("---\nStatus: Accepted\n---\n\n# ADR-0009\n", "0026")
     assert out is not None and "Status: Superseded" in out and "superseded_by: ADR-0026" in out
+
+
+def test_body_only_supersedes_does_not_trigger_reconcile() -> None:
+    """正文顶格的 `Supersedes:` 示例行不得触发破坏性 reconcile（ocr2-001）。
+
+    `Supersedes:` 只在 frontmatter 内成立；全文搜会把正文引用当声明，把被引 ADR 归档。
+    """
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {
+            "0001-old.md": "---\nStatus: Accepted\nSupersedes: -\n---\n# ADR-0001\n",
+            "0002-new.md": ("---\nStatus: Accepted\nSupersedes: -\nLanded-by: docs/specs/x/spec.md\n---\n"
+                            "# ADR-0002\n\n例如：Supersedes: ADR-0001\n"),
+        })
+        assert adr_gate.reconcile_supersedes(ws) is None
+        assert (ws / "docs" / "adr" / "0001-old.md").is_file()
+        assert not (ws / "docs" / "adr" / "obsolete").exists()

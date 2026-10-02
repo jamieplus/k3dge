@@ -237,3 +237,11 @@ class TestIndexUnavailableAndFallback(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_content_colon_digits_do_not_steal_line_number(self) -> None:
+        from k3dge.engine.search import _split_hit_line
+
+        # 内容里的 `:数字:`（比例、时间）不得被当成行号（ocr2-004）。
+        self.assertEqual(_split_hit_line("src/x.py:7: ratio = 4:2:1"), ("src/x.py", 7))
+        self.assertEqual(_split_hit_line("a.py:3: at 12:30 done"), ("a.py", 3))

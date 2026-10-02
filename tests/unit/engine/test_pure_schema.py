@@ -251,3 +251,14 @@ def test_purity_guard_raises_even_under_optimized_mode(tmp_path) -> None:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFrontmatterSchemaRel(unittest.TestCase):
+    def test_unsupported_rule_shape_reports_violation_not_nameerror(self) -> None:
+        # 不支持的规则形状必须报 `DOC_SCHEMA_INVALID`，不能 `NameError: schema_rel`（ocr2-003）。
+        out = pure_schema.check_frontmatter({"k": 123}, {}, "f.md", "---\nk: v\n---\n")
+        self.assertTrue(out and out[0][0] == "DOC_SCHEMA_INVALID" and "不支持" in out[0][1])
+        # 带显式 schema_rel 时用它
+        out2 = pure_schema.check_frontmatter({"k": 123}, {}, "f.md", "---\nk: v\n---\n",
+                                              schema_rel="docs/x/.schema.json")
+        self.assertIn("docs/x/.schema.json", out2[0][1])

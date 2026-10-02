@@ -116,7 +116,9 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
             text = p.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        m = _FM_SUPERSEDES.search(text)
+        # `Supersedes:` 只在 frontmatter 内成立：正文顶格的示例/引用行也能命中 `^Supersedes:`，
+        # 全文搜会触发破坏性 reconcile（把被引用的 ADR 归档）。与 `_FM_STATUS` 同口径（t-062 同族）。
+        m = _FM_SUPERSEDES.search(_frontmatter(text))
         if not m or m.group(1).strip() == "-":
             continue
         ref = m.group(1).strip()

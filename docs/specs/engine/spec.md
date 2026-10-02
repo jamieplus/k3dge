@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:7cc8acec6fd70660054683608f513fdb99bc314287995c5bd7053117cfe12522`
+- **Contract Hash**: `sha256:52c4adbebe1235badfd040a28bc760d35191bdaeb5df38adb759ba649dec5679`
 - **Last Updated**: 2026-10-02
 
 ## 1. Domain Boundary & Responsibilities
@@ -598,11 +598,11 @@ check_h1(h1_pat: Optional[str], codes: Dict[str, Any], text: str, filename: str,
 check_sections_when(sections_when: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
 check_sections(sections: Optional[List[str]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
 check_section_ordering(enabled: Any, codes: Dict[str, Any], filename: str, text: str) -> List[Check]
-check_frontmatter(fm_spec: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
+check_frontmatter(fm_spec: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str, schema_rel: str='.schema.json') -> List[Check]
 check_headers(hdr_spec: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
 check_index_ref(index_text: str, token: str, codes: Dict[str, Any], index_rel: str, filename: str) -> List[Check]
 check_amend(block: Any, codes: Dict[str, Any], filename: str, text: str) -> List[Check]
-check_content(schema: Dict[str, Any], filename: str, text: str, ident: str) -> List[Check]
+check_content(schema: Dict[str, Any], filename: str, text: str, ident: str, schema_rel: str='.schema.json') -> List[Check]
 check_file(schema: Dict[str, Any], filename: str, text: str, *, schema_rel: str='.schema.json') -> Tuple[List[Check], str, bool]
 from __future__ import annotations
 from typing import Dict

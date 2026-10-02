@@ -169,3 +169,24 @@ class self_raises:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSyncAbortPropagates(unittest.TestCase):
+    def test_sync_all_raises_when_a_node_aborts(self) -> None:
+        # 中止不许回落成"成功形"返回值（ocr2-005）：调用方无法区分"跑完无改动"与"中途掐断。
+        from k3dge.engine import nodes
+        from k3dge.sync import generator as gen
+
+        orig = nodes.run_phase
+        nodes.run_phase = lambda *a, **k: (False, "boom")
+        try:
+            with self.assertRaises(RuntimeError):
+                with tempfile.TemporaryDirectory() as d:
+                    root = Path(d)
+                    (root / ".agent").mkdir()
+                    (root / ".agent" / "manifest.json").write_text(
+                        json.dumps({"package_root": "src", "domains": {}, "ignore": []}),
+                        encoding="utf-8")
+                    gen.sync_all(root)
+        finally:
+            nodes.run_phase = orig

@@ -238,6 +238,7 @@ def check_frontmatter(
     codes: Dict[str, Any],
     filename: str,
     text: str,
+    schema_rel: str = ".schema.json",
 ) -> List[Check]:
     if not fm_spec:
         return []
@@ -469,6 +470,7 @@ def check_content(
     filename: str,
     text: str,
     ident: str,
+    schema_rel: str = ".schema.json",
 ) -> List[Check]:
     """Content checks (need text + ident; caller must pass the filename gate first)."""
     codes = schema.get("codes") or {}
@@ -477,7 +479,7 @@ def check_content(
     out += check_sections_when(schema.get("sections_when"), codes, filename, text)
     out += check_sections(schema.get("sections"), codes, filename, text)
     out += check_section_ordering(schema.get("section_order"), codes, filename, text)
-    out += check_frontmatter(schema.get("frontmatter"), codes, filename, text)
+    out += check_frontmatter(schema.get("frontmatter"), codes, filename, text, schema_rel)
     out += check_headers(schema.get("headers"), codes, filename, text)
     out += check_amend(schema.get("amend"), codes, filename, text)
     return out
@@ -500,5 +502,5 @@ def check_file(
     out, ident, ok = check_filename(schema.get("filename"), codes, schema_rel, filename)
     if not ok:
         return out, ident, False
-    out += check_content(schema, filename, text, ident)
+    out += check_content(schema, filename, text, ident, schema_rel)
     return out, ident, True

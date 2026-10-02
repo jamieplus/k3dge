@@ -910,12 +910,12 @@ check_h1(h1_pat: Optional[str], codes: Dict[str, Any], text: str, filename: str,
 check_sections_when(sections_when: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
 check_sections(sections: Optional[List[str]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
 check_section_ordering(enabled: Any, codes: Dict[str, Any], filename: str, text: str) -> List[Check]
-check_frontmatter(fm_spec: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
+check_frontmatter(fm_spec: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str, schema_rel: str='.schema.json') -> List[Check]
 check_headers(hdr_spec: Optional[Dict[str, Any]], codes: Dict[str, Any], filename: str, text: str) -> List[Check]
 check_index_ref(index_text: str, token: str, codes: Dict[str, Any], index_rel: str, filename: str) -> List[Check]
 check_amend(block: Any, codes: Dict[str, Any], filename: str, text: str) -> List[Check]
     # doc: ADR `Amended-by` 与 footnote 标记的形态（2026-09-24）。
-check_content(schema: Dict[str, Any], filename: str, text: str, ident: str) -> List[Check]
+check_content(schema: Dict[str, Any], filename: str, text: str, ident: str, schema_rel: str='.schema.json') -> List[Check]
     # doc: Content checks (need text + ident; caller must pass the filename gate first).
 check_file(schema: Dict[str, Any], filename: str, text: str, *, schema_rel: str='.schema.json') -> Tuple[List[Check], str, bool]
     # doc: File-local structure checks. Returns (violations, ident, filename_ok).

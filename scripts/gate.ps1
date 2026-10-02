@@ -24,7 +24,8 @@ if ([string]::IsNullOrWhiteSpace($want) -and (Test-Path (Join-Path $Root "pyproj
     foreach ($ln in (Get-Content -LiteralPath (Join-Path $Root "pyproject.toml"))) {
       if ($ln -match '^\[tool\.k3dge\]\s*(#.*)?$') { $inSec = $true; $sawSec = $true; continue }   # 容忍行尾注释（ocr-144）
       if ($inSec -and $ln -match '^\[') { break }
-      if ($inSec -and ($ln -match '^[[:space:]]*source[[:space:]]*=[[:space:]]*[\x22\x27]([^\x22\x27]*)[\x22\x27]')) {
+      # .NET `-match` 不认 POSIX `[[:space:]]`（会退化成匹配字面 `[`,`:`,`s`,`p`,`a`,`c`,`e`），用 `\s`（ocr2-006）。
+      if ($inSec -and ($ln -match '^\s*source\s*=\s*[\x22\x27]([^\x22\x27]*)[\x22\x27]')) {
         $want = $Matches[1]; break                                                   # 两种引号 + 允许缩进
       }
     }
@@ -51,6 +52,11 @@ if ($want) {
   }
   # UTF8 读 + Trim：去 BOM 与首尾空白；比较两侧**同一套**归一化；`-cne` 大小写敏感（源一致性是字面比较）。
   $rec = ((Get-Content -LiteralPath $srcFile -Encoding UTF8 -TotalCount 1) | Out-String).Trim()
+  if ([string]::IsNullOrWhiteSpace($rec)) {
+    # 空/仅空白/BOM-only 收据 ⇒ 无证据：与"收据缺失"同等拒跑，不能跳过比较静默放行（ocr2-007）。
+    [Console]::Error.WriteLine("[k3dge-source] 政策已声明但 .venv/k3dge-source.txt 为空/仅空白：无证据 ⇒ 拒跑")
+    exit 2
+  }
   $w = Resolve-PhysPath $want
   $r = if ($rec) { Resolve-PhysPath $rec } else { "" }
   if ($r -and ($w -cne $r)) {

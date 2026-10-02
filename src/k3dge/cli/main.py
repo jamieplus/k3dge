@@ -278,7 +278,13 @@ def cmd_sync(args: argparse.Namespace) -> int:
     from k3dge.sync.generator import sync_all
 
     workspace = _find_workspace(Path.cwd())
-    changed, docs_updated = sync_all(workspace, domains=args.domains)
+    try:
+        changed, docs_updated = sync_all(workspace, domains=args.domains)
+    except Exception as exc:
+        # `sync_all` 中止即抛（不再回落成功形元组）：这里按失败收（ocr2-005）。
+        print(f"[SYNC] FAILED: {exc}", file=sys.stderr)
+        _append_log(workspace, f"[{datetime.datetime.now().isoformat()}] sync -> FAILED {exc}")
+        return 1
     if not changed and not docs_updated:
         # 陈述事实：契约无变化 ≠ 本轮没写盘（docs-index 每次 sync 都会重生，见 sync_docs_index）。
         print("[SYNC] No spec contract changes (derived docs/index are rewritten only when stale).")
@@ -473,7 +479,12 @@ def cmd_doc(args: argparse.Namespace) -> int:
     if args.doc_action == "sync":
         from k3dge.sync.generator import sync_all
 
-        changed, docs_updated = sync_all(workspace)
+        try:
+            changed, docs_updated = sync_all(workspace)
+        except Exception as exc:
+            # `sync_all` 中止即抛（不再回落成功形元组）：这里按失败收（ocr2-005）。
+            print(f"[DOC] sync FAILED: {exc}", file=sys.stderr)
+            return 1
         print(f"[DOC] sync: changed={changed} docs_updated={docs_updated}")
         # Run generate-docs.sh if present
         gen = workspace / "scripts" / "generate-docs.sh"

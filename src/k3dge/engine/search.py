@@ -352,12 +352,15 @@ def search(
 def _split_hit_line(line: str) -> Tuple[str, Optional[int]]:
     """`file:line:content` → `(file, line)`；无行号 → `(整串, None)`。
 
-    `.+` 贪婪 ⇒ 匹配到**最后一个**"冒号+数字"，文件名里的冒号不再把路径切断（321）。
+    取**第一个** `:<digits>:`（非贪婪）：行号是生产方紧跟文件名的第二个字段，内容里
+    的 `:数字:`（如 `ratio = 4:2:1`、时间 `12:30`）不得参与。贪婪取最后一个会把内容
+    里的数字当行号、把路径切断（ocr2-004）。Windows 盘符（`C:\…`）不受影响：`C` 后
+    跟的不是数字，仍会推进到真正的行号段（321 的初衷仍成立）。
     """
-    m = re.match(r"^(?P<f>.+):(?P<l>\d+):", line)
+    m = re.match(r"^(?P<f>.+?):(?P<l>\d+):", line)
     if m:
         return m.group("f").replace("\\", "/"), int(m.group("l"))
-    m2 = re.match(r"^(?P<f>.+):(?P<l>\d+)$", line)
+    m2 = re.match(r"^(?P<f>.+?):(?P<l>\d+)$", line)
     if m2:
         return m2.group("f").replace("\\", "/"), int(m2.group("l"))
     return line, None

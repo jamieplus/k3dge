@@ -170,7 +170,7 @@
   "amend_format": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 258
+      "line": 260
     }
   ],
   "analyze_adr_coverage": [
@@ -308,7 +308,7 @@
   "build_parser": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1178
+      "line": 1189
     }
   ],
   "build_server_params": [
@@ -410,7 +410,7 @@
   "check_amend": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 327
+      "line": 328
     }
   ],
   "check_completeness": [
@@ -422,7 +422,7 @@
   "check_content": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 467
+      "line": 468
     }
   ],
   "check_dangling_adr": [
@@ -434,7 +434,7 @@
   "check_file": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 486
+      "line": 488
     }
   ],
   "check_filename": [
@@ -464,7 +464,7 @@
   "check_headers": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 283
+      "line": 284
     }
   ],
   "check_incident_id_redundant": [
@@ -476,7 +476,7 @@
   "check_index_ref": [
     {
       "file": "src/k3dge/engine/pure_schema.py",
-      "line": 305
+      "line": 306
     }
   ],
   "check_markdown_bytes": [
@@ -566,7 +566,7 @@
   "cmd_audit": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 607
+      "line": 618
     }
   ],
   "cmd_check": [
@@ -578,61 +578,61 @@
   "cmd_check_msg": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1047
+      "line": 1058
     }
   ],
   "cmd_commit": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 959
+      "line": 970
     }
   ],
   "cmd_commit_attest": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1013
+      "line": 1024
     }
   ],
   "cmd_doc": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 365
+      "line": 371
     }
   ],
   "cmd_extractor": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 301
+      "line": 307
     }
   ],
   "cmd_incident": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1063
+      "line": 1074
     }
   ],
   "cmd_index": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 950
+      "line": 961
     }
   ],
   "cmd_init": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 579
+      "line": 590
     }
   ],
   "cmd_markers": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 684
+      "line": 695
     }
   ],
   "cmd_mcp": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 598
+      "line": 609
     }
   ],
   "cmd_mcp_probe": [
@@ -650,19 +650,19 @@
   "cmd_milestone": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 718
+      "line": 729
     }
   ],
   "cmd_search": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 901
+      "line": 912
     }
   ],
   "cmd_status": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1101
+      "line": 1112
     }
   ],
   "cmd_sync": [
@@ -674,25 +674,25 @@
   "cmd_task": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 493
+      "line": 504
     }
   ],
   "cmd_verify_attest": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1040
+      "line": 1051
     }
   ],
   "cmd_version": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 331
+      "line": 337
     }
   ],
   "cmd_where": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 931
+      "line": 942
     }
   ],
   "code_for": [
@@ -1246,7 +1246,7 @@
     },
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 1413
+      "line": 1424
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
@@ -1334,7 +1334,7 @@
   "old_name_warnings": [
     {
       "file": "src/k3dge/cli/main.py",
-      "line": 868
+      "line": 879
     }
   ],
   "on_error": [
