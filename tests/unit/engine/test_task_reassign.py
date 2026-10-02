@@ -204,3 +204,46 @@ class TestBoundaryNudge(TestCase):
                       file_path="docs/tasks/x.md", detail={"path": "docs/tasks/x.md", "milestone": "M10"})
         self.assertTrue(v.format().startswith("[GATE WARN]"))
         self.assertIn("k3dge milestone reassign M10", v.format())
+
+
+class TestTaskWriteGuards(TestCase):
+    def _ws(self) -> Path:
+        ws = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
+        (ws / "docs" / "tasks").mkdir(parents=True)
+        (ws / "docs" / "reviews").mkdir(parents=True)
+        return ws
+
+    def test_create_task_rejects_bad_priority_and_newlines(self) -> None:
+        from k3dge.engine.task_write import create_task
+
+        ws = self._ws()
+        ok, msg, _ = create_task(ws, "t", priority="urgent")
+        self.assertFalse(ok)
+        self.assertIn("invalid priority", msg)
+        ok2, _, p2 = create_task(ws, "t2", priority="P1", report="docs/reviews/r.md\ninjected: x")
+        self.assertTrue(ok2)
+        self.assertNotIn("injected", p2.read_text(encoding="utf-8"))
+
+    def test_mark_done_refuses_unreadable_report(self) -> None:
+        from k3dge.engine.task_write import mark_task_done
+
+        ws = self._ws()
+        tp = ws / "docs" / "tasks" / "2026-10-02-M10-fix-x.md"
+        tp.write_text("---\nstatus: idea\nmilestone: M10\npriority: P2\ndate: 2026-10-02\nreport: docs/reviews/missing.md\n---\n\n# X\n", encoding="utf-8")
+        ok, msg = mark_task_done(ws, str(tp))[:2]
+        self.assertFalse(ok)
+        self.assertIn("不可读", msg)
+
+    def test_reassign_checks_target_before_writing(self) -> None:
+        from k3dge.engine.task_write import reassign_task_milestone
+
+        ws = self._ws()
+        a = ws / "docs" / "tasks" / "2026-10-02-M10-fix-a.md"
+        b = ws / "docs" / "tasks" / "2026-10-02-M11-fix-a.md"
+        a.write_text("---\nstatus: idea\nmilestone: M10\npriority: P2\ndate: 2026-10-02\n---\n\n# A\n", encoding="utf-8")
+        b.write_text("---\nstatus: idea\nmilestone: M11\npriority: P2\ndate: 2026-10-02\n---\n\n# B\n", encoding="utf-8")
+        ok, msg, _ = reassign_task_milestone(ws, a, "M11")
+        self.assertFalse(ok)
+        # 原文未动：内容仍是 M10（ocr2-084 的腐票形态不得出现）
+        self.assertIn("milestone: M10", a.read_text(encoding="utf-8"))

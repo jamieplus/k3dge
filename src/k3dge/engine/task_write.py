@@ -19,6 +19,7 @@ from k3dge.engine.milestone_pointer import _validate_milestone_id, get_current_m
 from k3dge.engine.task_index import MILESTONE_RE, TITLE_RE, parse_frontmatter
 
 _TASK_TYPES = frozenset({"audit", "feat", "fix", "docs", "chore", "refactor"})
+_TASK_PRIORITIES = frozenset({"P0", "P1", "P2", "P3"})
 
 
 def _review_has_audit_table(text: str) -> bool:
@@ -202,6 +203,13 @@ def create_task(
         err = _validate_milestone_id(milestone)
         if err:
             return False, err, None
+    # `priority` 是唯一没有闭集校验的元数据字段，且 `priority`/`report` 未做换行过滤：
+    # 换行会打断 YAML frontmatter（注入/解析错乱），非法优先级会让排序/筛选静默失准（ocr2-082）。
+    if priority not in _TASK_PRIORITIES:
+        return False, f"invalid priority '{priority}'（须为 P0/P1/P2/P3）", None
+    if report is not None:
+        # 取首行去空白：换行会打断 YAML frontmatter（ocr2-082）。越界路径由 `_report_open_findings` 挡。
+        report = str(report).strip().splitlines()[0] if str(report).strip() else None
     raw_slug = (slug if slug is not None else title).strip()
     norm = re.sub(r"[^A-Za-z0-9]+", "_", raw_slug).strip("_")
     if not norm:
@@ -254,7 +262,9 @@ def _task_report_pointer(content: str) -> str:
 
 
 def _report_open_findings(workspace: Path, report_rel: str) -> Optional[List[str]]:
-    """待修 IDs still open in a report; None if the report can't be read (don't block)."""
+    """待修 IDs still open in a report; None if the report can't be read.
+
+    None ≠ 干净：调用方必须把"不可读"当"无法验证"拒绝关票，不能当"无待修"放行（ocr2-083）。"""
     from k3dge.engine.pure_refs import inside_workspace
 
     if not inside_workspace(workspace, report_rel):
@@ -353,6 +363,13 @@ def _finalize_task_done(workspace: Path, target: Path, content: str, fm: dict) -
     )
     if report_rel and not already_done:
         pending = _report_open_findings(workspace, report_rel)
+        if pending is None:
+            # 报告指针存在但不可读（缺失/越界/解码失败）⇒ 无法验证闭环，不能当"干净"放行（ocr2-083）。
+            # 旧实现把 None 当"无待修"直接关票＝fail-open。
+            return False, (
+                f"报告 {report_rel} 不可读（缺失/越界/解码失败），无法验证闭环 ⇒ 不关票；"
+                f"先修好指针或报告（悬空指针另有 DANGLING_REPORT_REF 闸）。"
+            )
         if pending:
             return False, (
                 f"报告 {report_rel} 仍有 {len(pending)} 条待修（{', '.join(pending[:8])}）；"
@@ -496,10 +513,12 @@ def reassign_task_milestone(
         return True, f"已是 {new_milestone}（幂等）", path
     if dry_run:
         return True, f"[dry-run] {path.name} -> {target_name}", target
+    if target != path and target.exists():
+        # 先查目标存在性再动盘：frontmatter 已重写后才发现撞名 ⇒ 内容说新里程碑、文件名还是旧的，
+        # 票就腐了（ocr2-084）。 existence 检查必须在写之前。
+        return False, f"目标已存在：{target.name}（先人工处理，原文未动）", None
     path.write_text("---" + "\n".join(new_head_lines) + "\n---" + tail, encoding="utf-8")
     if target != path:
-        if target.exists():
-            return False, f"目标已存在：{target.name}（先人工处理）", None
         path.rename(target)
     return True, f"{path.name} -> {target_name}", target
 

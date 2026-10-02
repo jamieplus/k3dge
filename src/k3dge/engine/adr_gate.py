@@ -113,6 +113,7 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
     #    写相只剩 tmp+replace——"全通过才动盘"若只覆盖前半截校验，一条晚发现的坏声明仍会把
     #    工作区停在"部分生效"（ocr-034；t-063 要求校验面与承诺同宽）。
     plan: list[Tuple[Path, Path, str, str]] = []   # (声明件, 目标件, my_id, 已算好的落盘文本)
+    planned_targets: dict = {}   # 目标路径 → 声明件：同一目标被两处声明 ⇒ 写相第二次会崩/覆写，先拒（ocr2-030）
     for p in _adr_files(workspace):
         try:
             text = p.read_text(encoding="utf-8", errors="replace")
@@ -131,7 +132,12 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
             return f"[SEAL REJECTED] {p.name} Supersedes 解析不出 ADR 号：{ref!r}"
         mm = re.match(r"(\d+)", p.stem)
         my_id = (mm.group(1).zfill(4) if mm else p.stem[:4])
+        # 同一声明内重复 ID 去重；跨声明撞同一目标 ⇒ 拒（写相无法两次移动同一文件）。
+        seen_in_file = set()
         for raw_id in target_ids:
+            if raw_id in seen_in_file:
+                continue
+            seen_in_file.add(raw_id)
             tid = raw_id.zfill(4)
             target = _find_adr_by_id(d, tid)
             if target is None:
@@ -155,6 +161,11 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
                 # 无条件覆盖 ⇒ 归档件被静默销毁（编号重用/从备份恢复都会撞上），且 glob 不递归根本看不见（ocr-193）。
                 return (f"[SEAL REJECTED] obsolete/{target.name} 已存在且非本次移动产物"
                         "——拒绝覆盖归档事实源，请人工裁决")
+            _tkey = str(target.resolve())
+            if _tkey in planned_targets:
+                return (f"[SEAL REJECTED] {target.name} 被 {planned_targets[_tkey]} 与 {p.name} 同时 Supersede"
+                        "——写相无法移动同一文件两次，请人工裁决谁取代谁")
+            planned_targets[_tkey] = p.name
             plan.append((p, target, my_id, marked))
 
     # 2. Rejected ADR → 移入 obsolete/。**校验也在计划相做完**（撞名拒覆盖与 Supersedes 同规则，
@@ -252,10 +263,15 @@ def _mark_superseded(text: str, by_id: str) -> "str | None":
     if idx is None:
         return None
     lines[idx] = "Status: Superseded\n"
-    if not any(re.match(r"^superseded_by:", l) for l in lines[1:close]):
+    # 已有 `superseded_by:` 时**更新为本次取代方**，不能保留旧值：本次 reconcile 正在把它归档为
+    # "被 by_id 取代"，留旧值会让来源指向错误的前任（ocr2-031）。
+    _sb = next((i for i in range(1, close) if re.match(r"^superseded_by:", lines[i])), None)
+    if _sb is None:
         anchor = next((i for i in range(1, close)
                        if re.match(r"^Supersedes:", lines[i])), idx)
         lines.insert(anchor + 1, "superseded_by: ADR-" + by_id + "\n")
+    else:
+        lines[_sb] = "superseded_by: ADR-" + by_id + "\n"
     return "".join(lines)
 
 

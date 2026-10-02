@@ -316,3 +316,24 @@ def test_body_only_landed_by_does_not_pass() -> None:
         })
         bad = adr_gate.adr_landed(ws)
         assert bad is not None and "缺 Landed-by" in bad
+
+
+def test_duplicate_supersede_target_is_rejected_not_crashed() -> None:
+    """两处声明撞同一目标 ⇒ 拒（写相无法移动两次），不能崩/覆写（ocr2-030）。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {
+            "0001-old.md": "---\nStatus: Accepted\nSupersedes: -\n---\n# ADR-0001\n",
+            "0002-a.md": "---\nStatus: Accepted\nSupersedes: ADR-0001\nLanded-by: docs/specs/x/spec.md\n---\n# ADR-0002\n",
+            "0003-b.md": "---\nStatus: Accepted\nSupersedes: ADR-0001\nLanded-by: docs/specs/x/spec.md\n---\n# ADR-0003\n",
+        })
+        r = adr_gate.reconcile_supersedes(ws)
+        assert r is not None and "同时 Supersede" in r
+        assert (ws / "docs" / "adr" / "0001-old.md").is_file()
+
+
+def test_mark_superseded_updates_existing_provenance() -> None:
+    """已有 `superseded_by:` 时更新为本次取代方，不留旧值（ocr2-031）。"""
+    from k3dge.engine.adr_gate import _mark_superseded
+
+    out = _mark_superseded("---\nStatus: Accepted\nsuperseded_by: ADR-0001\n---\n# X\n", "0002")
+    assert out is not None and "superseded_by: ADR-0002" in out and "ADR-0001" not in out

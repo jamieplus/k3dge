@@ -170,7 +170,7 @@
   "amend_format": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 262
+      "line": 278
     }
   ],
   "analyze_adr_coverage": [
@@ -326,7 +326,7 @@
   "build_task_name": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 452
+      "line": 469
     }
   ],
   "bump_milestone": [
@@ -758,7 +758,7 @@
   "create_task": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 178
+      "line": 179
     }
   ],
   "critical_path": [
@@ -1274,7 +1274,7 @@
   "mark_task_done": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 389
+      "line": 406
     }
   ],
   "materialize": [
@@ -1496,13 +1496,13 @@
   "reassign_milestone": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 507
+      "line": 526
     }
   ],
   "reassign_task_milestone": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 458
+      "line": 475
     }
   ],
   "reconcile_report_rows": [
@@ -1832,7 +1832,7 @@
   "split_task_name": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 446
+      "line": 463
     }
   ],
   "staged_added": [
