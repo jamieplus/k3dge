@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:c6a97eb0611d870dd670341ceb5d82bb4b38be62220958a94d7c6afb50f80b4e`
-- **Last Updated**: 2026-10-01
+- **Contract Hash**: `sha256:7cc8acec6fd70660054683608f513fdb99bc314287995c5bd7053117cfe12522`
+- **Last Updated**: 2026-10-02
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -86,7 +86,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
-SUPPORTED_BUNDLE_VERSIONS = (1,)
+SUPPORTED_BUNDLE_VERSIONS = (1, 2)
 K3DIT_ENV = 'K3DIT_BIN'
 audit_cache_root() -> Path
 tool_state_dir(workspace: Path) -> Path

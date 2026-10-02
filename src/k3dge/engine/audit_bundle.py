@@ -30,7 +30,10 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 #: k3dit 交付包**结构**版本白名单（认不出即 fail-clear；见 k3dit 仓 0008 §2.5 第 7 条）。
-SUPPORTED_BUNDLE_VERSIONS = (1,)
+#: v2＝内容哈希 SHA-1→SHA-256（碰撞攻击面收口，k3dit pack ocr-220）；消费侧**双读**：
+#: v1 包按 sha1 验、v2 按 sha256，算法由 `bundle_version` 决定（`audit_verify._ALGO_BY_VERSION`
+#: 与产出方同一张表），布局/apply_order 不变。
+SUPPORTED_BUNDLE_VERSIONS = (1, 2)
 
 #: 环境变量：显式指定 k3dit 可执行（argv 列表中的第一段）。
 K3DIT_ENV = "K3DIT_BIN"

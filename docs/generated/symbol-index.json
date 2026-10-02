@@ -200,7 +200,7 @@
   "apply_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 404
+      "line": 407
     }
   ],
   "archived_milestone_tasks": [
@@ -218,7 +218,7 @@
   "audit_cache_root": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 39
+      "line": 42
     }
   ],
   "audit_call_result": [
@@ -350,19 +350,19 @@
   "bundle_digest": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 294
+      "line": 297
     }
   ],
   "bundle_facts": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 269
+      "line": 272
     }
   ],
   "bundle_input_matches": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 55
+      "line": 58
     }
   ],
   "cache_observability": [
@@ -710,7 +710,7 @@
   "commit_applied": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 768
+      "line": 771
     }
   ],
   "completeness_violations": [
@@ -734,7 +734,7 @@
   "consume": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 794
+      "line": 797
     }
   ],
   "consume_unreleased": [
@@ -846,7 +846,7 @@
   "find_k3dit": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 82
+      "line": 85
     }
   ],
   "find_orphan_adrs": [
@@ -990,7 +990,7 @@
   "has_marker_line": [
     {
       "file": "src/k3dge/engine/audit_verify.py",
-      "line": 91
+      "line": 92
     }
   ],
   "has_milestone_token": [
@@ -1170,7 +1170,7 @@
   "land_report": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 695
+      "line": 698
     }
   ],
   "legacy_config_present": [
@@ -1508,7 +1508,7 @@
   "reconcile_report_rows": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 645
+      "line": 648
     }
   ],
   "reconcile_supersedes": [
@@ -1586,7 +1586,7 @@
   "replay_to_baseline": [
     {
       "file": "src/k3dge/engine/audit_verify.py",
-      "line": 111
+      "line": 112
     }
   ],
   "reset_for_audit": [
@@ -1670,7 +1670,7 @@
   "run_path_audit": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 139
+      "line": 142
     }
   ],
   "run_phase": [
@@ -1700,7 +1700,7 @@
   "salvage_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 211
+      "line": 214
     }
   ],
   "satisfied_ids": [
@@ -1868,7 +1868,7 @@
   "strip_markers": [
     {
       "file": "src/k3dge/engine/audit_verify.py",
-      "line": 99
+      "line": 100
     }
   ],
   "strip_pins": [
@@ -1938,7 +1938,7 @@
   "tool_state_dir": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 48
+      "line": 51
     }
   ],
   "touched_files": [
@@ -2010,13 +2010,13 @@
   "verify_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 252
+      "line": 255
     }
   ],
   "verify_bundle_local": [
     {
       "file": "src/k3dge/engine/audit_verify.py",
-      "line": 230
+      "line": 243
     }
   ],
   "verify_commit": [
@@ -2100,7 +2100,7 @@
   "write_run_digest": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 233
+      "line": 236
     }
   ],
   "write_symbol_index": [

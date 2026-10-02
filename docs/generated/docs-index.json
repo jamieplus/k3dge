@@ -505,6 +505,14 @@
       "tokens": "外部审计报告（人工提交，milestone M11）"
     },
     {
+      "path": "docs/reviews/2026-10-02-M11-ocr-scan.md",
+      "type": "reviews",
+      "id": "2026-10-02-M11-ocr-scan",
+      "title": "审计：open-code-review 全文件再扫描（M11）",
+      "status": "",
+      "tokens": "审计：open-code-review 全文件再扫描（M11）"
+    },
+    {
       "path": "docs/specs/_template/spec.md",
       "type": "specs",
       "id": "spec",

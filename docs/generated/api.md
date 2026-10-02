@@ -204,7 +204,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
-SUPPORTED_BUNDLE_VERSIONS = (1,)
+SUPPORTED_BUNDLE_VERSIONS = (1, 2)
 K3DIT_ENV = 'K3DIT_BIN'
 audit_cache_root() -> Path
     # doc: 审计缓存根：工具状态（hall/ledger）与交付包 `--out` 都落这里。

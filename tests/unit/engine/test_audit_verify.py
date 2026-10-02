@@ -47,8 +47,10 @@ def make_bundle(root: Path, *, version: int = 1, claimed: str = "closed", row_st
     if tamper:      # 在（含钉的）文件里追加一行代码 ⇒ 必须被哈希链抓住
         code_text += "tampered = True\n"
     (b / "code" / "src" / "a.py").write_text(code_text, encoding="utf-8")
+    # 摘要算法随包版本（与 k3dit pack._ALGO_BY_VERSION / k3dge _ALGO_BY_VERSION 同表）
+    digest = (hashlib.sha1 if version == 1 else hashlib.sha256)(_PRE.encode()).hexdigest()
     (b / "baseline.json").write_text(json.dumps({
-        "files": {"src/a.py": hashlib.sha1(_PRE.encode()).hexdigest()},
+        "files": {"src/a.py": digest},
         "tree_hash": "x", "count": 1}, ensure_ascii=False), encoding="utf-8")
     (b / "findings.json").write_text(json.dumps({"items": [
         {"id": "code-1", "state": finding_state, "review_ack": review_ack,
@@ -140,6 +142,34 @@ def test_hash_chain_uses_contract_grammar_and_catches_tampering(tmp_path):
     # 再 tamper 加一行代码：strip_markers 仍容忍旧钉，但**必须**抓到多出来的代码。
     combo = av.verify_bundle_local(make_bundle(tmp_path / "combo", preexisting_pin=True, tamper=True))
     assert not combo["ok"] and "内容哈希链不通过" in _errors(combo), _errors(combo)
+
+
+def test_v2_bundle_is_dual_read_with_sha256(tmp_path):
+    """pack v2（SHA-256）双读：布局不变、算法随版本（k3dit ocr-220 的消费侧另一半）。"""
+    res = av.verify_bundle_local(make_bundle(tmp_path, version=2))
+    assert res["ok"], _errors(res)
+
+
+def test_v2_bundle_rejects_sha1_digest(tmp_path):
+    """算法不许**猜**：v2 包里塞 sha1 摘要＝哈希链必须不通过（用错算法比不算更糟——
+    能把篡改洗成"通过"）。旧的单算法实现测不出这条分叉。"""
+    b = make_bundle(tmp_path, version=2)
+    bl = json.loads((b / "baseline.json").read_text(encoding="utf-8"))
+    bl["files"]["src/a.py"] = hashlib.sha1(_PRE.encode()).hexdigest()
+    (b / "baseline.json").write_text(json.dumps(bl, ensure_ascii=False), encoding="utf-8")
+    res = av.verify_bundle_local(b)
+    assert not res["ok"] and "哈希链" in _errors(res), _errors(res)
+
+
+def test_unknown_bundle_version_does_not_guess_algo(tmp_path):
+    """白名单外的版本：哈希链显式"不可核"，不拿任何算法硬算。"""
+    b = make_bundle(tmp_path, version=3)
+    bl = json.loads((b / "baseline.json").read_text(encoding="utf-8"))
+    bl["files"]["src/a.py"] = hashlib.sha256(_PRE.encode()).hexdigest()
+    (b / "baseline.json").write_text(json.dumps(bl, ensure_ascii=False), encoding="utf-8")
+    res = av.verify_bundle_local(b)
+    assert not res["ok"]
+    assert "bundle_version" in _errors(res) and "不可核" in _errors(res), _errors(res)
 
 
 def test_version_and_input_identity_are_gated(tmp_path):

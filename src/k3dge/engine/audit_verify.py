@@ -8,7 +8,8 @@
 3. **闭环由 k3dge 自己算**：未关＝`pending`/`fixnote`/`disputed` 或终态未背书（`review_ack` 假）
    —— 不读产出方自报的 `status`/`unclosed`（只作交叉核，不一致时**报出来**，以本地算的为准）；
 4. **内容哈希链**：在临时副本上按 `apply_order` **反序**反向应用补丁，再与 `baseline.json` 逐文件比
-   （`sha1`）。含钉文件单列（`strip` 是产出方的口径，不由消费侧复刻）。
+   （算法按 `bundle_version` 双读：v1=sha1、v2=sha256，见 `_ALGO_BY_VERSION`）。含钉文件单列
+   （`strip` 是产出方的口径，不由消费侧复刻）。
 
 过了这道闸，才轮到 k3dge **自己**把补丁落到主干（`audit_bundle.apply_bundle`）。
 """
@@ -177,6 +178,12 @@ def replay_to_baseline(bundle: Path, dest: Optional[Path] = None,
     return {"ok": True, "root": str(work), "replay": replay, "detail": ""}
 
 
+#: 内容摘要算法由**包结构版本**决定——与产出方 `k3dit.pack._ALGO_BY_VERSION` 同一张双读表
+#: （v1＝sha1 只读兼容；v2＝sha256：SHA-1 有实用 chosen-prefix 碰撞，被审方可控文件集下
+#: "送审树≠后门树同哈希"在攻击面内，ocr-220）。版本标记＝迁移记录，不在包内再造口径。
+_ALGO_BY_VERSION = {1: "sha1", 2: "sha256"}
+
+
 def _replay_hashes(bundle: Path) -> Dict[str, Any]:
     """反向重放后逐文件比 `baseline.json`（重放本身走 `replay_to_baseline`，与合并器同源）。"""
     import hashlib
@@ -186,6 +193,12 @@ def _replay_hashes(bundle: Path) -> Dict[str, Any]:
     if not want:
         return {"ok": False, "checked": 0, "mismatched": [], "files_with_markers": [], "skipped_pin_files": [],
                 "detail": "baseline.json 缺 files"}
+    ver = (_read_json(bundle / "manifest.json") or {}).get("bundle_version")
+    algo = _ALGO_BY_VERSION.get(ver)
+    if algo is None:
+        # 白名单闸会另报；这里**不猜算法**——用错算法比"不算"更糟（把篡改洗成"哈希通过"）
+        return {"ok": False, "checked": 0, "mismatched": sorted(want), "files_with_markers": [],
+                "skipped_pin_files": [], "detail": f"bundle_version={ver!r} 无已知摘要算法，哈希链不可核"}
     rep = replay_to_baseline(bundle)
     if not rep.get("ok"):
         return {"ok": False, "checked": 0, "mismatched": [], "files_with_markers": [],
@@ -215,7 +228,7 @@ def _replay_hashes(bundle: Path) -> Dict[str, Any]:
                 with_pins.append(rel)
             # `errors="replace"` 会把坏字节变成 U+FFFD，再编码 ≠ 原字节 ⇒ 非 UTF-8/二进制文件
             # 的摘要**永远**对不上产出方的值，整包被判"内容不符"（409）
-            got = hashlib.sha1(sem.encode("utf-8", errors="surrogateescape")).hexdigest()
+            got = hashlib.new(algo, sem.encode("utf-8", errors="surrogateescape")).hexdigest()
             if got == digest:
                 checked += 1
             else:
@@ -243,7 +256,7 @@ def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed:
     try:
         from k3dge.engine.audit_bundle import SUPPORTED_BUNDLE_VERSIONS, bundle_input_matches
     except Exception:      # pragma: no cover - 防御
-        SUPPORTED_BUNDLE_VERSIONS = (1,)
+        SUPPORTED_BUNDLE_VERSIONS = (1, 2)
         bundle_input_matches = None
     ver = facts.get("bundle_version")
     if ver not in SUPPORTED_BUNDLE_VERSIONS:
