@@ -167,9 +167,6 @@ class self_raises:
         assert isinstance(v, self.exc), v
         return True
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class TestSyncAbortPropagates(unittest.TestCase):
     def test_sync_all_raises_when_a_node_aborts(self) -> None:
@@ -190,3 +187,7 @@ class TestSyncAbortPropagates(unittest.TestCase):
                     gen.sync_all(root)
         finally:
             nodes.run_phase = orig
+
+
+if __name__ == "__main__":
+    unittest.main()

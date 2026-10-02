@@ -38,13 +38,20 @@ if [ -n "$_WANT" ]; then
     echo "  重跑 ./k3dge-init.sh 落盘，或 unset K3DGE_SOURCE/改 pyproject 政策。" >&2
     exit 2
   fi
-  IFS= read -r _REC < "$_SRC_FILE" || _REC=""       # 不用 `head -1 | tr`（pipefail + SIGPIPE 有静默风险，ocr-154）
+  # `read` 在"末行无换行"时返回非零但仍已赋值；`|| _REC=""` 会把有效收据清空（ocr2-098）。
+  # 只压住 `set -e`，保留读到的值；空文件则 _REC 为空，下一步拒跑。
+  IFS= read -r _REC < "$_SRC_FILE" || :
   _REC="${_REC#$'\xef\xbb\xbf'}"                    # 去 BOM（旧 init.ps1 写的 BOM 会让比较恒不等）
   _REC="${_REC%$'\r'}"                              # 只去行尾 CR（`tr -d ' \t'` 会吞路径里的空格，ocr-156）
   _REC="$(printf '%s' "$_REC" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  if [ -z "$_REC" ]; then
+    # 空/仅空白/BOM-only 收据 ⇒ 无证据：与"收据缺失"同等拒跑，不能跳过比较静默放行（ocr2-016/099）。
+    echo "[k3dge-source] 政策已声明但 .venv/k3dge-source.txt 为空/仅空白：无证据 ⇒ 拒跑" >&2
+    exit 2
+  fi
   [ -d "$_WANT" ] && _WANT="$(cd "$_WANT" && pwd -P)"   # 只对真实目录取物理路径；pypi/URL 保持原样
-  [ -n "$_REC" ] && [ -d "$_REC" ] && _REC="$(cd "$_REC" && pwd -P)"
-  if [ -n "$_REC" ] && [ "$_WANT" != "$_REC" ]; then
+  [ -d "$_REC" ] && _REC="$(cd "$_REC" && pwd -P)"
+  if [ "$_WANT" != "$_REC" ]; then
     echo "[k3dge-source] MISMATCH: want='$_WANT'（env>pyproject） but installed from '$_REC'." >&2
     echo "  重装或改政策后再跑闸。" >&2
     exit 2

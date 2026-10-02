@@ -249,9 +249,6 @@ def test_purity_guard_raises_even_under_optimized_mode(tmp_path) -> None:
         assert rc2 == 0 and "OK" in out2, (flags, out2, err2[-300:])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class TestFrontmatterSchemaRel(unittest.TestCase):
     def test_unsupported_rule_shape_reports_violation_not_nameerror(self) -> None:
@@ -262,3 +259,7 @@ class TestFrontmatterSchemaRel(unittest.TestCase):
         out2 = pure_schema.check_frontmatter({"k": 123}, {}, "f.md", "---\nk: v\n---\n",
                                               schema_rel="docs/x/.schema.json")
         self.assertIn("docs/x/.schema.json", out2[0][1])
+
+
+if __name__ == "__main__":
+    unittest.main()

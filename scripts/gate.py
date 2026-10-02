@@ -74,7 +74,12 @@ if _want:
         print(f"[k3dge-source] 读收据失败：{exc}", file=sys.stderr)
         sys.exit(1)
     _rec = _txt.splitlines()[0].strip() if _txt.strip() else ""
-    if _rec and _norm_path(_want) != _norm_path(_rec):
+    if not _rec:
+        # 空/仅空白/BOM-only 收据 ⇒ 无证据：与"收据缺失"同等拒跑，不能跳过比较静默放行（ocr2-015/096）。
+        print("[k3dge-source] 政策已声明但 .venv/k3dge-source.txt 为空/仅空白：无证据 ⇒ 拒跑",
+              file=sys.stderr)
+        sys.exit(2)
+    if _norm_path(_want) != _norm_path(_rec):
         print(f"[k3dge-source] MISMATCH: want='{_want}' (env>pyproject) but installed from '{_rec}'.",
               file=sys.stderr)
         print("  重装或改政策后再跑闸。", file=sys.stderr)

@@ -305,3 +305,14 @@ def test_body_only_supersedes_does_not_trigger_reconcile() -> None:
         assert adr_gate.reconcile_supersedes(ws) is None
         assert (ws / "docs" / "adr" / "0001-old.md").is_file()
         assert not (ws / "docs" / "adr" / "obsolete").exists()
+
+
+def test_body_only_landed_by_does_not_pass() -> None:
+    """正文顶格的 `Landed-by:` 示例行不得让缺指针 ADR 过闸（ocr2-029，与 ocr2-001 同族）。"""
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {
+            "0001-a.md": ("---\nStatus: Accepted\n---\n# ADR-0001\n\n"
+                          "例如：Landed-by: docs/specs/x/spec.md\n"),
+        })
+        bad = adr_gate.adr_landed(ws)
+        assert bad is not None and "缺 Landed-by" in bad

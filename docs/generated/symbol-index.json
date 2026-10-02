@@ -170,7 +170,7 @@
   "amend_format": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 260
+      "line": 262
     }
   ],
   "analyze_adr_coverage": [
@@ -1514,7 +1514,7 @@
   "reconcile_supersedes": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 93
+      "line": 95
     }
   ],
   "record_screen_ack": [

@@ -78,7 +78,9 @@ def adr_landed(workspace: Path) -> Optional[str]:
             continue
         if _status(text) != "Accepted":
             continue
-        m = _FM_LANDED.search(text)
+        # `Landed-by:` 只在 frontmatter 内成立（与 `Supersedes:` 同族，ocr2-001/029）：
+        # 正文顶格的示例行也能命中 `^Landed-by:`，全文搜会让缺指针的 ADR 蒙混过闸。
+        m = _FM_LANDED.search(_frontmatter(text))
         if not m:
             bad.append(f"{p.name}(缺 Landed-by)")
             continue
