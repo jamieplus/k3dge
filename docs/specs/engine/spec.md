@@ -863,6 +863,7 @@ stateDiagram-v2
 | TC-ENG-32 | L1 | k3dit 交付包消费：异版/未闭环/自证失败/脏树/输入身份不符 | 各自 fail-clear 拒绝；标准 `git apply` 按序落补丁、dry-run 零改动 | `tests/unit/engine/test_audit_bundle.py` |
 | TC-ENG-33 | L1 | `scripts/pre-commit` 薄壳把 staged 文档接进 `engine/doc_gate.run_schema_gate`（三层闸接线） | 干净 doc 通过；坏文件名/坏 frontmatter/号空洞/复写 frontmatter 各按闭集码 block；warn 与 errs 分流 | `tests/unit/scripts/test_precommit.py` |
 | TC-ENG-34 | L1 | 测试文件里的断言真值已经写在表达式里（字面 True，或比较两边经一层别名后是同一表达式） | 违反 `ASSERT_TAUTOLOGY` 并阻断；普通比较、恒失败比较、被调契约上的恒真不报 | `tests/unit/engine/test_assert_tautology.py` |
+| TC-ENG-35 | L1 | 审计子进程外层监督：慢但推进 vs 真静默 | 活性签名（状态路径 mtime+size）变化即续等；连续无进展 `stall_sec` 才 `killpg`（rc 124）；`hard_timeout=0` 不设总时长上限 | `tests/unit/engine/test_audit_bundle.py::test_run_watched_survives_slow_progress_and_kills_a_silent_tool` |
 
 ## 5. Fact-Source Gate Matrix (三元门禁矩阵)
 

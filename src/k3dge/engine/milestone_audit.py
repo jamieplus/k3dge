@@ -444,18 +444,21 @@ def _bundle_audit_leg(
     if scope_err:
         return _reject_step(workspace, milestone_id, "audit_bad_k3dit_scope",
                             f'[roles.audit] k3dit_scope={scope_err!r} 不合法（相对仓根、不得含 .. 或绝对路径）'), ""
-    # 工具调用的**墙钟预算**（声明面旋钮；缺省 1h）。真跑实测：8 文件的 full 跑超过 1h 被 `_run` 掐断
-    # ⇒ 整轮白烧（判读+修+核都跑完了，包没产出来）。full 模式的修/复核轮数不可预估 ⇒ 默认放宽到 2h。
+    # 工具调用的**总时长硬上限（成本天花板）**（声明面旋钮；缺省 1h）。真跑实测：8 文件的 full 跑超过
+    # 1h 被掐断 ⇒ 整轮白烧。但**平铺墙钟管不住"慢但在推进"的整仓审计**（M11：6h 墙钟掐断、抢救出
+    # `incomplete` 包、封板被拒）⇒ 活性判据（`_run_watched`，随 k3dit 的 `K3DIT_STALL_SEC`）才是主兜底，
+    # 本旋钮降为可选成本上限：`0`＝不设。full 缺省仍给 2h 兜底（未显式声明时）。
     _tmo_raw = _role_opt(workspace, "audit", "k3dit_timeout", "")
     _tmo = 3600
     if str(_tmo_raw).strip():
         try:
             _tmo = int(str(_tmo_raw).strip())
-            if _tmo <= 0:
+            if _tmo < 0:
                 raise ValueError
         except ValueError:
             return _reject_step(workspace, milestone_id, "audit_bad_k3dit_timeout",
-                                f'[roles.audit] k3dit_timeout={_tmo_raw!r} 不合法（正整数秒）'), ""
+                                f'[roles.audit] k3dit_timeout={_tmo_raw!r} 不合法'
+                                '（非负整数秒；0＝不设硬上限，靠活性判据兜）'), ""
     elif k3dit_mode == "full":
         _tmo = 7200
     _salv: dict = {}      # 抢救结果（仅失败路径填）

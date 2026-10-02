@@ -334,11 +334,13 @@ value-2（with-worktree 上下文管理器，两处脚手架合并）、value-3�
   （M10 能封，是因为其包 `apply_order` 为空、`apply_bundle` 在脏树判据之前就早返回。）
 
 **本轮处置**：`k3dit_timeout = "21600"`（6h）兜住整仓一轮（`.agent/pipeline.toml` + `templates/assets/pipeline.toml.template` 同步，漂移闸要求两者一致）。
+（**已被下方「已收口」取代**：6h 仍不够，M11 三跑 6h 墙钟再掐；活性口径才是正解。）
 
 **仍留（需独立批次；reopen 条件见各条）**：
-- **外层墙钟改探针口径**：把 `_run` 的平铺超时换成**认探针的活性上限**（盯 `K3DIT_HALL_ROOT`/`K3DIT_LEDGER`
-  的 mtime 或账本 `events[].ts`；静默超阈值才 `killpg`，否则续等），另留一条可选硬上限当成本天花板。
-  与 k3dit 的 `stall_after_sec` 同口径。配 ADR + 测试（慢但推进不杀 / 真静默才杀）。
+- ~~**外层墙钟改探针口径**~~ **已收口（2026-10-02）**：`audit_bundle._run_watched` 认活性（盯
+  `K3DIT_HALL_ROOT`/`K3DIT_LEDGER` 的 mtime+size，连续无进展 `K3DIT_STALL_SEC`〔与 k3dit 同口径，
+  缺省 3600s〕才 `killpg`）；`k3dit_timeout` 降为**可选成本天花板**（本仓 `0`＝不设）。配 ADR-0025
+  §2.9.6 `🅰3` + 测试 `test_run_watched_survives_slow_progress_and_kills_a_silent_tool`。
 - ~~`audit_checklist.json` 运行态投影不该 tracked~~ **已决（2026-09-30）**：与 `.agent/audit_jobs.json`
   同批 gitignore 并 `git rm --cached`；`.gitignore` 覆盖两条投影由 `test_audit_bundle.test_repo_gitignore_covers_both_runtime_projections` 钉住。
 

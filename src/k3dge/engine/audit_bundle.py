@@ -125,6 +125,100 @@ def _run(argv: List[str], cwd: Path, timeout: int, env: Optional[Dict[str, str]]
     return proc.returncode, (out or "") + (err or "")
 
 
+def _kill_pg(proc: "subprocess.Popen", msg: str) -> Tuple[int, str]:
+    """杀整个进程组（k3dit 会再起席位子进程）并回收管道，返回 `(124, msg+残留输出)`。
+
+    与 `_run` 的超时杀法同源：只杀父进程会留孤儿，它们继续写 hall 状态，下一轮撞"站点占位"。
+    """
+    import signal
+
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except OSError:      # pragma: no cover - 进程已退出
+        proc.kill()
+    try:
+        out, err = proc.communicate(timeout=30)
+    except Exception:      # pragma: no cover
+        out, err = "", ""
+    return 124, msg + (out or "") + (err or "")
+
+
+def _activity_sig(paths: List[str]) -> Optional[Tuple[float, int]]:
+    """活动签名＝路径树的 `(最新 mtime, 总大小)`；一处都没有 ⇒ `None`（无活跃信号，不据此判停）。
+
+    变化即"工具在推进"。用 mtime+size 而非账本事件，是因为 hall 会频繁落盘（席日志/账本），
+    不必解析 k3dit 内部结构，只当**活性探针**读（判据仍归 k3dit）。
+    """
+    import os as _os
+
+    best_m, total, found = -1.0, 0, False
+    for raw in paths:
+        p = Path(raw)
+        try:
+            if p.is_file():
+                st = p.stat()
+                found, best_m, total = True, max(best_m, st.st_mtime), total + st.st_size
+            elif p.is_dir():
+                for root, _dirs, files in _os.walk(p):
+                    for fn in files:
+                        try:
+                            st = _os.stat(_os.path.join(root, fn))
+                        except OSError:
+                            continue
+                        found, best_m, total = True, max(best_m, st.st_mtime), total + st.st_size
+        except OSError:
+            continue
+    return (round(best_m, 6), total) if found else None
+
+
+def _stall_sec_from_env(env: Dict[str, str]) -> int:
+    """活性阈值：与 k3dit 的 `K3DIT_STALL_SEC` **同口径**（缺省 3600s；`0`＝关）。"""
+    raw = str((env or {}).get("K3DIT_STALL_SEC") or "").strip()
+    try:
+        return max(0, int(raw or "3600"))
+    except ValueError:
+        return 3600
+
+
+def _run_watched(argv: List[str], cwd: Path, *, hard_timeout: int, stall_sec: int,
+                 activity_paths: List[str], env: Optional[Dict[str, str]] = None,
+                 poll: int = 5) -> Tuple[int, str]:
+    """跑子进程，按**活性**兜底（不是平铺墙钟）——ADR-0025 §2.9.6。
+
+    - 每 `poll` 秒快照 `activity_paths` 的 `(最新 mtime, 总大小)`；变了＝工具在推进，续等。
+    - **确实观测到过活动**、且连续 `stall_sec` 秒无变化 ⇒ 判停滞、`killpg`（rc 124）。
+    - `hard_timeout > 0` 时另加一条总时长天花板（成本上限）；`0`＝不设。
+    - 与 k3dit 的 `K3DIT_STALL_SEC` 同口径：外层不再用固定墙钟把"慢但在推进"的整仓审计掐断
+      （真跑 M11，2026-10-02：6h 墙钟掐断 ⇒ `hall export` 抢救出 `incomplete` 包、封板被拒）。
+
+    活性口径只在**工具状态路径在场**时启用（调用方保证）；无状态信号时退回纯 `hard_timeout`，
+    避免把"写盘不频繁但仍在跑"的轮次误杀。
+    """
+    import time
+
+    try:
+        proc = subprocess.Popen(argv, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                text=True, env=env, start_new_session=True)
+    except OSError as exc:
+        return 127, f"{exc}"
+    start = last = time.monotonic()
+    last_sig: Optional[Tuple[float, int]] = None
+    while True:
+        try:
+            out, err = proc.communicate(timeout=poll)     # 重复调用不丢输出（逐轮 drain）
+            return proc.returncode, (out or "") + (err or "")
+        except subprocess.TimeoutExpired:
+            now = time.monotonic()
+            sig = _activity_sig(activity_paths)
+            if sig is not None:
+                if sig != last_sig:
+                    last_sig, last = sig, now
+                elif stall_sec > 0 and (now - last) >= stall_sec:
+                    return _kill_pg(proc, f"stall {stall_sec}s 无进展（已杀进程组）")
+            if hard_timeout > 0 and (now - start) >= hard_timeout:
+                return _kill_pg(proc, f"hard-timeout {hard_timeout}s（已杀进程组）")
+
+
 def _last_json(text: str) -> Optional[dict]:
     """k3dit 的 json 载荷在最后一行（前面可能有过程日志/诊断）。"""
     for line in reversed((text or "").strip().splitlines()):
@@ -143,7 +237,9 @@ def run_path_audit(workspace: Path, out: Path, *, mode: str = "full", pins: str 
                    scope: str = "", timeout: int = 3600, k3dit: Optional[List[str]] = None) -> dict:
     """跑 k3dit 路径入口（工具调用）。`mode`＝工具运行模式（full / audit-only）；
     `pins`＝钉的落地形态（inplace＝钉留树 / artifact＝钉只随包）；
-    `scope`＝送审范围（**逗号分隔**；空串＝不传，用 k3dit 自己的缺省）。返回 {ok, rc, out, payload, detail}。"""
+    `scope`＝送审范围（**逗号分隔**；空串＝不传，用 k3dit 自己的缺省）。
+    `timeout`＝**总时长硬上限（成本天花板）**：`0`＝不设，靠活性判据兜（见 `_run_watched`，
+    ADR-0025 §2.9.6）。活性口径随 k3dit 的 `K3DIT_STALL_SEC`（缺省 3600s）。返回 {ok, rc, out, payload, detail}。"""
     argv0 = k3dit or find_k3dit(workspace)
     if not argv0:
         return {"ok": False, "rc": 127, "detail": f"找不到 k3dit（设 {K3DIT_ENV} 或装到 PATH/兄弟仓）"}
@@ -155,7 +251,17 @@ def run_path_audit(workspace: Path, out: Path, *, mode: str = "full", pins: str 
     if _env.get("K3GE_STATE_UNSAFE"):
         return {"ok": False, "rc": 126, "out": str(out),
                 "detail": f"工具状态目录不安全，拒绝启动（{_env['K3GE_STATE_UNSAFE']}）"}
-    rc, text = _run(argv, workspace, timeout, env=_env)
+    # 活性探针：盯工具状态路径（hall/账本）的 mtime+size。只在拿到状态路径时启用
+    # （自审时 `_tool_env` 原样返回 env），否则退回纯 hard_timeout，避免误杀写盘不频繁的轮次。
+    _watch, _has_state = [str(out)], False
+    for _k in ("K3DIT_HALL_ROOT", "K3DIT_LEDGER"):
+        _v = _env.get(_k)
+        if _v:
+            _watch.append(_v)
+            _has_state = True
+    _stall = _stall_sec_from_env(_env) if _has_state else 0
+    rc, text = _run_watched(argv, workspace, hard_timeout=timeout, stall_sec=_stall,
+                            activity_paths=_watch, env=_env)
     payload = _last_json(text)
     if rc not in (0, 3):
         return {"ok": False, "rc": rc, "out": str(out), "detail": text.strip()[-400:],

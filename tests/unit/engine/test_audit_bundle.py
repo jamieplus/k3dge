@@ -223,11 +223,11 @@ def test_run_path_audit_passes_mode_and_pins(tmp_path, monkeypatch):
     """工具参数必须**传到位**：`--mode` 与 `--pins` 是 k3dit 的两个运行旋钮（纯审计/钉只随包）。"""
     seen = {}
 
-    def _fake_run(argv, cwd, timeout, env=None):
+    def _fake_run(argv, cwd, **k):
         seen["argv"] = argv
         return 0, '{"ok": true, "status": "closed"}'
 
-    monkeypatch.setattr(ab, "_run", _fake_run)
+    monkeypatch.setattr(ab, "_run_watched", _fake_run)
     monkeypatch.setattr(ab, "find_k3dit", lambda w: ["k3dit"])
     ab.run_path_audit(tmp_path, tmp_path / "b", mode="audit-only", pins="artifact",
                       scope="src/k3dit/tools,docs")
@@ -493,7 +493,7 @@ def test_tool_state_never_lands_in_a_foreign_subject(tmp_path, monkeypatch):
 
 
 def test_tool_timeout_is_a_knob_with_mode_defaults(tmp_path, monkeypatch):
-    """墙钟预算必须是**声明面旋钮**（真跑实测：8 文件 full 跑超 1h 被 `_run` 掐断 ⇒ 整轮白烧）。"""
+    """总时长硬上限是**声明面旋钮**；`0`＝不设（活性判据兜底，ADR-0025 §2.9.6）。"""
     from k3dge.engine import milestone_audit as ma
 
     ws = _repo(tmp_path)
@@ -517,9 +517,45 @@ def test_tool_timeout_is_a_knob_with_mode_defaults(tmp_path, monkeypatch):
     ma._bundle_audit_leg(ws, "M1", ma._Prompt.default(), "b" * 40)
     assert seen["timeout"] == 3600                      # 纯审计 ⇒ 1h
     (ws / ".agent" / "pipeline.toml").write_text(
+        '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\nk3dit_timeout = "0"\n', encoding="utf-8")
+    ma._bundle_audit_leg(ws, "M1", ma._Prompt.default(), "b" * 40)
+    assert seen["timeout"] == 0                         # 0＝不设硬上限（活性判据兜）
+    (ws / ".agent" / "pipeline.toml").write_text(
         '[roles.audit]\nbind = "k3dit"\nmode = "bundle"\nk3dit_timeout = "abc"\n', encoding="utf-8")
     early, _ = ma._bundle_audit_leg(ws, "M1", ma._Prompt.default(), "b" * 40)
     assert early is not None and early[0] == "refused" and "k3dit_timeout" in early[1], early
+
+
+def test_run_watched_survives_slow_progress_and_kills_a_silent_tool(tmp_path):
+    """活性兜底（ADR-0025 §2.9.6）：**慢但在推进**不杀；**真静默**超阈值才 `killpg`。
+
+    真跑 M11（2026-10-02）：外层平铺墙钟把 6h 的整仓审计掐断 ⇒ `hall export` 抢救出
+    `incomplete` 包 ⇒ 封板被拒。判据改为盯工具状态路径的活性。
+    """
+    import sys
+    import time
+
+    # ① 慢但推进：每 0.2s 写一次状态文件，自然跑完 ~1.2s。stall=1s、无硬上限 ⇒ 必须 rc 0。
+    slow = tmp_path / "slow"
+    slow.mkdir()
+    prog = ("import time,pathlib;"
+            f"p=pathlib.Path(r'{slow}');"
+            "[ (p / 'tick').write_text(str(i)) or time.sleep(0.2) for i in range(6) ]")
+    rc, out = ab._run_watched([sys.executable, "-c", prog], tmp_path,
+                              hard_timeout=0, stall_sec=1, activity_paths=[str(slow)], poll=1)
+    assert rc == 0, (rc, out)
+
+    # ② 真静默：预置一个静态文件让活性签名**有值但不变化**，再睡 10s。
+    #    stall=1s ⇒ 应在 ~2s 内被杀（远早于自然结束），返回 124 且带 stall 说明。
+    state = tmp_path / "state"
+    state.mkdir()
+    (state / "seed").write_text("seed", encoding="utf-8")
+    t0 = time.monotonic()
+    rc, out = ab._run_watched([sys.executable, "-c", "import time; time.sleep(10)"], tmp_path,
+                              hard_timeout=0, stall_sec=1, activity_paths=[str(state)], poll=1)
+    dt = time.monotonic() - t0
+    assert rc == 124 and "stall" in out, (rc, out)
+    assert dt < 5, dt
 
 
 def test_partial_landing_fails_closed_when_unclosed_files_are_unresolvable(tmp_path, monkeypatch):
