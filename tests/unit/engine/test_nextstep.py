@@ -689,9 +689,10 @@ class TestSidecarAndRejectionShape(TestCase):
         state = nextstep.GATE_NEXT[gid][0]
         opt = nextstep.STATE_OPTIONS[state]
         ns = nextstep.next_for_rejection("M7", "被拒", gate_id=gid)
-        assert ns.state == state
-        assert ns.priority == int(opt.get("priority", 3)), (ns.priority, opt)
-        assert ns.pointers == (list(opt.get("pointers") or []) or None), ns.pointers
+        # 裸 `assert` 在 `python -O` 下整条剥掉 ⇒ 失败静默过（ocr2-120）。用 unittest 断言。
+        self.assertEqual(ns.state, state)
+        self.assertEqual(ns.priority, int(opt.get("priority", 3)), (ns.priority, opt))
+        self.assertEqual(ns.pointers, (list(opt.get("pointers") or []) or None), ns.pointers)
 
     def test_rejected_keeps_declared_priority_and_pointers(self) -> None:
         opt = nextstep.STATE_OPTIONS["rejected"]

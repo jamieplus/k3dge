@@ -171,7 +171,17 @@ class TestTagBoundary(TestCase):
     def test_record_fails_when_not_a_repo(self) -> None:
         ws = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
-        ok, msg = seal_record(ws, "M10", baseline="abc1234", result="closed")
+        # 裸 mkdtemp 是否"非仓"取决于 `GIT_CEILING_DIRECTORIES`（别的测试的 `_repo()` 会设），
+        # 不钉住就是测序相关的偶然通过（ocr2-123）。显式封顶到本目录，隔离断言。
+        _old = os.environ.get("GIT_CEILING_DIRECTORIES")
+        os.environ["GIT_CEILING_DIRECTORIES"] = str(ws)
+        try:
+            ok, msg = seal_record(ws, "M10", baseline="abc1234", result="closed")
+        finally:
+            if _old is None:
+                del os.environ["GIT_CEILING_DIRECTORIES"]
+            else:
+                os.environ["GIT_CEILING_DIRECTORIES"] = _old
         self.assertFalse(ok)
         self.assertIn("git", msg.lower())
 

@@ -4,6 +4,10 @@ import ast
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
+# 深度写死：文件挪层/扁平拷贝时 `parents[3]` 指错地方，测试扫错目录还绿（ocr2-130）。
+# 启动即验锚点（`src/k3dge` + `tests/` + `.agent/` 三件齐），不对就大声失败，不静默。
+for _anchor in ("src/k3dge", "tests", ".agent"):
+    assert (REPO / _anchor).exists(), f"REPO 锚点缺失（{REPO}）：文件被移动后 parents[3] 已漂移"
 
 #: 债已清空 ⇒ **零容忍**：任何隐式编码的 read_text/write_text 都红。
 #: （2026-09-30：75 处全部收口，AST 定位调用自身右括号后插 encoding，含 `read_text()` 无参

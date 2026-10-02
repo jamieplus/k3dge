@@ -159,8 +159,8 @@ GATE_NEXT: dict = {
 #: 拒绝事实文案（仅当 state 自带的 fact 不够用时；`<id>` 占位）。
 REJECTION_FACTS: dict = {
     "audit_missing": "审计缺失：先落盘报告（k3dge milestone audit-submit <id>）或 k3dge milestone audit <id>",
-    "audit_noop": "审计未真跑：这一跳被跳过或失败——空转不得当闭环（ADR-0004 §2.1.11）；检查传输链/透镜可达后重跑 k3dge milestone audit <id>",
-    "audit_degraded_unsigned": "审计降级到 manual 但报告无署名/来源——降级不静默：补署名后可记 degraded-manual（ADR-0004 §2.1.11）",
+    "audit_noop": "审计未真跑：这一跳被跳过或失败——空转不得当闭环（k3dge ADR-0004 §2.1.11）；检查传输链/透镜可达后重跑 k3dge milestone audit <id>",
+    "audit_degraded_unsigned": "审计降级到 manual 但报告无署名/来源——降级不静默：补署名后可记 degraded-manual（k3dge ADR-0004 §2.1.11）",
     "audit_open_declined": "stop / 转人工干预（待修未修复且 agent 拒绝修复）",
     "tasks_pending": "票据未全 done：先干活或改挂里程碑，再谈 align/seal",
 }

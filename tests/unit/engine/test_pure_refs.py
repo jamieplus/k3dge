@@ -359,7 +359,9 @@ class TestPointerAndClosureShape(unittest.TestCase):
         self.assertEqual([c for c, _ in out2], ["DANGLING_REPORT_REF"], out2)
 
     def test_body_meta_gate_ignores_fence_samples(self) -> None:
-        text = "# X\n\n反例长这样：\n\n```md\n- **Status**: done\n```\n"
+        # 空 frontmatter 会短路直接回 `[]`，根本走不到围栏逻辑（ocr2-121）。给非空 frontmatter，
+        # 让围栏内的示例行真被检查并放过。
+        text = ("---\nstatus: idea\n---\n# X\n\n反例长这样：\n\n```md\n- **Status**: done\n```\n")
         self.assertEqual(pure_refs.check_task_body_meta_redundant(self.REL, text), [])
 
     def test_screen_ack_target_must_be_in_repo(self) -> None:

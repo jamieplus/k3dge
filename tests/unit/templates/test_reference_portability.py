@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from k3dge.engine.nextstep import STATE_OPTIONS
+from k3dge.engine.nextstep import GATE_NEXT, STATE_OPTIONS, next_for_rejection
 from k3dge.templates.scaffold import _QUALIFY_ADR_RE, _qualify_adr_refs, scaffold
 
 # 裸引用检测与限定转换**共用同一把正则**（t-309）：旧 `BARE_ADR_REF` 是
@@ -37,10 +37,20 @@ class TestScaffoldProtocolPortability(unittest.TestCase):
             # 旧清单只列 3 份，而 `scaffold()` 实际对**十余份**下发件跑 `_qualify_adr_refs`
             # （docs.toml / pipeline.toml / guides/{mcp-bridge,downstream} / protocols/*3 /
             # architecture/overview / adr/README…）⇒ 覆盖洞（t-305）。改成扫整棵下发树。
-            targets = [f for f in sorted(t.rglob("*"))
-                       if f.is_file() and f.suffix in {".md", ".toml"}
-                       and "docs/specs" not in f.relative_to(t).as_posix()
-                       and "docs/generated" not in f.relative_to(t).as_posix()]
+            # 只扫 `.md`/`.toml` 会漏掉其他下发文本件（`scaffold()` 写 `.gitignore` 等，ocr2-127）。
+            # 扫全部文件，读不出/非文本跳过（不硬编码后缀清单，免得下发新类型又漏）。
+            targets = []
+            for f in sorted(t.rglob("*")):
+                if not f.is_file():
+                    continue
+                _rel = f.relative_to(t).as_posix()
+                if "docs/specs" in _rel or "docs/generated" in _rel:
+                    continue
+                try:
+                    f.read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError):
+                    continue
+                targets.append(f)
             assert len(targets) >= 12, f"下发面缩水，本测试失去覆盖：{len(targets)}"
             for f in targets:
                 text = f.read_text(encoding="utf-8")
@@ -109,6 +119,16 @@ class TestNextStepPointersPortability(unittest.TestCase):
                         BARE_ADR_REF.search(s),
                         f"{state}.{field} 含裸 ADR 引用：{s}",
                     )
+        # `[NEXT]` 事实还有一块经 `next_for_rejection()` 从 `REJECTION_FACTS` 投射的同显示面，
+        # 只扫 `STATE_OPTIONS` 会漏（ocr2-128）。把每个 `GATE_NEXT` 码跑一遍真路由，扫出来的串。
+        for _gid in GATE_NEXT:
+            try:
+                _ns = next_for_rejection("M7", "被拒", gate_id=_gid)
+            except Exception:
+                continue
+            for s in self._strings([_ns.fact, _ns.reasons, _ns.pointers]):
+                scanned += 1
+                self.assertIsNone(BARE_ADR_REF.search(s), f"rejection({_gid}) 含裸 ADR 引用：{s}")
         self.assertGreater(scanned, 10, f"守卫空转：只扫到 {scanned} 条串")
 
 

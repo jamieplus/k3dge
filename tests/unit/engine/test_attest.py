@@ -139,6 +139,10 @@ def test_wrong_token_in_window_is_refused() -> None:
     from k3dge.engine.attest import token
 
     ws = _repo()
+    # 先落一个文件并暂存，使 token 基于**非空树**：旧写法在空树上产 token 再加文件，
+    # 正确 token 也会因树变而红，测不出"伪造"只测出"树变"（ocr2-110）。
+    (ws / "b.txt").write_text("1\n", encoding="utf-8")
+    _gitc(ws, "add", "-A")
     msg = append_to_message(ws, "feat: token case", who="t")
     m = re.search(r"@ (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z #(\S+)", msg)
     assert m, msg
@@ -161,8 +165,8 @@ def test_wrong_token_in_window_is_refused() -> None:
     forged = msg.replace("#" + m.group(2), "#" + bad)
     env_extra = {"GIT_AUTHOR_DATE": m.group(1).replace("T", " ") + " +0000",
                  "GIT_COMMITTER_DATE": m.group(1).replace("T", " ") + " +0000"}
-    (ws / "b.txt").write_text("2\n", encoding="utf-8")
-    _gitc(ws, "add", "-A")
+    # 树保持 token 时刻的样子（b.txt 已是 "1\n" 并暂存）：唯一变量是 token 真伪，
+    # 伪造被拒即证伪绑定，不掺树变（ocr2-110）。
     _gitc(ws, "-c", "user.name=t", "-c", "user.email=t@t",
           "commit", "-q", "--no-verify", "-m", forged, env_extra=env_extra)
     ok, out = verify_commit(ws, _head(ws))

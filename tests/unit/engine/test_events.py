@@ -58,7 +58,10 @@ def test_rotate_keeps_tail():
         assert idx == list(range(idx[0], total)), "留存段不连续（只留了尾巴？）"
         assert len(idx) >= events._KEEP_LINES, f"旋转后只剩 {len(idx)}，低于保留额 {events._KEEP_LINES}"
         assert len(idx) <= events._MAX_LINES + 100
-        assert idx[0] == total - len(idx) >= 0, "头部没截断＝旋转根本没跑"
+        # 旋转的证据是头部真被截掉（`idx[0] > 0`）：`idx[0] == total-len` 在"全留"时也成立（0==0），
+        # `>= 0` 恒真，删掉旋转逻辑也全绿（ocr2-117）。
+        assert idx[0] > 0, "头部没截断＝旋转根本没跑"
+        assert len(idx) < total, "一行没丢＝旋转根本没跑"
 
 
 def test_read_events():

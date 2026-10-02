@@ -371,6 +371,12 @@ class TestMilestone(unittest.TestCase):
         (reviews / "2026-08-24-M15-align.md").write_text(
             f"# Review M15\n{_align_pass_marker('M15')}\n- [x] `a.md`\n", encoding="utf-8"
         )
+        # 第二份报告：让第一次 review 移动成功并改写 LEFTOVERS 链接，再在第二次移动时失败。
+        # 旧写法只有一份报告，失败在 call#2（第一次 review 移动）⇒ LEFTOVERS 从未被改，
+        # "恢复后相等"恒真，测不到回滚（ocr2-119）。
+        (reviews / "2026-08-24-M15-second.md").write_text(
+            f"# Review M15 second\n{_align_pass_marker('M15')}\n", encoding="utf-8"
+        )
         leftover = (
             "| ID | 报告 |\n| --- | --- |\n"
             "| X | [2026-08-24-M15-align.md](2026-08-24-M15-align.md) |\n"
@@ -382,7 +388,7 @@ class TestMilestone(unittest.TestCase):
 
         def flaky_move(src, dst):
             calls["n"] += 1
-            if calls["n"] == 2:
+            if calls["n"] == 3:
                 raise OSError("disk full")
             return real_move(src, dst)
 

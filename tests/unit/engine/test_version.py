@@ -190,6 +190,9 @@ class TestVersionParsing(unittest.TestCase):
         vs = version.validate_versions(ws)
         self.assertTrue(vs, "坏 JSON 的 manifest 让版本闸直接 return []")
         self.assertEqual(vs[0].rule_id, "VERSION_MISMATCH")
+        # 必须走 `manifest_read_error` 支路，不能靠 `get_manifest_version` 回 None 兜底（ocr2-125）。
+        # 删掉前者也照样红 ⇒ 测不出回归。直接断言成因函数。
+        self.assertTrue(version.manifest_read_error(ws), "坏 JSON 必须被 manifest_read_error 指认")
 
     def test_non_table_project_does_not_crash(self) -> None:
         # `project` 是标量/数组（合法 TOML）时不得抛 AttributeError（ocr2-085）。

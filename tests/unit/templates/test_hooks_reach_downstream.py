@@ -31,11 +31,15 @@ class TestHooksReachDownstream(unittest.TestCase):
         self.repo = Path(self._tmp.name) / "r"
         self.repo.mkdir()
         scaffold(self.repo, name="r")
-        _git(self.repo, "init", "-b", "main")
+        # 夹具必须真立住：`git init -b main` 要 git≥2.28，`sync` 要成功——返回值丢掉则夹具没铺好
+        # 测试照跑（后果非 cosmetic，ocr2-126）。步步断言。
+        _r = _git(self.repo, "init", "-b", "main")
+        self.assertEqual(_r.returncode, 0, f"git init 失败，夹具未立：{_r.stderr}")
         _git(self.repo, "config", "user.email", "t@example.com")
         _git(self.repo, "config", "user.name", "tester")
         # 下游出生后先 sync（契约哈希/派生件落盘）——`docs/guides/downstream.md` 的既定流程
-        self._k3dge("sync")
+        _s = self._k3dge("sync")
+        self.assertEqual(_s.returncode, 0, f"sync 失败，夹具未立：{_s.stderr}")
 
     def tearDown(self) -> None:
         self._tmp.cleanup()
@@ -168,7 +172,7 @@ class TestInitEntrypoints(unittest.TestCase):
         self.addCleanup(shutil.rmtree, root, ignore_errors=True)
         (root / "scripts").mkdir()
         (root / "scripts" / "init.sh").write_text(
-            "#!/usr/bin/env bash\n# k3dge init\ntrue\n", encoding="utf-8")
+            "#!/usr/bin/env bash\n# k3dge-governed project\ntrue\n", encoding="utf-8")
         w = self._wrapper(root)
         r = subprocess.run([str(w), "/some/other/repo"], capture_output=True, text=True, cwd=root)
         self.assertIn("K3DGE_SOURCE", r.stderr)      # 365：不接受位置参数，别再给"生效"假象
@@ -257,7 +261,9 @@ class TestTrackHygiene(unittest.TestCase):
     def test_generate_docs_ps1_restores_location_and_names_itself(self) -> None:
         ps1 = (ASSETS / "generate-docs.ps1").read_text(encoding="utf-8")
         self.assertIn("Push-Location $Root", ps1)
-        self.assertIn("trap { Pop-Location } EXIT", ps1)             # 376
+        # `trap EXIT` 非法（ocr2-018）：现用 `try/finally` 包主体，任何出口都 Pop。
+        self.assertIn("} finally { Pop-Location }", ps1)
+        self.assertNotIn("trap { Pop-Location } EXIT", ps1)
         self.assertIn("Auto-generated stub by ``./scripts/generate-docs.ps1``", ps1)  # 377
         self.assertNotIn("Auto-generated stub by ``./scripts/generate-docs.sh``", ps1)
 

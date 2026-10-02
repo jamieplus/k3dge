@@ -367,8 +367,15 @@ class TestGeneratedPluginSurfaceGuards(unittest.TestCase):
                 os.symlink(str(root / "node_modules"), str(link))
             except (OSError, NotImplementedError):  # pragma: no cover - 平台不支持软链
                 self.skipTest("symlink unsupported")
-            self.assertFalse(ext.can_handle(link / "a.ts"),
-                             "目录 symlink 指向忽略目录 ⇒ 归一后仍须拒")
+            # 绝对路径在首卫即拒，测不到 symlink 解析（ocr2-118）。切进目录用相对路径，
+            # 让 `link/a.ts` 走完归一化+忽略目录判定。
+            _cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                self.assertFalse(ext.can_handle(Path("link/a.ts")),
+                                 "目录 symlink 指向忽略目录 ⇒ 归一后仍须拒")
+            finally:
+                os.chdir(_cwd)
 
     def test_slice_is_injective_on_invalid_bytes(self) -> None:
         class Node:

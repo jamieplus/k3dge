@@ -35,7 +35,13 @@ def test_pointer_matches_path_not_basename() -> None:
     (ws / ".agent" / "audit_jobs.json").write_text(json.dumps({"jobs": [
         {"job_id": "j", "milestone_id": "M9",
          "ticket_task": f"docs/tasks/archive/M9/{in_ledger.name}"}]}), encoding="utf-8")
-    pending = work_pending(scan_milestone_tasks(ws, "M9"), ws)
+    # 归档目录不在顶层扫描视野内：只传顶层列表测不出账本豁免（ocr2-124）。把归档票也传进去，
+    # 断言它被豁免（不在 pending），活票仍在。
+    from k3dge.engine.task_index import archived_milestone_tasks
+
+    _all = scan_milestone_tasks(ws, "M9") + archived_milestone_tasks(ws, "M9")
+    assert any(t.path == in_ledger for t in _all), "归档票须在输入里，否则豁免测不到"
+    pending = work_pending(_all, ws)
     assert [t.path for t in pending] == [live], "同名不同路径的活票被账本指针误免"
 
 

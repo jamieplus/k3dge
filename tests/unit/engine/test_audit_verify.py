@@ -30,7 +30,8 @@ def make_bundle(root: Path, *, version: int = 1, claimed: str = "closed", row_st
                 finding_state: str = "fixed", review_ack: bool = True,
                 disposition: str = "已改：加了 added_by_fix",
                 input_path: str = "/tmp/ws", order=("fix.patch", "pins.patch"),
-                preexisting_pin: bool = False, pins_in_code: bool = True) -> Path:
+                preexisting_pin: bool = False, pins_in_code: bool = True,
+                extra_file: bool = False) -> Path:
     """造一个**结构完整**的包：`code/` + `baseline.json` + 12 列表格 + 真生成的补丁。
 
     `preexisting_pin` ⇒ 输入树里本来就有一枚钉（baseline 存**去钉语义层** ⇒ 重放后要能对上）。
@@ -47,11 +48,18 @@ def make_bundle(root: Path, *, version: int = 1, claimed: str = "closed", row_st
     if tamper:      # 在（含钉的）文件里追加一行代码 ⇒ 必须被哈希链抓住
         code_text += "tampered = True\n"
     (b / "code" / "src" / "a.py").write_text(code_text, encoding="utf-8")
+    _algo = hashlib.sha1 if version == 1 else hashlib.sha256
+    files = {"src/a.py": _algo(_PRE.encode()).hexdigest()}
+    if extra_file:
+        # 第二文件：证明哈希链绑定整包多文件，不只 `src/a.py` 单点（ocr2-113）。
+        # `tree_hash`/`count` 仍是占位（产出方未定义整树口径；真包允许审计中新增文件，严查"无多余"会误杀）。
+        _extra = "z = 3\n"
+        (b / "code" / "src" / "b.py").write_text(_extra, encoding="utf-8")
+        files["src/b.py"] = _algo(_extra.encode()).hexdigest()
     # 摘要算法随包版本（与 k3dit pack._ALGO_BY_VERSION / k3dge _ALGO_BY_VERSION 同表）
-    digest = (hashlib.sha1 if version == 1 else hashlib.sha256)(_PRE.encode()).hexdigest()
     (b / "baseline.json").write_text(json.dumps({
-        "files": {"src/a.py": digest},
-        "tree_hash": "x", "count": 1}, ensure_ascii=False), encoding="utf-8")
+        "files": files,
+        "tree_hash": "x", "count": len(files)}, ensure_ascii=False), encoding="utf-8")
     (b / "findings.json").write_text(json.dumps({"items": [
         {"id": "code-1", "state": finding_state, "review_ack": review_ack,
          "location": "src/a.py:1",          # 真包含 location（部分落地要靠它把未关项所在文件排除）
@@ -311,3 +319,10 @@ def test_duplicate_finding_ids_are_reported(tmp_path):
     (b / "findings.json").write_text(_json.dumps(items, ensure_ascii=False), encoding="utf-8")
     res = av.verify_bundle_local(b)
     assert not res["ok"] and "ID 重复" in _errors(res), _errors(res)
+
+
+def test_hash_chain_binds_multiple_files(tmp_path):
+    """哈希链必须绑定包内多文件，不只单点（ocr2-113）。"""
+    res = av.verify_bundle_local(make_bundle(tmp_path, extra_file=True))
+    assert res["ok"], _errors(res)
+    assert res["hash"]["checked"] == 2, res["hash"]

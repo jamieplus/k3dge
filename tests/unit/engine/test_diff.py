@@ -76,12 +76,15 @@ class TestDiff(unittest.TestCase):
                 files2 = get_changed_files(repo)
             self.assertIn("c.txt", files2)
             self.assertNotIn("a.txt", files2)
-            # 非法 base（`-` 开头/含空白）：入口拒、不递给 git（ocr-229）
-            for bad_base in ("-b extra", "  ", "a b"):
+            # 非法 base（`-` 开头/含空白）：入口拒、不递给 git（ocr-229）。
+            # 纯空白是"没设"（`strip()` 后空 ⇒ 回落 `resolve_base`），必须真跑不断言跳过（ocr2-114）。
+            for bad_base in ("-b extra", "a b"):
                 with mock.patch.dict(os.environ, {"K3DGE_BASE_SHA": bad_base}):
-                    if bad_base.strip():
-                        with self.assertRaises(GitError):
-                            get_changed_files(repo)
+                    with self.assertRaises(GitError):
+                        get_changed_files(repo)
+            with mock.patch.dict(os.environ, {"K3DGE_BASE_SHA": "  "}):
+                files3 = get_changed_files(repo)
+                self.assertIn("c.txt", files3)
 
 class TestPorcelainZ(unittest.TestCase):
     """`get_changed_files` 走的是 `-z` 路径（t-100）——live 代码此前**零直测**：

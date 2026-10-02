@@ -82,12 +82,17 @@ class TestEvaluator(unittest.TestCase):
         self.assertTrue(report.passed, [(v.rule_id, v.message) for v in report.violations])
 
     def test_contract_drift_detected(self) -> None:
+        from k3dge.sync.generator import sync_all
+
         (self.repo / "src/core/mod.py").write_text(
             "def foo(x: int) -> int:\n    return x\n"
         , encoding="utf-8")
         (self.repo / "docs/specs/core/spec.md").write_text(
             SPEC.format(hash="sha256:" + "0" * 64)
         , encoding="utf-8")
+        # 先 sync 落真哈希再提交：基线干净（无漂移），后续改源码才引入真漂移（ocr2-115）。
+        # 旧写法基线即无效哈希（全零），漂移检测坏了也照样红，测不出回归。
+        sync_all(self.repo)
         _git(self.repo, "add", "-A")
         _git(self.repo, "commit", "-m", "init")
 
@@ -209,6 +214,10 @@ class TestEvaluator(unittest.TestCase):
         self.assertIn("core", selective.modified_domains)
         self.assertNotIn("other", selective.modified_domains)
         self.assertTrue(any(v.domain == "other" for v in full.violations))
+        # 选择性评估必须真跳过未动域：只查 `modified_domains` 元数据不断言跳过，
+        # 全量跑也照样过（ocr2-116）。`other` 的 violation 在 selective 里不得出现。
+        self.assertFalse(any(v.domain == "other" for v in selective.violations),
+                         [(v.domain, v.rule_id) for v in selective.violations])
 
     def test_non_utf8_spec_is_violation(self) -> None:
         (self.repo / "src/core/mod.py").write_text("def foo() -> int:\n    return 1\n", encoding="utf-8")

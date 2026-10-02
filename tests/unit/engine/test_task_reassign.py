@@ -236,8 +236,6 @@ class TestTaskWriteGuards(TestCase):
         self.assertIn("不可读", msg)
 
     def test_reassign_checks_target_before_writing(self) -> None:
-        from k3dge.engine.task_write import reassign_task_milestone
-
         ws = self._ws()
         a = ws / "docs" / "tasks" / "2026-10-02-M10-fix-a.md"
         b = ws / "docs" / "tasks" / "2026-10-02-M11-fix-a.md"

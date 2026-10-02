@@ -36,6 +36,10 @@ class TestScaffoldProblemsChannel(unittest.TestCase):
         if not (os.stat(f).st_mode & 0o111):
             self.skipTest("本文件系统不承载 exec 位（挂载选项/umask）")
         f.chmod(0o644)                      # 模拟跨 fs/checkout 丢 mode
+        # `chmod(0o644)` 在忽略 mode 的挂载上可能根本清不掉执行位 ⇒ 后面"修回来了"的断言空转（ocr2-129）。
+        # 先证清掉了，清不掉就跳过（在此 FS 上测不了修复）。
+        if os.stat(f).st_mode & 0o111:
+            self.skipTest("chmod(0o644) 未实际清除执行位（文件系统忽略 mode），无法验证修复")
         content_before = f.read_text(encoding="utf-8")
         problems2 = scaffold(self.target, name="p")     # 重跑＝公开幂等面
         self.assertEqual([m for m in problems2 if "gate" in m], [], problems2)
@@ -205,8 +209,6 @@ class TestSlugAndPackageRoot(unittest.TestCase):
 
     def test_package_root_traversal_falls_back(self) -> None:
         # manifest 的 package_root 含 `..`/绝对路径 ⇒ 回落 src，不铺出仓（ocr2-108）。
-        import json
-
         from k3dge.templates import scaffold as sc
 
         with self.subTest("parent-escape"):

@@ -11,17 +11,23 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[3]
-ID_RE = re.compile(r"[a-z]+-\d+$")
+# `ID_RE`（仅小写前缀）已删：它曾把大写 ID（如 `D-1`）的行在 `_rows` 里预过滤掉，
+# 调用方再查"坏行"永空（ocr2-111）。现在 `_rows` 不过滤 ID，大小写全覆盖。
 STATUSES = {"待修", "已修", "有意留", "待验证", "待裁", "部分修"}
 
 
 def _rows(text: str) -> list[tuple[int, list[str]]]:
+    # 不在这里过滤短行/数据 ID：调用方要**看见**畸形行才能断言（ocr2-111/112）。
+    # 旧写法先丢弃 `len<12` 与大写 ID（如 `D-1`），再让调用方查"有没有坏行" ⇒ 永空，测了寂寞。
+    # 只跳过表头与分隔行（`ID`/`---` 字面），数据行无论 ID 形状全留。
     out = []
     for no, ln in enumerate(text.splitlines(), 1):
         if not ln.startswith("| "):
             continue
         cells = [x.strip() for x in ln.split("|")[1:-1]]
-        if len(cells) < 12 or not ID_RE.match(cells[0]):
+        if cells and cells[0] in ("ID", "---"):
+            continue
+        if cells and all(set(c) <= set("-: ") for c in cells):
             continue
         out.append((no, cells))
     return out
@@ -31,7 +37,7 @@ def _rows(text: str) -> list[tuple[int, list[str]]]:
 def test_finding_rows_have_exactly_twelve_cells(path: Path) -> None:
     if path.name == "LEFTOVERS.md":
         pytest.skip("留账本不是 finding 表")
-    broken = [(no, len(c), c[0]) for no, c in _rows(path.read_text(encoding="utf-8")) if len(c) != 12]
+    broken = [(no, len(c), c[0] if c else "") for no, c in _rows(path.read_text(encoding="utf-8")) if len(c) != 12]
     assert not broken, f"{path.name}: 竖线破表的行（行号, 格数, ID）: {broken[:5]}"
 
 
@@ -39,8 +45,9 @@ def test_finding_rows_have_exactly_twelve_cells(path: Path) -> None:
 def test_status_column_is_in_closed_set(path: Path) -> None:
     if path.name == "LEFTOVERS.md":
         pytest.skip("留账本不是 finding 表")
+    # 短行（<8 格）取不到状态槽：它们归 `broken` 管，这里只查够格的行（ocr2-112 同源）。
     bad = [(no, c[0], c[7]) for no, c in _rows(path.read_text(encoding="utf-8"))
-           if c[7] and c[7] not in STATUSES]
+           if len(c) >= 8 and c[7] and c[7] not in STATUSES]
     assert not bad, f"{path.name}: 状态列不在闭集 {sorted(STATUSES)}（行号, ID, 落进状态槽的文本）: {bad[:5]}"
 
 
