@@ -167,3 +167,14 @@ def test_wrong_token_in_window_is_refused() -> None:
           "commit", "-q", "--no-verify", "-m", forged, env_extra=env_extra)
     ok, out = verify_commit(ws, _head(ws))
     assert not ok and "token mismatch" in out, out
+
+
+def test_stale_shaped_line_is_refreshed_not_kept():
+    # 形状对但 token 过期/伪造的行不得原样保留，必须重算 fresh 行（ocr2-011/035）。
+    ws = _repo()
+    (ws / "a.txt").write_text("x\n", encoding="utf-8")
+    _gitc(ws, "add", "-A")
+    stale = "feat: x\n\nk3dge-commit: t @ 2020-01-01T00:00:00Z #wrongword\n"
+    out = append_to_message(ws, stale, who="t")
+    assert "wrongword" not in out and "2020-01-01" not in out
+    assert PREFIX in out

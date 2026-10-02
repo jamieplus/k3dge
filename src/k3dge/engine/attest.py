@@ -113,8 +113,9 @@ def append_to_message(workspace: Path, msg: str, who: str = "") -> str:
     就足以让受管路径放弃署名；`--amend` 复用旧行时 tree 已变也不会重算 ⇒ CI 误红（ocr-200）。
     """
     body = msg or ""
-    if any(LINE_RE.match(ln.strip()) for ln in body.splitlines()):
-        return body
+    # 形状对 ≠ 合法：`LINE_RE` 只验形状，不重算 token（ocr2-035）。`--amend` 复用旧行时 tree 已变，
+    # 旧 token 已过期；伪造行只要形状对也能蒙混。不再"见形就留"——一律剥掉 PREFIX 行后重算 fresh 行：
+    # tree+window 未变时重算结果相同（幂等），变了则拿到新 token（ocr-125/142 的初衷仍成立）。
     kept = [ln for ln in body.splitlines() if not ln.strip().startswith(PREFIX)]
     trailer = line(workspace, who=who)
     cleaned = "\n".join(kept).rstrip()

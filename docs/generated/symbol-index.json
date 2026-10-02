@@ -2022,7 +2022,7 @@
   "verify_commit": [
     {
       "file": "src/k3dge/engine/attest.py",
-      "line": 132
+      "line": 133
     }
   ],
   "verify_contract": [

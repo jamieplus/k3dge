@@ -28,3 +28,6 @@ if ! python3 "${ROOT}/scripts/gate.py" commit-attest --rewrite-file "$1"; then
   echo "[k3dge] commit-attest 改写失败：拒绝提交（缺 k3dge-commit 署名会被 CI 全量验拦下）" >&2
   exit 1
 fi
+# 改写后的字节（git 真正要提交的）必须再验一次：`check-msg` 只验了改写前的字节，
+# 改写引入错误时不复验等于放行未验证的内容（ocr2-010）。
+python3 "${ROOT}/scripts/gate.py" check-msg --file "$1" || exit 1
