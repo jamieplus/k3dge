@@ -59,51 +59,75 @@ def _strip_impl_body(text: str) -> str:
     return text[:brace].rstrip()
 
 
+def _body_node(node):
+    """Grammar `body` field child (drilling through wrappers) — where the
+    implementation starts. `None` for bodyless declarations."""
+    b = node.child_by_field_name("body")
+    if b is not None:
+        return b
+    for c in node.children:
+        r = _body_node(c)
+        if r is not None:
+            return r
+    return None
+
+
+def _signature_text(source: bytes, node) -> str:
+    """Declaration text **without** the body, sliced at the grammar `body` node.
+    (Not `text.find("{")` — that truncates inline object return types, code-4.)"""
+    b = _body_node(node)
+    if b is None:
+        return _slice(source, node)
+    text = source[node.start_byte : b.start_byte].decode("utf-8", "backslashreplace")
+    return "".join(ch for ch in text if ch in "\n\t" or ch.isprintable()).strip()
+
+
 def _container_signature(source: bytes, node) -> str:
-    header = _strip_impl_body(_slice(source, node))
+    header = _signature_text(source, node)
     methods: List[str] = []
-    for child in node.children:
-        if child.type not in ("class_body",):
+    body = _body_node(node)
+    for member in (body.children if body is not None else ()):
+        if member.type in ("{", "}", ";"):
             continue
-        for member in child.children:
-            if member.type in ("method_definition", "public_field_definition", "field_definition"):
-                sig = _strip_impl_body(_slice(source, member))
-                if sig:
-                    methods.append("  " + sig)
-            else:
-                _warn_unrecognized("class member", member.type)
+        if member.type in ("method_definition", "public_field_definition", "field_definition", "abstract_method_signature", "method_signature"):
+            sig = _signature_text(source, member)
+            if sig:
+                methods.append("  " + sig)
+        else:
+            _warn_unrecognized("class member", member.type)
     if not methods:
         return header
     return header + "\n" + "\n".join(methods)
 
 
-def _decl_signature(source: bytes, node, exported: bool = False) -> Optional[str]:
+def _decl_signature(source: bytes, node, exported: bool = False, prefix: str = "") -> Optional[str]:
     if node.type in ("export_statement",):
         inner = None
         for child in node.children:
-            if child.type in ("function_declaration", "method_definition") + ("class_declaration",) + ("interface_declaration", "type_alias_declaration", "enum_declaration") + ("lexical_declaration",):
+            if child.type in ("function_declaration", "method_definition") + ("class_declaration", "abstract_class_declaration") + ("interface_declaration", "type_alias_declaration", "enum_declaration") + ("lexical_declaration",):
                 inner = child
                 break
         if inner is None:
+            _warn_unrecognized("top-level", next((c.type for c in node.named_children), node.type))
             return _slice(source, node)
-        return _decl_signature(source, inner, exported=True)
-    elif node.type in ("class_declaration",):
+        prefix = source[node.start_byte:inner.start_byte].decode("utf-8", "backslashreplace")
+        prefix = "".join(ch for ch in prefix if ch in "\n\t" or ch.isprintable()).strip()
+        return _decl_signature(source, inner, exported=True, prefix=prefix)
+    elif node.type in ("class_declaration", "abstract_class_declaration"):
         text = _container_signature(source, node)
     elif node.type in ("function_declaration", "method_definition"):
-        text = _strip_impl_body(_slice(source, node))
+        text = _signature_text(source, node)
     elif node.type in ("interface_declaration", "type_alias_declaration", "enum_declaration"):
         text = _slice(source, node)
     elif node.type in ("lexical_declaration",):
         if not exported:
             return None
-        text = _slice(source, node)
-        if "=>" in text or "function" in text:
-            text = _strip_impl_body(text)
+        text = _signature_text(source, node)
     else:
         _warn_unrecognized("top-level", node.type)
         return None
-    if exported and not text.startswith("export"):
-        text = "export " + text
+    if prefix:
+        return (prefix + " " + text).strip()
     return text
 
 
@@ -145,7 +169,21 @@ def extract_typescript_interface(path: Path, include_doc: bool = False) -> str:
     except TypeError:
         parser = Parser()
         parser.language = language  # type: ignore[attr-defined]
-    source = path.read_bytes()
+    import os
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    except OSError as exc:
+        raise ImportError("typescript: cannot open " + str(path) + " (" + str(exc) + ")") from exc
+    try:
+        chunks: List[bytes] = []
+        while True:
+            c = os.read(fd, 1 << 20)
+            if not c:
+                break
+            chunks.append(c)
+        source = b"".join(chunks)
+    finally:
+        os.close(fd)
     tree = parser.parse(source)
     if tree.root_node.has_error:
         _warn_unrecognized("parse-error", path.name)   # 残缺树：可见降级，不静默漏接口
@@ -169,7 +207,7 @@ class TypescriptExtractor(ContractExtractor):
         # `a/../node_modules/x.ts` 都能绕过目录黑名单（判据落在未归一的形状上），故先归一再判（code-7）。
         import os
 
-        if path.is_absolute() or path.suffix not in (".ts", ".tsx", ".js"):
+        if path.suffix not in (".ts", ".tsx", ".js"):
             return False
         parts = Path(os.path.normpath(str(path))).parts
         if ".." in parts or _IGNORED_DIRS.intersection(parts):
@@ -177,10 +215,15 @@ class TypescriptExtractor(ContractExtractor):
         if _is_generated(path):
             return False
         try:                              # 解析后仍不得越界（symlink 指向忽略目录 ⇒ 拒）
-            resolved = Path(os.path.realpath(str(path))).parts
+            resolved = Path(os.path.realpath(str(path)))
         except OSError:                   # pragma: no cover - 罕见 IO 故障
             return False
-        return not _IGNORED_DIRS.intersection(resolved)
+        if _IGNORED_DIRS.intersection(resolved.parts):
+            return False
+        # 黑名单不是包含性校验（code-6）：绝对路径必须落在仓根（cwd）内，否则可能是仓外符号链接靶。
+        if path.is_absolute() and not resolved.is_relative_to(Path.cwd().resolve()):
+            return False
+        return True
 
     def extract(self, path: Path, include_doc: bool = False) -> str:
         return extract_typescript_interface(path, include_doc=include_doc)

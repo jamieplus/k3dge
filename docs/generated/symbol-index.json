@@ -14,7 +14,7 @@
   "ExtractorConfigError": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 148
+      "line": 149
     }
   ],
   "GateReport": [
@@ -776,7 +776,7 @@
   "describe_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 546
+      "line": 597
     }
   ],
   "emit": [
@@ -1574,7 +1574,7 @@
   "render_plugin": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 258
+      "line": 259
     }
   ],
   "render_readme_layout": [
@@ -1628,7 +1628,7 @@
   "resolve_languages": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 212
+      "line": 213
     }
   ],
   "resolve_role": [
@@ -1908,7 +1908,7 @@
   "sync_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 488
+      "line": 539
     }
   ],
   "tag_audit_baseline": [

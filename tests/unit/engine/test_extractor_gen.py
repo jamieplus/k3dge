@@ -26,10 +26,11 @@ class TestRender(unittest.TestCase):
         self.assertTrue(text.startswith(g.MARKER))
 
     def test_typescript_branches(self):
-        """Generated TS keeps the legacy branch structure (export/class/lexical)."""
+        """Generated TS keeps the branch structure (export/class/lexical) + node-based body slicing."""
         src = g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"])
-        for needle in ("export_statement", "class_body", "lexical_declaration",
-                       "public_field_definition", "language_typescript()"):
+        for needle in ("export_statement", "class_declaration", "abstract_class_declaration",
+                       "lexical_declaration", "public_field_definition", "language_typescript()",
+                       "_body_node", "_signature_text"):
             self.assertIn(needle, src)
 
     def test_no_container_means_no_walker(self):
@@ -327,6 +328,45 @@ class TestSync(unittest.TestCase):
                 # 会把一个后端文件已删的提取器留在进程注册表里；`collect_domain_interface`
                 # 取首个匹配 ⇒ 其它测试变成顺序相关（t-140）
                 from k3dge.engine import contract as _c
+                _c._EXTRACTORS[:] = snapshot
+
+
+    def test_generated_ts_modifiers_inline_types_and_abstract(self):
+        """code-2/4/5 回归：node 语义切体（非首个 `{`）。
+
+        - `export default fn` 前缀保留（旧版摘成 `export fn`）；
+        - 内联对象返回类型不被截断（旧版 `f(): { a: string }` → `f():`）；
+        - `abstract class` 作容器抽取成员（旧版整段带体或空壳）。
+        """
+        import importlib.util
+        import sys
+        try:
+            import tree_sitter  # noqa: F401
+            import tree_sitter_typescript  # noqa: F401
+        except ImportError:
+            self.skipTest("tree-sitter-typescript not installed")
+        with tempfile.TemporaryDirectory() as d:
+            mod_p = Path(d) / "typescript.py"
+            mod_p.write_text(g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"]), encoding="utf-8")
+            spec = importlib.util.spec_from_file_location("gen_ts_sem", mod_p)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            from k3dge.engine import contract as _c
+            snapshot = list(_c._EXTRACTORS)
+            sys.modules["gen_ts_sem"] = mod
+            try:
+                spec.loader.exec_module(mod)
+                cases = {
+                    "export default function f(): void {}\n": "export default function f(): void",
+                    "export function f(): { a: string } { return {a:'x'} }\n": "export function f(): { a: string }",
+                    "export abstract class C { abstract m(): void }\n": "export abstract class C\n  abstract m(): void",
+                }
+                for src, want in cases.items():
+                    f = Path(d) / "s.ts"
+                    f.write_text(src, encoding="utf-8")
+                    self.assertEqual(mod.extract_typescript_interface(f), want, src)
+            finally:
+                sys.modules.pop("gen_ts_sem", None)
                 _c._EXTRACTORS[:] = snapshot
 
 

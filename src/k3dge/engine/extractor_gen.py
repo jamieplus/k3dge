@@ -70,9 +70,10 @@ DEFAULT_LANGS: Dict[str, Dict[str, Any]] = {
         "wrapper": ["export_statement"],
         "wrapper_kw": "export",
         "fn": ["function_declaration", "method_definition"],
-        "container": ["class_declaration"],
+        "container": ["class_declaration", "abstract_class_declaration"],
         "body": ["class_body"],
-        "member": ["method_definition", "public_field_definition", "field_definition"],
+        "member": ["method_definition", "public_field_definition", "field_definition",
+                   "abstract_method_signature", "method_signature"],
         "type": ["interface_declaration", "type_alias_declaration", "enum_declaration"],
         "lexical_nodes": ["lexical_declaration"],
         "lexical_markers": ["=>", "function"],
@@ -324,22 +325,45 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
         "    return text[:brace].rstrip()",
         "",
         "",
+        "def _body_node(node):",
+        '    """Grammar `body` field child (drilling through wrappers) — where the',
+        '    implementation starts. `None` for bodyless declarations."""',
+        '    b = node.child_by_field_name("body")',
+        "    if b is not None:",
+        "        return b",
+        "    for c in node.children:",
+        "        r = _body_node(c)",
+        "        if r is not None:",
+        "            return r",
+        "    return None",
+        "",
+        "",
+        "def _signature_text(source: bytes, node) -> str:",
+        '    """Declaration text **without** the body, sliced at the grammar `body` node.',
+        '    (Not `text.find("{")` — that truncates inline object return types, code-4.)"""',
+        "    b = _body_node(node)",
+        "    if b is None:",
+        "        return _slice(source, node)",
+        '    text = source[node.start_byte : b.start_byte].decode("utf-8", "backslashreplace")',
+        '    return "".join(ch for ch in text if ch in "\\n\\t" or ch.isprintable()).strip()',
+        "",
+        "",
     ]
     if row["container"]:
         lines += [
             "def _container_signature(source: bytes, node) -> str:",
-            "    header = _strip_impl_body(_slice(source, node))",
+            "    header = _signature_text(source, node)",
             "    methods: List[str] = []",
-            "    for child in node.children:",
-            f"        if child.type not in {_tup(row['body'])}:",
+            "    body = _body_node(node)",
+            "    for member in (body.children if body is not None else ()):",
+            '        if member.type in ("{", "}", ";"):',
             "            continue",
-            "        for member in child.children:",
-            f"            if member.type in {_tup(row['member'])}:",
-            "                sig = _strip_impl_body(_slice(source, member))",
-            "                if sig:",
-            '                    methods.append("  " + sig)',
-            "            else:",
-            '                _warn_unrecognized("class member", member.type)',
+            f"        if member.type in {_tup(row['member'])}:",
+            "            sig = _signature_text(source, member)",
+            "            if sig:",
+            '                methods.append("  " + sig)',
+            "        else:",
+            '            _warn_unrecognized("class member", member.type)',
             "    if not methods:",
             "        return header",
             '    return header + "\\n" + "\\n".join(methods)',
@@ -361,8 +385,13 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
             "                inner = child\n"
             "                break\n"
             "        if inner is None:\n"
+            '            _warn_unrecognized("top-level", next((c.type for c in node.named_children), node.type))\n'
             "            return _slice(source, node)\n"
-            "        return _decl_signature(source, inner, exported=True)"
+            # 前缀＝wrapper 节点到 inner 之间的原文（含 `default` 等修饰），原样传给 inner，
+            # 不再硬拼 `"export "`——否则 `export default f` 被摘成 `export f`（code-2）。
+            '        prefix = source[node.start_byte:inner.start_byte].decode("utf-8", "backslashreplace")\n'
+            '        prefix = "".join(ch for ch in prefix if ch in "\\n\\t" or ch.isprintable()).strip()\n'
+            "        return _decl_signature(source, inner, exported=True, prefix=prefix)"
         )
     if row["container"]:
         branches.append(
@@ -371,31 +400,29 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
         )
     branches.append(
         f"    {'el' if branches else ''}if node.type in {_tup(row['fn'])}:\n"
-        "        text = _strip_impl_body(_slice(source, node))"
+        "        text = _signature_text(source, node)"
     )
     branches.append(
         f"    elif node.type in {_tup(row['type'])}:\n"
         "        text = _slice(source, node)"
     )
     if row["lexical"]:
-        markers = " or ".join(f'"{m}" in text' for m in row["lexical_markers"])
         branches.append(
             f"    elif node.type in {_tup(row['lexical_nodes'])}:\n"
             "        if not exported:\n"
             "            return None\n"
-            "        text = _slice(source, node)\n"
-            f"        if {markers}:\n"
-            "            text = _strip_impl_body(text)"
+            "        text = _signature_text(source, node)"
         )
     branches.append('    else:\n        _warn_unrecognized("top-level", node.type)\n        return None')
-    decl = ["def _decl_signature(source: bytes, node, exported: bool = False) -> Optional[str]:"] + branches
-    if row["wrapper_kw"]:
-        kw = row["wrapper_kw"]
-        decl += [
-            f'    if exported and not text.startswith("{kw}"):',
-            f'        text = "{kw} " + text',
-        ]
-    decl += ["    return text", "", ""]
+    decl = ['def _decl_signature(source: bytes, node, exported: bool = False, '
+            'prefix: str = "") -> Optional[str]:'] + branches
+    decl += [
+        "    if prefix:",
+        '        return (prefix + " " + text).strip()',
+        "    return text",
+        "",
+        "",
+    ]
     lines += decl
     lines += [
         f"def _load_language():",
@@ -438,7 +465,24 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
         "    except TypeError:",
         "        parser = Parser()",
         "        parser.language = language  # type: ignore[attr-defined]",
-        "    source = path.read_bytes()",
+        # 一次打开读完，且 `O_NOFOLLOW` 拒符号链接：`can_handle` 的路径判据与本次读取之间
+        # 若路径被换成指向他处的链接，旧 `read_bytes()` 会读进非预期文件（code-10）。打开失败
+        # （含链接）按 skip 信号 `ImportError` 上抛（contract 视为"本插件不接管"，不红门禁）。
+        "    import os",
+        "    try:",
+        "        fd = os.open(path, os.O_RDONLY | getattr(os, \"O_NOFOLLOW\", 0))",
+        "    except OSError as exc:",
+        f'        raise ImportError("{slug}: cannot open " + str(path) + " (" + str(exc) + ")") from exc',
+        "    try:",
+        "        chunks: List[bytes] = []",
+        "        while True:",
+        "            c = os.read(fd, 1 << 20)",
+        "            if not c:",
+        "                break",
+        "            chunks.append(c)",
+        "        source = b\"\".join(chunks)",
+        "    finally:",
+        "        os.close(fd)",
         "    tree = parser.parse(source)",
         "    if tree.root_node.has_error:",
         '        _warn_unrecognized("parse-error", path.name)   # 残缺树：可见降级，不静默漏接口',
@@ -462,7 +506,9 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
         "        # `a/../node_modules/x.ts` 都能绕过目录黑名单（判据落在未归一的形状上），故先归一再判（code-7）。",
         "        import os",
         "",
-        "        if path.is_absolute() or path.suffix not in " + _tup(row["suffixes"]) + ":",
+        # 绝对路径**不再一律拒**：调用方 `contract.collect_domain_interface` 用 `rglob` 得到的
+        # 就是（可能绝对的）路径，一律拒会让全部 TS 静默不进契约（code-1）。改按后缀筛 + 包含性校验。
+        "        if path.suffix not in " + _tup(row["suffixes"]) + ":",
         "            return False",
         "        parts = Path(os.path.normpath(str(path))).parts",
         "        if \"..\" in parts or _IGNORED_DIRS.intersection(parts):",
@@ -470,10 +516,15 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
         "        if _is_generated(path):",
         "            return False",
         "        try:                              # 解析后仍不得越界（symlink 指向忽略目录 ⇒ 拒）",
-        "            resolved = Path(os.path.realpath(str(path))).parts",
+        "            resolved = Path(os.path.realpath(str(path)))",
         "        except OSError:                   # pragma: no cover - 罕见 IO 故障",
         "            return False",
-        "        return not _IGNORED_DIRS.intersection(resolved)",
+        "        if _IGNORED_DIRS.intersection(resolved.parts):",
+        "            return False",
+        "        # 黑名单不是包含性校验（code-6）：绝对路径必须落在仓根（cwd）内，否则可能是仓外符号链接靶。",
+        "        if path.is_absolute() and not resolved.is_relative_to(Path.cwd().resolve()):",
+        "            return False",
+        "        return True",
         "",
         "    def extract(self, path: Path, include_doc: bool = False) -> str:",
         f"        return extract_{slug}_interface(path, include_doc=include_doc)",
