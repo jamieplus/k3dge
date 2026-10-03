@@ -3,8 +3,12 @@
 > Protocol slice for tools that look under `.agent/rules/` (ADR-0010).
 > Live agent protocol is repo-root `AGENTS.md`. If this file disagrees, `AGENTS.md` wins; fix this file in the same task.
 
+### 游标与任务编码
+
 * **Milestone cursor**：`.agent/milestone` 纯文本 `M0`→`M1`…，`scaffold` 默认写 `M0`，`seal` 成功后原子 `bump`。
 * **任务编码**：`docs/tasks/YYYY-MM-DD-<type>-<slug>.md`（`type` ∈ {audit, feat, fix, docs, chore, refactor}，`slug` 内 `_`），`Status: done` 时后缀 `.done.md`；有 `Milestone: M1` 时文件名中加入 `M1`。
+
+### 审计与封板生命周期
 
 * **一次声明 + 一条链（审计是封板的主体）。** 「结束里程碑」没有尺子（全 done、硬闸绿、没 task 都能被说成可封）；**审计**才是封板的主体与界限。人发起 `k3dge milestone seal <id>`（唯一入口，幂等重入）＝同时开启三相位：**预审**（align + 形式闸；失败⇒修完再 seal）→ **审计**（对**基线版本**跑；正常返回⇒**版号前进**，不管有没有报告）→ **审核后自动**（归档+版本+指针+记录）。`[NEXT] state=seal_ready` 只说"形式闸与票已齐、要不要收这一章由你决定"。
 
@@ -27,6 +31,8 @@
 
 * **人工入口** —— `k3dge milestone audit <id>` / `k3dge milestone seal [--yes] <id>` 都是人工主动入口，走同一套流程。`--yes` 跳过「要不要封」的提问，但不跳过审计。
 
+### 交付物、重挂与文档合规
+
 * **CHANGELOG 由提交区间生成** —— 来源＝`<上一里程碑 tag> .. HEAD` 的**非机械提交**（过滤 `round work` 与带 `Seal-milestone` trailer 的封版提交），类型取 conventional 前缀；**`task done` 不再写 CHANGELOG**（每票各写一行＝双写，票改了它没改、没开票的改动漏掉）。闸只验**不漏项**（解析不出类型的提交进 `uncovered` 并由封版告警），写得好归人/审计。首个里程碑（无边界 tag）回落 `[Unreleased]` 累积 + 通用行。
 
 * **重挂（边界之后开的票）** —— 边界确立后（`tag <M> = <B>`），B 之后新开的票若指针未前进就会挂在旧里程碑上 ⇒ `[GATE WARN] TASK_MILESTONE_AFTER_BOUNDARY`（**advisory**：只指出"边界那一版还没有它"，不判该归哪一版）。重挂用 `k3dge milestone reassign <M> --to <新号> [--dry-run]`：**frontmatter 与文件名同改**（半吊子会被 `TASK_MILESTONE_MISMATCH` 拦），幂等。
@@ -38,6 +44,8 @@
 * **审计条件 Checklist（不是封板 checklist）** —— `.agent/audit_checklist.json` 记**审计条件达成 + 审计环状态**：量化触发快照（账齐/C2/体积 + reasons）、该审计报告的 `待修`（closure）、`verify_attempts`（>3 升级用）、`audit_started_at`；以当前里程碑任务状态 hash 为键缓存（任务集不变 `check` 不重算）。**`k3dge milestone audit <id>` 发起审计时重置**（verify 预算归零 + 打 started_at，重跑拿新的 3 次预算）。**它是运行态投影，不作封板判据**（判据只认 git 事实：基线 hash / `tag <M>` / 封版提交 trailer）。`k3dge milestone checklist <id>` 查看。
 
 * **钩子链（`seal` 相位 2 是消费者）** —— `seal` **自己跑审计**（声明面 `[checks.seal].actions` 里的 `audit` 节点，位在 `full_matrix` 之后、`archive` 之前）；`k3dge milestone audit <id>` / 外部报告 `k3dge milestone audit-submit <id>` 是**独立的主动入口**，语义不变。审计结果只认**闭集** `closed` / `degraded-manual`（**走了 manual 传输**：不论它是降级位还是首选位，均无独立透镜 ⇒ 须署名，ADR-0004 §2.1.11 🅰2）/ `escalated` / `refused`：只有前两者推进版号，**`skip` 与空转一律 `refused`**（先判"这一跳真跑过"，再谈报告在不在）。外部步声明在 `[checks.audit]`：`stages_produce` = `k3dit.actions.audit`（一份必做）；`stages_verify` = `k3dit.actions.verify`（核对本报告）。缺省在 `engine/gates.DEFAULTS`，**声明面唯一**＝`.agent/pipeline.toml`（`[checks.*]`/`[gates.*]`），下游可配、坏配置回落缺省；`.agent/gates.toml` 已废（存在即红一次逼迁移）；声明了却解析不到 peer action ⇒ `PIPELINE_UNRESOLVED_STAGE`（不让声明空转）。原 `[pipelines.on_seal_enter]` / `[on_pre_seal]` **已废**：那两处只有 schema 校验、没有执行者。`transports` 链 `mcp→cli→manual`/`skip`，`skip` 记 `HARNESS_SKIP` 于 `logs/k3dge.log`。k3dge 只调透镜、不自己审/打分（sidecar，ADR-0006）。
+
+### 提示、门禁与归档
 
 * **`[NEXT]` 提示（命令结果附下一跳）** —— 单一事实源 `src/k3dge/engine/nextstep.py`（`STATE_OPTIONS`）+ `src/k3dge/engine/audit_trigger.py`，与 `.agent/pipeline.toml`/`AGENTS.md §12` 同一张表。优先级：`pending_findings`（有钉的 pending）> `seal_ready`（审计报告闭环）> `audit_suggested`（量化触发）。只报合法下一步、不替人决定；`reasons` 可数。`new_domain` 仍单独报；`overview` 更新已移出钩子。
 
