@@ -136,7 +136,9 @@ class TestGeneratedFiltering(unittest.TestCase):
             p.write_text(g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"]), encoding="utf-8")
             # 构建产物在 tests/ 之外（`.agent/extractors/…`）：稀疏检出/未 sync 时 p 可以不存在，
             # `spec` 会是 None、`spec.loader` 可缺——直接抛 AttributeError 读不出"缺工件"这个因（t-142）
-            assert p.is_file(), f"构建工件不在：{p}（先跑 k3dge extractor sync）"
+            # ocr2-735：旧 `assert p.is_file()` 是同函数两行上刚 write 出来的——永真，且裸 assert
+            # 在 `python -O` 下整句剥掉（坏了就变 AttributeError）。用 unittest 断言（永不优化掉）。
+            self.assertTrue(p.is_file(), f"构建工件不在：{p}（先跑 k3dge extractor sync）")
             spec = importlib.util.spec_from_file_location("gen_ts_filter_probe", p)
             self.assertIsNotNone(spec, f"spec_from_file_location 对 {p} 回 None")
             self.assertIsNotNone(spec.loader, f"{p} 没有可用 loader")
@@ -287,7 +289,10 @@ class TestSync(unittest.TestCase):
             p.write_text(g.render_plugin("typescript", g.DEFAULT_LANGS["typescript"]),
                        encoding="utf-8")     # 生成头含非 ASCII（"— do not edit"）⇒ 缺 encoding 随 locale 崩
             spec = importlib.util.spec_from_file_location("gen_ts_fidelity", p)
-            assert spec is not None and spec.loader is not None
+            # ocr2-736：同病——裸 assert 在 `python -O` 下剥掉，spec 为 None 就变
+            # `AttributeError: 'NoneType'...loader`。分两句 unittest 断言（永不优化掉）。
+            self.assertIsNotNone(spec, f"spec_from_file_location 对 {p} 回 None")
+            self.assertIsNotNone(spec.loader, f"{p} 没有可用 loader")
             mod = importlib.util.module_from_spec(spec)
             from k3dge.engine import contract as _contract
             snapshot = list(_contract._EXTRACTORS)

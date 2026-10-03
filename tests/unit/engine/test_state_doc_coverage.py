@@ -50,6 +50,14 @@ class TestStateDocCoverage(unittest.TestCase):
         # `tearDown`，旧写法每次都泄漏一个临时目录；addCleanup 在 setUp 失败时照跑。
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
+        # ocr2-788：类级 skip 只验 git 存在——`init -b` 要 git≥2.28，老版本在
+        # `_make_repo` 里炸成 error，"环境太老"被读成"规则回归"。探能力，不足跳过。
+        probe = Path(self._tmp.name) / "probe"
+        probe.mkdir()
+        r = subprocess.run(["git", "init", "-b", "main"], cwd=str(probe),
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            self.skipTest(f"git 不支持 `init -b main`（需 ≥2.28）：{(r.stderr or r.stdout).strip()}")
         self.repo = _make_repo(Path(self._tmp.name))
 
     def _violations(self):
@@ -81,29 +89,45 @@ class TestStateDocCoverage(unittest.TestCase):
         """
         original = _full_overview()
         victim = sorted(nextstep.STATE_OPTIONS)[0]
+        # ocr2-789：`replace(..., 1)` 只换第一处——victim 若在两表都出现，
+        # 第一处可能是另一张表的，victim 仍在文档里，判据 0 违例假绿。先钉唯一。
+        self.assertEqual(original.count(f"`{victim}`"), 1,
+                         f"`{victim}` 在 fixture 里出现多次——换第一处换不到它")
         text = original.replace(f"`{victim}`", "`something_else`", 1)
         self.assertNotEqual(text, original, f"`{victim}` 不在 fixture 表里——过期 fixture，不是规则")
         self._write(text)
         det = self._drift_violation().detail or {}
-        self.assertIn(victim, det.get("missing"), det)
+        # ocr2-790：`missing` 在缺态分支是 list、在 priority 分支是串——
+        # `assertIn` 在串形下退化成子串匹配，None 时变 TypeError。先钉形状。
+        missing = det.get("missing")
+        self.assertIsInstance(missing, list, f"missing 不再是 list（形状漂了）：{det}")
+        self.assertIn(victim, missing, det)
 
     def test_missing_task_state_is_violation(self) -> None:
         original = _full_overview()
         victim = sorted(s.value for s in state_machine.TaskState)[0]
+        self.assertEqual(original.count(f"`{victim}`"), 1,
+                         f"`{victim}` 在 fixture 里出现多次——换第一处换不到它")
         text = original.replace(f"`{victim}`", "`paused`", 1)
         self.assertNotEqual(text, original, f"`{victim}` 不在 fixture 表里——过期 fixture，不是规则")
         self._write(text)
         det = self._drift_violation().detail or {}
-        self.assertIn(victim, det.get("missing"), det)
+        missing = det.get("missing")
+        self.assertIsInstance(missing, list, f"missing 不再是 list（形状漂了）：{det}")
+        self.assertIn(victim, missing, det)
 
     def test_plain_words_without_backticks_do_not_count(self) -> None:
         original = _full_overview()
         victim = sorted(nextstep.STATE_OPTIONS)[1]
+        self.assertEqual(original.count(f"`{victim}`"), 1,
+                         f"`{victim}` 在 fixture 里出现多次——换第一处换不到它")
         text = original.replace(f"`{victim}`", victim, 1)
         self.assertNotEqual(text, original)
         self._write(text)
         det = self._drift_violation().detail or {}
-        self.assertIn(victim, det.get("missing"), det)
+        missing = det.get("missing")
+        self.assertIsInstance(missing, list, f"missing 不再是 list（形状漂了）：{det}")
+        self.assertIn(victim, missing, det)
 
     def test_priority_mismatch_is_violation(self) -> None:
         """三分支只测过一条（t-261）：priority 漂移分支此前零覆盖——

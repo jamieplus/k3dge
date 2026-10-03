@@ -10,7 +10,9 @@ set -euo pipefail
 # TARGET is always pwd. Harness directories come from scaffold — do not mkdir by hand.
 
 TARGET="$(pwd)"
-SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# 物理路径（`pwd -P`）：逻辑 `pwd` 经包装软链调用时会把 SCRIPT_ROOT 算到链接所在目录，
+# `[ -d $SCRIPT_ROOT/src/k3dge ]` 误判 ⇒ 在 checkout 内却报 K3DGE_SOURCE 缺失（ocr2-573）。
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 
 if [ -n "${K3DGE_SOURCE:-}" ]; then
   K3DGE_HOME="$K3DGE_SOURCE"
@@ -67,8 +69,10 @@ fi
 # 只看 .venv/bin/python 可执行不够：坏 pip / 无 pip / 过期 shebang 会在下一步才炸（ocr-172）。
 if ! .venv/bin/python -m pip --version >/dev/null 2>&1; then
   echo "[k3dge] venv 内无可用 pip ⇒ ensurepip"
-  .venv/bin/python -m ensurepip --upgrade >/dev/null 2>&1 || {
+  # stdout 静默、stderr 留作报错证据：全吞会把缺 python3-venv/只读 .venv 等真实原因一起吞掉（ocr2-690）。
+  _ensurepip_err="$(.venv/bin/python -m ensurepip --upgrade 2>&1 >/dev/null)" || {
     echo "[k3dge] FAIL: .venv 里没有可用的 pip（删 .venv 重建，或修 python 安装）" >&2
+    [ -n "$_ensurepip_err" ] && printf '%s\n' "$_ensurepip_err" >&2
     exit 1
   }
 fi

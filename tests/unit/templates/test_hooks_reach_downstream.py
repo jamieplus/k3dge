@@ -245,6 +245,26 @@ class TestInitEntrypoints(unittest.TestCase):
         self.assertNotIn("不是 k3dge 下发", r.stderr)
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_wrapper_runs_valid_executable_init_to_completion(self) -> None:
+        """ocr2-692：合法可执行的 init.sh 必须真跑完（rc==0 + 哨兵输出）——无参情形。
+
+        旧套件只断"拒掉坏输入"，从不断"放行真输入"：exec 位丢失、标记误判这类"该跑却没跑"
+        的回归全绿。只测无参：有位置参数时拒跑是 365 钉住的行为（见上测），不是本找补面。
+        """
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        (root / "scripts").mkdir()
+        sentinel = "K3DGE_INIT_RAN_692"
+        init = root / "scripts" / "init.sh"
+        init.write_text("#!/usr/bin/env bash\n# k3dge-governed project\necho " + sentinel + "\n",
+                        encoding="utf-8")
+        init.chmod(0o755)
+        w = self._wrapper(root)
+        r = subprocess.run([str(w)], capture_output=True, text=True, cwd=root)
+        self.assertNotIn("不是 k3dge 下发", r.stderr)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn(sentinel, r.stdout)
+
     def test_wrapper_follows_symlinked_invocation(self) -> None:
         """经符号链接调用要解析到**真实**所在目录，而不是链接目录（ocr2-378）。"""
         root = Path(tempfile.mkdtemp())
@@ -318,7 +338,11 @@ class TestInitEntrypoints(unittest.TestCase):
         dg = mod._load_doc_gate(ws)
         try:
             self.assertTrue(str(Path(dg.__file__)).startswith(str(K3DGE_SRC / "k3dge")))
-            self.assertNotIn(str(ws / "src"), sys.path, "已能 import 时不得再塞仓内路径")
+            # ocr2-807：`mkdtemp()` 回未解析路径（macOS 上 /var→/private/var）——
+            # 只比一种写法时，实现若记解析形就静默穿透。两边都解析后再比。
+            want = os.path.realpath(ws / "src")
+            hits = [p for p in sys.path if os.path.realpath(p) == want]
+            self.assertEqual(hits, [], f"已能 import 时不得再塞仓内路径：{hits}")
         finally:
             _restore_path()
 
@@ -451,8 +475,11 @@ class TestTrackHygiene(unittest.TestCase):
         ps1 = (ASSETS / "init.ps1").read_text(encoding="utf-8")
         self.assertIn("} elseif ($PSCommandPath) {", ps1)             # 378：$PSScriptRoot 空不再算错根
         self.assertIn('$ScriptRoot -and (Test-Path', ps1)
-        self.assertNotIn("\n  Write-Error", ps1,                      # 379：Stop 下 Write-Error 吞掉 exit 码
-                         "该用 [Console]::Error.WriteLine + exit")
+        # ocr2-808：旧 `assertNotIn("\n  Write-Error")` 只认"行首恰两空格"——
+        # 4 空格/行内 `if (...) { Write-Error ... }` 会穿透并复活 379 缺陷
+        # （Stop 下 Write-Error 吞 exit 码）。结构匹配：任何缩进的行首 Write-Error。
+        self.assertNotRegex(ps1, r"(?m)^\s*Write-Error\b",
+                            "该用 [Console]::Error.WriteLine + exit")
 
     def test_commit_msg_delegates_attestation_to_library(self) -> None:
         hook = (K3DGE_SRC.parent / "scripts" / "commit-msg").read_text(encoding="utf-8")

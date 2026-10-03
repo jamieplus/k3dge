@@ -643,7 +643,6 @@ class ConsistencyEngine:
         if isinstance(f, ast.Name) and f.id == "open":
             return bool(node.args) and _hits(node.args[0])
         return False
-        return False
 
     @classmethod
     def _logs_overwrite(cls, node) -> str:

@@ -35,8 +35,14 @@ def test_all_green_exits_zero(tmp_path, monkeypatch):
 
 def test_failing_gate_shows_red_and_exits_1(tmp_path, monkeypatch):
     """挑一条**真需要人办**的闸：`align_pass` 会被 `satisfies` 标成 ⚙️（seal 自己会跑），
-    不是 ❌ ⇒ 用它当"红样例"只会测到自动档。`guides_filled` 有未填桩才是人办红。"""
-    ws = _ws(tmp_path, '"guides_filled"')
+    不是 ❌ ⇒ 用它当"红样例"只会测到自动档。`guides_filled` 有未填桩才是人办红。
+
+    ocr2-707：本例曾与 test_unmet_exits_one_and_lists_reason 同夹具同断言（被完全包含）。
+    改测两者之间缺的第三种形状——混合态下 ✅/❌ 并存且仍退 1。"""
+    ws = _ws(tmp_path, '"tasks_all_done", "guides_filled"')
+    (ws / "docs" / "tasks").mkdir(parents=True)
+    (ws / "docs" / "tasks" / "x.md").write_text(
+        "# Task\n- **Status**: done\n- **Milestone**: M10\n", encoding="utf-8")
     (ws / "docs" / "guides").mkdir(parents=True)
     (ws / "docs" / "guides" / "g.md").write_text("# G\n<!-- k3dge:guide-stub -->\n", encoding="utf-8")
     monkeypatch.chdir(ws)
@@ -46,7 +52,7 @@ def test_failing_gate_shows_red_and_exits_1(tmp_path, monkeypatch):
     out = buf.getvalue()
     assert rc == 1, out
     assert "❌ guides_filled" in out, out
-    assert "✅" not in out, out
+    assert "✅ tasks_all_done" in out, out  # 混合态：过项与红项并存
 
 
 def test_empty_precondition_list_is_refused(tmp_path, monkeypatch):

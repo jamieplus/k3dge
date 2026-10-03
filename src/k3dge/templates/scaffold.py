@@ -119,7 +119,6 @@ RULE_ASSETS = (
 
 def _slug(raw: str) -> str:
     import keyword
-    import sys
 
     s = re.sub(r"[^A-Za-z0-9_]+", "_", raw.strip()).strip("_").lower()
     if not s:
@@ -185,8 +184,6 @@ def ensure_mcp_config(target: Path) -> bool:
     Write-side parse stays here: templates ↛ engine (ADR-0001). Read-side host is
     `k3dge.engine.mcp_json` (cli + engine).
     """
-    import sys
-
     mcp_path = target / ".mcp.json"
     # Load existing or start empty; corrupted JSON or non-dict root must not silently destroy peers
     data: dict = {}
@@ -232,8 +229,6 @@ def ensure_mcp_config(target: Path) -> bool:
 
 def _pipeline_servers(target: Path) -> set:
     """Server names the generated pipeline references（`roles.*.bind` ∪ `[peers.*]`，除 k3dge）。"""
-    import sys
-
     p = target / ".agent" / "pipeline.toml"
     if not p.is_file():
         return set()
@@ -470,7 +465,6 @@ def scaffold(target: Path, name: str | None = None) -> list:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     import argparse
-    import sys
 
     parser = argparse.ArgumentParser(prog="k3dge.templates.scaffold")
     parser.add_argument("target", nargs="?", default=".", help="target project root")
@@ -486,6 +480,4 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == "__main__":
-    import sys
-
     sys.exit(main())

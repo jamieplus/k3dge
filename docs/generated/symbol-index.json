@@ -140,7 +140,7 @@
   "actions": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 278
+      "line": 276
     }
   ],
   "adr_landed": [
@@ -158,13 +158,13 @@
   "advance": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 128
+      "line": 132
     }
   ],
   "all_stage_refs": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 263
+      "line": 261
     }
   ],
   "amend_format": [
@@ -194,7 +194,7 @@
   "apply": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 306
+      "line": 305
     }
   ],
   "apply_bundle": [
@@ -230,7 +230,7 @@
   "audit_closed": [
     {
       "file": "src/k3dge/engine/audit_trigger.py",
-      "line": 140
+      "line": 139
     }
   ],
   "audit_evidence": [
@@ -254,7 +254,7 @@
   "begin_run": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 296
+      "line": 300
     }
   ],
   "blocking_cycles": [
@@ -290,7 +290,7 @@
   "build_checklist": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 107
+      "line": 108
     }
   ],
   "build_docs_index": [
@@ -326,7 +326,7 @@
   "build_task_name": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 505
+      "line": 501
     }
   ],
   "bump_milestone": [
@@ -338,7 +338,7 @@
   "bump_verify_attempt": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 188
+      "line": 189
     }
   ],
   "bump_version": [
@@ -368,7 +368,7 @@
   "cache_observability": [
     {
       "file": "src/k3dge/cli/status.py",
-      "line": 25
+      "line": 24
     }
   ],
   "call_mcp_tool": [
@@ -428,7 +428,7 @@
   "check_dangling_adr": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 105
+      "line": 104
     }
   ],
   "check_file": [
@@ -446,7 +446,7 @@
   "check_footnotes": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 144
+      "line": 143
     }
   ],
   "check_frontmatter": [
@@ -500,7 +500,7 @@
   "check_report_pointer": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 129
+      "line": 128
     }
   ],
   "check_retired_adr_dest": [
@@ -536,13 +536,13 @@
   "check_supersede_unreconciled": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 246
+      "line": 243
     }
   ],
   "check_task_body_meta_redundant": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 214
+      "line": 213
     }
   ],
   "check_task_closure_record": [
@@ -554,7 +554,7 @@
   "check_task_consistency": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 179
+      "line": 178
     }
   ],
   "closure_ok": [
@@ -638,13 +638,13 @@
   "cmd_mcp_probe": [
     {
       "file": "src/k3dge/cli/mcp_peers.py",
-      "line": 226
+      "line": 231
     }
   ],
   "cmd_mcp_sync": [
     {
       "file": "src/k3dge/cli/mcp_peers.py",
-      "line": 188
+      "line": 193
     }
   ],
   "cmd_milestone": [
@@ -722,7 +722,7 @@
   "compute_audit_suggestion": [
     {
       "file": "src/k3dge/engine/audit_trigger.py",
-      "line": 86
+      "line": 85
     }
   ],
   "compute_hash": [
@@ -758,7 +758,7 @@
   "create_task": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 202
+      "line": 200
     }
   ],
   "critical_path": [
@@ -786,13 +786,13 @@
     },
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 339
+      "line": 343
     }
   ],
   "emit_all": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 373
+      "line": 377
     }
   ],
   "ensure": [
@@ -804,13 +804,13 @@
   "ensure_checklist": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 167
+      "line": 168
     }
   ],
   "ensure_mcp_config": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 179
+      "line": 178
     }
   ],
   "extract": [
@@ -834,13 +834,13 @@
   "facts_of": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 676
+      "line": 682
     }
   ],
   "fill": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 622
+      "line": 628
     }
   ],
   "find_k3dit": [
@@ -888,7 +888,7 @@
   "fix_kind": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 590
+      "line": 596
     }
   ],
   "format_seal_trailers": [
@@ -906,7 +906,7 @@
   "get": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 205
+      "line": 203
     }
   ],
   "get_changed_files": [
@@ -966,7 +966,7 @@
   "get_verify_attempts": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 184
+      "line": 185
     }
   ],
   "get_version": [
@@ -996,7 +996,7 @@
   "has_milestone_token": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 161
+      "line": 160
     }
   ],
   "has_table": [
@@ -1038,13 +1038,13 @@
   "inside_workspace": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 45
+      "line": 44
     }
   ],
   "is_declared": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 600
+      "line": 606
     }
   ],
   "is_screenable_new_doc": [
@@ -1164,7 +1164,7 @@
   "kind": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 85
+      "line": 94
     }
   ],
   "land_report": [
@@ -1176,13 +1176,13 @@
   "legacy_config_present": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 200
+      "line": 198
     }
   ],
   "lifecycle_next": [
     {
       "file": "src/k3dge/cli/status.py",
-      "line": 49
+      "line": 47
     }
   ],
   "line": [
@@ -1212,7 +1212,7 @@
   "load_all": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 414
+      "line": 418
     }
   ],
   "load_mcp_document": [
@@ -1230,7 +1230,7 @@
   "load_persisted": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 435
+      "line": 439
     }
   ],
   "load_pipeline_config": [
@@ -1242,7 +1242,7 @@
   "main": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 411
+      "line": 419
     },
     {
       "file": "src/k3dge/cli/main.py",
@@ -1250,7 +1250,7 @@
     },
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 471
+      "line": 466
     }
   ],
   "malformed_rows": [
@@ -1262,7 +1262,7 @@
   "managed_docs": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 85
+      "line": 84
     }
   ],
   "manifest_read_error": [
@@ -1274,13 +1274,13 @@
   "mark_task_done": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 432
+      "line": 428
     }
   ],
   "materialize": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 407
+      "line": 412
     }
   ],
   "mcp_server_names": [
@@ -1298,7 +1298,7 @@
   "merge_back": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 273
+      "line": 278
     }
   ],
   "merge_into": [
@@ -1310,19 +1310,19 @@
   "milestone_tags": [
     {
       "file": "src/k3dge/engine/milestone_files.py",
-      "line": 72
+      "line": 73
     }
   ],
   "missing_declared_facts": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 202
+      "line": 210
     }
   ],
   "next_for_rejection": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 486
+      "line": 490
     }
   ],
   "normalize": [
@@ -1340,7 +1340,7 @@
   "on_error": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 89
+      "line": 98
     }
   ],
   "open_samples": [
@@ -1406,13 +1406,13 @@
   "patch_rels": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 241
+      "line": 240
     }
   ],
   "persist": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 308
+      "line": 312
     }
   ],
   "persist_external_audit_report": [
@@ -1424,13 +1424,13 @@
   "pin_baseline": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 366
+      "line": 371
     }
   ],
   "preconditions": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 247
+      "line": 245
     }
   ],
   "premature_archive_hint": [
@@ -1460,13 +1460,13 @@
   "projection": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 666
+      "line": 672
     }
   ],
   "prune": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 340
+      "line": 345
     }
   ],
   "prune_finished": [
@@ -1478,13 +1478,13 @@
   "question_text": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 522
+      "line": 526
     }
   ],
   "read_checklist": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 142
+      "line": 143
     }
   ],
   "read_events": [
@@ -1496,13 +1496,13 @@
   "reassign_milestone": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 562
+      "line": 558
     }
   ],
   "reassign_task_milestone": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 511
+      "line": 507
     }
   ],
   "reconcile_report_rows": [
@@ -1544,13 +1544,13 @@
   "remove": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 362
+      "line": 367
     }
   ],
   "render": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 637
+      "line": 643
     }
   ],
   "render_checklist": [
@@ -1592,13 +1592,13 @@
   "reset_for_audit": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 171
+      "line": 172
     }
   ],
   "reset_verify_attempts": [
     {
       "file": "src/k3dge/engine/audit_checklist.py",
-      "line": 212
+      "line": 213
     }
   ],
   "resolve": [
@@ -1658,7 +1658,7 @@
   "run_audit_flow": [
     {
       "file": "src/k3dge/engine/milestone_audit.py",
-      "line": 601
+      "line": 599
     }
   ],
   "run_milestone_alignment": [
@@ -1676,19 +1676,19 @@
   "run_phase": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 115
+      "line": 124
     }
   ],
   "run_schema_gate": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 213
+      "line": 221
     }
   ],
   "run_screen_gate": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
-      "line": 351
+      "line": 359
     }
   ],
   "run_seal_flow": [
@@ -1706,19 +1706,19 @@
   "satisfied_ids": [
     {
       "file": "src/k3dge/engine/nodes.py",
-      "line": 94
+      "line": 103
     }
   ],
   "scaffold": [
     {
       "file": "src/k3dge/templates/scaffold.py",
-      "line": 370
+      "line": 365
     }
   ],
   "scan": [
     {
       "file": "src/k3dge/engine/doc_fix.py",
-      "line": 288
+      "line": 287
     }
   ],
   "scan_milestone_tasks": [
@@ -1778,7 +1778,7 @@
   "seal_ready_for": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 455
+      "line": 459
     }
   ],
   "seal_record": [
@@ -1814,7 +1814,7 @@
   "severity": [
     {
       "file": "src/k3dge/engine/gate_facts.py",
-      "line": 605
+      "line": 611
     }
   ],
   "severity_tag": [
@@ -1832,7 +1832,7 @@
   "split_task_name": [
     {
       "file": "src/k3dge/engine/task_write.py",
-      "line": 499
+      "line": 495
     }
   ],
   "staged_added": [
@@ -1850,19 +1850,19 @@
   "stages": [
     {
       "file": "src/k3dge/engine/gates.py",
-      "line": 252
+      "line": 250
     }
   ],
   "strip_code_spans": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 80
+      "line": 79
     }
   ],
   "strip_fences": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
-      "line": 60
+      "line": 59
     }
   ],
   "strip_markers": [
@@ -1874,7 +1874,7 @@
   "strip_pins": [
     {
       "file": "src/k3dge/engine/worktree.py",
-      "line": 158
+      "line": 163
     }
   ],
   "summary": [
@@ -1920,7 +1920,7 @@
   "tasks_after_boundary": [
     {
       "file": "src/k3dge/engine/milestone_files.py",
-      "line": 96
+      "line": 97
     }
   ],
   "test_files": [
@@ -1956,7 +1956,7 @@
   "union_pins": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 273
+      "line": 272
     }
   ],
   "unmet_seal_preconditions": [
@@ -2070,7 +2070,7 @@
   "workspace_status": [
     {
       "file": "src/k3dge/cli/status.py",
-      "line": 100
+      "line": 98
     }
   ],
   "worktree_path": [

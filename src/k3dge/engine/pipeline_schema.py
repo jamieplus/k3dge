@@ -233,7 +233,7 @@ def _validate_declared_stages(workspace: Path, data: dict) -> List[PipelineViola
                 "PIPELINE_UNRESOLVED_STAGE",
                 f"declared stage '{ref}' resolves to no transports "
                 f"(check [roles.*] bind + [peers.*.actions.*] in .agent/pipeline.toml, "
-                f"or override [checks.audit] in .agent/gates.toml)",
+                f"or override [checks.audit] in .agent/pipeline.toml)",
             ))
     return errors
 

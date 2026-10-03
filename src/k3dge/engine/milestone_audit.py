@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
-import tempfile
+import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -95,7 +95,7 @@ def _ensure_leftovers(workspace: Path, text: str, report_path: Path) -> None:
     except (OSError, UnicodeDecodeError) as exc:
         # 坏编码/读不出不得以非拒绝异常中止整个审计腿；出声后跳过登记（ocr2-270）。
         print(f"[milestone_audit] WARN: LEFTOVERS.md 不可读（{type(exc).__name__}）⇒ 本次不登记有意留",
-              file=__import__("sys").stderr)
+              file=sys.stderr)
         return
     new_lines = []
     for rid in ids:
@@ -344,9 +344,7 @@ def _oneshot_audit_leg(
             if found is None:
                 hint = ""
                 try:
-                    import json as _json
-
-                    _body = _json.loads(produced.payload) if produced.payload else {}
+                    _body = json.loads(produced.payload) if produced.payload else {}
                     if _body.get("report_path"):
                         hint = (
                             f" {produced.provider} 已给出落点建议 `{_body['report_path']}`"
@@ -414,7 +412,7 @@ def _oneshot_audit_leg(
             # verify（"待修==0 的二次核对"）失败被吞 ⇒ 仍按已核对返回 closed，等于把未核对当已核对（ocr-265）。
             degraded = True
             _vmsg = f"verify 步异常（{type(exc).__name__}: {exc}）⇒ 记为 degraded-manual，不作独立核对"
-            print(f"[AUDIT] WARN: {_vmsg}", file=__import__("sys").stderr)
+            print(f"[AUDIT] WARN: {_vmsg}", file=sys.stderr)
     ac.reset_verify_attempts(workspace)
     result = "degraded-manual" if degraded else "closed"
     status = "audited_degraded" if degraded else "audited"
@@ -540,7 +538,7 @@ def _bundle_audit_leg(
         except Exception:
             return _reject_step(workspace, milestone_id, "audit_bundle_run_failed",
                                 f"抢救出的包不可读（{_lm}）\n[运行摘要] {_dig or '（未写出）'}"), ""
-    # 纯审计（audit-only）：    # 纯审计（audit-only）：`status=partial` 是设计（钉留树）；它**只出证据，不构成封板依据** ⇒ 落报告后
+    # 纯审计（audit-only）：`status=partial` 是设计（钉留树）；它**只出证据，不构成封板依据** ⇒ 落报告后
     # 以 refused 交回（带理由），不推进任何"已审"判定。full 才要求闭环。
     # **闭环判据归 k3dge**：`consume` 里的 `audit_verify.verify_bundle_local` 从 findings 自己算未关项，
     # 产出方自报的 `payload.status` **不在这里读**（交叉核归 `audit_verify.verify_bundle_local`

@@ -1,6 +1,5 @@
 """任务 DAG 透镜：blocking 环 + CPM 关键路径。"""
 
-import argparse
 import contextlib
 import io
 import shutil
@@ -166,9 +165,12 @@ class TestBlockingDangling(unittest.TestCase):
             from k3dge.cli import main as cli_main
 
             buf = io.StringIO()
+            # ocr2-793：不用手拼 Namespace——`json`/`deep` 改名/加项时手拼版
+            # 静默走默认支。从真 parser 派生，`status` 子命令变了这里即红。
+            args = cli_main.build_parser().parse_args(["status"])
             with mock.patch.object(cli_main, "_find_workspace", lambda *a, **k: ws), \
                     contextlib.redirect_stdout(buf):
-                rc = cli_main.cmd_status(argparse.Namespace(json=False, deep=False))
+                rc = cli_main.cmd_status(args)
             out_txt = buf.getvalue()
             self.assertEqual(rc, 0, out_txt)
             self.assertIn("指向不存在的票", out_txt)

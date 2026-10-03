@@ -416,7 +416,10 @@ def consume_unreleased(workspace: Path) -> str:
         return ""
     try:
         text = _read_utf8(changelog)
-    except (OSError, ValueError):
+    except (OSError, ValueError) as exc:
+        # 读不出 ≠ Unreleased 为空：调用方（CLI/MCP seal）会把它当发布说明，静默即无说明的发布。
+        print(f"[WARN] consume_unreleased: CHANGELOG.md 不可读（{type(exc).__name__}）⇒ 视为空发布说明",
+              file=sys.stderr)
         return ""
     unreleased = "## [Unreleased]"
     idx = text.find(unreleased)
@@ -431,7 +434,5 @@ def consume_unreleased(workspace: Path) -> str:
         _atomic_write(changelog, new_text)
     except Exception:
         # Write failure is non-fatal for seal notes; return body anyway and warn
-        import sys
-
         print(f"[WARN] consume_unreleased: failed to clear Unreleased in {changelog}", file=sys.stderr)
     return body

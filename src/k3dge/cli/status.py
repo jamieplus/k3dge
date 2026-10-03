@@ -15,11 +15,10 @@ from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.manifest import Manifest, ManifestError
 from k3dge.engine.milestone_files import _is_doc_aux
 from k3dge.engine.state_machine import TaskState
-from k3dge.engine.task_index import parse_frontmatter
+from k3dge.engine.task_index import TITLE_RE, parse_frontmatter
 
 #: done 词表单源（ocr2-180）：不得在这里再硬编码一份 "done"。
 _DONE_VALUE = TaskState.DONE.value
-
 
 
 def cache_observability(workspace: Path) -> Optional[Dict[str, Any]]:
@@ -30,22 +29,21 @@ def cache_observability(workspace: Path) -> Optional[Dict[str, Any]]:
     """
     if not (workspace / ".k3che").is_dir():
         return None
-    from k3dge.engine.pipeline_runner import run_action
-
     try:
+        from k3dge.engine.pipeline_runner import run_action
+
         # 只供展示的遥测 ⇒ 不许按缺省 60s/跳去跑整条传输链（status 是被 harness 高频调的读面）
         res = run_action(workspace, "cache.stats", timeout_default=10)
-    except Exception:  # pragma: no cover - 观测件绝不拖垮 status
-        return None
-    if not res.ok or res.provider != "mcp":
-        return None
-    try:
+        if not res.ok or res.provider != "mcp":
+            return None
         env = json.loads(res.payload or "")
-    except ValueError:
+    except Exception:  # pragma: no cover - 观测件绝不拖垮 status
         return None
     if not isinstance(env, dict) or not env.get("ok"):
         return None
     return {k: env[k] for k in ("total", "hits", "hit_rate", "indexed", "persisted") if k in env}
+
+
 def lifecycle_next(workspace: Path) -> Any:
     """The single NextStep for this workspace, or None (ADR-0008 routing source).
 
@@ -153,8 +151,6 @@ def workspace_status(workspace: Path) -> Dict[str, Any]:
             if status != _DONE_VALUE:
                 # 标题复用引擎单源 TITLE_RE（`^#\s+(.+)$` MULTILINE）：原 `#\s*(.+)` 无锚定，
                 # 会命中二级标题/代码注释里的 `#`，三处出口标题不一致（ocr-189）。
-                from k3dge.engine.task_index import TITLE_RE
-
                 tm = re.search(TITLE_RE, txt)
                 unfinished.append(
                     {

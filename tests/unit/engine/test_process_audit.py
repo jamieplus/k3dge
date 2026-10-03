@@ -39,7 +39,7 @@ def test_field_accepts_fullwidth_colon() -> None:
     assert process_audit._field("- **审计人**：k3dit\n", "审计人") == "k3dit"
 
 
-def test_field_empty_value_does_not_capture_the_next_line(tmp_path: Path) -> None:
+def test_field_empty_value_does_not_capture_the_next_line() -> None:
     r"""ocr-097 的 fail-open 形状**必须留在测里**（t-191）：`- **审计人**:` 空值 +
     下一行 `- **基线**: abc…`——旧 `[ \t]*\s*(.+)` 的 `\s` 含 `\n`，跨行捕获下一行 ⇒
     假"值非空"，报告没署名也算签了。现判据（行内空白 + 值同行 + re.M）没测兜住它，
@@ -90,7 +90,7 @@ def test_sign_missing_rejects_template_placeholder(tmp_path: Path) -> None:
     assert process_audit.sign_missing(text) == ["基线"]
 
 
-def test_every_placeholder_mark_is_rejected(tmp_path: Path) -> None:
+def test_every_placeholder_mark_is_rejected() -> None:
     """逐个标记测（t-193）：旧测只钉 `状态快照` 一个值，其余标记（含 ocr-288 点名补进来的
     `...`/TODO/N/A）漂移进元组也不会有测红——把 `_SIGN_PLACEHOLDER_MARKS` **本身**当参数源。
 
@@ -118,5 +118,12 @@ def test_every_placeholder_mark_is_rejected(tmp_path: Path) -> None:
 
 
 def test_sign_missing_accepts_filled_anchor(tmp_path: Path) -> None:
+    import re
+
     text = _report(tmp_path, sign=True).read_text(encoding="utf-8")
     assert process_audit.sign_missing(text) == []
+    # ocr2-766: 上面与 test_signed_report_passes_the_single_criterion 同形——
+    # 只断 [] 时"填充锚点是真锚"从没被钉。调用方剥壳后基线须是真 sha 形。
+    raw = process_audit._field(text, "基线")
+    sha = raw.strip().strip("`").strip()
+    assert re.fullmatch(r"[0-9a-fA-F]{40}", sha), f"填充锚点不是 sha 形：{raw!r}"

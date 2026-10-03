@@ -124,7 +124,7 @@ def build_card(workspace: Path, typ: str, path: Path) -> dict:
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
-        return {"path": rel, "type": typ, "id": path.stem, "title": path.stem, "status": "", "tokens": ""}
+        return {"path": rel, "type": typ, "id": _card_id(typ, path), "title": path.stem, "status": "", "tokens": ""}
     fm = dict(_frontmatter_pairs(text))
     headers = _headers(text)
     tm = _TITLE_RE.search(_body(text))

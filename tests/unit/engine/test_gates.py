@@ -7,8 +7,6 @@ import tempfile
 from pathlib import Path
 
 from k3dge.engine import gates
-import shutil
-import atexit
 
 
 def _ws(d, body=None):
@@ -63,6 +61,31 @@ def test_malformed_falls_back_to_defaults():
         with contextlib.redirect_stderr(err2):
             gates.load(ws)
         assert err2.getvalue() == "", err2.getvalue()
+
+
+def test_scalar_section_falls_back_loud():
+    """ocr2-739："坏配置"的第二条路——段写成标量/列表（`[gates] audit_trigger = 5`、
+    `[checks] seal = []`）此前全树零断言。删掉 `isinstance` 守卫 ⇒ `5.get`/
+    `merged.update("fact")` 当场炸；删掉 print ⇒ 静默放宽。两条都必须出声且回落缺省。"""
+    import contextlib
+    import io
+
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, "[gates]\naudit_trigger = 5\n")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            data = gates.load(ws)
+        text = err.getvalue()
+        assert "不是表" in text and "audit_trigger" in text, text
+        assert data["audit_trigger"] == gates.DEFAULTS["audit_trigger"], data["audit_trigger"]
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, "[checks]\nseal = []\n")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            data = gates.load(ws)
+        text = err.getvalue()
+        assert "不是表" in text and "seal" in text, text
+        assert gates.preconditions(ws, "seal")[0] == "tasks_all_done"  # 编排回落缺省
 
 
 def test_pipeline_toml_with_peers_only_keeps_check_defaults():
@@ -146,9 +169,11 @@ def test_repo_declares_the_same_values_as_defaults():
             assert val == gates.DEFAULTS["checks"][name][key], f"checks.{name}.{key}: {val!r} != 缺省"
     # 再证 `gates.load` 真的走了声明合并路径（不是回落）：与非默认的独立解析结果一致。
     declared = {k: v for k, v in gates.load(repo).items() if k != "nodes"}
-    fresh_ws = Path(tempfile.mkdtemp())
-    atexit.register(shutil.rmtree, fresh_ws, True)
-    fresh = {k: v for k, v in gates.load(fresh_ws).items() if k != "nodes"}
+    # ocr2-740：本文件唯独这里逃出 TemporaryDirectory 模式——裸 mkdtemp + atexit 驻留到
+    # 解释器退出，ignore_errors 还吞清理失败。嵌套 with，随测回收、失败可见。
+    with tempfile.TemporaryDirectory() as _fresh:
+        fresh_ws = Path(_fresh)
+        fresh = {k: v for k, v in gates.load(fresh_ws).items() if k != "nodes"}
     assert declared == fresh, {
         k: (declared.get(k), fresh.get(k)) for k in set(declared) | set(fresh)
         if declared.get(k) != fresh.get(k)

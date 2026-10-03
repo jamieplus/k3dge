@@ -44,7 +44,8 @@ def test_merge_reports_real_conflict(tmp_path):
     ws = _ws(tmp_path, "x = 1\ny = 99\n")
     res = am.merge_into(ws, b)
     assert not res["ok"] and res["conflicts"] == ["src/a.py"], res
-    assert res["merged"] == {} or "src/a.py" not in res["merged"]
+    # ocr2-723：旧析取后半恒真（前半 ⇒ 后半），"无部分合并"一半永不独立失败。直接断言空合并。
+    assert res["merged"] == {}, res
 
 
 def test_merge_excludes_files_explicitly(tmp_path):
@@ -175,6 +176,8 @@ def test_missing_files_reach_the_detail(tmp_path, monkeypatch) -> None:
     (bundle / "code").mkdir()
     (bundle / "code" / "gone.py").write_text("fixed\n", encoding="utf-8")
     res = am.merge_into(tmp_path, bundle)
+    # ocr2-724：本分支的要点是"幻影文件不得报成功合并"——旧断言缺 ok 侧，成功/失败同脸也绿。
+    assert res["ok"] is False, res
     assert res["missing"] == ["gone.py"], res
     assert "主干缺文件" in res["detail"], res
     assert (tmp_path / "gone.py").exists() is False, "主干缺文件不得被凭空写出来"
@@ -197,6 +200,11 @@ def test_theirs_missing_is_reported_separately(tmp_path, monkeypatch) -> None:
                         lambda b, name: {"ghost.py"} if name == "fix.patch" else set())
     res = am.merge_into(tmp_path, bundle)
     assert res["missing"] == ["ghost.py"], res
+    # ocr2-725：只看 missing 时，"记了 missing 又写出空/合并文件"的回归照样绿——
+    # 文件既不得报合并，也不得在工作区物化（与主干缺分支同契约"不静默丢修复"）。
+    assert res["ok"] is False, res
+    assert "ghost.py" not in res["merged"], res
+    assert not (tmp_path / "ghost.py").exists(), "包里没有的文件不得被凭空写出来"
 
 
 def test_union_pins_refuses_binary(tmp_path):

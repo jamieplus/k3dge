@@ -116,6 +116,21 @@ class TestDocList(unittest.TestCase):
 
 
 class TestDocGrep(unittest.TestCase):
+    def test_unreadable_card_uses_canonical_id(self):
+        """读不出的卡片与可读时拿同一个 id（ocr2-604）。
+
+        读不出（此处用目录冒充不可读文件）时 `path.stem` 会给出 `0042-foo`，
+        而可读时 `_card_id` 给出 `ADR-0042` ⇒ 同一份文档两种身份，`where_doc`
+        按规范 id 找不着它。不可读分支也走 `_card_id`（只看文件名，不读内容）。
+        """
+        from k3dge.engine.doc_catalog import build_card
+
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            bad = ws / "docs" / "adr" / "0042-foo.md"
+            bad.mkdir(parents=True)
+            card = build_card(ws, "adr", bad)
+            self.assertEqual(card["id"], "ADR-0042")
     def test_grep_returns_path_only(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Path(d)
@@ -321,8 +336,15 @@ def test_shipped_schema_codes_are_declared() -> None:
 
     from k3dge.engine.gate_facts import GATE_FACTS, is_declared
 
-    repo = Path(__file__).resolve().parents[3]
-    assert (repo / "docs").is_dir(), f"仓根解析错误：{repo}（parents[3] 漂了？）"
+    # ocr2-732：旧 `parents[3]` 只在规范位置成立——摊平复制/换深度就静默指错靶，
+    # 漂了的路径恰好含 docs 树时还会验错树。与本文件 `_repo_root`（t-105）同规则：向上找标记。
+    repo = None
+    for cand in Path(__file__).resolve().parents:
+        if (cand / "docs" / "adr" / ".schema.json").is_file():
+            repo = cand
+            break
+    assert repo is not None, f"仓根标记找不到（文件被复制到别处？）：{Path(__file__).resolve()}"
+    assert (repo / "docs").is_dir(), f"仓根解析错误：{repo}（标记漂了？）"
     schema_files = sorted((repo / "docs").glob("*/.schema.json"))
     # 正对照（同 t-105 的病）：一份 schema 都没扫到时循环空转、undeclared 恒空＝假绿
     assert len(schema_files) >= 5, f"只扫到 {len(schema_files)} 份 .schema.json——判据在空转"
@@ -331,12 +353,14 @@ def test_shipped_schema_codes_are_declared() -> None:
         codes = (json.loads(f.read_text(encoding="utf-8")).get("codes") or {})
         undeclared += [(f.parent.name, k, v) for k, v in codes.items()
                        if not is_declared(v)]
-    # 已知债（2026-09-30，LEFTOVERS「schema 未声明码」）：这四码是 schema 专用别名，
-    # 需要各自写 fact/options 才能进声明表 ⇒ 独立批次。本测试兜住"别再新增第五个"。
-    known_debt = {"ADR_AMEND_FORMAT", "INCIDENT_FORM_INVALID",
+    # 已知债（2026-09-30，LEFTOVERS「schema 未声明码」）：这些码是 schema 专用别名，
+    # 需要各自写 fact/options 才能进声明表 ⇒ 独立批次。本测试兜住"别再新增"。
+    # ocr2-686 已还：INCIDENT_FORM_INVALID 进 GATE_FACTS 后从本集合移除。
+    known_debt = {"ADR_AMEND_FORMAT",
                   "TASK_STATUS_INVALID", "TASK_SECTION_MISSING"}
     # 直接对**结构化值**过滤（旧写 `u.split("=")[-1]` 再比——值里含 `=` 即错配，
     # 且 type/key 改名会静默把新债当旧债、或把旧债当新违例，t-108）；展示时才拼串。
     fresh = [u for u in undeclared if u[2] not in known_debt]
-    assert not fresh, "未声明的 schema 码（回执降级）：" \
-        + str([f"{t}:{k}={v}" for t, k, v in fresh])
+    # ocr2-731：GATE_FACTS 此前只 import 不用——失败信息里报出声明表规模，定位"哪边漏声明"。
+    assert not fresh, ("未声明的 schema 码（回执降级，声明表共 "
+                       f"{len(GATE_FACTS)} 项）：" + str([f"{t}:{k}={v}" for t, k, v in fresh]))

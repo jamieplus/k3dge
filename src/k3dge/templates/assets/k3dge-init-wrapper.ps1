@@ -7,7 +7,7 @@ if (-not $Here) {
   exit 1
 }
 $Init = Join-Path $Here "scripts/init.ps1"
-if (-not (Test-Path $Init -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath $Init -PathType Leaf)) {
   [Console]::Error.WriteLine("[k3dge] 找不到 $Init ⇒ 这不是 k3dge 初始化入口所在的项目根（或在别处复制了同名脚本）")
   exit 1
 }

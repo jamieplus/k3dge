@@ -136,6 +136,8 @@ def _state_lock():
 
 _json_loads = json.loads
 _json_dumps = json.dumps
+#: ocr2-700：DUMMY_PENDING 上界——桩只看开环/闭环两态，万级以上不再是"待修行数"而是爆炸载荷。
+_DUMMY_PENDING_MAX = 10000
 _HEADER = "| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |"
 _SEP = "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
 
@@ -194,6 +196,12 @@ def dummy_collect(job_id: str) -> str:
     if pending < 0:
         return json.dumps({"ok": False, "error": "BAD_CONFIG",
                            "message": f"DUMMY_PENDING 不得为负，收到 {pending}"}, ensure_ascii=False)
+    # ocr2-700：无上界时 typo/恶意值会物化百万行 markdown（内存/payload 爆炸）。
+    # 桩报告只看开环/闭环两态，_DUMMY_PENDING_MAX 之上直接拒（与 pending<0 同 BAD_CONFIG）。
+    if pending > _DUMMY_PENDING_MAX:
+        return json.dumps({"ok": False, "error": "BAD_CONFIG",
+                           "message": f"DUMMY_PENDING 过大（>{_DUMMY_PENDING_MAX}），收到 {pending}"},
+                          ensure_ascii=False)
     today = datetime.date.today().isoformat()
     ms = job.get("milestone_id") or "M0"
     rows = []

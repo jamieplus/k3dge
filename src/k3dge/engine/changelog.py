@@ -123,7 +123,7 @@ def build_notes_from_range(workspace: Path, previous_tag: str = "") -> tuple:
         if not rec:
             continue
         parts = rec.split("\x1f")
-        sha, subject = parts[0], (parts[1] if len(parts) > 1 else "")
+        subject = (parts[1] if len(parts) > 1 else "")
         body = parts[2] if len(parts) > 2 else ""
         if mechanical_commit(subject, body):
             continue

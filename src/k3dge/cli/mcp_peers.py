@@ -145,6 +145,11 @@ def _sync_peers_into_mcp(workspace: Path, cfg: dict) -> Optional[str]:
             data["mcpServers"][pid] = _peer_mcp_entry(mod, py_path)
             changed = True
             print(f"[MCP] auto-added peer '{pid}' from sibling {probe} as python -m {mod}", file=sys.stderr)
+        elif not isinstance(existing, dict):
+            # 用户手写了非对象条目（如 `"k3dit": "python -m k3dit"`）：不断言、不覆盖用户内容，
+            # 但必须出声——否则探到的 sibling 被静默丢弃，坏结构只在远处的 probe 才暴露（ocr2-579）。
+            _peer_fallback_warn(pid, f".mcp.json 的 '{pid}' 条目不是对象（{type(existing).__name__}）⇒ 保留用户内容，探到的 sibling 未合并",
+                                _peer_fallback(pcfg))
         elif _ensure_peer_pythonpath(existing, py_path):
             changed = True
             print(f"[MCP] filled PYTHONPATH for peer '{pid}' -> {py_path}", file=sys.stderr)

@@ -139,9 +139,8 @@ def _sync_registry():
     （改 ADR frontmatter + 移文件 ⇒ 重跑是追加，不是重算）。此前这条链的顺序与失败语义
     都硬编码在本函数里，与声明面并存 ⇒ 现收进 `[checks.sync].actions` + `nodes.run_phase`。
     """
-    from k3dge.engine import adr_gate, extractor_gen, nodes
+    from k3dge.engine import adr_gate, extractor_gen
     from k3dge.engine.doc_catalog import write_docs_index
-    from k3dge.engine.nodes import on_error as _on_error  # noqa: F401  (声明可读性)
 
     def sync_extractors(ctx):
         ws = ctx["workspace"]
@@ -168,7 +167,8 @@ def _sync_registry():
         # （docstring 变动不得动哈希）
         from k3dge.engine.pure_refs import inside_workspace
 
-        targets = list(ctx["domains"]) if ctx.get("domains") else list(manifest.domains)
+        # 空选择＝空目标集（`None` 才是"全量"）：`domains=[]`（MCP 客户端显式传空）不得回落全仓重写（ocr2-677）。
+        targets = list(ctx["domains"]) if ctx.get("domains") is not None else list(manifest.domains)
         # 只采本轮目标域：全量预采会让 `--domain x` 重扫整个仓库的 src 树（ocr2-343b）。
         wanted = {d for d in targets if d in manifest.domains}
         iface_cache: dict[str, str] = {}

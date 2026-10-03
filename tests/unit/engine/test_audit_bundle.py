@@ -990,6 +990,59 @@ def test_dummy_peer_state_and_report_shape(tmp_path, monkeypatch) -> None:
     sys.modules.pop("dummy_peer_c", None)
 
 
+def test_dummy_peer_eviction_is_bounded_and_newest_survives(tmp_path, monkeypatch) -> None:
+    """ocr2-699：账超 _MAX_JOBS 时最旧条目被裁——把"静默裁剪"变成可观测行为。
+
+    残留（有意留）：被裁 id 的 collect 仍报 NOT_FOUND（与 bogus id 同脸），
+    EVICTED 区分需改线契约，归 owner 定——这里只钉"有界 + 最新可用"。"""
+    import importlib.util
+    import json as _json
+    import sys
+
+    src = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "dummy_peer.py"
+    spec = importlib.util.spec_from_file_location("dummy_peer_evict", src)
+    m = importlib.util.module_from_spec(spec)
+    sys.modules["dummy_peer_evict"] = m
+    try:
+        spec.loader.exec_module(m)
+        monkeypatch.setenv("DUMMY_PEER_STATE", str(tmp_path / "evict.json"))
+        monkeypatch.setattr(m, "_MAX_JOBS", 5)
+        first = _json.loads(m.dummy_submit(baseline="a" * 40))["payload"]["job_id"]
+        for _ in range(5):
+            last = _json.loads(m.dummy_submit(baseline="b" * 40))["payload"]["job_id"]
+        jobs = _json.loads((tmp_path / "evict.json").read_text(encoding="utf-8"))
+        assert len(jobs) == 5, jobs.keys()  # 有界：不再无界增长
+        assert first not in jobs and last in jobs  # 裁的是最旧，不是随机/最新
+        assert _json.loads(m.dummy_collect(last))["ok"]  # 最新仍可 collect
+        assert _json.loads(m.dummy_collect(first))["error"] == "NOT_FOUND"
+    finally:
+        sys.modules.pop("dummy_peer_evict", None)
+
+
+def test_dummy_peer_pending_is_clamped(tmp_path, monkeypatch) -> None:
+    """ocr2-700：DUMMY_PENDING 超上界 ⇒ 入口式 BAD_CONFIG（不物化百万行）。"""
+    import importlib.util
+    import json as _json
+    import sys
+
+    src = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "dummy_peer.py"
+    spec = importlib.util.spec_from_file_location("dummy_peer_clamp", src)
+    m = importlib.util.module_from_spec(spec)
+    sys.modules["dummy_peer_clamp"] = m
+    try:
+        spec.loader.exec_module(m)
+        monkeypatch.setenv("DUMMY_PEER_STATE", str(tmp_path / "clamp.json"))
+        job = _json.loads(m.dummy_submit(baseline="c" * 40))["payload"]["job_id"]
+        monkeypatch.setenv("DUMMY_PENDING", str(m._DUMMY_PENDING_MAX + 1))
+        bad = _json.loads(m.dummy_collect(job))
+        assert bad["ok"] is False and bad["error"] == "BAD_CONFIG", bad
+        monkeypatch.setenv("DUMMY_PENDING", str(m._DUMMY_PENDING_MAX))
+        ok = _json.loads(m.dummy_collect(job))
+        assert ok["ok"], ok["error"] if not ok["ok"] else ok
+    finally:
+        sys.modules.pop("dummy_peer_clamp", None)
+
+
 def test_apply_bundle_rejects_missing_manifest(tmp_path):
     """manifest 缺失/不可解析 ≠ "无补丁要打"：空 facts 必须 fail-clear（ocr2-037/038）。"""
     ws = _repo(tmp_path)

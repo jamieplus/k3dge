@@ -22,14 +22,13 @@ from typing import List, Optional, Tuple
 # chain are docstring-only — verified, no heavy deps). Never import functional
 # engine modules from here; enforced by `test_pure_imports_stdlib_only`.
 
-from k3dge.engine.pure_schema import AUX_NAMES, parse_frontmatter_pairs
+from k3dge.engine.pure_schema import AUX_NAMES, parse_frontmatter_pairs, parse_headers
 
 Ref = Tuple[str, str]  # (code, message)
 
-_ADR_RE = re.compile(r"ADR-(\d{4})")
+_ADR_RE = re.compile(r"ADR-(\d{4})(?!\d)")
 _FOOTNOTE_REF_RE = re.compile(r"\[\^([^\]]+)\]")
 _FOOTNOTE_DEF_RE = re.compile(r"^\[\^([^\]]+)\]:", re.MULTILINE)
-_FENCE_RE = re.compile(r"^(`{3,}|~{3,})", re.MULTILINE)
 _REPORT_RE = re.compile(r"-\s+\*\*Report\*\*:\s*`?([^`\n]+?)`?\s*$", re.MULTILINE)
 _STATUS_RE = re.compile(r"-\s+\*\*Status\*\*:\s*([\w-]+)", re.IGNORECASE)
 _ADR_FILE_RE = re.compile(r"^(\d{4})-")
@@ -224,8 +223,6 @@ def check_task_body_meta_redundant(rel: str, text: str) -> List[Ref]:
     """
     if not rel.startswith("docs/tasks/"):
         return []
-    from k3dge.engine.pure_schema import parse_frontmatter_pairs, parse_headers
-
     fm = {k.lower(): v for k, v in parse_frontmatter_pairs(text)}
     if not fm:
         return []
@@ -251,31 +248,34 @@ def check_supersede_unreconciled(workspace: Path, rel: str, text: str) -> List[R
     """
     if not rel.startswith("docs/adr/") or "/obsolete/" in rel.replace("\\", "/"):
         return []
-    m = _SUPERSEDES_RE.search(text)
-    if not m:
+    targets = _SUPERSEDES_RE.findall(text)
+    if not targets:
         return []
-    target = m.group(1)
-    adr_dir = workspace / "docs" / "adr"
-    if list(adr_dir.glob(f"{target}-*.md")):
-        return [("ADR_SUPERSEDE_UNRECONCILED",
-                 f"{rel}: 声明 Supersedes ADR-{target}，但该 ADR 仍在 docs/adr/（未归档）"
-                 f"——run `k3dge sync`")]
-    archived = list((adr_dir / "obsolete").glob(f"{target}-*.md"))
-    if not archived:
-        return [("ADR_SUPERSEDE_UNRECONCILED",
-                 f"{rel}: 声明 Supersedes ADR-{target}，但 obsolete/ 下无该文件"
-                 f"——run `k3dge sync`")]
-    try:
-        old = archived[0].read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return []
-    # 行锚定 + 大小写不敏感：`Status: superseded` 也算（adr_gate._is_superseded 就是 .lower() 判的）；
-    # 整篇子串匹配会被散文/围栏示例里的同串误放行（ocr-100）。
-    if not re.search(r"^Status:\s*superseded\s*$", old, re.M | re.I):
-        return [("ADR_SUPERSEDE_UNRECONCILED",
-                 f"{rel}: obsolete/{archived[0].name} 未标 Status: Superseded"
-                 f"——run `k3dge sync`")]
-    return []
+    refs: List[Ref] = []
+    for target in targets:
+        adr_dir = workspace / "docs" / "adr"
+        if list(adr_dir.glob(f"{target}-*.md")):
+            refs.append(("ADR_SUPERSEDE_UNRECONCILED",
+                         f"{rel}: 声明 Supersedes ADR-{target}，但该 ADR 仍在 docs/adr/（未归档）"
+                         f"——run `k3dge sync`"))
+            continue
+        archived = list((adr_dir / "obsolete").glob(f"{target}-*.md"))
+        if not archived:
+            refs.append(("ADR_SUPERSEDE_UNRECONCILED",
+                         f"{rel}: 声明 Supersedes ADR-{target}，但 obsolete/ 下无该文件"
+                         f"——run `k3dge sync`"))
+            continue
+        try:
+            old = archived[0].read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        # 行锚定 + 大小写不敏感：`Status: superseded` 也算（adr_gate._is_superseded 就是 .lower() 判的）；
+        # 整篇子串匹配会被散文/围栏示例里的同串误放行（ocr-100）。
+        if not re.search(r"^Status:\s*superseded\s*$", old, re.M | re.I):
+            refs.append(("ADR_SUPERSEDE_UNRECONCILED",
+                         f"{rel}: obsolete/{archived[0].name} 未标 Status: Superseded"
+                         f"——run `k3dge sync`"))
+    return refs
 
 
 def check_adr_consistency(rel: str, text: str) -> List[Ref]:

@@ -3,12 +3,9 @@
 import re
 import os
 import subprocess
-import tempfile
 from pathlib import Path
 
 from k3dge.engine.attest import PREFIX, append_to_message, verify_commit
-import shutil
-import atexit
 
 
 def _git_env(extra: "dict | None" = None) -> dict:
@@ -38,17 +35,20 @@ def _head(ws: Path) -> str:
     return h
 
 
-def _repo() -> Path:
-    ws = Path(tempfile.mkdtemp())
-    atexit.register(shutil.rmtree, ws, True)
+def _repo(base: Path) -> Path:
+    # ocr2-722：旧写法裸 `mkdtemp()` + `atexit(shutil.rmtree, ws, True)`——清理失败
+    # （权限/磁盘满/只读位）全吞，且目录在整个 pytest 会话期常驻、跨测累积。
+    # 收进 fixture 管内：随测回收、失败可见（pytest 清理报错不再是静默磁盘占用）。
+    ws = base / "ws"
+    ws.mkdir(parents=True, exist_ok=True)
     _gitc(ws, "init", "-q")
     _gitc(ws, "-c", "user.name=t", "-c", "user.email=t@t",
           "commit", "-q", "--allow-empty", "--no-verify", "-m", "chore: init")
     return ws
 
 
-def test_appended_line_verifies():
-    ws = _repo()
+def test_appended_line_verifies(tmp_path):
+    ws = _repo(tmp_path)
     (ws / "a.txt").write_text("x\n", encoding="utf-8")
     _gitc(ws, "add", "-A")
     msg = append_to_message(ws, "feat: x", who="t")
@@ -67,18 +67,18 @@ def test_appended_line_verifies():
     assert ok, out
 
 
-def test_missing_line_is_refused():
-    ws = _repo()
+def test_missing_line_is_refused(tmp_path):
+    ws = _repo(tmp_path)
     ok, out = verify_commit(ws, _head(ws))
     assert not ok
     assert "missing attestation line" in out
 
 
-def test_line_replayed_onto_other_commit_is_refused():
+def test_line_replayed_onto_other_commit_is_refused(tmp_path):
     """一条合法行不能原样搬到另一提交（同树）：必须与本提交的作者时间同窗（ocr-005）。"""
     from k3dge.engine.attest import token
 
-    ws = _repo()
+    ws = _repo(tmp_path)
     old = "2020-01-01T00:00:00Z"
     ln = f"{PREFIX}t @ {old} #{token(ws, old)}"
     _gitc(ws, "-c", "user.name=t", "-c", "user.email=t@t",
@@ -86,13 +86,13 @@ def test_line_replayed_onto_other_commit_is_refused():
     ok, out = verify_commit(ws, _head(ws))
     assert not ok
     assert "timestamp mismatch" in out
-def test_attestation_stays_inside_existing_trailer_block() -> None:
+def test_attestation_stays_inside_existing_trailer_block(tmp_path) -> None:
     """另起一段会把封版四键挤成倒数第二段 ⇒ `%(trailers)` 只读回署名（ocr-308）。
 
     （原来这行串落在 `ws = _repo()` **之后** ⇒ 只是被丢弃的表达式语句，不是 docstring：
     `__doc__` 为 None，`pytest -vv`/collect-only 里看不到本测的意图。t-071）
     """
-    ws = _repo()
+    ws = _repo(tmp_path)
     msg = ("chore: seal\n\n"
            "Seal-milestone: M11\nAudit-baseline: a7259c2\nAudit-seat: k3dit\nAudit-result: closed")
     out = append_to_message(ws, msg, who="k3dge-process")
@@ -101,8 +101,8 @@ def test_attestation_stays_inside_existing_trailer_block() -> None:
     assert last.startswith("Seal-milestone:"), out
 
 
-def test_prose_body_still_gets_own_paragraph() -> None:
-    out = append_to_message(_repo(), "feat: x\n\n正文说明", who="w")
+def test_prose_body_still_gets_own_paragraph(tmp_path) -> None:
+    out = append_to_message(_repo(tmp_path), "feat: x\n\n正文说明", who="w")
     assert "\n\nk3dge-commit:" in out
 
 
@@ -119,17 +119,17 @@ def test_verify_commit_rejects_option_shaped_and_blank_ids(tmp_path) -> None:
         assert not ok and "不合法" in msg, (bad, msg)
 
 
-def test_verify_commit_passes_ref_names_through_validation() -> None:
+def test_verify_commit_passes_ref_names_through_validation(tmp_path) -> None:
     """名字别读反（t-074）：本测验的是**校验放行**——`HEAD`/`main^` 这类 ref 名过得了
     "非空/不以 - 开头/不含空白"的门，抵达真判据（未署名 ⇒ not ok）。断言本来就是
     `not ok`，旧名 "accepts" 会让人以为是验签收，将来"顺手改成 assertTrue"即毁测。
     """
-    ws = _repo()
+    ws = _repo(tmp_path)
     ok, msg = verify_commit(ws, "HEAD")
     assert not ok and "missing attestation" in msg, msg   # 通过校验，进到真判据（未署名）
 
 
-def test_wrong_token_in_window_is_refused() -> None:
+def test_wrong_token_in_window_is_refused(tmp_path) -> None:
     """钉住 **token 比对支路**（t-075）：旧"重放"测用 2020 年戳，`timestamp mismatch`
     先短路，`tok not in expected` 这行从未被执行——删掉整个比对，本文件仍全绿。
     现在：署名行时间**落在提交作者分钟内**（时间判据放行），token 手改成别的词 ⇒
@@ -138,7 +138,7 @@ def test_wrong_token_in_window_is_refused() -> None:
 
     from k3dge.engine.attest import token
 
-    ws = _repo()
+    ws = _repo(tmp_path)
     # 先落一个文件并暂存，使 token 基于**非空树**：旧写法在空树上产 token 再加文件，
     # 正确 token 也会因树变而红，测不出"伪造"只测出"树变"（ocr2-110）。
     (ws / "b.txt").write_text("1\n", encoding="utf-8")
@@ -173,9 +173,9 @@ def test_wrong_token_in_window_is_refused() -> None:
     assert not ok and "token mismatch" in out, out
 
 
-def test_stale_shaped_line_is_refreshed_not_kept():
+def test_stale_shaped_line_is_refreshed_not_kept(tmp_path):
     # 形状对但 token 过期/伪造的行不得原样保留，必须重算 fresh 行（ocr2-011/035）。
-    ws = _repo()
+    ws = _repo(tmp_path)
     (ws / "a.txt").write_text("x\n", encoding="utf-8")
     _gitc(ws, "add", "-A")
     stale = "feat: x\n\nk3dge-commit: t @ 2020-01-01T00:00:00Z #wrongword\n"
@@ -192,11 +192,11 @@ def test_windows_tolerance_is_symmetric_around_the_minute() -> None:
         "2026-01-01T00:04", "2026-01-01T00:05", "2026-01-01T00:06"]
 
 
-def test_verify_commit_survives_non_ascii_under_ascii_locale(monkeypatch) -> None:
+def test_verify_commit_survives_non_ascii_under_ascii_locale(tmp_path, monkeypatch) -> None:
     """ocr2-189：git 输出 UTF-8，但 `text=True` 按 locale 解码；ASCII locale 不得崩栈。"""
     import locale
 
-    ws = _repo()
+    ws = _repo(tmp_path)
     (ws / "a.txt").write_text("x\n", encoding="utf-8")
     _gitc(ws, "add", "-A")
     msg = append_to_message(ws, "feat: x\n\n作者：José", who="José")
@@ -211,9 +211,9 @@ def test_verify_commit_survives_non_ascii_under_ascii_locale(monkeypatch) -> Non
     assert ok, out
 
 
-def test_verify_commit_accepts_later_valid_line_after_shaped_decoy() -> None:
+def test_verify_commit_accepts_later_valid_line_after_shaped_decoy(tmp_path) -> None:
     """ocr2-190：正文里靠前的形状合法但无效的行不得遮住真正的 trailer。"""
-    ws = _repo()
+    ws = _repo(tmp_path)
     (ws / "a.txt").write_text("x\n", encoding="utf-8")
     _gitc(ws, "add", "-A")
     msg = append_to_message(ws, "feat: x", who="t")

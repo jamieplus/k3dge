@@ -121,6 +121,7 @@ def check_one(rel: str) -> list[str]:
 
 
 _PURE_CACHE: dict = {}
+_GATE_FACTS_CACHE: dict = {}
 
 
 def _load_pure():
@@ -147,12 +148,19 @@ def _load_pure():
 
 def _load_gate_facts():
     """闸红文案/档位的声明面（零依赖）。不可用 ⇒ None，消费者回落自带文案。"""
+    key = str(WS)
+    if key in _GATE_FACTS_CACHE:              # 与 `_load_pure` 同口径记忆化（ocr-417）
+        return _GATE_FACTS_CACHE[key]
     try:
-        sys.path.insert(0, str(WS / "src"))
+        root = str(WS / "src")
+        if root not in sys.path:              # 无条件的 insert(0) 会每调一次插一条同名项
+            sys.path.insert(0, root)
         from k3dge.engine import gate_facts
+        _GATE_FACTS_CACHE[key] = gate_facts
         return gate_facts
     except Exception as exc:  # 工具坏不得阻断所有提交
         print(f"[k3dge screen] WARN: gate_facts unavailable ({exc}); 回落简式输出")
+        _GATE_FACTS_CACHE[key] = None
         return None
 
 

@@ -95,10 +95,10 @@ def check_completeness(
         if t.target not in states:                                   # ③ 目标态已定义
             v.append(f"未定义目标态 {t.target!r}")
         if t.source in terminals:                                    # ① 终态不得有出边
-            v.append(f"终态 {t.source.value} 有出边 -> {t.target.value}")
+            v.append(f"终态 {getattr(t.source, 'value', t.source)} 有出边 -> {getattr(t.target, 'value', t.target)}")
     dead = _dead_states(states, terminals, transitions)
-    for s in sorted(dead, key=lambda x: x.value):                     # ② 非终态须有出边（防死锁）
-        v.append(f"非终态 {s.value} 无出边（潜在死锁）")
+    for s in sorted(dead, key=lambda x: getattr(x, "value", str(x))):  # ② 非终态须有出边（防死锁）
+        v.append(f"非终态 {getattr(s, 'value', s)} 无出边（潜在死锁）")
 
     def _can_reach_terminal(start: TaskState) -> bool:               # ②b 非终态须**可达终态**（防活锁）
         seen: Set[TaskState] = {start}
@@ -113,18 +113,18 @@ def check_completeness(
                     stack.append(t.target)
         return False
 
-    for s in sorted(states - set(terminals), key=lambda x: x.value):
+    for s in sorted(states - set(terminals), key=lambda x: getattr(x, "value", str(x))):
         if not _can_reach_terminal(s):
-            v.append(f"非终态 {s.value} 无法到达任何终态（活锁）")
+            v.append(f"非终态 {getattr(s, 'value', s)} 无法到达任何终态（活锁）")
     seen: Set[tuple] = set()                                         # ④ `(source, move)` 唯一（非确定/二义）
     for t in transitions:
         key = (t.source, t.move)
         if key in seen:
-            v.append(f"非确定转移 {t.source.value}/{t.move.value}")
+            v.append(f"非确定转移 {getattr(t.source, 'value', t.source)}/{getattr(t.move, 'value', t.move)}")
         seen.add(key)
     reach = _reachable(transitions, initial)                         # ⑥ 初始态可达全部
-    for s in sorted(states - reach, key=lambda x: x.value):
-        v.append(f"不可达状态 {s.value}")
+    for s in sorted(states - reach, key=lambda x: getattr(x, "value", str(x))):
+        v.append(f"不可达状态 {getattr(s, 'value', s)}")
     return v
 
 

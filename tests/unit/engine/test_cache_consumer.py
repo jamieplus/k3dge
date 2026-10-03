@@ -77,12 +77,13 @@ class TestDupCheck(unittest.TestCase):
         from k3dge.cli.main import main
         import contextlib
         import os
-        import subprocess
 
         with TemporaryDirectory() as d:
             ws = pathlib.Path(d)
             (ws / ".agent").mkdir()
-            subprocess.run(["git", "init", "-b", "main"], cwd=ws, check=True, capture_output=True)
+            # ocr2-728：旧写法 `git init -b main`（check=True）是本路径不需要的硬外部依赖
+            # （_find_workspace 认 .agent 标记；create_task/_similar_task_hints 不调 git）——
+            # 无 git 的镜像上整测 error，读起来像产品回归。直接删，不加 skip。
             (ws / ".agent" / "manifest.json").write_text('{"package_root":"src","domains":{}}', encoding="utf-8")
             old = pathlib.Path.cwd()
             try:

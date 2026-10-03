@@ -201,6 +201,9 @@ def test_proposed_adr_must_not_carry_amend_trail():
 
 def test_schema_block_gates_the_check():
     """数据驱动：ADR schema 声明 `amend` 才查（其它文档类型不受影响）；`k3dge check` 与 seal 同源。"""
+    import json as _json
+    import tempfile as _tmp
+
     from k3dge.engine.pure_schema import check_amend
 
     bad = "Amended-by:\n  - 1 | X | 2026-01-01 | a\n"
@@ -212,3 +215,19 @@ def test_schema_block_gates_the_check():
     # 码可被 schema 覆盖（数据驱动）
     got2 = check_amend({"enabled": True}, {"amend_order": "X_CUSTOM"}, "0001-a.md", bad)
     assert got2 and got2[0][0] == "X_CUSTOM"
+    # ocr2-712：docstring 的"与 seal 同源"此前无 seal 侧用例——check_amend 只证内函数早退。
+    # seal 入口自己的 fail-closed 分支（缺 schema ⇒ 拒；有 schema + 坏 ADR ⇒ 拒并点名文件）。
+    with _tmp.TemporaryDirectory() as _d:
+        _ws = Path(_d)
+        (_ws / "docs" / "adr").mkdir(parents=True)
+        (_ws / "docs" / "adr" / "0001-a.md").write_text(
+            "---\nStatus: Accepted\n---\n# ADR-0001\n" + bad, encoding="utf-8")
+        out = amend_format(_ws)
+        assert out and ".schema.json 缺失" in out, out  # 无表 ⇒ 拒，不是静默全绿
+        (_ws / "docs" / "adr" / ".schema.json").write_text(
+            _json.dumps({"amend": {"enabled": True},
+                         "codes": {"amend_order": "ADR_AMEND_ORDER"}}),
+            encoding="utf-8")
+        out2 = amend_format(_ws)
+        # seal 侧汇总只渲染 msg（码在 check_amend 元组里，上已钉）：钉文件名 + 消息体。
+        assert out2 and "0001-a.md" in out2 and "前缀" in out2, out2

@@ -64,6 +64,36 @@ class TestGenerator(unittest.TestCase):
             api = (root / "docs/generated/api.md").read_text(encoding="utf-8")
             self.assertIn("# mod.py", api)
 
+    def test_empty_domains_selects_empty_target_set(self) -> None:
+        """ocr2-677：显式空选择（MCP `{"domains": []}`）＝空目标集，不得回落成全量同步。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".agent").mkdir()
+            (root / ".agent" / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "package_root": "src",
+                        "domains": {
+                            "core": {"src": "src/core", "spec": "docs/specs/core/spec.md"}
+                        },
+                        "ignore": [],
+                    }
+                )
+            , encoding="utf-8")
+            (root / "src" / "core").mkdir(parents=True)
+            (root / "src" / "core" / "mod.py").write_text(
+                "def foo(x: int) -> int:\n    return x\n"
+            , encoding="utf-8")
+            (root / "docs" / "specs" / "core").mkdir(parents=True)
+            spec = root / "docs" / "specs" / "core" / "spec.md"
+            spec.write_text(SPEC, encoding="utf-8")
+            before = spec.read_text(encoding="utf-8")
+
+            changed, _docs_updated = sync_all(root, domains=[])
+            self.assertEqual(changed, [])
+            # 空目标集 ⇒ 域 spec 逐字节不动（回落全量会重写接口块+哈希）
+            self.assertEqual(spec.read_text(encoding="utf-8"), before)
+
     def test_render_readme_layout(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -96,7 +126,16 @@ class TestGenerator(unittest.TestCase):
             self.assertIn("| core | `src/core` | `docs/specs/core/spec.md` | 核心模块 |", content)
             self.assertNotIn("old content", content)
 
+            # ocr2-805：幂等只断返回值时，第二遍重写/截断/丢临时兄弟也照样绿——
+            # 这是 no-op 路径的唯一覆盖。重读断内容逐字节不动、无残留临时件。
+            siblings_before = sorted(p.name for p in readme.parent.iterdir())
             self.assertIsNone(render_readme_layout(root, manifest))
+            self.assertEqual(readme.read_text(encoding="utf-8"), content)
+            self.assertIn("| core | `src/core` | `docs/specs/core/spec.md` | 核心模块 |",
+                          readme.read_text(encoding="utf-8"))
+            self.assertNotIn("old content", readme.read_text(encoding="utf-8"))
+            self.assertEqual(sorted(p.name for p in readme.parent.iterdir()), siblings_before,
+                             "第二遍渲染留下临时兄弟文件")
 
 
 
@@ -151,14 +190,17 @@ class TestGenerator(unittest.TestCase):
         real_replace = Path.replace
 
         def spy_replace(self, dst, *a, **k):
-            replaced.append((self.name, str(dst)))
+            # ocr2-806：记全路径——旧版只记 `self.name`（basename），写到别的
+            # 目录的同名 spec.md 也满足"源名 ≠ 目标名"，真文件身份从没被断。
+            replaced.append((str(self), str(dst)))
             return real_replace(self, dst, *a, **k)
 
         with mock.patch.object(Path, "replace", spy_replace):
             atomic_write_text(target, "新内容\n")
         # 源恒为同目录临时件，dst 才是 target ⇒ 从不就地写 target
         self.assertTrue(replaced, replaced)
-        self.assertTrue(all(src != target.name for src, _dst in replaced), replaced)
+        self.assertTrue(all(Path(src).parent == ws and Path(src).name != target.name
+                            for src, _dst in replaced), replaced)
         self.assertTrue(any(dst == str(target) for _src, dst in replaced), replaced)
         self.assertEqual(target.read_text(encoding="utf-8"), "新内容\n")
         self.assertFalse([p for p in ws.iterdir() if p.name.startswith("." + target.name)])

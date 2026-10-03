@@ -144,7 +144,11 @@ class TestScaffold(unittest.TestCase):
         self.assertTrue((self.target / "docs" / "guides" / "mcp-bridge.md").is_file())
         self.assertTrue((self.target / "docs" / "guides" / "downstream.md").is_file())
         self.assertTrue((self.target / ".gitignore").is_file())
-        reviews = (self.target / "docs" / "reviews" / "README.md").read_text(encoding="utf-8")
+        # ocr2-810：直接读文件时若 scaffold 漏发它，死的是 FileNotFoundError
+        # 裸 traceback（还连带吞掉后面两条真断言），失败像环境问题。先断存在。
+        reviews_path = self.target / "docs" / "reviews" / "README.md"
+        self.assertTrue(reviews_path.is_file(), "scaffold 漏发 docs/reviews/README.md")
+        reviews = reviews_path.read_text(encoding="utf-8")
         self.assertNotIn("2026-08-25-pass1", reviews)
         leftovers = self.target / "docs" / "reviews" / "LEFTOVERS.md"
         self.assertTrue(leftovers.is_file())

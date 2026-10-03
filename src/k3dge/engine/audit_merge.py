@@ -186,14 +186,13 @@ def merge_into(workspace: Path, bundle: Path, *, exclude: Iterable[str] = ()) ->
     tmp_mid = str(mid_root) if mid.get("ok") else ""      # 复用包的 `code/`（**别 rmtree 它**）
     try:
         # code-4（报告）：原 `... or True` 是**恒真谓词** ⇒ 过滤完全失效。改成显式语义：
-        # 回落集**只认 fix 层**：`fix_only` 为空意味着"没有 fix.patch 或其文件全被排除"，
+        # 回落集**只认 fix 层**：`fix_rels` 为空意味着"没有 fix.patch 或其文件全被排除"，
         # 用 `touched_files`（fix ∪ pins）当回退会把标注层硬塞进 fix 三路合并，与两层语义矛盾（ocr-212）。
         fix_rels = sorted(patch_rels(bundle, "fix.patch") - excluded)
-        fix_only = fix_rels
         merged: Dict[str, str] = {}
         conflicts: List[str] = []
         missing: List[str] = []
-        for rel in fix_only or fix_rels:
+        for rel in fix_rels:
             if need_pins_replay:
                 # 中间树是"基线+修复"（钉已反向掉）：它里面缺 `rel` 说明反向钉删掉了该文件 ⇒
                 # 回落含钉的 `code/` 会把钉当修复侧改动合进来（再正向 apply pins.patch ⇒ 同一枚钉写两遍，

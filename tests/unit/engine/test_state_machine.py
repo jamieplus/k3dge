@@ -59,18 +59,23 @@ def test_nondeterministic_pair_is_flagged() -> None:
 
 
 def test_unreachable_state_is_flagged() -> None:
+    # ocr2-791：与邻测（t-282/283/284）同标准——只断"有条含 不可达"时，
+    # 报去别的态（如 initial/全态）的回归照样绿。本夹具其余规则全干净，
+    # 故钉死恰一条、点名 deferred、无其它噪声。
     bad = (
         T(S.IDEA, M.START, S.IN_PROGRESS),
         T(S.IN_PROGRESS, M.FINISH, S.DONE),
         T(S.DEFERRED, M.FINISH, S.DONE),  # DEFERRED 从 IDEA 不可达
     )
     v = sm.check_completeness(bad, set(S), sm.TERMINAL_STATES, sm.INITIAL)
-    assert any("不可达" in x for x in v), v
+    unreach = [x for x in v if "不可达" in x]
+    assert unreach, v
+    assert any("deferred" in x for x in unreach), unreach
+    assert len(v) == 1, v
 
 
 def test_new_state_without_registration_fails() -> None:
     """新增态若不登记（既不加转移也不标终态）⇒ 完备性红（防漂移核心）。"""
-    import enum
 
     # 死锁判据必须用**同一套枚举**验：旧写法另造一个 MoreStates，成员与 TaskState 是
     # 不同对象 ⇒ 每一行都变成"未定义源态/目标态"，`无出边` 其实一条都没产生，
@@ -96,3 +101,16 @@ def test_completeness_checks_the_declaration_set_itself() -> None:
 
     v_init = sm.check_completeness(_GOOD, set(S), sm.TERMINAL_STATES, "nope")   # type: ignore[arg-type]
     assert any("初始态" in x for x in v_init), v_init
+
+
+def test_garbage_labels_do_not_crash_the_checker() -> None:
+    # 函数契约是"返回违例列表"：自造坏表（含非 Enum 的 target / 纯字符串 states）
+    # 不得抛 AttributeError（ocr2-666）。消息经 getattr 取 label。
+    bad = (T(S.DONE, M.START, "idea"),)  # type: ignore[arg-type]
+    v = sm.check_completeness(bad, set(S), sm.TERMINAL_STATES, S.IDEA)
+    assert any("未定义目标态" in x for x in v), v
+    assert any("有出边" in x for x in v), v
+
+    v2 = sm.check_completeness(
+        (T("done", "start", "idea"),), {"done", "idea"}, frozenset({"done"}), "done")  # type: ignore[arg-type]
+    assert isinstance(v2, list) and v2, v2

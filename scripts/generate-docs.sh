@@ -81,6 +81,7 @@ Spec-gate harness：为 vibecoding agent 提供确定性的契约漂移检测与
 
 另见：`docs/specs/<domain>/spec.md`（各域契约事实源）。
 EOF
+    chmod 644 "$_readme_tmp" || exit 1   # 与 gen() 同因：mktemp 0600 会经 mv 原样落盘（ocr2-685）
     # 独占落盘：生成期间若 README.md 已被（另一进程/agent）创建，`mv -n` 不覆盖，
     # 临时件仍在 ⇒ 检测到而非清掉用户的文件（ocr2-360/361）。
     mv -n "$_readme_tmp" README.md 2>/dev/null || true
@@ -121,8 +122,10 @@ gen() {
       # 让它**永久**停在半成品上，与脚本开头宣称的幂等不符（356）⇒ 同目录临时件 + mv 原子落盘。
       local tmp
       tmp="$(mktemp "${file}.XXXXXX")"
-      printf '# %s\n\n' "$title" > "$tmp"
-      cat >> "$tmp" << 'EOT'
+      # `mktemp` 落盘 0600 且 `mv` 保留 mode ⇒ 生成件变 owner-only（相对旧 `cat >` 的 0644 回归，ocr2-685）；
+      # 写失败（磁盘满/被杀）时清半成品，不在 docs 树里堆 `*.XXXXXX`。
+      printf '# %s\n\n' "$title" > "$tmp" || { rm -f "$tmp"; exit 1; }
+      cat >> "$tmp" << 'EOT' || { rm -f "$tmp"; exit 1; }
 > Auto-generated stub by `./scripts/generate-docs.sh` from `.agent/docs.toml`.
 > Agent: please fill this document per software engineering standards, referencing
 > `docs/specs/`, `.agent/manifest.json` and `docs/generated/`.
@@ -136,6 +139,7 @@ gen() {
 <!-- k3dge:guide-stub -->
 
 EOT
+      chmod 644 "$tmp" || { rm -f "$tmp"; exit 1; }
       # 独占落盘：check-then-act 窗口里目标若被另一进程/agent 建出，`mv -n` 不覆盖。
       # 残留临时件＝未落盘：目标在则"已出现、跳过"，否则真失败（ocr2-361）。
       mv -n "$tmp" "$file" 2>/dev/null || true

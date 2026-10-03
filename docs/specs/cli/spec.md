@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/cli`
-- **Contract Hash**: `sha256:bffd868be37630700283e5eb04dfe045e686a73bbd11adb4cb8e05bfb81de68f`
+- **Contract Hash**: `sha256:16f1ec498910ee1546dc74022591103f343cf176f65cdad267c3d37b9ab47ed4`
 - **Last Updated**: 2026-10-02
 
 ## 1. Domain Boundary & Responsibilities
@@ -104,6 +104,7 @@ from k3dge.engine.evaluator import ConsistencyEngine
 from k3dge.engine.manifest import Manifest
 from k3dge.engine.manifest import ManifestError
 from k3dge.engine.state_machine import TaskState
+from k3dge.engine.task_index import TITLE_RE
 from k3dge.engine.task_index import parse_frontmatter
 cache_observability(workspace: Path) -> Optional[Dict[str, Any]]
 lifecycle_next(workspace: Path) -> Any

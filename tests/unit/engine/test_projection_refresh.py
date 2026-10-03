@@ -56,7 +56,12 @@ class TestProjectionRefresh(unittest.TestCase):
         changed = _refresh_projections(self.repo)
         self.assertIn("docs/generated/api.md", changed)
         expected = self._fresh_contents()[gen / "api.md"]
-        self.assertEqual((gen / "api.md").read_text(encoding="utf-8"), expected)
+        got = (gen / "api.md").read_text(encoding="utf-8")
+        self.assertEqual(got, expected)
+        # ocr2-768: 上面是自洽比较（渲染错了两边一起错）——加与渲染器无关的
+        # 断言，渲染回归（丢节/丢接口/围栏处理变了）时本测真红。
+        self.assertNotEqual(got, "# API Reference\n\n陈旧\n", "旧内容根本没被覆盖")
+        self.assertIn("core", got, "刷出的 api.md 里没有本仓唯一的域 core")
 
     def test_refresh_is_idempotent(self) -> None:
         """第二次为空**只有第一次真写了**才有意义（t-233）。
@@ -70,7 +75,9 @@ class TestProjectionRefresh(unittest.TestCase):
         self.assertTrue(first, "首轮什么都没刷新＝'已新鲜'的前提没建立，二轮的'空'是假绿")
         f2: list = []
         second = _refresh_projections(self.repo, f2)
-        self.assertEqual(second, [], f2)
+        # ocr2-769: 失败消息必须带被比较的值 second——旧消息只打 f2，
+        # second 误报变更而 f2 为空时打印 []，藏起真诊断。
+        self.assertEqual(second, [], f"第二轮误报变更（失败：{f2}）：{second}")
         self.assertEqual(f2, [], "第二轮把失败吞进了返回值之外")
 
     def test_readme_layout_block_is_refreshed(self) -> None:

@@ -38,6 +38,15 @@ class TestMcp(unittest.TestCase):
             self.assertNotIn("\\", t["path"])
             self.assertIn("/", t["path"])
 
+    def test_submit_audit_report_path_is_workspace_relative(self) -> None:
+        """ocr2-577：submit 回执的 path 必须仓内相对 + 正斜杠（裸 `str(path)` 在 Windows 下是 `docs\\...`）。"""
+        with tempfile.TemporaryDirectory() as d:
+            payload = json.loads(mcp.k3dge_submit_audit_report("M1", "实质内容行", workspace_path=d))
+        self.assertTrue(payload.get("ok"), payload)
+        self.assertNotIn("\\", payload["path"], payload)
+        self.assertFalse(Path(payload["path"]).is_absolute(), payload)
+        self.assertTrue(payload["path"].startswith("docs/reviews/"), payload)
+
     def test_domain_spec_unregistered(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -279,6 +288,14 @@ class TestAuditPromptRouting(unittest.TestCase):
             repo = str(Path(__file__).resolve().parents[3])
             self.assertNotIn(repo, proto)
             self.assertNotIn(repo, reason)
+
+    def test_protocol_fallback_reason_is_never_empty(self) -> None:
+        """ocr2-578：删掉不可达的默认分支后，fallback 原因仍恒非空（调用方把 reason 直接展示给审计 agent）。"""
+        with tempfile.TemporaryDirectory() as d:
+            proto, fell_back, reason = mcp._audit_protocol_with_fallback(workspace_path=d)
+        self.assertTrue(fell_back)
+        self.assertTrue(reason, "fallback 时 reason 为空 ⇒ 审计提示丢了原因")
+        self.assertIn("audit_default.md", proto)
 
     def test_protocol_fallback_returns_tuple_on_bad_workspace(self) -> None:
         """越界 workspace 下 `_audit_protocol_with_fallback` 必须回传 tuple（ocr2-026）。

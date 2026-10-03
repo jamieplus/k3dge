@@ -82,7 +82,14 @@ class TestCli(unittest.TestCase):
             try:
                 # 对等审计线动词已退休（2026-09-26）：一律**明确拒绝**并给指引（不静默、不崩）
                 for verb in ("submit", "status", "show", "materialize", "close", "advance"):
-                    self.assertEqual(main(["audit", verb, "X"]), 1, verb)
+                    err = io.StringIO()
+                    with contextlib.redirect_stderr(err):
+                        rc = main(["audit", verb, "X"])
+                    self.assertEqual(rc, 1, verb)
+                    # ocr2-701：光断退出码时"静默 return 1"/空话术回归照样绿——指引必须指到替代命令
+                    text = err.getvalue()
+                    self.assertIn("已退休", text, verb)
+                    self.assertIn("k3dge audit bundle --run", text, verb)
             finally:
                 os.chdir(cwd)
 
@@ -292,11 +299,13 @@ class TestCli(unittest.TestCase):
                     code = main(["status"])
                 json_buf = io.StringIO()
                 with contextlib.redirect_stdout(json_buf):
-                    main(["status", "--json"])
+                    json_code = main(["status", "--json"])
             finally:
                 os.chdir(old)
 
             self.assertEqual(code, 0)
+            # ocr2-702：ADR-0008 三出口同形——JSON 出口的退出码同样要钉，否则 --json 退 1 照样绿
+            self.assertEqual(json_code, 0, json_buf.getvalue()[-500:])
             h = human.getvalue()
             self.assertIn("[NEXT] state=pending_findings", h)
             data = json.loads(json_buf.getvalue())
@@ -340,6 +349,8 @@ class TestCli(unittest.TestCase):
             finally:
                 os.chdir(old)
             out = buf.getvalue()
+            # ocr2-703：list_code 此前是死变量——task list --json 非零退时 body 照印，本测照绿
+            self.assertEqual(list_code, 0, f"task list --json 退出非零：\n{out[-500:]}")
             self.assertEqual(code, 0, f"status must finish without NameError; got:\n{out}")
             self.assertIn("Unfinished tasks (1):", out)
             self.assertIn("Demo task", out)

@@ -67,24 +67,37 @@ def test_lifecycle_next_warns_when_routing_breaks(ws: Path) -> None:
     # ocr2-178：路由坏了不得渲染成"没待办"（None）⇒ 投专用态，机器面可区分。
     assert ns is not None and ns.state == "routing_error", ns
     text = err.getvalue()
-    assert "WARN" in text, "把'路由坏了'渲染成'没有下一步'"
-    assert "boom" in text, text
+    # ocr2-708：分开断 "WARN" 与 "boom" 时，两者落在不同行也绿，且 type(exc).__name__ 丢了也看不出。
+    # 钉到同一路由告警行（生产渲染 `type(exc).__name__: exc`）。
+    warn_lines = [l for l in text.splitlines() if "WARN" in l]
+    assert len(warn_lines) == 1, text
+    assert "boom" in warn_lines[0], text
+    assert "RuntimeError" in warn_lines[0], text
 
 
 def test_seal_ready_for_reuses_precomputed_scans() -> None:
     """status 已算过票与前置闸，`seal_ready_for` 不得再各扫一遍（388）。"""
     from k3dge.engine import nextstep
+    from k3dge.engine.task_index import MilestoneTask
 
     # （t-034 尾账）`unmet=`/`tasks=` 都给齐时 `seal_ready_for` 短路返回、零磁盘 IO——
     # 旧夹具的 `(root / ".agent").mkdir()` 是死 setup，删掉；root 只当形参占位。
     root = Path(tempfile.mkdtemp())
     atexit.register(shutil.rmtree, root, True)
+    # ocr2-709：旧值 `unmet=[]`/`tasks=[object()]` 测不出"注入被消费"——空 unmet 渲染
+    # 出的"全绿"与缺省/丢弃同脸，object() 只被判真。给真形状并断言它落进结果。
+    sentinel_tasks = [MilestoneTask(path=root / "t.md", slug="t", status="done",
+                                    milestone="M9")]
+    sentinel_unmet = [("guides_filled", "g.md 未填")]
     with mock.patch("k3dge.engine.seal.unmet_seal_preconditions") as unmet, \
             mock.patch("k3dge.engine.task_index.scan_milestone_tasks") as tasks:
-        ns = nextstep.seal_ready_for(root, "M9", unmet=[], tasks=[object()])
+        ns = nextstep.seal_ready_for(root, "M9", unmet=sentinel_unmet,
+                                     tasks=sentinel_tasks)
     assert ns.state == "seal_ready"
     unmet.assert_not_called()
     tasks.assert_not_called()
+    assert any("guides_filled" in r for r in ns.reasons), ns.reasons  # 注入的 unmet 真被消费
+    assert "guides_filled" in (ns.fact or ""), ns.fact
 
 
 def test_workspace_status_returns_error_shape_when_scan_raises(ws: Path) -> None:
@@ -135,3 +148,27 @@ def test_lifecycle_next_scans_once_for_whole_render(ws: Path) -> None:
     srf.assert_called_once()
     assert srf.call_args.kwargs.get("unmet") == []
     assert srf.call_args.kwargs.get("tasks") == sentinel_tasks
+
+
+class TestCacheObservabilityNeverRaises:
+    """ocr2-580：观测件绝不拖垮 status——`run_action` 之后（含 import 时）的任何异常都收敛为 None。"""
+
+    def test_non_string_payload_returns_none(self, ws: Path) -> None:
+        """对端信封畸形（payload 非 str ⇒ `json.loads` 抛 TypeError）时返回 None 而不是崩栈。"""
+        bad = mock.Mock(ok=True, provider="mcp")
+        bad.payload = 12345
+        with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=bad):
+            assert st.cache_observability(ws) is None
+
+    def test_duck_typed_result_without_attrs_returns_none(self, ws: Path) -> None:
+        """duck-typed/mocked 结果缺 `ok`/`provider` 属性（AttributeError）时返回 None。"""
+        with mock.patch("k3dge.engine.pipeline_runner.run_action",
+                        return_value=mock.Mock(spec=[])):
+            assert st.cache_observability(ws) is None
+
+    def test_import_failure_returns_none(self, ws: Path) -> None:
+        """`pipeline_runner` 自身导不进来（ImportError）时返回 None，status 照常绿。"""
+        import sys
+
+        with mock.patch.dict(sys.modules, {"k3dge.engine.pipeline_runner": None}):
+            assert st.cache_observability(ws) is None

@@ -213,8 +213,8 @@ def test_unknown_bundle_version_does_not_guess_algo(tmp_path):
     bl["files"]["src/a.py"] = hashlib.sha256(_PRE.encode()).hexdigest()
     (b / "baseline.json").write_text(json.dumps(bl, ensure_ascii=False), encoding="utf-8")
     res = av.verify_bundle_local(b)
-    assert not res["ok"]
-    assert "bundle_version" in _errors(res) and "不可核" in _errors(res), _errors(res)
+    # ocr2-727：光断布尔时"因无关原因被拒"也绿——漂移闸自己就没被测到。把原因一起钉住。
+    assert not res["ok"] and "bundle_version" in _errors(res) and "不可核" in _errors(res), _errors(res)
 
 
 def test_version_and_input_identity_are_gated(tmp_path):

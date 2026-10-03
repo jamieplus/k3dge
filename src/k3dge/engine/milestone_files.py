@@ -5,6 +5,7 @@ Pure, low-coupling predicates/regexes.
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 from typing import List, Tuple
 
@@ -80,7 +81,7 @@ def milestone_tags(workspace: Path) -> dict:
     if rc != 0:
         # git 不可用/仓损坏 ⇒ `{}` 与"确实没有 tag"不可分，下游会把"不知道"读成"干净"（ocr2-277）。
         print(f"[milestone_files] WARN: git tag --list 失败（rc={rc}: {out.strip()[:120]}）"
-              "⇒ 边界 tag 事实不可用", file=__import__("sys").stderr)
+              "⇒ 边界 tag 事实不可用", file=sys.stderr)
         return {}
     tags = {}
     for name in out.splitlines():
@@ -128,7 +129,7 @@ def tasks_after_boundary(workspace: Path) -> List[Tuple[str, str, str]]:
         except (OSError, UnicodeDecodeError) as exc:
             # 读不出不得静默从 advisory 里消失（与下一分支同样出声，ocr2-278）。
             print(f"[milestone_files] WARN: 票不可读，跳过边界判定（{path.name}: "
-                  f"{type(exc).__name__}）", file=__import__("sys").stderr)
+                  f"{type(exc).__name__}）", file=sys.stderr)
             continue
         ms = str(fm.get("milestone") or "").strip()
         resolved = tags_by_lower.get(ms.lower())
@@ -146,7 +147,7 @@ def tasks_after_boundary(workspace: Path) -> List[Tuple[str, str, str]]:
         else:
             trees[ms] = None
             print(f"[milestone_files] WARN: ls-tree {ms} 失败（rc={rc}: {tree_out.strip()[:120]}）"
-                  f"⇒ 该边界的票判定跳过", file=__import__("sys").stderr)
+                  f"⇒ 该边界的票判定跳过", file=sys.stderr)
     out: List[Tuple[str, str, str]] = []
     for rel, ms in candidates:
         tree = trees.get(ms)

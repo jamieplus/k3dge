@@ -84,13 +84,16 @@ def test_non_ff_rejected(tmp_path):
     _g(other, "add", "-A")
     _g(other, "commit", "-qm", "theirs")
     theirs = _g(other, "rev-parse", "HEAD").strip()
+    # ocr2-802：先记下 worktree 当前检出的 sha——旧 `HEAD~1` 只是碰巧成立
+    # （update-ref 把分支推到 theirs 后，其唯一父提交恰是旧检出），注释还虚构了
+    # 一次"worktree 已提交"。显式取值，分叉含义不变。
+    base = _g(wt, "rev-parse", "HEAD").strip()
     _g(ws, "update-ref", "refs/heads/k3dit/J1", theirs)
-    # worktree 留在旧检出但已提交过一次 ⇒ head 与分支互不为祖先 = 真分叉。
+    # worktree 仍在旧检出（base），分支已被推到 theirs ⇒ head 与分支互不为祖先＝真分叉。
     # 不能用 `HEAD@{1}`：新建的 linked worktree 的 reflog 往往只有一条、旧值是 null OID，
     # 解不出目标，且不同 git 版本行为不一（t-311）。显式取那次检出的 commit；
     # `_g` 的 check=True 保证前置造不出来时报 git 的 stderr 而不是跑到假分叉（t-313）。
     (wt / "conflict.py").write_text("c = 1\n", encoding="utf-8")
-    base = _g(wt, "rev-parse", "HEAD~1").strip()
     _g(wt, "checkout", "-q", "--detach", base)
     with pytest.raises(RuntimeError, match="non-fast-forward"):
         W.advance(ws, "J1")
@@ -213,8 +216,18 @@ def test_merge_back_strips_before_ff(tmp_path):
 def test_present_reattaches_branch(tmp_path):
     ws = _repo(tmp_path)
     wt = W.ensure(ws, "J9")
+    # ocr2-803：旧 `head` 就是建线时的主干头——`present()` 忽略 `commit` 参数
+    # 照样绿（只钉了"切回"，没钉"按给定 commit 抽取"）。主干再走一步，
+    # 新头 ≠ J9 线头：抽取内容证明 commit 真被用了。
+    (ws / "src" / "m.py").write_text(
+        "def f():\n    # k3dit:pending B-2 y\n    return 2\n", encoding="utf-8")
+    _g(ws, "add", "-A")
+    _g(ws, "commit", "-qm", "main moved")
     head = _g(ws, "rev-parse", "HEAD").strip()
-    W.present(ws, "J9", commit=head)
+    assert head != _g(ws, "rev-parse", "k3dit/J9").strip(), \
+        "前置：新头必须异于 J9 线头，否则 commit 参数无意义"
+    pre = W.present(ws, "J9", commit=head)
+    assert [p["id"] for p in pre] == ["B-2"], pre  # 按给定 commit 抽取，不是线头旧内容
     assert _g(wt, "symbolic-ref", "-q", "HEAD").strip() == "refs/heads/k3dit/J9"  # 看完切回，不留 detached
 
 
@@ -257,7 +270,7 @@ def test_present_raise_when_restore_fails(tmp_path, monkeypatch):
     正是真分支名那次调用。
     """
     ws = _repo(tmp_path)
-    W.ensure(ws, "J1")
+    wt = W.ensure(ws, "J1")
     real = W._git
     forced = []
 
@@ -271,7 +284,12 @@ def test_present_raise_when_restore_fails(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="复位失败"):
         W.present(ws, "J1", commit="HEAD")
     assert forced, "复位 checkout 从没发生——本测钉的形状已变"
+    assert len(forced) == 1, f"复位 checkout 应恰一次：{forced}"
     assert all(a[-1] == W.branch_name("J1") for a in forced), forced
+    # ocr2-801：只断"替身被调 + 抛错"不碰产品状态——钉"worktree 仍处 detached"
+    # 这个产品警告的实体，复位语义漂了（比如改成静默切回别处）本测才真红。
+    assert _grc(wt, "symbolic-ref", "-q", "HEAD") != 0, \
+        "复位失败了 worktree 却不在 detached——钉的形状已变"
 
 
 def test_present_surfaces_extract_problems(tmp_path, monkeypatch, capsys):

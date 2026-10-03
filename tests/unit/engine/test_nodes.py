@@ -44,6 +44,23 @@ class TestNodeDeclaration(unittest.TestCase):
             if decl.get("kind") == "fact":
                 self.assertIn(decl.get("on_rerun"), ("append", "reject"), nid)   # fact 必声明重跑语义
 
+    def test_scalar_node_override_is_ignored_loudly(self):
+        """`[nodes.<id>]` 写成标量/列表时不得崩执行器（ocr2-639，`satisfies` 的 ocr-278 同族）。
+
+        坏覆盖忽略（回落缺省）+ 出声；`dict.update(标量)` 的 ValueError 不得外泄。
+        """
+        import contextlib
+        import io
+
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        ws = _write_ws(d, '[nodes]\narchive = "fact"\n')
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            got = nodes.decl(ws, "archive")
+        self.assertEqual(got, nodes.NODE_DEFAULTS["archive"])
+        self.assertIn("WARN", err.getvalue())
+
     def test_every_default_node_is_referenced(self):
         """可达性交叉核对：NODE_DEFAULTS 里每条都必须被某个 `[checks.*]` 相位引用。
 
@@ -148,6 +165,16 @@ class TestRunPhase(_WsBodyMixin, unittest.TestCase):
         ok, out = nodes.run_phase(ws, "demo", "preconditions", {}, {})
         self.assertFalse(ok)
         self.assertEqual(out.gate_id, "unknown_gate_id")
+
+    def test_unknown_phase_is_rejected(self):
+        """`phase` 非闭集时不得静默落到 actions 分支（前置闸一个不跑却可能假绿，ocr2-642）。
+
+        与"未知 id 一律拒绝"同律：未知 phase 直接拒。
+        """
+        ws = self._ws_with('[checks.demo]\npreconditions = ["a_ok"]\n')
+        ok, out = nodes.run_phase(ws, "demo", "precondition", {"a_ok": lambda _c: None}, {})
+        self.assertFalse(ok)
+        self.assertEqual(out.gate_id, "unknown_phase")
 
     def test_empty_declaration_is_explicit_noop(self):
         """空/未配置相位 ⇒ `(True, "")`：钉住**显式 no-op** 判定（ocr t-205）。

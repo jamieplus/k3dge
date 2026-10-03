@@ -167,8 +167,6 @@ def load(workspace: Path) -> Dict[str, Any]:
         print(f"[gates] WARN: {REL} 不可读/解析失败（{type(exc).__name__}: {exc}）⇒ 按缺省跑，"
               "仓内声明的覆盖未生效", file=sys.stderr)
         return data
-    if not isinstance(raw, dict):
-        return data
     # [gates.<name>] 的内容即阈值段本身（audit_trigger/search/markers/output），平铺合并
     if isinstance(raw.get("gates"), dict):
         _merge_section(data, raw["gates"])

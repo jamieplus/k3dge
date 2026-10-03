@@ -412,6 +412,12 @@ GATE_FACTS: Dict[str, Dict[str, Any]] = {
         "options": ["把编号改回升序（不移动内容）", "内容确需换序 → 连编号一起重排，并核对文内自引"],
         "pointers": ["docs/adr/AUTHORING.md「杂项」"],
     },
+    "INCIDENT_FORM_INVALID": {
+        "severity": "block", "fix": "judgment",
+        "fact": "`{path}` 的事件报告格式不对（文件名/H1/编号章节）——缺的通常是**要写的内容**，不是格式，故不自动修",
+        "options": ["按 docs/incidents/_template.md 与 AUTHORING.md 补齐缺的部分", "规则本身不对 → 改 docs/incidents/.schema.json（改声明，同步模板资产）"],
+        "pointers": ["docs/incidents/AUTHORING.md", "docs/incidents/_template.md"],
+    },
     # --- 环境/配置（evaluator）：都不是仓内文件的机械偏差，故一律 judgment ---
     "MANIFEST_INVALID": {
         "fix": "judgment", "severity": "block",

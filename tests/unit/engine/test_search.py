@@ -95,7 +95,7 @@ class TestStalenessSignature(unittest.TestCase):
         (pkg / "gone.py").write_text("def ghost():\n    return 1\n", encoding="utf-8")
 
     def test_deleted_source_is_not_stale_cheaply_invisible(self) -> None:
-        from k3dge.engine.search import _is_stale_cheaply, index_path, write_symbol_index
+        from k3dge.engine.search import _is_stale_cheaply, index_meta_path, index_path, write_symbol_index
 
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -106,7 +106,12 @@ class TestStalenessSignature(unittest.TestCase):
             (root / "src" / "demo" / "gone.py").unlink()
             self.assertTrue(_is_stale_cheaply(root, idx), "删掉源文件后仍判'不陈旧'⇒ where 给幽灵坐标")
             self.assertNotIn("ghost", build_symbol_index(root))
-            self.assertIn(str(index_path(root)), str(idx))
+            # ocr2-786：旧 `assertIn(str(index_path(root)), str(idx))` 是同义反复
+            # （两边都是 index_path）——INDEX_REL 一改两边一起动，永远绿。
+            # 钉死字面落点：索引在 docs/generated，签名侧车在 gitignored 的 .k3dge/。
+            self.assertEqual(idx, root / "docs/generated/symbol-index.json", idx)
+            self.assertEqual(index_meta_path(root),
+                             root / ".k3dge/symbol-index.meta.json")
 
     def test_editing_source_still_detected(self) -> None:
         from k3dge.engine.search import _is_stale_cheaply, write_symbol_index
@@ -125,9 +130,7 @@ class TestStalenessSignature(unittest.TestCase):
             self.assertTrue(_is_stale_cheaply(root, idx))
 
     def test_missing_meta_sidecar_forces_one_rebuild(self) -> None:
-        from k3dge.engine.search import (
-            _is_stale_cheaply, index_meta_path, write_symbol_index,
-        )
+        from k3dge.engine.search import _is_stale_cheaply, index_meta_path, write_symbol_index
 
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -136,6 +139,13 @@ class TestStalenessSignature(unittest.TestCase):
             self.assertTrue(index_meta_path(root).is_file())
             index_meta_path(root).unlink()
             self.assertTrue(_is_stale_cheaply(root, idx), "无签名 ⇒ 不猜'应该不陈旧'")
+            # ocr2-787：名曰"forces one rebuild"却只断了谓词——`where` 绕过
+            # 谓词（缺失才建的老行为）或每次都建（签名没落盘），本测都绿。
+            # 钉行为：where 一次 ⇒ 侧车再生、符号可解、第二次不再陈旧（恰建一次）。
+            locs = where(root, "ghost")
+            self.assertTrue(locs, "谓词判陈旧但 where 没重建出 ghost")
+            self.assertTrue(index_meta_path(root).is_file(), "重建没把签名侧车落盘")
+            self.assertFalse(_is_stale_cheaply(root, idx), "刚重建完仍判陈旧 ⇒ 每次都建")
 
 
 class TestIndexUnavailableAndFallback(unittest.TestCase):

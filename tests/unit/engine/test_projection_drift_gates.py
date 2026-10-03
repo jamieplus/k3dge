@@ -105,6 +105,13 @@ class TestExtractorPluginStale(_RepoCase):
 
 
 class TestDocsTomlKeys(_RepoCase):
+    """`.agent/docs.toml` 的 `= true` 键必须被 `generate-docs.sh` 的 gen 表认领。
+
+    跳过条件（ocr2-767，如实）：`_check_docs_toml` 只在三处静默返回 `[]`——
+    `.agent/docs.toml` 缺席、`scripts/generate-docs.sh` 缺席、gen 表解析为空。
+    它**不**看 `[docs]` 表头：`enabled` 是整文件正则收的，别表下的键同样被查。
+    """
+
     def _write_script(self) -> None:
         (self.repo / "scripts").mkdir(exist_ok=True)
         (self.repo / "scripts" / "generate-docs.sh").write_text(
@@ -139,6 +146,16 @@ class TestDocsTomlKeys(_RepoCase):
     def test_readme_key_is_known(self) -> None:
         self._write_script()
         self._write_cfg("readme = true\nbogus = true\n")
+        self.assertEqual(self._reported_keys(), ["bogus"])
+
+    def test_key_under_other_table_is_still_scanned(self) -> None:
+        """ocr2-767：整文件扫描的钉子——`[other]` 表下的键同样被查。
+
+        若将来把正则收紧到只扫 `[docs]` 表，本测会红（提醒同步更新闸注释）。
+        """
+        self._write_script()
+        (self.repo / ".agent" / "docs.toml").write_text(
+            "[other]\nbogus = true\n", encoding="utf-8")
         self.assertEqual(self._reported_keys(), ["bogus"])
 
 

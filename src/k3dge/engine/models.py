@@ -36,7 +36,7 @@ class Violation:
             body = gate_facts.render(self.rule_id, facts, where=f"{dom}{loc}".strip())
             tag = gate_facts.severity_tag(gate_facts.severity(self.rule_id))   # 标签单源在声明面（435）
             return f"[{tag}] {body}"
-        return f"[GATE ERROR] {self.rule_id}{dom}: {self.message}{loc}"
+        return f"[{gate_facts.severity_tag(gate_facts.severity(self.rule_id))}] {self.rule_id}{dom}: {self.message}{loc}"
 
 
 @dataclass(frozen=True)

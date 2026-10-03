@@ -192,6 +192,18 @@ class TestParseText(unittest.TestCase):
                "c = 3  # k3dit:pending P1 todo\n")
         ms, _ = parse_text("src/a.py", src)
         self.assertEqual({m.kind for m in ms}, {"fixed", "leftover", "pending"})
+        # ocr2-747：旧写法只断"解析出哪几种"——OPEN_KINDS 里加回 fixed/leftover 照样绿，
+        # 测试名却宣称"不是 open"。端到端断开放性（从解析文本直达判定）。
+        self.assertNotIn("fixed", OPEN_KINDS)
+        self.assertNotIn("leftover", OPEN_KINDS)
+        self.assertEqual(sorted(open_samples(ms)), ["src/a.py#P1"])
+        c = counts(ms)
+        self.assertEqual(c["open"], 1)
+        ok, info = closure_ok(ms)
+        self.assertFalse(ok)
+        self.assertIn("pending", info["blockers"])
+        self.assertNotIn("fixed", info["blockers"])
+        self.assertNotIn("leftover", info["blockers"])
 
 
 class TestParseSidecar(unittest.TestCase):
@@ -212,8 +224,19 @@ class TestParseSidecar(unittest.TestCase):
         text = "## k3dit:pending R3@repo 说明\n- files: src/a.py, src/b.py\n"
         ms, _ = parse_sidecar(text)
         self.assertEqual(len(ms), 1)
-        self.assertIn("src/a.py", ms[0].note)
+        # ocr2-748①：旧只断第一个路径——只留 src/a.py（或按逗号切错）也绿。断整段载荷。
+        self.assertIn("src/a.py, src/b.py", ms[0].note)
         self.assertIn("说明", ms[0].note)
+
+    def test_why_line_appends_to_note(self):
+        """ocr2-748②：docstring 承诺 `- files:` 与 `- why:` 都进 note，但全套件从没喂过
+        `- why:`——解析器丢理由也绿。钉住文档行为（标签保留、可检索）。"""
+        text = "## k3dit:pending R3w@repo 说明\n- why: 跨模块，需 owner 定\n"
+        ms, problems = parse_sidecar(text)
+        self.assertEqual(len(ms), 1)
+        self.assertEqual(problems, [])
+        self.assertIn("跨模块，需 owner 定", ms[0].note)
+        self.assertIn("- why:", ms[0].note)
 
     def test_non_marker_heading_ignored(self):
         text = "## 普通标题\n\n正文\n"
@@ -280,29 +303,34 @@ class TestOpenSamplesAndCounts(unittest.TestCase):
 
 
 class TestValidate(unittest.TestCase):
+    # ocr2-749：旧写法把真检出根（Path(".")＝用例启动目录）传给 validate——今天无害只因
+    # validate 忽略该参数（noqa ARG001）。一旦它长出工作区触碰（锚存在性/重读/列文件），
+    # 本类全员静默依赖真仓。用显式不存在的哨兵，隔离意图写进代码。
+    _SENTINEL = Path("definitely-not-a-workspace-sentinel")
+
     def test_repo_scope_outside_sidecar_is_problem(self):
         ms = [_mk("R", "pending", file="src/a.py", scope="repo")]
-        problems = validate(Path("."), ms)
+        problems = validate(self._SENTINEL, ms)
         self.assertTrue(any("@repo" in p for p in problems), problems)
 
     def test_repo_scope_in_sidecar_ok(self):
         ms = [_mk("R", "pending", file=SIDECAR, scope="repo")]
-        self.assertEqual(validate(Path("."), ms), [])
+        self.assertEqual(validate(self._SENTINEL, ms), [])
 
     def test_same_id_multiple_kinds_is_problem(self):
         ms = [_mk("X", "pending", file="src/a.py"), _mk("X", "leftover", file="src/a.py")]
-        problems = validate(Path("."), ms)
+        problems = validate(self._SENTINEL, ms)
         self.assertTrue(any("多种 kind" in p for p in problems), problems)
 
     def test_multi_anchor_same_id_is_problem(self):
         ms = [_mk("X", "pending", file="src/a.py"), _mk("X", "pending", file="src/b.py")]
-        problems = validate(Path("."), ms)
+        problems = validate(self._SENTINEL, ms)
         self.assertTrue(any("多主锚" in p for p in problems), problems)
 
     def test_leftover_may_span_files(self):
         """规则 2 例外：leftover 随文件走，多宿主不算违规。"""
         ms = [_mk("L", "leftover", file="src/a.py"), _mk("L", "leftover", file="src/b.py")]
-        self.assertEqual(validate(Path("."), ms), [])
+        self.assertEqual(validate(self._SENTINEL, ms), [])
 
 
 class TestParseSidecarWhy(unittest.TestCase):

@@ -53,6 +53,20 @@ class TestVersion(unittest.TestCase):
         _write_manifest(self.ws, "0.1.0")
         self.assertEqual(version.get_version(self.ws), "0.1.0")
 
+    def test_unreadable_changelog_warns_instead_of_silent_empty(self) -> None:
+        """读不出的 CHANGELOG ≠ Unreleased 为空（ocr2-671）：调用方拿它当发布说明，
+        静默 `""` 会产出无说明的 release。此处只钉"出声 + 返回空串"，不清 Unreleased。"""
+        import contextlib
+        import io
+        from unittest import mock
+
+        (self.ws / "CHANGELOG.md").write_text("## [Unreleased]\n\n- x\n", encoding="utf-8")
+        err = io.StringIO()
+        with mock.patch.object(version, "_read_utf8", side_effect=OSError("denied")):
+            with contextlib.redirect_stderr(err):
+                self.assertEqual(version.consume_unreleased(self.ws), "")
+        self.assertIn("WARN", err.getvalue())
+
     def test_validate_mismatch_pyproject_vs_manifest(self) -> None:
         _write_pyproject(self.ws, "0.1.0")
         _write_manifest(self.ws, "0.1.1")
@@ -88,8 +102,10 @@ class TestVersion(unittest.TestCase):
         self.assertEqual(version.validate_versions(ws), [])
         self.assertEqual(version.bump_version(ws, "patch"), "0.1.1")
         self.assertIn("0.1.1", (pkg / "__init__.py").read_text(encoding="utf-8"))
-        # fallback 支路不许在下游布局里凭空造 `src/k3dge/`——造了＝解析根本没走 manifest
-        self.assertFalse((ws / "src" / "k3dge").exists())
+        # ocr2-800：旧 `assertFalse((ws / "src" / "k3dge").exists())` 恒真——
+        # 读/写路径根本造不出 `src/k3dge/`，断它证明不了"解析走了 manifest"。
+        # 直接断解析本身：下游布局必须落到 `src/myproj/__init__.py`。
+        self.assertEqual(version._init_path(ws), pkg / "__init__.py")
         self.assertEqual(version.validate_versions(ws), [])
 
     def test_bump_patch_updates_all(self) -> None:

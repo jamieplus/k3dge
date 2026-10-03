@@ -63,7 +63,6 @@ BY_COMMAND: Dict[str, str] = {
 _SKIP_PARTS = frozenset({"archive", "generated", "obsolete"})
 
 _BODY_META_LINE_RE = re.compile(r"^-\s+\*\*(Status|Milestone|Priority|Date|Report)\*\*:")
-_BODY_META_RE = re.compile(r"^-\s+\*\*(Status|Milestone|Priority|Date|Report)\*\*:.*$\n?", re.MULTILINE)
 
 
 def _strip_body_meta(text: str) -> str:
@@ -146,7 +145,7 @@ def _fix_incident_id(text: str) -> str:
     m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
     if not m:
         return text
-    fm = [ln for ln in m.group(1).splitlines() if not re.match(r"^id\s*:", ln)]
+    fm = [ln for ln in m.group(1).splitlines() if not re.match(r"^\s*id\s*:", ln, re.IGNORECASE)]
     return "---\n" + "\n".join(fm) + "\n---\n" + text[m.end():]
 
 

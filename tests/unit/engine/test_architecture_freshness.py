@@ -83,8 +83,9 @@ class TestArchitectureFreshness(unittest.TestCase):
         os.environ.clear()
         os.environ.update(self._old_env)
 
-    def tearDown(self) -> None:
-        self._tmp.cleanup()
+    # ocr2-716：此前 `tearDown` 又调一次已 `addCleanup` 注册的 cleanup——双重清理
+    # （第二次靠 TemporaryDirectory 弱引用终结才 no-op，且 setUp 中途失败时 tearDown
+    # 不跑而 addCleanup 跑）。只留 addCleanup，不再复写 tearDown。
 
     def test_boundary_tag_before_skips_current_milestone(self) -> None:
         self.assertEqual(_boundary_tag_before(self.repo, "M10"), "M9")
@@ -141,7 +142,11 @@ class TestArchitectureFreshness(unittest.TestCase):
         (self.repo / "docs" / "memo" / "x.md").write_text("# x\n", encoding="utf-8")
         _git(self.repo, "add", "-A")
         _git(self.repo, "commit", "-q", "-m", "docs: memo only")
-        self.assertIn("无改动", _architecture_staleness(self.repo, "M10"))
+        # ocr2-717：本文件唯独这条不断支路形状——裸 `assertIn("无改动")` 会被其它分支
+        # 漏进来的同一子串喂饱。与兄弟测同口径，按前缀钉死无改动短路支路。
+        line = _architecture_staleness(self.repo, "M10")
+        self.assertTrue(line.startswith("✅"), line)
+        self.assertIn("无改动", line)
 
     def test_first_milestone_without_boundary_is_ok(self) -> None:
         line = _architecture_staleness(self.repo, "M9")

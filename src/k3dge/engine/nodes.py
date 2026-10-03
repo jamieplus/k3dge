@@ -78,7 +78,16 @@ def decl(workspace: Path, node_id: str) -> Dict[str, Any]:
     import copy
 
     merged = copy.deepcopy(NODE_DEFAULTS.get(node_id, {}))
-    merged.update(copy.deepcopy((gates.load(workspace).get("nodes") or {}).get(node_id) or {}))
+    override = (gates.load(workspace).get("nodes") or {}).get(node_id) or {}
+    if not isinstance(override, dict):
+        # 下游把整节点写成标量/列表（`nodes = { archive = "fact" }` 这类 inline 写法）：
+        # `dict.update(标量)` 抛 ValueError ⇒ 执行器崩（`satisfies` 的 ocr-278 同族）。忽略坏覆盖，出声。
+        import sys
+
+        print(f"[nodes] WARN: [nodes.{node_id}] 不是表（{type(override).__name__}）⇒ 忽略该覆盖",
+              file=sys.stderr)
+        override = {}
+    merged.update(copy.deepcopy(override))
     return merged
 
 
@@ -119,7 +128,7 @@ def run_phase(
     registry: Dict[str, NodeFn],
     ctx: Dict[str, Any],
 ) -> Tuple[bool, Any]:
-    """跑一个相位的全部节点（**单一执行器**）。返回 `(ok, 首个失败或末节点输出)`。
+    """跑一个相位的全部节点（**单一执行器**）。返回 `(ok, 各节点输出与 on_error=continue 失败消息的换行拼接)`。
 
     - `phase` ∈ {preconditions, actions}；id 列表来自声明面（`gates.preconditions/actions`）
     - 空/未配置相位 ⇒ `(True, "")`：**显式 no-op**（没有节点跑过，不等于"所有闸都过了"；
@@ -128,6 +137,9 @@ def run_phase(
     - precondition 的失败值 ⇒ `Rejection(gid, msg)`；action 的失败值 ⇒ `gates.rejection(out, aid)`
     - `on_error=continue` 的节点失败**不中断**（用于收尾类步骤），其消息并入输出
     """
+    if phase not in ("preconditions", "actions"):
+        return False, gates.Rejection(
+            "unknown_phase", f"gate contract references unknown phase: '{phase}'")
     ids = (gates.preconditions(workspace, op) if phase == "preconditions"
            else gates.actions(workspace, op))
     collected: list[str] = []

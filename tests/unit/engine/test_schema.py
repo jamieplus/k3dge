@@ -15,9 +15,16 @@ class TestSpecSchema(unittest.TestCase):
         self.assertEqual(spec_schema.validate_structure(VALID), [])
 
     def test_missing_sections(self):
+        # ocr2-781：夹具是 t-248 的"关键词 + 丢尾巴"形（`Domain Boundary` 缺
+        # `& Responsibilities`）——旧 `any("X" in e)` 只看两节，boundary 节
+        # 从没被断（旧宽松判据下它甚至算满足）。精确比整表：缺一节、多一节、
+        # 改名、游离文本含节名，四种漂移都红。
         errors = spec_schema.validate_structure("## 1. Domain Boundary\n")
-        self.assertTrue(any("Public Interfaces" in e for e in errors))
-        self.assertTrue(any("Verification Matrix" in e for e in errors))
+        self.assertEqual(errors, [
+            "missing required section 'Domain Boundary & Responsibilities'",
+            "missing required section 'Public Interfaces & Type Contracts'",
+            "missing required section 'Verification Matrix'",
+        ])
 
     def test_extract_hash(self):
         content = "- **Contract Hash**: `sha256:" + "a" * 64 + "`"

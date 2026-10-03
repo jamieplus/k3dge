@@ -197,11 +197,21 @@ class TestScreenGateWiring(unittest.TestCase):
                 hook.WS = orig
 
     def test_broken_tool_does_not_block(self):
+        import contextlib
+        import io
+
         class Boom:
             def find_unscreened_new_docs(self, *_a, **_k):
                 raise RuntimeError("boom")
 
-        self.assertEqual(hook.run_screen_gate(["docs/adr/0028-x.md"], Boom()), [])
+        # ocr2-804：只断空返回时，`except` 被收窄成静默 `return []` 也照样绿——
+        # 每次真提交都无声丢排查闸。钉契约另一半：必须出声且点名故障。
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            self.assertEqual(hook.run_screen_gate(["docs/adr/0028-x.md"], Boom()), [])
+        out = buf.getvalue()
+        self.assertIn("排查闸不可用", out, out)
+        self.assertIn("boom", out, out)
 
 
 class TestDeclaredFactsSelfCheck(unittest.TestCase):

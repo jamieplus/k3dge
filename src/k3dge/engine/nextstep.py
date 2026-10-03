@@ -291,6 +291,10 @@ def _write_cards(workspace: Path, cards: list, primary: Optional[str]) -> None:
     except OSError as exc:
         # 静默吞 ⇒ 操作者与 harness 读到的是上一轮遗留的提示，且没有任何信号（ocr-273）
         print(f"[nextstep] WARN: 侧车写入失败（{exc}）⇒ 本轮提示未持久化", file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 - ocr2-755：json.dumps 的 TypeError（如 reasons 里混进
+        # Path/set/datetime）同样不得把 persist/emit 掀翻——侧车是 best-effort，出声不断行。
+        print(f"[nextstep] WARN: 侧车序列化失败（{type(exc).__name__}: {exc}）⇒ 本轮提示未持久化",
+              file=sys.stderr)
 
 
 def begin_run(workspace: Path) -> None:

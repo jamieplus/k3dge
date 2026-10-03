@@ -32,7 +32,18 @@ def _stdlib_only(mod_path: Path) -> None:
             if node.module:
                 top = node.module.split(".")[0]
                 if top == "k3dge":
-                    if not node.module.startswith(allowed_prefixes):
+                    if node.module.startswith(allowed_prefixes):
+                        pass  # from k3dge.engine.pure_x import y
+                    elif node.module in ("k3dge", "k3dge.engine"):
+                        # ocr2-775：`from k3dge.engine import pure_refs`
+                        # （doc_catalog.py:403 用的形状）与
+                        # `import k3dge.engine.pure_refs` 同义（t-243 放行后者）——
+                        # 只看 module 会误杀。看 names 是否全落进 pure_ 边界。
+                        for a in node.names:
+                            full = f"{node.module}.{a.name}"
+                            if a.name == "*" or not full.startswith(allowed_prefixes):
+                                _fail(f"{mod_path.name} imports non-pure k3dge module {full}")
+                    else:
                         _fail(f"{mod_path.name} imports non-pure k3dge module {node.module}")
                 elif top not in stdlib:
                     _fail(f"{mod_path.name} imports non-stdlib {node.module}")
@@ -85,6 +96,29 @@ class TestPurity(unittest.TestCase):
     def test_pure_refs_stdlib_only(self):
         _stdlib_only(SRC / "pure_refs.py")
 
+    def test_from_import_of_pure_module_is_allowed(self):
+        """ocr2-775：`from k3dge.engine import pure_refs` 不得误杀（与
+        `import k3dge.engine.pure_refs` 同义，t-243）；而非纯成员仍要拦。"""
+        with tempfile.TemporaryDirectory() as td:
+            ok_mod = Path(td) / "ok_from.py"
+            ok_mod.write_text("from k3dge.engine import pure_refs\n", encoding="utf-8")
+            _stdlib_only(ok_mod)  # 不得抛
+            bad_mod = Path(td) / "bad_from.py"
+            bad_mod.write_text("from k3dge.engine import doc_catalog\n", encoding="utf-8")
+            with self.assertRaises(AssertionError):
+                _stdlib_only(bad_mod)
+
+    def test_all_pure_modules_are_checked(self):
+        """ocr2-776：纯度门按目录驱动——新增 `pure_*.py` 自动纳入零依赖门，
+        不再靠手写枚举（旧形状只点名两文件，新文件 `import yaml` 也全绿）。"""
+        mods = sorted(SRC.glob("pure_*.py"))
+        names = [p.name for p in mods]
+        self.assertIn("pure_schema.py", names, names)
+        self.assertIn("pure_refs.py", names, names)
+        for p in mods:
+            with self.subTest(mod=p.name):
+                _stdlib_only(p)
+
     def test_aux_names_in_sync(self):
         from k3dge.engine.doc_catalog import AUX_NAMES
         self.assertEqual(pure_schema.AUX_NAMES, AUX_NAMES)
@@ -112,11 +146,10 @@ class TestCheckFileParity(unittest.TestCase):
         out = doc_catalog._validate_file(REPO, typ, path, schema, seen)
         return sorted((v.rule_id, v.message, v.file_path) for v in out)
 
-    def _pure_results(self, typ, path, schema):
+    def _pure_results(self, typ, path, schema, text):
         from k3dge.engine.doc_catalog import _schema_rel
         rel = str(path.relative_to(REPO)).replace("\\", "/")
         schema_rel = _schema_rel(typ)
-        text = path.read_text(encoding="utf-8")
         violations, _ident, ok = pure_schema.check_file(schema, path.name, text, schema_rel=schema_rel)
         out = sorted((c, m, schema_rel if s == "schema" else rel) for c, m, s in violations)
         return out, ok
@@ -135,8 +168,10 @@ class TestCheckFileParity(unittest.TestCase):
                     text = path.read_text(encoding="utf-8")
                 except (OSError, UnicodeDecodeError):
                     continue
+                # ocr2-777：已读的 text 直接喂 pure 侧（之前 pure 侧又读一遍，
+                # 每件受管文档每轮被解码三次）；engine 侧走自己的读路径（委托被测）。
                 eng = self._engine_results(typ, path, schema)
-                pure, ok = self._pure_results(typ, path, schema)
+                pure, ok = self._pure_results(typ, path, schema, text)
                 rel = str(path.relative_to(REPO)).replace("\\", "/")
                 # **双向**对账（t-245）：单向 `pure ⊆ engine` 按构造恒真——
                 # `_validate_file` 的文件局域检查就是**委托这几个 pure 函数**的，

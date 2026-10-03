@@ -634,9 +634,11 @@ def k3dge_submit_audit_report(
         path = persist_external_audit_report(ws, milestone_id, content or "")
     except Exception as exc:   # 畸形 milestone_id / 写盘失败 ⇒ verdict，不是 traceback（ocr-183）
         return _err("AuditSubmitFailed", f"{type(exc).__name__}: {exc}", path=milestone_id)
+    # 与其它工具出口同形：仓内相对路径 + 正斜杠（ocr2-577；裸 str(path) 在 Windows 下是 `docs\...`）。
+    rel = str(path.relative_to(ws)).replace("\\", "/") if path.is_relative_to(ws) else str(path)
     return json.dumps(
-        {"ok": True, "milestone_id": milestone_id, "path": str(path),
-         "advances_version": False, "triggers_seal": False},
+        {"ok": True, "milestone_id": milestone_id, "path": rel,
+          "advances_version": False, "triggers_seal": False},
         indent=2,
         ensure_ascii=False,
     )
@@ -685,8 +687,6 @@ def _audit_protocol_with_fallback(workspace_path: Optional[str] = None) -> tuple
             reason = ".mcp.json missing mcpServers.k3dit (harness not configured), k3dit_run_audit unavailable"
             fell_back = True
             proto = str(fallback.relative_to(ws)) if fallback.is_relative_to(ws) else str(fallback)
-    if fell_back and not reason:
-        reason = "protocol file not found"
     return (proto, fell_back, reason)
 
 

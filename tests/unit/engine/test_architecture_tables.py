@@ -156,11 +156,11 @@ class TestArchitectureTables(unittest.TestCase):
     def test_missing_doc_is_not_a_violation(self) -> None:
         # "表没写"是合法状态（闸只在**写了半张表**时判）——可达性仍要证（t-065），
         # 否则这条测退化成"evaluate 早退了，恭喜"。
+        # ocr2-718：旧写法手写守卫漏了 MANIFEST_INVALID——manifest 坏时 evaluate 在
+        # 闸前早退，两条 assertNotIn 空转绿。用现成 helper（断三元组）。
         arch = self.repo / "docs" / "architecture"
         (arch / "overview.md").write_text("# Arch\n", encoding="utf-8")
-        rules = self._rules()
-        self.assertNotIn("GIT_UNAVAILABLE", rules)
-        self.assertNotIn("ARCH_TABLE_DRIFT", rules)
+        self._rules_gate_ran()
 
     def test_other_tables_are_ignored(self) -> None:
         # ocr2-427：旧样本里根本没有域表 ⇒ `_domain_table_rows()` 回 None ⇒闸 `continue`，

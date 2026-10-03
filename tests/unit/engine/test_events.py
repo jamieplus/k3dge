@@ -39,7 +39,11 @@ def test_emit_never_raises_but_really_fails(tmp_path) -> None:
     blocker.write_text("我是普通文件，不是目录\n", encoding="utf-8")
     events.emit(ws, "gate_pass")                      # 不得抛
     assert blocker.read_text(encoding="utf-8") == "我是普通文件，不是目录\n"
-    assert not (ws / ".k3dge" / "events.jsonl").exists()
+    # ocr2-733：旧断言 `(ws / ".k3dge" / "events.jsonl").exists()` 恒 False——父级是普通文件
+    # 时 ENOTDIR ⇒ 无论 emit 干了什么都 False，对"失败真发生了"零贡献。断整棵树：除 blocker
+    # 外不得多出任何文件（吞错后换地方写盘也红）。
+    leftovers = [p for p in ws.rglob("*") if p.is_file() and p != blocker]
+    assert leftovers == [], leftovers
 
 
 def test_rotate_keeps_tail():
@@ -95,6 +99,19 @@ def test_read_events_guard_rails(tmp_path):
         fh.write("{坏行\n" + json.dumps(["不是对象"]) + "\n")
     tail = events.read_events(tmp_path, last=7)
     assert [e["i"] for e in tail] == [0, 1, 2, 3, 4], tail
+
+
+def test_read_events_bad_lines_do_not_consume_last_budget(tmp_path):
+    """ocr2-734：坏行是否占 `last` 名额——旧测 5 好 + 2 坏配 `last=7`，窗口恰盖全部，
+    切片-后过滤 与 过滤-后切片 同脸。坏行压进窗口内（10 好 + 2 坏，取 3）：
+    当前语义＝先切片后过滤（坏行占名额）⇒ 只剩 1 条；改成先过滤就回 3 条。"""
+    for i in range(10):
+        events.emit(tmp_path, "evt", i=i)
+    p = tmp_path / ".k3dge" / "events.jsonl"
+    with open(p, "a", encoding="utf-8") as fh:
+        fh.write("{坏行\n" + json.dumps(["不是对象"]) + "\n")
+    got = events.read_events(tmp_path, last=3)
+    assert [e["i"] for e in got] == [9], got  # 窗口 [good9, 坏, 坏] → 滤后只剩 good9
 
 
 def test_read_events_default_returns_newest_20(tmp_path):

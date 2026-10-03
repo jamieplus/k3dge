@@ -107,12 +107,20 @@ class TestGeneratedProjections(unittest.TestCase):
 
     def _fresh_check(self, rule: str):
         """取该闸的违例并验它**不是崩溃冒充**（t-167：detail/message 里不许有 crash）。"""
-        vs = [v for v in _violations(self.repo) if v.rule_id == rule]
-        self.assertEqual(len(vs), 1, [v.rule_id for v in _violations(self.repo)])
-        text = str(getattr(vs[0], "detail", "") or "") + str(vs[0].message)
-        self.assertNotIn("crash", text, f"{rule} 实为闸崩溃冒充判定：{text[:200]}")
-        self.assertNotIn("失败", text, f"{rule} 实为闸崩溃冒充判定：{text[:200]}")
-        return vs[0]
+        # ocr2-741：旧写法为拼失败信息把 `_violations(self.repo)` 求值两遍（全引擎×2），
+        # 且"非崩溃"只靠英文子串 `crash`/`失败`——生产改措辞就静默退化。求值一次复用；
+        # 钉崩溃分支的**模板级**标记（`check crashed: ` + peer 哨兵），不是通用子串。
+        found = _violations(self.repo)
+        vs = [v for v in found if v.rule_id == rule]
+        self.assertEqual(len(vs), 1, [v.rule_id for v in found])
+        v = vs[0]
+        text = str(v.message) + str(getattr(v, "detail", "") or "")
+        self.assertNotIn("check crashed", text, f"{rule} 实为闸崩溃冒充判定：{text[:200]}")
+        detail = getattr(v, "detail", None) or {}
+        if isinstance(detail, dict):
+            self.assertNotIn("（校验崩溃，未定位）", str(detail.values()),
+                             f"{rule} 实为闸崩溃冒充判定：{text[:200]}")
+        return v
 
     def _assert_gate_ran(self) -> None:
         """负测的正面：闸可达（无 GIT_UNAVAILABLE/MANIFEST_INVALID 早退）才算"没漂移"（t-166/167）。"""
@@ -121,6 +129,15 @@ class TestGeneratedProjections(unittest.TestCase):
         self.assertNotIn("MANIFEST_INVALID", rules)
 
     # --- ① 符号索引 ---
+
+    def test_cell_neutralises_backticks(self) -> None:
+        """`_cell` 必须中和反引号（ocr2-618）：`_layout_block` 把 src/spec 包进
+        行内代码段，反引号会提前闭合代码段 ⇒ 剩余文本渲染成活 Markdown。
+        `_head`（api.md 标题）早已去反引号，表格单元走同一口径。"""
+        from k3dge.engine.generated_docs import _cell
+
+        self.assertNotIn("`", _cell("a`b"))
+        self.assertIn("a", _cell("a`b"))
 
     def test_missing_symbol_index_is_not_a_violation(self) -> None:
         """索引不存在 ⇒ 跳过（`k3dge where` 会惰性建；缺文件不是漂移）。
@@ -152,6 +169,23 @@ class TestGeneratedProjections(unittest.TestCase):
         gen.mkdir(parents=True)
         (gen / "api.md").write_text("# API Reference\n\n手写的旧内容\n", encoding="utf-8")
         self._fresh_check("DOCS_GENERATED_STALE")
+
+    def test_stale_domains_doc_is_violation_with_own_path(self) -> None:
+        """ocr2-742：旧夹具只放 `api.md`——`domains.md` 缺文件时被跳过（evaluator 直接
+        continue），`_fresh_check` 靠 api.md 一条就满足。只比第一条/漏掉 domains 的
+        回归照样绿。两份都先写新鲜、再只改 domains.md：必须报且 file_path 就是它。"""
+        from k3dge.engine import generated_docs
+
+        manifest = Manifest.load(self.repo)
+        rendered = generated_docs.render_manual_docs_content(self.repo, manifest)
+        self.assertEqual(sorted(p.name for p in rendered), ["api.md", "domains.md"])
+        for path, content in rendered.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        dom = self.repo / "docs" / "generated" / "domains.md"
+        dom.write_text("# 手改的旧 domains\n", encoding="utf-8")
+        v = self._fresh_check("DOCS_GENERATED_STALE")
+        self.assertEqual(v.file_path, "docs/generated/domains.md", (v.file_path, v.detail))
 
     def test_fresh_generated_docs_pass(self) -> None:
         manifest = Manifest.load(self.repo)
@@ -204,6 +238,8 @@ class TestGeneratedProjections(unittest.TestCase):
     def test_unresolvable_peer_is_not_a_violation(self) -> None:
         """sibling 不在 ⇒ 写侧本就会跳过（回退告警），闸不制造假红。"""
         self._write_pipeline(peer="nope")
+        # 注意：self（k3dge）必须声明——否则 MCP_JSON_PEER_MISSING 为 self 而响，
+        # 本测就不再测"unresolvable peer 跳过"（并发批次曾误改成 k3dit 即红于此）。
         (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"k3dge": {}}}), encoding="utf-8")
         self._assert_gate_ran()   # ocr2-473：先证闸跑了
         self.assertNotIn("MCP_JSON_PEER_MISSING", _rules(self.repo))

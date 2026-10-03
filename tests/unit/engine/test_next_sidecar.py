@@ -73,6 +73,22 @@ def test_persist_never_raises_but_says_so(tmp_path):
     assert "侧车写入失败" in err.getvalue()
 
 
+def test_persist_never_raises_on_unserializable_card(tmp_path):
+    """ocr2-755：`_write_cards` 只接 `OSError`——`json.dumps` 的 TypeError（如 reasons 里
+    混进 Path/set/datetime）会直接掀翻 persist，正是本文件"永不抛"承诺要防的。
+    序列化失败同样出声不断行，且侧车不留半截。"""
+    import contextlib
+    import io
+
+    ws = Path(tmp_path)
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        persist(ws, NextStep.from_state("seal_ready", "M10", reasons=[Path("x")]))  # 不得抛
+    assert "[nextstep] WARN" in err.getvalue(), err.getvalue()
+    assert "序列化失败" in err.getvalue(), err.getvalue()
+    assert not (ws / ".k3dge" / "next.json").exists()  # 失败路径不得留半截侧车
+
+
 def test_emit_upserts_and_orders_by_priority():
     """一轮内多处理点：同 state 去重、按 priority 排、primary＝最小 priority。
 
@@ -200,6 +216,22 @@ def test_emit_all_merges_with_cards_already_landed_this_run():
             f"primary 独立字段必须指向合并后最小 priority 卡，拿到 {persisted}")
         assert persisted["state"] == prim["state"]
         assert not (ws / ".k3dge" / "next.json.tmp").exists()
+
+
+def test_stale_tmp_does_not_survive_next_write(tmp_path):
+    """ocr2-756：旧断言只认字面 `next.json.tmp`——实现换成唯一 tmp 名（并发标准修法）时
+    断言空转，而陈旧 tmp 照堆。同时"上次替换断半路"的故障从没被真的模拟过。
+    种一个陈旧 tmp 再走一次成功写：侧车有效，且 `.k3dge/` 下不留任何 tmp 残留
+    （固定名与唯一名两种实现都必须满足——断的是目录面，不是字面名）。"""
+    ws = Path(tmp_path)
+    (ws / ".k3dge").mkdir(parents=True)
+    (ws / ".k3dge" / "next.json.tmp").write_text('{"stale": true}\n', encoding="utf-8")
+    emit(ws, _ns("seal_ready"))
+    assert (ws / ".k3dge" / "next.json").is_file()
+    data = _raw(ws)
+    assert data["primary"] == "seal_ready", data  # 读到的是新写，不是陈旧 tmp
+    leftovers = list((ws / ".k3dge").glob("*.tmp"))
+    assert leftovers == [], leftovers
 
 
 def test_emit_all_prints_in_priority_order(capsys):

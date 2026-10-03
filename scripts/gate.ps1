@@ -23,8 +23,8 @@ if ([string]::IsNullOrWhiteSpace($want) -and (Test-Path (Join-Path $Root "pyproj
     $inSec = $false
     $sawSec = $false
     foreach ($ln in (Get-Content -LiteralPath (Join-Path $Root "pyproject.toml"))) {
-      if ($ln -match '^\[tool\.k3dge\]\s*(#.*)?$') { $inSec = $true; $sawSec = $true; continue }   # 容忍行尾注释（ocr-144）
-      if ($inSec -and $ln -match '^\[') { break }
+      if ($ln -match '^\s*\[\s*tool\.k3dge\s*\]\s*(#.*)?$') { $inSec = $true; $sawSec = $true; continue }   # 容忍缩进/表头空白/行尾注释（ocr-144/ocr2-569，与 gate.py 文本回退同口径）
+      if ($inSec -and $ln -match '^\s*\[') { break }
       # .NET `-match` 不认 POSIX `[[:space:]]`（会退化成匹配字面 `[`,`:`,`s`,`p`,`a`,`c`,`e`），用 `\s`（ocr2-006）。
       if ($inSec -and ($ln -match '^\s*source\s*=\s*[\x22\x27]([^\x22\x27]*)[\x22\x27]')) {
         $want = $Matches[1]; break                                                   # 两种引号 + 允许缩进

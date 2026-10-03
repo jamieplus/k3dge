@@ -117,7 +117,7 @@ def probe_peer_mcp(workspace: Path, pid: str) -> Tuple[Optional[Path], Optional[
             mod, root = cand_mod, cand_root
             break
     if mod is None or root is None:
-        return probe, None, None
+        return None, None, None
     try:
         py_path = os.path.relpath(root, workspace)
     except ValueError:

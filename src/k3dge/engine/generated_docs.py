@@ -125,7 +125,7 @@ def _cell(v: object) -> str:
     会把一行撕成两行；含 `<!--`/`-->` 会提前闭合/伪造 README 自动块标记（ocr-251/252）。
     新鲜度闸与写盘用同一份渲染结果 ⇒ 坏行会同时坏产物与坏判据。"""
     s = str(v or "").replace("\r\n", " ").replace("\n", " ").replace("\r", " ").strip()
-    return s.replace("|", "\\|").replace("<", "&lt;").replace(">", "&gt;")
+    return s.replace("|", "\\|").replace("<", "&lt;").replace(">", "&gt;").replace("`", "'")
 
 
 def render_readme_layout(workspace: Path, manifest: Manifest) -> Optional[Path]:

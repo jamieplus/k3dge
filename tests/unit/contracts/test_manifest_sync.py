@@ -35,6 +35,13 @@ class TestManifestSpecsFullSync(unittest.TestCase):
             parsed = json.loads(MANIFEST.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
             self.fail(f".agent/manifest.json 解析失败：{exc}")
+        except UnicodeDecodeError as exc:
+            # ocr2-710：坏编码（b"\xff\xfe" 类事实源）不是 JSONDecodeError 子类——
+            # 旧写法让它带 traceback 冲出 setUp，CI 上伪装成环境故障而非契约红。
+            self.fail(f".agent/manifest.json 非 UTF-8（编码坏，非 JSON 坏）：{exc}")
+        except OSError as exc:
+            # 同上：权限/IO 坏了也要出干净的红，不抛裸栈。
+            self.fail(f".agent/manifest.json 读不出：{exc}")
         self.assertIsInstance(parsed, dict, "manifest 顶层必须是对象")
         self.manifest = parsed
         # `domains` 缺失/被改名/被清空时旧写法静默回落 `{}` ⇒ 三条逐域断言全部空转仍报绿，
@@ -47,7 +54,14 @@ class TestManifestSpecsFullSync(unittest.TestCase):
     def test_manifest_is_present(self) -> None:
         # 真正的存在性断言已上提进 setUp（t-028）；本用例保留为契约的**登记位**
         # （报告/审计引用过它），内容对账同一事实、措辞可检索。
+        # ocr2-711：裸 `is_file` 在 setUp 后恒真、永不当决定性失败——让它校验
+        # setUp 没覆盖的事实（顶层键/name 与仓名一致），否则就是恒真登记。
         self.assertTrue(MANIFEST.is_file(), ".agent/manifest.json missing")
+        self.assertEqual(self.manifest.get("name"), "k3dge", self.manifest.get("name"))
+        self.assertEqual(self.manifest.get("package_root"), "src/k3dge",
+                         self.manifest.get("package_root"))
+        for key in ("version", "domains"):
+            self.assertIn(key, self.manifest, f"manifest 缺顶层键：{key}")
 
     def test_every_domain_has_all_registered_paths(self) -> None:
         for domain, cfg in self.domains.items():

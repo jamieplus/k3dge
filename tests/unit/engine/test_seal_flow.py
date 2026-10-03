@@ -56,9 +56,14 @@ def _mk_task(ws, mid="M1"):
     return p
 
 
-def _ws() -> Path:
+def _ws(tc=None) -> Path:
+    # ocr2-782：atexit 只在解释器正常退出时跑——会话内 ~40 个工作区全程驻盘，
+    # 崩一次还互相污染。传进 TestCase 时按测回收（同 TestSealFlowEdges._ws）。
     d = Path(tempfile.mkdtemp())
-    atexit.register(shutil.rmtree, d, True)
+    if tc is not None:
+        tc.addCleanup(shutil.rmtree, d, True)
+    else:
+        atexit.register(shutil.rmtree, d, True)
     (d / ".agent").mkdir()
     (d / ".agent" / "milestone").write_text("M1\n", encoding="utf-8")
     (d / "docs" / "reviews").mkdir(parents=True)
@@ -77,9 +82,9 @@ _ONESHOT = ('[roles.audit]\nbind = "k3dit"\nmode = "oneshot"\n\n'
             'stages_verify = ["audit.actions.verify"]\n')
 
 
-def _ws_oneshot() -> Path:
+def _ws_oneshot(tc=None) -> Path:
     """`_ws()` + 显式 `mode = "oneshot"`（与当前默认值同效，仅把隐式变显式）。"""
-    ws = _ws()
+    ws = _ws(tc)
     (ws / ".agent" / "pipeline.toml").write_text(_ONESHOT, encoding="utf-8")
     return ws
 
@@ -102,7 +107,7 @@ class TestAuditStats(TestCase):
         self.assertEqual(stats["total"], 3)
 
     def test_find_report(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         p = ws / "docs" / "reviews" / "2026-09-01-M1-x.md"
         p.write_text(_AUDIT, encoding="utf-8")
         found = _find_audit_report(ws, "M1")
@@ -110,7 +115,7 @@ class TestAuditStats(TestCase):
         self.assertEqual(found[0], p)
 
     def test_ensure_leftovers(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         p = ws / "docs" / "reviews" / "2026-09-01-M1-x.md"
         p.write_text(_AUDIT, encoding="utf-8")
         _ensure_leftovers(ws, _AUDIT, p)
@@ -133,7 +138,7 @@ class TestPrompt(TestCase):
 
 class TestPipelineRunner(TestCase):
     def test_resolve_and_run_cli(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         (ws / ".agent" / "pipeline.toml").write_text(
             '[peers.k3dit.actions.echo]\n'
             'transports = [ { provider = "cli", command = "echo RAN", timeout = 5 } ]\n',
@@ -147,7 +152,7 @@ class TestPipelineRunner(TestCase):
         self.assertEqual(res.provider, "cli")
 
     def test_skip_records_and_logs(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         (ws / ".agent" / "pipeline.toml").write_text(
             '[peers.k3dit.actions.none]\n'
             'transports = [ { provider = "skip" } ]\n',
@@ -179,7 +184,7 @@ class TestAuditFlow(TestCase):
     def test_produce_and_verify_send_action_level_arguments(self) -> None:
         """ADR-0006 §2.3.8: k3dge asks for "audit this milestone", never for pass numbers,
         and tells the verify transport *which* report to check."""
-        ws = _ws_oneshot()
+        ws = _ws_oneshot(self)
         _clean_report(ws)
         calls = []
 
@@ -202,7 +207,7 @@ class TestAuditFlow(TestCase):
         self.assertTrue(str(verify["audit.actions.verify"].get("path", "")).endswith(".md"))
 
     def test_rejection_quotes_the_peer_suggested_report_path(self) -> None:
-        ws = _ws_oneshot()  # no report on disk
+        ws = _ws_oneshot(self)  # no report on disk
         payload = json.dumps({"ok": True, "lens_count": 5, "report_path": "docs/reviews/2026-09-03-M1-code.md"})
         with mock.patch(
             "k3dge.engine.pipeline_runner.run_action",
@@ -214,27 +219,27 @@ class TestAuditFlow(TestCase):
         self.assertIn("k3dge 不代笔正文", msg)
 
     def test_audited_when_clean(self) -> None:
-        ws = _ws_oneshot()
+        ws = _ws_oneshot(self)
         _clean_report(ws)
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "audited")
 
     def test_rejected_when_audit_missing(self) -> None:
-        ws = _ws_oneshot()  # no report
+        ws = _ws_oneshot(self)  # no report
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "rejected")
 
     def test_declined_fix_rejects(self) -> None:
-        ws = _ws_oneshot()
+        ws = _ws_oneshot(self)
         _open_report(ws)
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["n"]))
         self.assertEqual(status, "rejected")
 
     def test_escalates_after_max_verify_attempts(self) -> None:
-        ws = _ws_oneshot()
+        ws = _ws_oneshot(self)
         _open_report(ws)
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             # three fix-yes answers -> 4th loop escalates (max=3)
@@ -248,7 +253,7 @@ class TestSealFlow(TestCase):
     def test_seal_runs_the_audit_itself_and_refusal_stops_it(self) -> None:
         """相位 2（ADR-0004 §2.1.9）：审计由 **seal 自己**跑（不再靠外部 hook 先跑）。
         审计没正常返回（refused/escalated）⇒ 不归档、不前进版号。"""
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         with mock.patch("k3dge.engine.milestone_audit.run_audit_flow",
                         return_value=("refused", "审计未成（跳被跳过）")) as audit, \
@@ -262,7 +267,7 @@ class TestSealFlow(TestCase):
 
     def test_rerun_does_not_bump_version_twice(self) -> None:
         """幂等重入：已立边界 tag ⇒ 第二次 seal **不再推版号**（09-28 code-7 / ocr-443 同族）。"""
-        ws = _ws()
+        ws = _ws(self)
         (ws / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
         (ws / "docs" / "tasks" / "2026-09-01-M1-feat-x.md").write_text(
             "---\nstatus: done\nmilestone: M1\npriority: P2\ndate: 2026-09-01\n---\n\n# X\n",
@@ -310,7 +315,7 @@ class TestSealFlow(TestCase):
         """ADR-0004 §2.1.9/§2.1.11：**版号在审计正常返回后前进**，不管有没有报告；
         `no_version_bump` 是显式逃生口（不动版本文件，其余照旧）。"""
         for bump_flag, expected in ((False, "1.2.4"), (True, "1.2.3")):
-            ws2 = _ws()
+            ws2 = _ws(self)
             (ws2 / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
             (ws2 / "docs" / "tasks" / "2026-09-01-M1-feat-x.md").write_text(
                 "---\nstatus: done\nmilestone: M1\npriority: P2\ndate: 2026-09-01\n---\n\n# X\n",
@@ -342,7 +347,7 @@ class TestSealFlow(TestCase):
             self.assertIn("跳过" if bump_flag else "1.2.4", msg)
 
     def test_seal_declined_when_operator_says_no(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         _clean_report(ws)
         with mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed")) as seal:
@@ -351,7 +356,7 @@ class TestSealFlow(TestCase):
         seal.assert_not_called()
 
     def test_sealed_when_audit_clean(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         _clean_report(ws)
         with _audit_ok(), _record_ok(), \
@@ -365,7 +370,7 @@ class TestSealFlow(TestCase):
         self.assertTrue(any(p.name.endswith("-closure.md") for p in (ws / "docs" / "reviews").iterdir()))
 
     def test_skip_enter_prompt_seals(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         _clean_report(ws)
         with _audit_ok(), _record_ok(), \
@@ -383,7 +388,7 @@ class TestSealReviewGate(TestCase):
         from k3dge.engine.seal import _seal_review_gate
         from k3dge.engine.task_index import scan_milestone_tasks
 
-        ws = _ws()
+        ws = _ws(self)
         (ws / "docs" / "tasks").mkdir(parents=True, exist_ok=True)
         (ws / "docs" / "tasks" / "2026-09-01-M1-feat-x.md").write_text(
             "---\nstatus: done\nmilestone: M1\npriority: P2\ndate: 2026-09-01\n---\n\n# X\n",
@@ -404,7 +409,7 @@ class TestSealReviewGate(TestCase):
         from k3dge.engine.seal import unmet_seal_preconditions
         from k3dge.engine.task_index import work_pending, scan_milestone_tasks
 
-        ws = _ws()
+        ws = _ws(self)
         td = ws / "docs" / "tasks"
         td.mkdir(parents=True)
         (td / "2026-09-01-M1-feat-x.done.md").write_text(
@@ -433,7 +438,7 @@ class TestWriteClosureNote(TestCase):
     def test_records_current_version_and_archived_report(self) -> None:
         from k3dge.engine.seal_flow import _write_closure_note
 
-        ws = _ws()
+        ws = _ws(self)
         (ws / "pyproject.toml").write_text('[project]\nname="x"\nversion="1.2.3"\n', encoding="utf-8")
         arch = ws / "docs" / "reviews" / "archive" / "M1"
         arch.mkdir(parents=True)
@@ -448,7 +453,7 @@ class TestWriteClosureNote(TestCase):
         """已存在的清单读不出时不得当空桩覆盖（ocr2-313）：人改内容保留。"""
         from k3dge.engine.seal_flow import _write_closure_note
 
-        ws = _ws()
+        ws = _ws(self)
         p = ws / "docs" / "reviews" / "2026-10-02-M1-closure.md"
         p.write_text("人写的清单内容\n", encoding="utf-8")
         real_read = Path.read_text
@@ -474,7 +479,7 @@ class TestPrematureArchive(TestCase):
             "# X\n- **Status**: done\n- **Milestone**: M1\n", encoding="utf-8")
 
     def test_align_hints_when_milestone_tasks_archived_early(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         self._archived_m1(ws)
         ok, msg, _ = run_milestone_alignment(ws, "M1")
         self.assertFalse(ok)
@@ -484,7 +489,7 @@ class TestPrematureArchive(TestCase):
     def test_hint_none_for_non_current_milestone(self) -> None:
         from k3dge.engine.task_index import premature_archive_hint
 
-        ws = _ws()
+        ws = _ws(self)
         self._archived_m1(ws)
         self.assertIsNone(premature_archive_hint(ws, "M9"))  # 当前 = M1
 
@@ -494,7 +499,7 @@ class TestAlignCheckpoint(TestCase):
         """ocr2-182：已存在、非桩的报告缺 align-pass marker ⇒ 不得认作 seal-eligible（fail-closed）。"""
         import datetime
 
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         today = datetime.date.today().isoformat()
         rep = ws / "docs" / "reviews" / f"{today}-M1-align.md"
@@ -511,7 +516,7 @@ class TestPruneFinished(TestCase):
         """ocr2-209：账本顶层非对象 ⇒ 当"无单可清"，不 AttributeError。"""
         from k3dge.engine.audit_flow import STATE_REL, prune_finished
 
-        ws = _ws()
+        ws = _ws(self)
         (ws / STATE_REL).write_text('["x"]', encoding="utf-8")
         self.assertEqual(prune_finished(ws), {"pruned": 0})
 
@@ -519,7 +524,7 @@ class TestPruneFinished(TestCase):
         """ocr2-210：坏元素不得终止整个清理循环。"""
         from k3dge.engine.audit_flow import STATE_REL, prune_finished
 
-        ws = _ws()
+        ws = _ws(self)
         (ws / STATE_REL).write_text(json.dumps({"jobs": ["bad", 7]}), encoding="utf-8")
         self.assertEqual(prune_finished(ws), {"pruned": 0})
 
@@ -528,7 +533,7 @@ class TestClosureNote(TestCase):
     def test_note_records_final_version_and_merged_wording(self) -> None:
         from k3dge.engine import seal_flow
 
-        ws = _ws()
+        ws = _ws(self)
         with mock.patch("k3dge.engine.version.get_version", return_value="0.1.11"):
             p = seal_flow._write_closure_note(ws, "M1")
         text = p.read_text(encoding="utf-8")
@@ -539,7 +544,7 @@ class TestClosureNote(TestCase):
 
 class TestAuditChecklist(TestCase):
     def test_build_snapshot_flags_suggestion(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         data = ac.build_checklist(ws, "M1")
         self.assertTrue(data["audit_suggested"])
@@ -548,7 +553,7 @@ class TestAuditChecklist(TestCase):
         self.assertEqual(data["verify_attempts"], 0)
 
     def test_verify_attempt_tracking_and_reset(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         ac.reset_verify_attempts(ws)
         self.assertEqual(ac.get_verify_attempts(ws), 0)
@@ -558,7 +563,7 @@ class TestAuditChecklist(TestCase):
         self.assertEqual(ac.get_verify_attempts(ws), 0)
 
     def test_reset_for_audit_clears_budget_and_stamps(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         ac.bump_verify_attempt(ws)
         ac.bump_verify_attempt(ws)
@@ -568,14 +573,14 @@ class TestAuditChecklist(TestCase):
         self.assertIsNotNone(data["audit_started_at"])
 
     def test_persists_to_audit_path(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         ac.build_checklist(ws, "M1")
         self.assertTrue((ws / ".agent" / "audit_checklist.json").is_file())
 
     def test_blank_report_ids_do_not_collapse_pending(self) -> None:
         """ocr2-201：空白 ID 不得坍缩成同一个 `""` 成员而少报待修。"""
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         hdr = ("| ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |\n"
                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
@@ -587,7 +592,7 @@ class TestAuditChecklist(TestCase):
 
     def test_verify_budget_is_scoped_to_explicit_milestone(self) -> None:
         """ocr2-202：显式里程碑的预算/快照不得被当前指针（M1）改写而清零。"""
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         ac.reset_for_audit(ws, "M2")
         ac.bump_verify_attempt(ws, "M2")
@@ -598,7 +603,7 @@ class TestAuditChecklist(TestCase):
         """ocr2-204：写快照用唯一临时名（mkstemp），不再抢固定 `.tmp`。"""
         import tempfile as _tf
 
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         made: list = []
         real = _tf.mkstemp
@@ -614,7 +619,7 @@ class TestAuditChecklist(TestCase):
 
     def test_corrupt_verify_attempts_degrades_to_zero(self) -> None:
         """ocr2-203：投影里的 null/非数字字段退化为 0，不得让审计环崩。"""
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         ac.build_checklist(ws, "M1")
         p = ws / ".agent" / "audit_checklist.json"
@@ -639,7 +644,7 @@ class TestReportTask(TestCase):
         )
 
     def test_create_task_records_report(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         self._rep(ws)
         ok, _msg, path = create_task(ws, "fix A1", typ="audit", milestone="M1", report="docs/reviews/x.md")
         self.assertTrue(ok)
@@ -650,7 +655,7 @@ class TestReportTask(TestCase):
         self.assertNotIn("- **Status**:", text)
 
     def test_done_blocked_when_report_open(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         self._rep(ws, "待修")
         _ok, _m, path = create_task(ws, "fix A1", typ="audit", milestone="M1", report="docs/reviews/x.md")
         ok, msg = mark_task_done(ws, path.name)[:2]
@@ -658,14 +663,14 @@ class TestReportTask(TestCase):
         self.assertIn("A1", msg)
 
     def test_done_allowed_when_report_clean(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         self._rep(ws, "已修")
         _ok, _m, path = create_task(ws, "fix A1", typ="audit", milestone="M1", report="docs/reviews/x.md")
         ok, _msg = mark_task_done(ws, path.name)[:2]
         self.assertTrue(ok)
 
     def test_unbound_task_not_gated(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         _ok, _m, path = create_task(ws, "plain task", typ="fix", milestone="M1")
         ok, _msg = mark_task_done(ws, path.name)[:2]
         self.assertTrue(ok)
@@ -673,7 +678,7 @@ class TestReportTask(TestCase):
 
 class TestExternalAuditPersist(TestCase):
     def test_persist_with_header_discoverable(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         path = persist_external_audit_report(ws, "M1", _AUDIT)
         self.assertTrue(path.name.endswith("-M1-external-audit.md"))
         self.assertTrue(path.is_file())
@@ -682,7 +687,7 @@ class TestExternalAuditPersist(TestCase):
         self.assertEqual(_parse_audit_stats(found[1])["待修"], 1)
 
     def test_persist_without_header_canonicalizes(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         # Human pastes rows but no 12-col header; system must still land a parseable report.
         pasted = "| A1 | x | s | p | t | desc | loc | 待修 | - | - | 待复审 | - |"
         path = persist_external_audit_report(ws, "M1", pasted)
@@ -693,7 +698,7 @@ class TestExternalAuditPersist(TestCase):
         self.assertEqual(_parse_audit_stats(found[1])["待修"], 1)
 
     def test_latest_submission_overwrites(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         first = persist_external_audit_report(ws, "M1", _AUDIT)
         second = persist_external_audit_report(ws, "M1", _AUDIT.replace("待修", "已修"))
         self.assertEqual(first, second)
@@ -709,7 +714,7 @@ class TestRatchetRetired(TestCase):
         # 工作区来自 `_ws()`（自带 mkdtemp＋清理），`d` 从没被用；"with 块＝隔离"是假象。
         from k3dge.engine import nextstep  # noqa: F401  （拒绝分支会 persist [NEXT]）
 
-        ws = _ws()
+        ws = _ws(self)
         (ws / ".agent" / "pipeline.toml").write_text(
             '[roles.audit]\nbind = "k3dit"\nmode = "ratchet"\n', encoding="utf-8")
         _mk_task(ws)
@@ -728,7 +733,7 @@ class TestSingleAuditReport(TestCase):
         走 oneshot 腿（显式声明）。原名下“ratchet_closed”与实际路径不符；
         原写 `audit_jobs.json` 在 oneshot 模式下从不被读（实测 open 次数 0），已删。
         """
-        ws = _ws_oneshot()
+        ws = _ws_oneshot(self)
         (ws / "docs" / "reviews" / "2026-09-01-M1-audit.md").write_text(_AUDIT_CLEAN, encoding="utf-8")
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, msg = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
@@ -747,7 +752,7 @@ class TestGateIdDispatch(TestCase):
         return data["next"][0] if data.get("next") else data
 
     def test_audit_flow_rejection_routes_by_gate_id(self) -> None:
-        ws = _ws_oneshot()  # 无 12 列报告 ⇒ gate_id=audit_report_missing
+        ws = _ws_oneshot(self)  # 无 12 列报告 ⇒ gate_id=audit_report_missing
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "rejected")
@@ -756,7 +761,7 @@ class TestGateIdDispatch(TestCase):
         self.assertIn("审计缺失：先落盘报告", self._sidecar(ws)["fact"])
 
     def test_declined_fix_routes_by_gate_id(self) -> None:
-        ws = _ws_oneshot()
+        ws = _ws_oneshot(self)
         _open_report(ws)
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
             status, _ = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["n"]))
@@ -767,7 +772,7 @@ class TestGateIdDispatch(TestCase):
     def test_seal_preconditions_rejection_carries_declared_gate_id(self) -> None:
         from k3dge.engine.seal import seal_preconditions_error
 
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         (ws / "docs" / "guides").mkdir(parents=True)
         (ws / "docs" / "guides" / "g.md").write_text(
@@ -780,7 +785,7 @@ class TestGateIdDispatch(TestCase):
         self.assertIn("Unfilled guide stubs", str(err))   # 仍是 str：既有断言/print 不破
 
     def test_seal_flow_rejection_is_table_driven(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         _clean_report(ws)
         with _audit_ok(), _record_ok(), \
@@ -799,7 +804,7 @@ class TestGateIdDispatch(TestCase):
         """封板那一问的两个投影同一句（票 decision_single_source）。"""
         from k3dge.engine import nextstep
 
-        ws = _ws()
+        ws = _ws(self)
         _mk_task(ws)
         _clean_report(ws)
         out = io.StringIO()
@@ -815,7 +820,7 @@ class TestGateIdDispatch(TestCase):
     def test_audit_open_prompt_wording_is_single_sourced(self) -> None:
         from k3dge.engine import nextstep
 
-        ws = _ws_oneshot()
+        ws = _ws_oneshot(self)
         _open_report(ws)
         out = io.StringIO()
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MCP):
@@ -837,14 +842,14 @@ class TestStagesAreDeclaredNotHardcoded(TestCase):
 
         # 缺省＝无外部步（审计是本地工具调用，2026-09-26）：要外部步的仓**显式**声明（见下一条用例与
         # `_ws_oneshot`）——"缺省声明一个解析不到的 action"才是要避免的。
-        self.assertEqual(gates.stages(_ws(), "audit", "produce"), [])
-        self.assertEqual(gates.stages(_ws(), "audit", "verify"), [])
-        self.assertEqual(gates.all_stage_refs(_ws()), [])
+        self.assertEqual(gates.stages(_ws(self), "audit", "produce"), [])
+        self.assertEqual(gates.stages(_ws(self), "audit", "verify"), [])
+        self.assertEqual(gates.all_stage_refs(_ws(self)), [])
 
     def test_downstream_can_rebind_stages(self):
         """下游可配（用户裁定）：改声明面 .agent/pipeline.toml 就换实现，只有一处。"""
 
-        ws = _ws()
+        ws = _ws(self)
         (ws / ".agent" / "pipeline.toml").write_text(
             '[checks.audit]\nstages_produce = ["myauditor.actions.lens"]\nstages_verify = []\n',
             encoding="utf-8")
@@ -853,7 +858,7 @@ class TestStagesAreDeclaredNotHardcoded(TestCase):
         self.assertEqual(gates.all_stage_refs(ws), ["myauditor.actions.lens"])
 
     def test_audit_flow_calls_the_declared_ref(self):
-        ws = _ws_oneshot()
+        ws = _ws_oneshot(self)
         _clean_report(ws)
         # 覆盖整份配置时**重新声明 role 块**（t-345）：旧写法把 `_ws_oneshot()` 立的
         # `[roles.audit] mode="oneshot"` 静默抹掉——本测只走 oneshot 腿是因为
@@ -877,11 +882,18 @@ class TestStagesAreDeclaredNotHardcoded(TestCase):
 
     def test_no_pipelines_section_left_in_repo_config(self):
         """声明面唯一：仓内配置不得再有 `[pipelines.*]` 段（注释里提历史不算）。"""
+        # ocr2-784：TOML array-of-tables 形 `[[pipelines.foo]]` 同样声明 pipelines
+        # 表，却以 `[[` 开头——旧 `startswith("[pipelines.")` 放它过。先归一前导括号。
+        def _is_retired(line: str) -> bool:
+            return line.strip().lstrip("[").startswith("pipelines.")
+        self.assertTrue(_is_retired("[[pipelines.foo]]"), "array-of-tables 形必须同样被认")
+        self.assertTrue(_is_retired("[pipelines.on_pre_seal]"))
+        self.assertFalse(_is_retired("# [pipelines.foo] 注释不算"))
         root = Path(__file__).resolve().parents[3]
         for rel in (".agent/pipeline.toml",
                     "src/k3dge/templates/assets/pipeline.toml.template"):
             lines = (root / rel).read_text(encoding="utf-8").splitlines()
-            sections = [ln.strip() for ln in lines if ln.strip().startswith("[pipelines.")]
+            sections = [ln.strip() for ln in lines if _is_retired(ln)]
             self.assertEqual(sections, [], f"{rel} 仍有已废段：{sections}")
 
 
@@ -893,7 +905,7 @@ class TestAuditNoNoop(TestCase):
     """
 
     def _refused(self, produced, answers=("y",)):
-        ws = _ws_oneshot()
+        ws = _ws_oneshot(self)
         _clean_report(ws)  # 旧报告在场——这正是旧代码会误判闭环的条件
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=produced):
             return ws, run_audit_flow(ws, "M1", prompter=_Prompt(answers=list(answers)))
@@ -919,7 +931,7 @@ class TestAuditNoNoop(TestCase):
         self.assertEqual(audit_call_result(TransportResult(True, "manual", "ok")), "degraded-manual")
         self.assertEqual(audit_call_result(_OK_MCP), "closed")
         # 端到端：manual 首选 + 无署名报告 ⇒ 拒
-        ws = _ws_oneshot()
+        ws = _ws_oneshot(self)
         _clean_report(ws)                      # _AUDIT_CLEAN 不含署名
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=_OK_MANUAL):
             status, msg = run_audit_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
@@ -927,7 +939,7 @@ class TestAuditNoNoop(TestCase):
         self.assertIn("署名", msg)
 
     def test_downgraded_needs_signature(self) -> None:
-        ws = _ws_oneshot()
+        ws = _ws_oneshot(self)
         _clean_report(ws)  # 无署名（_AUDIT_CLEAN 不含 _SIGNS）
         prod = TransportResult(True, "manual", "ok", downgrades=["mcp→manual"])
         with mock.patch("k3dge.engine.pipeline_runner.run_action", return_value=prod):
@@ -936,7 +948,7 @@ class TestAuditNoNoop(TestCase):
         self.assertIn("署名", msg)
 
     def test_downgraded_and_signed_is_degraded_manual(self) -> None:
-        ws = _ws_oneshot()
+        ws = _ws_oneshot(self)
         _clean_report(ws)
         p = ws / "docs" / "reviews" / "2026-09-01-M1-audit.md"
         p.write_text(p.read_text(encoding="utf-8") + _SIGNS, encoding="utf-8")
@@ -951,7 +963,7 @@ class TestAuditNoNoop(TestCase):
 
     def test_empty_stage_declaration_is_refused(self) -> None:
         """配置层的同一个洞：`stages_produce` 留空 ⇒ 一次都没跑，**不得**因旧报告判闭环。"""
-        ws = _ws_oneshot()
+        ws = _ws_oneshot(self)
         _clean_report(ws)
         (ws / ".agent" / "pipeline.toml").write_text(
             '[roles.audit]\nbind = "k3dit"\nmode = "oneshot"\n'
@@ -1101,7 +1113,7 @@ class TestLeftoverNewlineGuard(TestCase):
     """已有 LEFTOVERS.md 不以换行收尾时不得把新行并到旧行尾（ocr2-270）。"""
 
     def test_no_final_newline_inserts_separator(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         p = ws / "docs" / "reviews" / "2026-09-01-M1-x.md"
         p.write_text(_AUDIT, encoding="utf-8")
         lp = ws / "docs" / "reviews" / "LEFTOVERS.md"
@@ -1132,7 +1144,7 @@ class TestRoleOptAndAuditMode(TestCase):
     def test_bad_toml_warns_but_defaults(self) -> None:
         from k3dge.engine.milestone_audit import _role_opt
 
-        ws = _ws()
+        ws = _ws(self)
         (ws / ".agent" / "pipeline.toml").write_text("this = = =\n", encoding="utf-8")
         err = io.StringIO()
         with mock.patch("sys.stderr", err):
@@ -1142,7 +1154,7 @@ class TestRoleOptAndAuditMode(TestCase):
     def test_audit_mode_reads_same_value(self) -> None:
         from k3dge.engine.milestone_audit import _audit_mode
 
-        ws = _ws()
+        ws = _ws(self)
         (ws / ".agent" / "pipeline.toml").write_text(
             '[roles.audit]\nmode = "bundle"\n', encoding="utf-8")
         self.assertEqual(_audit_mode(ws), "bundle")

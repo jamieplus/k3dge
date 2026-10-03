@@ -136,14 +136,23 @@ class TestCursor(unittest.TestCase):
             real.mkdir()
             link = ws / ".agent"
             link.mkdir(parents=True)
-            (link / "milestone").symlink_to(real)   # 指目录的符号链接：exists 但非文件
+            # ocr2-753：无 symlink 权限的环境（无开发者模式的 Windows、部分容器）上
+            # 裸 symlink_to 直接 OSError（WinError 1314）error——读起来像产品回归。
+            # 本仓既定口径（t-269）：建不出链接就 skip，不 error。
+            try:
+                (link / "milestone").symlink_to(real)   # 指目录的符号链接：exists 但非文件
+            except OSError as exc:
+                self.skipTest(f"环境建不出符号链接：{exc}")
             with self.assertRaises(MilestoneError):
                 get_current_milestone(ws)
             # 指**普通文件**的符号链接是合法游标（is_file 跟随链接）
             (link / "milestone").unlink()
             target = ws / "cur"
             target.write_text("M7\n", encoding="utf-8")
-            (link / "milestone").symlink_to(target)
+            try:
+                (link / "milestone").symlink_to(target)
+            except OSError as exc:
+                self.skipTest(f"环境建不出符号链接：{exc}")
             self.assertEqual(get_current_milestone(ws), "M7")
             # 写侧必须穿透链接写目标，不得替换链接本身（ocr2-491）
             set_current_milestone(ws, "M8")
@@ -232,6 +241,48 @@ class TestBump(unittest.TestCase):
             bump_milestone(ws)
             # 新进程语义：重读盘上值
             self.assertEqual(get_current_milestone(ws), "M1")
+
+    def test_failed_write_keeps_old_cursor_and_no_tmp(self):
+        """ocr2-754(a)：写半路崩 ⇒ 旧游标仍可读、.agent 下无残留 tmp（原子写承诺）。"""
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            set_current_milestone(ws, "M5")
+            with mock.patch.object(Path, "replace", side_effect=OSError("disk full")):
+                with self.assertRaises(OSError):
+                    set_current_milestone(ws, "M6")
+            self.assertEqual(get_current_milestone(ws), "M5", "失败的写污染了游标")
+            tmps = list((ws / ".agent").glob("*.tmp"))
+            self.assertEqual(tmps, [], f"残留 tmp：{tmps}")
+
+    def test_concurrent_bumps_do_not_lose_updates(self):
+        """ocr2-754(b)：并发 bump 不得丢失更新（读-改-写持锁，ocr2-280）——两次结果互异。"""
+        import threading
+
+        try:
+            import fcntl  # noqa: F401
+        except ImportError:
+            self.skipTest("fcntl unavailable")
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d)
+            results = []
+            errors = []
+
+            def _bump():
+                try:
+                    results.append(bump_milestone(ws))
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(exc)
+
+            threads = [threading.Thread(target=_bump) for _ in range(2)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            self.assertEqual(errors, [])
+            self.assertEqual(sorted(results), ["M1", "M2"], results)
+            self.assertEqual(get_current_milestone(ws), "M2")
 
 
 class TestBumpLocking(unittest.TestCase):

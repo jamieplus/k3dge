@@ -16,9 +16,14 @@ import shutil
 import atexit
 
 
-def _ws() -> Path:
+# ocr2-796：atexit 只在解释器正常退出时清——传进 TestCase 时按测回收
+# （同 test_seal_flow.TestSealFlowEdges._ws 的正确形状）。
+def _ws(tc=None) -> Path:
     ws = Path(tempfile.mkdtemp())
-    atexit.register(shutil.rmtree, ws, True)
+    if tc is not None:
+        tc.addCleanup(shutil.rmtree, ws, ignore_errors=True)
+    else:
+        atexit.register(shutil.rmtree, ws, True)
     (ws / "docs" / "tasks").mkdir(parents=True)
     (ws / ".agent").mkdir()
     (ws / ".agent" / "milestone").write_text("M10\n", encoding="utf-8")
@@ -65,7 +70,7 @@ class TestNameParts(TestCase):
 
 class TestReassignTask(TestCase):
     def test_moves_frontmatter_and_filename_together(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         p = _task(ws, "2026-09-20-M10-feat-x.md")
         ok, msg, newp = reassign_task_milestone(ws, p, "M11")
         self.assertTrue(ok, msg)
@@ -76,7 +81,7 @@ class TestReassignTask(TestCase):
         self.assertEqual(pure_refs.check_task_consistency(rel, newp.read_text(encoding="utf-8")), [])
 
     def test_idempotent(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         p = _task(ws, "2026-09-20-M10-feat-x.md")
         reassign_task_milestone(ws, p, "M11")
         again = ws / "docs" / "tasks" / "2026-09-20-M11-feat-x.md"
@@ -86,23 +91,27 @@ class TestReassignTask(TestCase):
         self.assertEqual(newp, again)
 
     def test_dry_run_touches_nothing(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         p = _task(ws, "2026-09-20-M10-feat-x.md")
-        ok, msg, _ = reassign_task_milestone(ws, p, "M11", dry_run=True)
+        ok, msg, target = reassign_task_milestone(ws, p, "M11", dry_run=True)
         self.assertTrue(ok, msg)
         self.assertIn("[dry-run]", msg)
         self.assertTrue(p.exists())
         self.assertIn("milestone: M10", p.read_text(encoding="utf-8"))
+        # ocr2-797：只断源文件不动时，dry-run 顺手把改名副本落盘也照样绿——
+        # 目标文件名必须仍不存在（函数返回的正是目标路径）。
+        self.assertIsNotNone(target)
+        self.assertFalse(target.exists(), f"dry-run 落下了目标文件：{target}")
 
     def test_refuses_bad_id_and_bad_name(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         p = _task(ws, "2026-09-20-M10-feat-x.md")
         self.assertFalse(reassign_task_milestone(ws, p, "M 11")[0])       # 非法 id
         bad = _task(ws, "2026-09-20-random.md")
         self.assertFalse(reassign_task_milestone(ws, bad, "M11")[0])      # 名字拆不出段位
 
     def test_removing_milestone_drops_the_segment(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         p = _task(ws, "2026-09-20-M10-feat-x.md")
         ok, msg, newp = reassign_task_milestone(ws, p, None)
         self.assertTrue(ok, msg)
@@ -112,7 +121,7 @@ class TestReassignTask(TestCase):
 
 class TestReassignBulk(TestCase):
     def test_only_matching_milestone_moves(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         _task(ws, "2026-09-20-M10-feat-a.md")
         _task(ws, "2026-09-20-M10-fix-b.done.md")
         _task(ws, "2026-09-19-M9-docs-c.md", milestone="M9")
@@ -122,9 +131,24 @@ class TestReassignBulk(TestCase):
         self.assertEqual(names, ["2026-09-19-M9-docs-c.md",
                                  "2026-09-20-M11-feat-a.md",
                                  "2026-09-20-M11-fix-b.done.md"])
+        # ocr2-798：只断文件名时"改名而 frontmatter 仍挂 M10"的半迁移照样绿——
+        # 单票测的两处同改不变式在这里逐票复验（只查里程碑档：`.done.md` 夹具
+        # 自带的 status/结案形态与重挂无关，不在此断）。
+        # 负对照：半迁移（改名 M11 而 frontmatter 仍 M10）必须真触发该码——
+        # 否则上面的 NotIn 是"闸根本不跑"的假绿。
+        half = ("---\nstatus: idea\nmilestone: M10\npriority: P2\ndate: 2026-09-20\n---\n\n# X\n")
+        half_codes = [c for c, _ in pure_refs.check_task_consistency(
+            "docs/tasks/2026-09-20-M11-feat-a.md", half)]
+        self.assertIn("TASK_MILESTONE_MISMATCH", half_codes, half_codes)
+        for name in ("2026-09-20-M11-feat-a.md", "2026-09-20-M11-fix-b.done.md"):
+            moved = ws / "docs" / "tasks" / name
+            rel = moved.relative_to(ws).as_posix()
+            codes = [c for c, _ in pure_refs.check_task_consistency(
+                rel, moved.read_text(encoding="utf-8"))]
+            self.assertNotIn("TASK_MILESTONE_MISMATCH", codes, (name, codes))
 
     def test_nothing_to_do_is_ok(self) -> None:
-        ws = _ws()
+        ws = _ws(self)
         _task(ws, "2026-09-20-M11-feat-a.md", milestone="M11")
         ok, lines = reassign_milestone(ws, "M10", "M11")
         self.assertTrue(ok, lines)
@@ -190,17 +214,24 @@ class TestBoundaryNudge(TestCase):
     """`TASK_MILESTONE_AFTER_BOUNDARY`（advisory）：边界之后新增的票仍挂在边界那一版。"""
 
     def _repo(self) -> Path:
+        import os
+
         ws = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, ws, ignore_errors=True)
         (ws / "docs" / "tasks").mkdir(parents=True)
         (ws / ".agent").mkdir()
         (ws / ".agent" / "milestone").write_text("M10\n", encoding="utf-8")
+        # ocr2-799：宿主 global/system git 配置（commit.gpgsign/tag.gpgsign/
+        # core.hooksPath/alias.*）会让种子提交或注解 tag 崩，前置半初始化后
+        # 红在下游断言里毫无线索。钉死配置隔离，断言只反映被测行为。
+        env = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
 
         def g(*a) -> str:
             # 前置 git **步步查错**（t-298）：旧写法把 rc/stderr 扔了——缺 git、全局
             # gpgsign/hooksPath 让 commit 或 tag 崩时，夹具半初始化往下跑，
             # 红在 `tasks_after_boundary`/`validate_docs` 的下游断言里毫无线索。
-            r = subprocess.run(["git", "-C", str(ws), *a], capture_output=True, text=True)
+            r = subprocess.run(["git", "-C", str(ws), *a], capture_output=True,
+                               text=True, env=env)
             if r.returncode != 0:
                 raise RuntimeError(f"git {' '.join(a)} 失败：{(r.stderr or r.stdout).strip()}")
             return r.stdout

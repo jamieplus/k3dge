@@ -28,7 +28,21 @@ def _test_files() -> list:
     return files
 
 
+def _parse_file(path: Path):
+    """ocr2-815：单文件读/解析失败记成调用方的 offender，不让整闸裸崩。
+
+    语料 glob 是 `tests/**/*.py`（非 `test_*.py`）：一件非 UTF-8/不可 parse 的
+    `.py`（含他测中途落盘的）会把整条闸炸成 UnicodeDecodeError/SyntaxError，
+    而不是 hygiene 报告。返回 Module 或异常，由调用方归位。
+    """
+    try:
+        return ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+        return exc
+
+
 # ---------------------------------------------------------------- main guard
+
 
 def _name_of(node):
     return node.id if isinstance(node, ast.Name) else None
@@ -63,7 +77,10 @@ def test_main_guard_is_last_statement_in_every_test_file() -> None:
     """
     offenders = []
     for p in _test_files():
-        tree = ast.parse(p.read_text(encoding="utf-8"))
+        tree = _parse_file(p)
+        if isinstance(tree, Exception):
+            offenders.append(f"{p.relative_to(REPO)}: 读/解析失败（{type(tree).__name__}）")
+            continue
         g = _main_guard(tree)
         if g is None:
             continue
@@ -74,6 +91,7 @@ def test_main_guard_is_last_statement_in_every_test_file() -> None:
 
 
 # ------------------------------------------------------- dead / dup imports
+
 
 def _bound(node) -> list:
     if isinstance(node, ast.ImportFrom) and node.module == "__future__":
@@ -95,17 +113,17 @@ def test_no_dead_or_duplicate_imports_in_tests() -> None:
     """
     bad: list[str] = []
     for path in _test_files():
-        tree = ast.parse(path.read_text(encoding="utf-8"))
+        tree = _parse_file(path)
+        if isinstance(tree, Exception):
+            bad.append(f"{path}:{0} 读/解析失败（{type(tree).__name__}）")
+            continue
         used: set[str] = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Name):
                 used.add(node.id)
-            elif isinstance(node, ast.Attribute):
-                base = node
-                while isinstance(base, ast.Attribute):
-                    base = base.value
-                if isinstance(base, ast.Name):
-                    used.add(base.id)
+            # ocr2-817：旧 `elif Attribute` 分支是冗余的——`ast.walk` 产出所有
+            # 节点，属性链最内层的 Name（如 `os.path.join` 的 `os`）已被上一支
+            # 收录，used 集逐文件一致。删掉它，去掉"属性处理是刻意为之"的误导。
 
         module_bound = {n for node in tree.body
                         if isinstance(node, (ast.Import, ast.ImportFrom))
@@ -136,6 +154,7 @@ def test_no_dead_or_duplicate_imports_in_tests() -> None:
 
 
 # ------------------------------------------------- mkdtemp cleanup handle
+
 
 def _callee(node) -> str:
     if isinstance(node, ast.Attribute):
@@ -191,8 +210,11 @@ def test_every_mkdtemp_site_has_a_cleanup_handle() -> None:
     """
     offenders: list[str] = []
     for path in _test_files():
+        tree = _parse_file(path)
+        if isinstance(tree, Exception):
+            offenders.append(f"{path}:{0} 读/解析失败（{type(tree).__name__}）")
+            continue
         src = path.read_text(encoding="utf-8")
-        tree = ast.parse(src)
         aliases = _mkdtemp_aliases(tree)
         parents: dict = {}
         for node in ast.walk(tree):

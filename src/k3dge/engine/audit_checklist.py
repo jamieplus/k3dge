@@ -7,8 +7,9 @@ state of the audit loop — not "can I seal". The checklist holds:
   - verify_attempts: the >3-loop escalation counter (reset on each audit initiation)
   - audit_started_at: when the current audit pass was initiated (manual or auto)
 
-Caching: keyed by a hash of the current milestone's task statuses so `check` need
-not re-scan when nothing changed. **Initiating an audit (`k3dge milestone audit`)
+Caching: keyed by a hash of the current milestone's task statuses; the hash itself
+is computed from a scan, so the cache does not avoid re-scanning — it preserves
+counters/verify budget across re-scans when nothing changed. **Initiating an audit (`k3dge milestone audit`)
 resets the checklist** (fresh verify budget + new started_at).
 
 **这是运行态投影，不是判据**（ADR-0004 §2.1.10 🅰1）：文件在 `.agent/`（本地、可删、可重建）；
@@ -44,7 +45,7 @@ def _tasks_hash(workspace: Path, milestone_id: str) -> str:
 
 def _snapshot(workspace: Path, milestone_id: str) -> dict:
     from k3dge.engine.audit_trigger import audit_closed, compute_audit_suggestion
-    from k3dge.engine.audit_report import _find_report, _parse_audit_stats
+    from k3dge.engine.audit_report import _find_report
 
     suggested, reasons = compute_audit_suggestion(workspace)
     found = _find_report(workspace, milestone_id, "audit")
@@ -105,8 +106,8 @@ def _coerce_attempts(v: object) -> int:
 
 
 def build_checklist(workspace: Path, milestone_id: Optional[str] = None) -> dict:
-    """Recompute the audit-condition snapshot and persist it (keeps counters if the
-    task set is unchanged)."""
+    """Recompute the audit-condition snapshot and persist it (keeps counters while
+    the milestone is unchanged)."""
     from k3dge.engine.milestone_pointer import get_current_milestone
 
     mid = milestone_id or get_current_milestone(workspace)

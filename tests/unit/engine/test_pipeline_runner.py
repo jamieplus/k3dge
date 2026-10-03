@@ -37,9 +37,14 @@ class EndpointResolution(unittest.TestCase):
     def test_absolute_command_must_exist(self) -> None:
         with TemporaryDirectory() as d:
             ws = Path(d)
-            ok, note = pr.resolve_endpoint_command(ws, {"command": str(ws / "nope")})
+            missing = str(ws / "nope")
+            ok, note = pr.resolve_endpoint_command(ws, {"command": missing})
             self.assertIsNone(ok)
-            self.assertIn("not found", note)
+            # ocr2-757：两分支都含 "not found"——只断它时，绝对路径被误路由进 shutil.which
+            # （按 CWD/PATH 语义解析，选错可执行文件）也绿。钉分支：绝对分支回显原路径，
+            # 且不得带 PATH 分支的话术。
+            self.assertIn(missing, note)
+            self.assertNotIn("not on PATH", note)
 
     def test_bare_python_lands_on_venv_and_says_so(self) -> None:
         with TemporaryDirectory() as d:
@@ -79,6 +84,13 @@ class PeerIsolation(unittest.TestCase):
                 res = pr.run_action(ws, "other.actions.score", io=buf)  # not even declared -> not found
             self.assertFalse(res.ok)
             fake.assert_not_called()
+            # ocr2-758：光断 ok 时"pipeline 根本没被解析"（load 掉空 ⇒ 全 action 都是
+            # not found ⇒ call_mcp_tool 照样没被调）也绿。钉具体原因 + 正对照证明
+            # 夹具真被读过（k3dit 的声明链可解析）。
+            self.assertIn("not declared", res.detail, res.detail)
+            self.assertIn("other.actions.score", res.detail, res.detail)
+            declared = pr.resolve_action(pr.load_pipeline_config(ws), "k3dit.actions.audit")
+            self.assertTrue(declared, "pipeline 夹具没被读到——本测的隔离断言空转")
 
     def test_peer_transport_targets_own_endpoint(self) -> None:
         cfg = {
@@ -191,6 +203,13 @@ class ContractSurface(unittest.TestCase):
         self.assertEqual(
             list(sig.parameters), ["workspace", "action_ref", "io", "timeout_default", "arguments"]
         )
+        # ocr2-759: 名字承诺"stays sync"——光比参数名时 `async def` 照样绿。
+        self.assertFalse(inspect.iscoroutinefunction(pr.run_action),
+                         "run_action 变成了 async —— 调用方同步契约已破")
+        # `*` 分隔符松掉后 io/timeout_default/arguments 可被位置传参，
+        # arguments 位置误用会静默错位——钉死 keyword-only。
+        for name in ("io", "timeout_default", "arguments"):
+            self.assertEqual(sig.parameters[name].kind, inspect.Parameter.KEYWORD_ONLY, name)
 
     def test_probe_reports_per_server_without_touching_the_gate(self) -> None:
         cfg = {"mcpServers": {"k3dit": {"command": "python", "args": ["-m", "k3dit.mcp"]}}}
@@ -237,7 +256,7 @@ transports = [ { provider = "cli", command = "printf hello", timeout = 5 } ]
 PIPE_CLI_ARGS = """
 [peers.k3dit]
 [peers.k3dit.actions.audit]
-transports = [ { provider = "cli", command = "printf word={w}", args = { w = "from-transport" }, timeout = 10 } ]
+transports = [ { provider = "cli", command = "echo word={w} base={base}", args = { w = "from-transport", base = "transport-only" }, timeout = 10 } ]
 """
 
 PIPE_CLI_BAD_TIMEOUT = """
@@ -258,14 +277,26 @@ class CliTransportShape(unittest.TestCase):
             res2 = pr.run_action(ws, "k3dit.actions.audit", io=io.StringIO(),
                                  arguments={"w": "from-call"})
             self.assertIn("word=from-call", res2.payload or res2.detail)
+            # ocr2-760: transport-only 键在覆盖调用后必须存活——否则
+            # `merged = dict(arguments)`（丢掉传输底座）也照样绿。
+            self.assertIn("base=transport-only", res2.payload or res2.detail,
+                          res2.payload or res2.detail)
 
     def test_non_int_timeout_falls_back_instead_of_raising(self) -> None:
         """`timeout = "60s"` 曾让 `int()` 抛 ValueError 冒到封板流程（ocr-282）。"""
+        import contextlib
+
         with TemporaryDirectory() as d:
             ws = _ws(Path(d), {}, PIPE_CLI_BAD_TIMEOUT)
             buf = io.StringIO()
-            res = pr.run_action(ws, "k3dit.actions.audit", io=buf)
+            err = io.StringIO()
+            # ocr2-761: 回退告警打到 sys.stderr（绕过注入的 io）——必须捕获
+            # stderr 才能证明"回退了"而非"静默丢弃后碰巧成功"。
+            with contextlib.redirect_stderr(err):
+                res = pr.run_action(ws, "k3dit.actions.audit", io=buf)
             self.assertTrue(res.ok, res.detail)
+            self.assertIn("timeout", err.getvalue(), "非法 timeout 的回退告警没出声")
+            self.assertIn("60s", err.getvalue(), err.getvalue())
 
     def test_timeout_kills_the_whole_process_group(self) -> None:
         """shell=True 的超时以前只杀 `/bin/sh`：孙进程继续跑并持有管道（ocr-281）。

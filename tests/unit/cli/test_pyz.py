@@ -63,8 +63,13 @@ def test_pyz_builder_and_runtime(tmp_path: Path) -> None:
     out = root / "dist" / "k3dge.pyz"
     assert out.is_file() and out.stat().st_size > 0, "构建器没产出 dist/k3dge.pyz"
 
-    names = zipfile.ZipFile(out).namelist()
-    assert "__main__.py" in names, "入口必须是仓内 src/__main__.py（zipapp --main 模板不 sys.exit）"
+    # ocr2-706①：ZipFile 不关＝fd 靠 refcount，Windows 上会卡 tmp_path 清理。用 with。
+    # ocr2-706②：zipapp --main 模板同样产出同名 __main__.py——只验名字分不出"吞 rc 模板"。
+    with zipfile.ZipFile(out) as zf:
+        names = zf.namelist()
+        assert "__main__.py" in names, "入口必须是仓内 src/__main__.py（zipapp --main 模板不 sys.exit）"
+        entry = zf.read("__main__.py").decode("utf-8")
+    assert "sys.exit(main())" in entry, "入口不是仓内那份（吞 rc 模板无 sys.exit）"
     junk = [n for n in names if "__pycache__" in n or n.endswith((".pyc", ".DS_Store"))]
     assert junk == [], f"派生垃圾随单件外发：{junk[:5]}"
     planted = [n for n in names if "planted" in n]

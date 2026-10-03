@@ -44,6 +44,16 @@ class TestContract(unittest.TestCase):
             contract.normalize("  def foo(x: int)  "),
             contract.normalize("def foo(x: int)"),
         )
+        # ocr2-729：旧两输入是同一单行、内部文本全同——`strip()` 等价实现也绿，而真正
+        # 让文档改动不进 hash 的是下面两条（多行缩进坍缩 + 空行剔除）。分开钉。
+        self.assertEqual(
+            contract.normalize("def foo(x: int):\n        return 1\n"),
+            contract.normalize("def foo(x: int):\n    return 1\n"),
+        )
+        self.assertEqual(
+            contract.normalize("def foo(x: int):\n\n    return 1\n\n"),
+            contract.normalize("def foo(x: int):\n    return 1\n"),
+        )
 
     def test_verify_contract_matches(self):
         with tempfile.TemporaryDirectory() as d:
@@ -64,6 +74,9 @@ class TestContract(unittest.TestCase):
             spec = "**Contract Hash**: `sha256:" + "0" * 64 + "`"
             ok, expected, actual = contract.verify_contract(src, spec)
             self.assertFalse(ok)
+            # ocr2-730：旧断言分不出"hash 失配"与"hash 根本没解析出来"（后者 (False, None, actual)
+            # 也绿，本测就退化成 test_verify_contract_missing_hash 的复本）。把解析值钉死。
+            self.assertEqual(expected, "0" * 64, (expected, actual))
             self.assertNotEqual(expected, actual)
 
     def test_symbol_diff_reports_changed_symbols(self):

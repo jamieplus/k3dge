@@ -60,11 +60,14 @@ def _scan():
             code_node = slot(0, "rule_id")
             if not (isinstance(code_node, ast.Constant) and isinstance(code_node.value, str)):
                 continue          # 动态 code（变量拼表）不归本表管（GATE_FACTS 键闭集另测）
+            # ocr2-737：`_FIELDS` 此前声明了没人读——位置参下标全手写，字段序假设没被执行。
+            # 由它驱动取值：Violation 字段序一变，这里跟着变（改一处），手写下标漂了即红。
+            vals = {key: slot(i, key) for i, key in enumerate(_FIELDS)}
             sites.append({
                 "rel": py.relative_to(_SRC).as_posix(), "lineno": node.lineno,
                 "code": code_node.value,
-                "message": slot(1, "message"), "domain": slot(2, "domain"),
-                "file_path": slot(3, "file_path"), "detail": slot(4, "detail"),
+                "message": vals["message"], "domain": vals["domain"],
+                "file_path": vals["file_path"], "detail": vals["detail"],
                 "star_kwargs": star,
             })
     return unreadable, sites
@@ -385,11 +388,15 @@ class TestMessageDoesNotRestateFact(unittest.TestCase):
 
     def test_static_messages_do_not_restate_facts(self):
         offenders = []
+        unverifiable = []
         for s in _scan_sites_strict():
             if not gate_facts.is_declared(s["code"]):
                 continue
             text = _literal_text(s["message"])
+            # ocr2-738：旧 `if not text: continue` 把 None（变量/属性拼的 message——散文
+            # 重返构造点的正路）与 "" 静默豁免，无计数。与兄弟守卫同口径：记入不可核并棘轮。
             if not text:
+                unverifiable.append(f"{s['rel']}:{s['lineno']} {s['code']}")
                 continue
             fact = (gate_facts.GATE_FACTS.get(s["code"]) or {}).get("fact", "")
             for seg in self._segments(fact):
@@ -397,6 +404,9 @@ class TestMessageDoesNotRestateFact(unittest.TestCase):
                     offenders.append(f"{s['rel']}:{s['lineno']} {s['code']}: "
                                      f"message 复述 fact 片段 {seg!r}")
         self.assertEqual(offenders, [])
+        # 棘轮：只许减不许增（初值按实测填，跑测后如数钉死）
+        self.assertLessEqual(len(unverifiable), 7,
+                             f"message 不可核（变量拼/空）的站点在增长：{unverifiable}")
 
 
 class TestFactsAreProducedNotParsed(unittest.TestCase):

@@ -33,8 +33,14 @@ class TestCountdownZero(unittest.TestCase):
         # countdown 支路**从没进**——`"0s default Y"` 只证明后缀写了。换"写入端敞着、
         # 无数据"的真实 fd：select(timeout=0) 立即返回空 ⇒ 只有倒计时超时支路会回显 "Y"。
         r_fd, w_fd = os.pipe()
+        # ocr2-770: 两端都要确定性回收——fdopen 成功后 r_fd 所有权归文件对象；
+        # 若 fdopen 本身抛，r_fd 仍在我们手里；断言失败时 traceback 会拽住帧，
+        # 只靠 GC 不可接受。finally 里两端都关（重复关吞 OSError）。
+        f = None
         try:
-            in_stream = _TtyPipe(os.fdopen(r_fd, "r", encoding="utf-8"))
+            f = os.fdopen(r_fd, "r", encoding="utf-8")
+            r_fd = -1
+            in_stream = _TtyPipe(f)
             buf = io.StringIO()
             p = Prompt(in_stream=in_stream, out_stream=buf)
             # ocr2-510：回归时 `if countdown:` 会落进阻塞 readline（w_fd 故意敞着，
@@ -60,7 +66,20 @@ class TestCountdownZero(unittest.TestCase):
             self.assertIn("0s default Y", out)
             self.assertTrue(out.endswith("Y\n"), f"超时支路的回显缺失（走了别的路径？）：{out!r}")
         finally:
-            os.close(w_fd)
+            if f is not None:
+                try:
+                    f.close()
+                except OSError:
+                    pass
+            elif r_fd >= 0:
+                try:
+                    os.close(r_fd)
+                except OSError:
+                    pass
+            try:
+                os.close(w_fd)
+            except OSError:
+                pass
 
     def test_none_countdown_still_prints_plain_hint(self) -> None:
         class Tty(io.StringIO):
@@ -114,6 +133,45 @@ class TestReadFailureIsNotConfirmation(unittest.TestCase):
         # WARN 消息里必须带着 _S 的专属错文。
         self.assertIn("WARN", err.getvalue())
         self.assertIn("not supported on this platform", err.getvalue())
+
+    def test_eof_takes_declared_default_silently(self) -> None:
+        """ocr2-771：兄弟读失败路径——写端先关，流在答案前到头。
+
+        当前行为：`readline()` 见 EOF 得 `""`，走"空回车＝采纳声明默认"支，
+        `default_yes=True` 的封板问题返回 True 且 stderr 无 WARN——与上面的
+        OSError 支（fail-closed + loud）**不对称**。改生产前先把现状钉死：
+        动了该支时本测会红，提醒同步审 fail-open 语义，而不是静默改道。
+        """
+        r_fd, w_fd = os.pipe()
+        os.close(w_fd)          # 先关：读端见 EOF，还没问就没答案
+        w_fd = -1
+        f = None
+        try:
+            f = os.fdopen(r_fd, "r", encoding="utf-8")
+            r_fd = -1
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                ans = Prompt(in_stream=_TtyPipe(f),
+                             out_stream=io.StringIO()).ask(
+                    "封板?", countdown=5, default_yes=True)
+            self.assertTrue(ans, "EOF 当前按声明默认走（与 OSError 支不对称：改动需同步审）")
+            self.assertNotIn("WARN", err.getvalue(), "EOF 支当前静默取默认：出声了说明语义已变")
+        finally:
+            if f is not None:
+                try:
+                    f.close()
+                except OSError:
+                    pass
+            elif r_fd >= 0:
+                try:
+                    os.close(r_fd)
+                except OSError:
+                    pass
+            if w_fd >= 0:
+                try:
+                    os.close(w_fd)
+                except OSError:
+                    pass
 
 
 class TestAnswerExhaustion(unittest.TestCase):

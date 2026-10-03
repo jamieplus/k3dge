@@ -60,27 +60,43 @@ def _offenders(path: Path) -> list:
     return out
 
 
+_scan_cache: dict | None = None
+
+
+def _scan_tree() -> dict:
+    """ocr2-813：两闸共用一次全树扫描。旧形状各扫一遍：两倍解码/parse 成本，
+    且两测可能看到两棵不同的树（他测的临时工作区中途落文件）。纯只读不变式，
+    一次扫描、两处过滤。行号一并带出，失败消息可定位（`len()` 丢行号）。"""
+    global _scan_cache
+    if _scan_cache is None:
+        found: dict = {}
+        for p in sorted((REPO / "tests").rglob("*.py")):
+            rel = str(p.relative_to(REPO))
+            got = _offenders(p)
+            if got:
+                found[rel] = got
+        _scan_cache = found
+    return _scan_cache
+
+
 def test_no_new_implicit_encoding_reads_writes() -> None:
     debt = dict(DEBT)
-    offenders = {}
-    for p in sorted((REPO / "tests").rglob("*.py")):
-        rel = str(p.relative_to(REPO))
-        if rel == "tests/unit/templates/test_test_explicit_encoding.py":
-            continue
-        got = _offenders(p)
-        if got:
-            offenders[rel] = len(got)
-    grown = {k: v for k, v in offenders.items() if v > debt.get(k, 0)}
-    assert not grown, "新增/变多的隐式编码读写（补 encoding=\"utf-8\" 或登记进 DEBT 并说明理由）：" + str(grown)
+    # ocr2-814：本文件不再豁免——旧硬编码跳过让闸永远查不到自己的扫描代码；
+    # 且另一测不跳过，`DEBT` 里一旦出现本路径两测互相矛盾。两边同口径。
+    offenders = _scan_tree()
+    grown = {k: v for k, v in offenders.items() if len(v) > debt.get(k, 0)}
+    assert not grown, ("新增/变多的隐式编码读写（补 encoding=\"utf-8\" 或登记进 DEBT 并说明理由）："
+                       + "; ".join(f"{k} 行 {v}" for k, v in grown))
 
 
 def test_debt_list_is_not_stale() -> None:
     """ocr2-558：从 `DEBT` 的键集重算（文件已删/改名 ⇒ 计 0），这样移除也会被报成 stale，
     而不是只在现存文件上走一圈（非零旧条目会永远留着）。"""
+    tree = _scan_tree()
     stale = {}
     for rel, budget in DEBT.items():
         p = REPO / rel
-        n = len(_offenders(p)) if p.is_file() else 0
+        n = len(tree.get(rel, [])) if p.is_file() else 0
         if n < budget:
             stale[rel] = {"budget": budget, "actual": n}
     assert not stale, "债已降/条目所指文件已删改，请同步 DEBT：" + str(stale)

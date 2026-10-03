@@ -7,6 +7,16 @@ from pathlib import Path
 from k3dge.engine.protocol import write_incident
 
 
+def _repo_root() -> pathlib.Path:
+    """ocr2-772：`parents[3]` 把文件深度焊死——挪一层就静默指错，前置断言报
+     confusing 的"文件不在"而非"根找错了"。改走标记反查（pyproject ∧ src/k3dge）。"""
+    here = pathlib.Path(__file__).resolve()
+    for cand in (here, *here.parents):
+        if ((cand / "pyproject.toml").is_file() and (cand / "src" / "k3dge").is_dir()):
+            return cand
+    raise AssertionError(f"从 {here} 向上找不到 k3dge 仓根——别把本文件搬出 tests/**/")
+
+
 class TestWriteIncident(unittest.TestCase):
     def test_write_incident_creates_human_visible_file(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -41,7 +51,7 @@ class TestWriteIncident(unittest.TestCase):
 
         from k3dge.engine.doc_catalog import iter_managed_files, validate_docs
 
-        schema_src = pathlib.Path(__file__).resolve().parents[3] / "docs" / "incidents" / ".schema.json"
+        schema_src = _repo_root() / "docs" / "incidents" / ".schema.json"
         self.assertTrue(schema_src.is_file(), f"权威 schema 不在：{schema_src}")
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

@@ -52,7 +52,10 @@ class TestScaffoldProtocolPortability(unittest.TestCase):
                 except (OSError, UnicodeDecodeError):
                     continue
                 targets.append(f)
-            assert len(targets) >= 12, f"下发面缩水，本测试失去覆盖：{len(targets)}"
+            # ocr2-809：裸 `assert` 在 `python -O` 下整条剥掉——"下发面缩水"
+            # 保护静默消失。用 unittest 等价形。
+            self.assertGreaterEqual(len(targets), 12,
+                                    f"下发面缩水，本测试失去覆盖：{len(targets)}")
             for f in targets:
                 text = f.read_text(encoding="utf-8")
                 for m in _bare(text):

@@ -4,7 +4,6 @@
   - 账齐    : current milestone top tasks N>0 and none in-progress/idea
   - C2 嵌套 : max control-flow AST depth (if/for/while/try/with) in touched src/ >= 5
   - 体积    : changed files under src/ + docs/specs/ >= 8 since last audit
-  - 文档不同步: src/ changed while overview.md not changed
 
 Seal is NOT suggested here — seal is only offered after the audit loop has closed
 (待修==0). There is no ruler for "is it time to end the milestone"; the only real
@@ -56,7 +55,7 @@ def _git_changed_files(workspace: Path) -> Optional[List[str]]:
             # rename/copy：`-z` 下下一 token 是**原路径**（跳过），本 token 是新路径（取它）。
             if i < len(toks):
                 i += 1
-        files.append(path.strip())
+        files.append(path)
     return files
 
 

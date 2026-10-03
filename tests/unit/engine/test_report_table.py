@@ -1,7 +1,5 @@
 """value-2：12 列报告单一解析器。"""
 from k3dge.engine import report_table as rt
-import shutil
-import atexit
 
 _TBL = """# 报告
 | ID | 日期 | 严重度 | 优先级 | 类型 | 问题描述 | 位置 | 状态 | 处置 | 验证 | 复审 | 验收 |
@@ -66,6 +64,12 @@ def test_audit_closed_refuses_truncated_pending_row(tmp_path) -> None:
         "| B-1 | 2026-01-01 | 高 | P1 | 缺陷 | 写漏几列 | f.py:1 | 待修\n"
     )
     (revs / "2026-09-01-M7-audit.md").write_text(truncated, encoding="utf-8")
+    # ocr2-778：`False` 也可能是"根本没找到报告/没认成审计表"——先钉夹具
+    # 真带畸形信号，`False` 才只能来自 malformed 守卫，而非 discovery 空转。
+    c = rt.count_statuses(truncated)
+    assert c["malformed"] == 1, c
+    assert c["_ids_畸形"] == ["B-1"], c
+    assert c["total"] == 0, c
     assert audit_closed(tmp_path, "M7") is False, "截断的待修行被当成了闭环"
 
 
@@ -111,24 +115,22 @@ def test_count_statuses_exposes_contract_check() -> None:
     assert rt.count_statuses("nothing")["contract_ok"] is False
 
 
-def test_external_scan_report_is_not_the_audit_report() -> None:
+def test_external_scan_report_is_not_the_audit_report(tmp_path) -> None:
     """外部全文件扫描（`-scan.md`）不得被当成本轮 k3dit 审计报告消费。
 
     以前 `_find_report(kind="audit")` 只按"M11 + 12 列 + 最新 mtime"认，扫描件一旦比真审新，
     `seal_flow._report_seat` 会把封版提交的 `Audit-seat` 写成扫描器名，`audit_closed` 也会拿
     扫描计数当闭环证据（ADR-0004 §2.1.10 / ADR-0006）。
     """
-    import tempfile
-    from pathlib import Path as _P
-
     from k3dge.engine.audit_report import _find_report, _report_kind
 
     assert _report_kind("2026-09-30-M11-ocr-tests-scan.md", "") == "scan"
     assert _report_kind("2026-09-29-M11-quality-audit.md", "") == "audit"
     assert _report_kind("2026-09-29-M11-k3dit-bundle-audit.md", "") == "audit"
 
-    ws = _P(tempfile.mkdtemp())
-    atexit.register(shutil.rmtree, ws, True)
+    # ocr2-779：用 pytest 的 tmp_path（按测回收），不手搓 mkdtemp + atexit
+    # （解释器退出才清；崩溃/xdist worker 挂时永久残留 /tmp）。
+    ws = tmp_path
     (ws / "docs" / "reviews").mkdir(parents=True)
     tbl = _TBL
     (ws / "docs" / "reviews" / "2026-09-29-M11-k3dit-bundle-audit.md").write_text(
@@ -139,5 +141,10 @@ def test_external_scan_report_is_not_the_audit_report() -> None:
     import os, time
     os.utime(newer, (time.time() + 60, time.time() + 60))          # 让扫描件"更新"
     found = _find_report(ws, "M11", "audit")
-    assert found is not None and found[0].name.endswith("k3dit-bundle-audit.md"), found[0].name
-    assert _find_report(ws, "M11", "scan")[0].name.endswith("-ocr-scan.md")
+    # ocr2-780：`None` 与"名不对"分开断——合写时 found 为 None 会死在
+    # TypeError（'NoneType' 不可下标），CI 输出丢了"哪个报告没找到"的真因。
+    assert found is not None, "audit 报告没找到（discovery/kind 分类回归？）"
+    assert found[0].name.endswith("k3dit-bundle-audit.md"), found[0].name
+    scan_found = _find_report(ws, "M11", "scan")
+    assert scan_found is not None, "scan 桶空（-scan.md 分类/过滤回归？）"
+    assert scan_found[0].name.endswith("-ocr-scan.md"), scan_found[0].name

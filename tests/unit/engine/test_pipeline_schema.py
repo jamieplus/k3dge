@@ -36,6 +36,7 @@ def _mk_cfg(root, toml, mcp_json=None):
     _write(root, ".agent/pipeline.toml", toml)
     if mcp_json is not None:
         _write(root, ".mcp.json", mcp_json)
+    return pathlib.Path(root)
 
 def _neutralize_key(body: str, key: str) -> str:
     """把 `key = <值>` 的值原地换成 `[]`（ocr2-503）。
@@ -156,8 +157,15 @@ class TestNoAuditStagesHelper(unittest.TestCase):
 
 class TestPipelineSchema(unittest.TestCase):
     def test_absent_file_is_graceful(self):
-        root = pathlib.Path("/tmp/does-not-exist-xyz")
-        self.assertEqual(validate_pipeline_config(root), [])
+        import tempfile
+
+        # ocr2-762: 旧夹具测的是"路径根本不存在"——从没走到"仓在而
+        # pipeline.toml 缺席"分支（下游最小仓恰恰是这个形状）。
+        # 且 /tmp 全局路径若被他处建出会误红。用新鲜临时仓。
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            (root / ".agent").mkdir()
+            self.assertEqual(validate_pipeline_config(root), [])
 
     def test_valid_config_passes(self):
         root = pathlib.Path(__file__).resolve().parents[3]
@@ -335,7 +343,8 @@ class TestPipelineSchema(unittest.TestCase):
                      "transports = [ { provider = \"mcp\", tool = \"t\", command = \"python\" } ]\n",
                      '{"mcpServers": {"k3dit": {"command": "python"}}}')
             errs = validate_pipeline_config(root)
-            self.assertTrue(any("leaks endpoint facts" in m for c, m in errs), errs)
+            self.assertTrue(any(c == "PIPELINE_SCHEMA_INVALID" and "leaks endpoint facts" in m
+                                for c, m in errs), errs)
 
     def test_role_bind_resolves_to_wired_server(self):
         import tempfile
@@ -460,7 +469,8 @@ class TestTransportShapeRobustness(unittest.TestCase):
     def _errs(self, body: str):
         import tempfile
         with tempfile.TemporaryDirectory() as d:
-            return validate_pipeline_config(_mk(d, body))
+            # ocr2-764: 复用模块级 _mk_cfg（_write 已做 mkdir），不另立 writer。
+            return validate_pipeline_config(_mk_cfg(pathlib.Path(d), body))
 
     def test_malformed_actions_still_checks_peer_transports(self):
         errs = self._errs('[peers.k3dit]\nactions = 7\n'
@@ -481,19 +491,15 @@ class TestTransportShapeRobustness(unittest.TestCase):
     def test_manual_protocol_must_be_string(self):
         errs = self._errs('[peers.k3dit.actions.v]\n'
                           'transports = [ { provider = "manual", protocol = { path = "x.md" } } ]\n')
-        self.assertTrue(any("must be a string" in m for _, m in errs), errs)
+        # ocr2-763: 只比自由文本时改措辞就误红、无关违例含同串就误绿——钉死规则码。
+        self.assertTrue(any(c == "PIPELINE_SCHEMA_INVALID" and "must be a string" in m
+                            for c, m in errs), errs)
 
     def test_manual_protocol_stays_inside_workspace(self):
         errs = self._errs('[peers.k3dit.actions.v]\n'
                           'transports = [ { provider = "manual", protocol = "../secret.md" } ]\n')
-        self.assertTrue(any("workspace" in m for _, m in errs), errs)
-
-
-def _mk(d: str, body: str):
-    root = pathlib.Path(d)
-    (root / ".agent").mkdir(parents=True, exist_ok=True)
-    _write(root, ".agent/pipeline.toml", body)
-    return root
+        self.assertTrue(any(c == "PIPELINE_SCHEMA_INVALID" and "workspace" in m
+                            for c, m in errs), errs)
 
 
 if __name__ == "__main__":

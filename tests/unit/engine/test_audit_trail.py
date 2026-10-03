@@ -19,6 +19,13 @@ def _codes(ws: Path) -> list:
     return [v.rule_id for v in list(ConsistencyEngine(ws)._check_audit_trail())]
 
 
+def _findings(ws: Path) -> list:
+    """ocr2-726：与 `_codes` 同一 helper 族——返回原始 findings，供正例钉 file_path/detail
+    （Violation.format 渲染 `[src/pkg/a.py]` 与 `{path}` 就靠这两字段；只看 rule_id
+    时路径错一位/丢 detail 也全绿）。seam 仍只多这一行。"""
+    return list(ConsistencyEngine(ws)._check_audit_trail())
+
+
 def _positive_control() -> None:
     """自造一个**含必报代码**的工作区，确认本闸在该路径约定下真的会响（t-077b）。
     不往被测目录塞东西（那会污染负测的空断言），只证"分析确实发生"。"""
@@ -33,6 +40,11 @@ def _positive_control() -> None:
 def test_flags_logs_write_text(tmp_path: Path) -> None:
     ws = _ws(tmp_path, 'from pathlib import Path\n\n\ndef f(p):\n    (p / "logs" / "x.log").write_text("z")\n')
     assert _codes(ws) == ["AUDIT_TRAIL_APPEND_ONLY"]
+    # ocr2-726：只看 rule_id 时 file_path/detail 漂了也绿——正例里钉一次渲染要用的两字段。
+    got = _findings(ws)
+    assert len(got) == 1
+    assert got[0].file_path == "src/pkg/a.py", got[0].file_path
+    assert got[0].detail.get("path") == "src/pkg/a.py", got[0].detail
 
 
 def test_flags_logs_open_write_mode(tmp_path: Path) -> None:

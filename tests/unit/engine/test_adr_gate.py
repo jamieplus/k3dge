@@ -1,5 +1,6 @@
 """封版 ADR 硬闸：全 Accepted + 可解析落地指针。"""
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -35,16 +36,25 @@ def test_all_accepted_and_landed_pass():
 def test_draft_blocks():
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d, {"0001-a.md": "---\nStatus: Draft\n---\n# ADR-0001\n"})
-        assert "未 Accepted" in (adr_gate.adrs_all_accepted(ws) or "")
+        out = adr_gate.adrs_all_accepted(ws) or ""
+        assert "未 Accepted" in out
+        # ocr2-713 同款：只钉汇总头时"错件归因"也绿——明细必须点名具体文件与状态
+        assert "0001-a.md" in out and "Draft" in out, out
 
 
 def test_missing_or_bad_pointer_blocks():
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d, {"0001-a.md": "---\nStatus: Accepted\n---\n# ADR-0001\n"})
-        assert "缺可解析落地指针" in (adr_gate.adr_landed(ws) or "")
+        out = adr_gate.adr_landed(ws) or ""
+        assert "缺可解析落地指针" in out
+        # ocr2-713：汇总头对 bad 列表任何原因都出现——"缺 Landed-by"错分类成
+        # "指针不可解析"（或反之）时本行照绿。把逐件明细一起钉住。
+        assert "0001-a.md(缺 Landed-by)" in out, out
     with tempfile.TemporaryDirectory() as d:
         ws = _ws(d, {"0001-a.md": "---\nStatus: Accepted\nLanded-by: docs/nope.md\n---\n# ADR-0001\n"})
-        assert "指针不可解析" in (adr_gate.adr_landed(ws) or "")
+        out2 = adr_gate.adr_landed(ws) or ""
+        assert "指针不可解析" in out2
+        assert "0001-a.md->docs/nope.md(指针不可解析)" in out2, out2
 
 
 def test_reconcile_supersedes_auto_marks_old():
@@ -150,8 +160,12 @@ def test_landing_pointer_must_stay_in_workspace_and_be_file():
         assert adr_gate._pointer_resolves(ws, str(outside)) is False          # 绝对越界（is_file 真）
         rel = os.path.relpath(outside, ws)                                    # ../outside.md
         assert rel.startswith("..") and adr_gate._pointer_resolves(ws, rel) is False
-        assert adr_gate._pointer_resolves(ws, "/etc") is False
-        assert adr_gate._pointer_resolves(ws, "../../etc/hosts") is False
+        # ocr2-714：下面两行是 POSIX-only——Windows 上 `/etc` 本来就不是文件，
+        # "不解析"与"被 containment 拦"同脸；跨盘符时 relpath 还会抛 ValueError。
+        # containment 的真判据是上面两行（ws 外真文件 + is_file 真而仍拒）。
+        if sys.platform != "win32":
+            assert adr_gate._pointer_resolves(ws, "/etc") is False
+            assert adr_gate._pointer_resolves(ws, "../../etc/hosts") is False
 
 
 def test_landed_end_to_end_rejects_outside_workspace_pointer():
@@ -267,6 +281,20 @@ def test_amend_format_corrupt_schema_fail_closed():
         (ws / "docs" / "adr" / ".schema.json").write_text("{ broken", encoding="utf-8")
         out = adr_gate.amend_format(ws)
         assert out and "不可读/损坏" in out
+
+
+def test_amend_format_non_object_schema_fail_closed():
+    """ocr2-715：ocr-194 的 fail-closed 承诺是三条支路（缺失/损坏/顶层非对象），
+    这里此前只钉两条——`isinstance(schema, dict)` 守卫在全树零覆盖。删掉它 ⇒
+    顶层 `[...]`/`"..."` 时 `schema.get` 抛 AttributeError 打碎 seal 预审；
+    改成 `return None` ⇒ 静默全绿。两种退化本测都拦。
+    """
+    with tempfile.TemporaryDirectory() as d:
+        ws = _ws(d, {"0001-a.md": "---\nStatus: Accepted\n---\n# ADR-0001\n"})
+        for bad in ("[1, 2]", '"just a string"'):
+            (ws / "docs" / "adr" / ".schema.json").write_text(bad, encoding="utf-8")
+            out = adr_gate.amend_format(ws)
+            assert out and "顶层不是对象" in out, (bad, out)  # 结构化拒，不抛裸 AttributeError
 
 
 def test_is_superseded_needs_the_actual_field_line() -> None:

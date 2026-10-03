@@ -71,7 +71,9 @@ class TestMcpJson(unittest.TestCase):
                     self.assertEqual(names, set(), f"根非对象被读成缺失（{bad}）⇒ peer 闸静默跳过")
                     self.assertIn("WARN", err)
 
-    def test_absent_servers_key_is_present_with_none(self) -> None:
+    # ocr2-750：旧名 "present_with_none" 与断言/契约矛盾——None 在本文件只表示"文件缺失"，
+    # 此例（有文件、无 mcpServers 键）返回空集 + WARN。改名，免得后人"恢复" None 行为。
+    def test_absent_servers_key_is_present_with_empty_set(self) -> None:
         with TemporaryDirectory() as d:
             ws = Path(d)
             (ws / _MCP_CONFIG_REL).write_text(json.dumps({"other": 1}), encoding="utf-8")

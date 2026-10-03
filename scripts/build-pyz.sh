@@ -9,11 +9,20 @@ case "$SELF" in
   /*) ;;
   *) SELF="$(command -v -- "$SELF" 2>/dev/null || printf '%s' "$SELF")" ;;
 esac
+_nlink=0
 while [ -L "$SELF" ]; do
+  # 软链成环（a -> b -> a / 自指）时 `[ -L ]` 恒真 ⇒ 无上限会无限打转，CI 挂死（ocr2-567）。
+  _nlink=$((_nlink + 1))
+  if [ "$_nlink" -gt 40 ]; then
+    echo "[build-pyz] 解析 \$0 软链超过 40 跳（疑似成环：$0）⇒ 拒跑" >&2
+    exit 1
+  fi
   LINK="$(readlink -- "$SELF")"
   case "$LINK" in
     /*) SELF="$LINK" ;;
-    *) SELF="$(cd "$(dirname "$SELF")" && pwd -P)/$LINK" ;;
+    # 内层 `cd` 失败在 `set -e` 下是无解释终止 ⇒ 转成可读报错（ocr2-567）。
+    *) _selfdir="$(dirname "$SELF")" || { echo "[build-pyz] 取链接目录失败（$SELF）" >&2; exit 1; }
+      SELF="$(cd "$_selfdir" && pwd -P)/$LINK" || { echo "[build-pyz] 无法进入链接所在目录（$_selfdir）" >&2; exit 1; } ;;
   esac
 done
 cd "$(dirname "$SELF")/.." || { echo "[build-pyz] 无法进入仓根（$SELF）" >&2; exit 1; }

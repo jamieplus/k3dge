@@ -178,8 +178,6 @@ def _auto_backfill_reviews(workspace: Path, task_path: Path, task_title: str, mi
     只是字符串手术的作用域从 97 行收到三个小函数里（复核要收紧口径时只需改 `_row_hits_task`）。
     反证：若本函数或任一子件复杂度仍 >10，或上述任一匹配条件被顺手收紧/放宽，即没修对。
     """
-    import sys
-
     try:
         reviews_dir = workspace / "docs" / "reviews"
         if not reviews_dir.is_dir():
@@ -355,8 +353,6 @@ def _rename_task_done(target: Path) -> Tuple[Path, str]:
 
 def _backfill_task_reviews(workspace: Path, target: Path) -> None:
     """Best-effort audit-review backfill when a task closes (never raises)."""
-    import sys
-
     try:
         t_content = target.read_text(encoding="utf-8")
         if _task_report_pointer(t_content):

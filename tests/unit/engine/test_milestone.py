@@ -586,7 +586,8 @@ class TestSealChecklist(unittest.TestCase):
 
         _write_task(self.ws / "docs/tasks/x.md", "done", "M10")
         # 非审计类的失败（走 _archive 的拒绝路径）：guides 有 stub（❌ 需人办，非 ⚙️）
-        _write_task(self.ws / "docs/tasks/x.md", "done", "M10")
+        # ocr2-751：旧写法在这里把同一 x.md 写两遍——第二遍无任何可观测效果，还掩盖
+        # "多票"本意（真要多票该换文件名）。删重复。
         (self.ws / "docs" / "guides").mkdir(parents=True, exist_ok=True)
         (self.ws / "docs" / "guides" / "g.md").write_text(
             "# G\n<!-- k3dge:guide-stub -->\n", encoding="utf-8")

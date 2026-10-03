@@ -96,6 +96,16 @@ class TestApplyRules(unittest.TestCase):
         self.assertNotIn("- **Priority**:", text)
         self.assertIn("- **可检索摘要**:", text)      # 没有 frontmatter 对应字段的正文行不动
 
+    def test_incident_id_case_insensitive_fix(self):
+        """修复端与检测端同口径：检测把键小写后判 `id`，修复就不得只删小写 `id:`。
+
+        否则 `ID:`/`Id:` 检出却修不动，规则永不收敛（ocr2-607）。
+        """
+        body = "---\nID: INC-20260101-X-x\nStatus: open\n---\n\n# t\n"
+        _d, p, before, _rep = self._scan_and_fix("docs/incidents/INC-20260101-X-x.md", body)
+        self.assertIn("INCIDENT_ID_REDUNDANT", [b["rule"] for b in before])
+        self.assertNotIn("ID:", p.read_text(encoding="utf-8"))
+
     def test_idempotent(self):
         """幂等：再跑一次应为零改动（闸 `docs_normalized` 的零偏差判据依赖它）。"""
         d, _p, _b, first = self._scan_and_fix("docs/memo/a.md", "# t\n\n正文   ")

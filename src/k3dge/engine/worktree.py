@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from k3dge.engine.markers import Marker, extract, parse_text
+from k3dge.engine.markers import extract, parse_text
 
 #: job id 白名单：它进 `.k3dge/wt/<job>` 与分支名 `k3dit/<job>` ⇒ 分隔符/`..`/git 非法 ref 字符都要挡（ocr-119）。
 _JOB_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -84,11 +84,11 @@ def ensure(workspace: Path, job: str, base: Optional[str] = None) -> Path:
         m = _git(workspace, "worktree", "add", str(wt), br)
     if m.returncode != 0 and "already registered" in (m.stderr or ""):
         _git(workspace, "worktree", "prune")            # 陈旧登记自愈（目录被外部清过）
-        re = _git(workspace, "worktree", "add", "-f", str(wt), branch_name(job)) \
+        retry = _git(workspace, "worktree", "add", "-f", str(wt), branch_name(job)) \
             if _git(workspace, "rev-parse", "--verify", "-q", f"refs/heads/{branch_name(job)}").returncode == 0 \
             else _git(workspace, "worktree", "add", "-f", "-b", branch_name(job), str(wt), base or "HEAD")
-        if re.returncode != 0:
-            raise RuntimeError(f"worktree add failed after prune: {(re.stderr or re.stdout).strip()[:200]}")
+        if retry.returncode != 0:
+            raise RuntimeError(f"worktree add failed after prune: {(retry.stderr or retry.stdout).strip()[:200]}")
         return wt
     if m.returncode != 0:
         raise RuntimeError(f"worktree add failed: {(m.stderr or m.stdout).strip()[:200]}")
@@ -120,13 +120,18 @@ def present(workspace: Path, job: str, commit: Optional[str] = None) -> list:
             back = _git(wt, "checkout", "-q", br)   # 复位：后人（advance/rebase）都在分支上干活
             if back.returncode != 0:
                 # 复位失败仍静默 ⇒ worktree 留在 detached，毒化后续 rebase（模块自己声明的不变量）
-                raise RuntimeError(
+                err = RuntimeError(
                     f"present 复位失败（{br}）：worktree 仍处 detached，"
                     f"后续 advance/rebase 不可信：{(back.stderr or back.stdout).strip()[:160]}")
+                if sys.exc_info()[0] is None:
+                    raise err
+                # 已有异常在传播（extract 失败）：不得顶替原始异常，出声后让原异常继续抛。
+                print(f"[worktree] WARN: {err}", file=sys.stderr)
 
 
 def advance(workspace: Path, job: str) -> Optional[str]:
-    """轮次前进：worktree 脏 ⇒ 进程代 commit（席位身份由调用方注入 env 或默认进程名）；
+    """轮次前进：worktree 脏 ⇒ 进程代 commit（席位身份固定为进程名：`_clean_env` 剥掉调用方
+    `GIT_*`（含 author 变量），env 注入的身份无效；未设时默认进程名）；
     分支前进只接受祖先关系（含 detached 席位 commit 的合法快进）；真分叉 ⇒ 拒，升级人工（§1.4）。"""
     wt = ensure(workspace, job)
     st = _git(wt, "status", "--porcelain")
@@ -160,7 +165,7 @@ def strip_pins(workspace: Path, job: str) -> dict:
     **除 leftover 外**的钉永不进主干（§3③）——leftover 作有意留的长期文献随文件留下，故不删。
     扫描面是全树（present 的 roots 限定之外也得兜住）。返回 {stripped_files, stripped_lines, suspicious, kept}。"""
     from k3dge.engine import gates
-    from k3dge.engine.markers import _SCAN_SUFFIXES, _SKIP_DIR_PARTS, parse_text
+    from k3dge.engine.markers import _SCAN_SUFFIXES, _SKIP_DIR_PARTS
 
     _mn = int(gates.get(workspace, "markers", "max_note"))
     _mnp = int(gates.get(workspace, "markers", "max_note_pending"))

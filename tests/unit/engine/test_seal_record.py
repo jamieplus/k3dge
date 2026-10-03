@@ -291,15 +291,21 @@ class TestAuditEvidence(_RepoMixin, TestCase):
 
     def test_local_job_state_cannot_claim_a_seal(self) -> None:
         """本地账说 `collected`、仓里没有 tag/trailer ⇒ 判"未封"（git 优先）。"""
+        import json
+
         from k3dge.engine import audit_flow
 
         ws = self._repo()
         (ws / ".agent").mkdir(exist_ok=True)
-        (ws / ".agent" / "audit_jobs.json").write_text(
-            '{"jobs": [{"job_id": "J1", "role": "audit", "milestone_id": "M10",'
-            ' "state": "collected", "baseline": "deadbeef", "report": "docs/reviews/x.md",'
-            ' "counts": {"待修": 0}, "merge_ok": true}]}',
-            encoding="utf-8")
+        raw = ('{"jobs": [{"job_id": "J1", "role": "audit", "milestone_id": "M10",'
+               ' "state": "collected", "baseline": "deadbeef", "report": "docs/reviews/x.md",'
+               ' "counts": {"待修": 0}, "merge_ok": true}]}')
+        (ws / ".agent" / "audit_jobs.json").write_text(raw, encoding="utf-8")
+        # ocr2-785：先证夹具真是"会认领封版的账"——JSON 坏掉/键名拼错时，
+        # `sealed is False` 是"账不可读"而非"git 优先"，本测就白跑了。
+        jobs = [j for j in json.loads(raw)["jobs"]
+                if j.get("milestone_id") == "M10" and j.get("state") == "collected"]
+        self.assertEqual(len(jobs), 1, f"夹具不再是 M10 的 collected 账：{raw}")
         self.assertFalse(audit_flow.audit_evidence(ws, "M10")["sealed"])
 
     def test_uppercase_baseline_is_still_sealed(self) -> None:

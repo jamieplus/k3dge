@@ -51,7 +51,7 @@ finally { $ErrorActionPreference = $prevPref }
 if ($LASTEXITCODE -ne 0 -or -not $top) {
   Write-Host "[k3dge] git init -b main  ($Target)"
   git init -b main
-} elseif (((Resolve-Path $top).Path).TrimEnd('\','/') -ne ((Resolve-Path $Target).Path).TrimEnd('\','/')) {
+} elseif (((Resolve-Path -LiteralPath $top).Path).TrimEnd('\','/') -ne ((Resolve-Path -LiteralPath $Target).Path).TrimEnd('\','/')) {
   [Console]::Error.WriteLine("[k3dge] 当前目录在既有仓库里（toplevel=$top）但根不是目标目录 ⇒ 拒跑（会造嵌套仓，绕过外层闸口）")
   exit 1
 }
@@ -91,8 +91,8 @@ if ($LASTEXITCODE -ne 0) {
 
 # K3DGE_SOURCE 可能是 pypi / git+https URL（非路径）⇒ 只在确为目录时才 Resolve（ocr-021）。
 $self = $false
-if (Test-Path $K3dgeHome -PathType Container) {
-  $self = ((Resolve-Path $K3dgeHome).Path.TrimEnd('/','\') -eq (Resolve-Path $Target).Path.TrimEnd('/','\'))
+if (Test-Path -LiteralPath $K3dgeHome -PathType Container) {
+  $self = ((Resolve-Path -LiteralPath $K3dgeHome).Path.TrimEnd('/','\') -eq (Resolve-Path -LiteralPath $Target).Path.TrimEnd('/','\'))
 }
 if ($self) {
   Write-Host "[k3dge] pip install -e .[dev] (self)"
@@ -157,7 +157,7 @@ $K3dgeExe = if (Test-Path -LiteralPath (Join-Path $Target ".venv/Scripts/k3dge.e
 }
 # 兜底路径**必须验存在**：venv 里没有这个入口还继续 `&` 会抛 CommandNotFoundException
 # （报错与真实原因无关），而它上游的退出码又没查 ⇒ 半初始化一路装完（361）。
-if (-not (Test-Path $K3dgeExe -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath $K3dgeExe -PathType Leaf)) {
   [Console]::Error.WriteLine("[k3dge] 找不到 k3dge 入口：$K3dgeExe ⇒ pip install 未落进本 venv，删 .venv 重跑 init")
   exit 1
 }

@@ -41,6 +41,22 @@ class TestDanglingAdr(unittest.TestCase):
             self.assertEqual(len(out), 1)
             self.assertIn("ADR-0099", out[0][1])
 
+    def test_overlong_number_is_not_truncated_to_neighbour(self):
+        """`ADR-00015` 不得被静默截成 `ADR-0001`（ocr2-652）。
+
+        区分：0001 存在时旧实现"通过"（错配到邻居）；0001 不存在时旧实现报
+        `ADR-0001`（错号）。新实现都不认这个引用——此处钉"不错配"，检出超长号
+        本身是另一条规则的事。
+        """
+        with tempfile.TemporaryDirectory() as d:
+            ws = _ws(d, adrs=[("0001-a.md", "# ADR-0001\n")])
+            out = pure_refs.check_dangling_adr(ws, "docs/x.md", "see ADR-00015")
+            self.assertEqual(out, [])
+        with tempfile.TemporaryDirectory() as d:
+            ws = _ws(d)
+            out = pure_refs.check_dangling_adr(ws, "docs/x.md", "see ADR-00015")
+            self.assertFalse([m for _c, m in out if "ADR-0001" in m], out)
+
     def test_obsolete_counts_as_resolved(self):
         with tempfile.TemporaryDirectory() as d:
             ws = _ws(d)
@@ -242,6 +258,21 @@ class TestSupersedeUnreconciled(unittest.TestCase):
             self.assertEqual(
                 pure_refs.check_supersede_unreconciled(ws, "docs/adr/0002-x.md", "# ADR-0002\n"), [])
 
+    def test_all_supersedes_targets_are_checked(self):
+        """多行 `Supersedes:` 逐条核对，不只看第一条（ocr2-656）。
+
+        0001 已归档且标 superseded（合规），0003 仍在原位 ⇒ 恰好一条违例且点名 0003。
+        """
+        with tempfile.TemporaryDirectory() as d:
+            ws, adr = self._ws(d)
+            obs = adr / "obsolete"; obs.mkdir()
+            (obs / "0001-old.md").write_text("---\nStatus: Superseded\n---\n# ADR-0001\n", encoding="utf-8")
+            (adr / "0003-mid.md").write_text("---\nStatus: Accepted\n---\n# ADR-0003\n", encoding="utf-8")
+            text = "---\nStatus: Accepted\nSupersedes: ADR-0001\nSupersedes: ADR-0003\n---\n# ADR-0004\n"
+            out = pure_refs.check_supersede_unreconciled(ws, "docs/adr/0004-new.md", text)
+            self.assertEqual(len(out), 1, out)
+            self.assertIn("ADR-0003", out[0][1])
+
     def test_non_adr_and_obsolete_skipped(self):
         with tempfile.TemporaryDirectory() as d:
             ws, _adr = self._ws(d)
@@ -361,10 +392,18 @@ class TestPointerAndClosureShape(unittest.TestCase):
         self.assertEqual(pure_refs.check_report_pointer(ws, self.REL, text), [])
 
     def test_report_pointer_must_stay_in_workspace(self) -> None:
-        ws = self._ws_with_report("/etc/hosts")
-        text = f"---\nreport: {self._report}\n---\n\n# X\n"
+        ws = self._ws_with_report("docs/reviews/r.md")
+        # ocr2-773：旧夹具用 `/etc/hosts`——Windows/最小容器上文件不存在时，
+        # 断言以"指针缺失"而非"越界"理由通过（假绿）。改用沙箱内真实文件，
+        # 以绝对路径指向它：存在但在仓外，只能是 containment 理由。
+        base = ws.parent
+        abs_target = base / "abs-outside.md"
+        abs_target.write_text("# 在仓外但真实存在\n", encoding="utf-8")
+        self.assertTrue(abs_target.is_file())
+        text = f"---\nreport: {abs_target}\n---\n\n# X\n"
         out = pure_refs.check_report_pointer(ws, self.REL, text)
         self.assertEqual([c for c, _ in out], ["DANGLING_REPORT_REF"])
+        self.assertIn("越出", out[0][1], f"应是越界理由而非缺失：{out}")
         # t-256：越界靶**必须真实存在**——旧夹具里 `../elsewhere/x.md` 根本不存在，
         # 一个只做 `is_file()`、完全不管 containment 的实现也会"报违规"（不存在当然不是
         # 合法指针）⇒ 本测点名的回归（不校验越界）恰恰逃过。造在 ws 的父目录、相对可达。
@@ -393,14 +432,11 @@ class TestPointerAndClosureShape(unittest.TestCase):
         outside.write_text("x", encoding="utf-8")
         self.assertTrue(pure_refs.screen_target_exists(ws, "docs/a.md"))
         self.assertFalse(pure_refs.screen_target_exists(ws, str(outside)))
-        # t-257：`..` 靶必须**真在**——旧夹具里 `ws/../elsewhere.md` 从不存在，
-        # `is_file()` 单独就能把这个假绿喂饱。换成与 ws 同父的真实兄弟文件：
-        # 只有 containment 判据能拒它。
-        base = ws.parent
-        sibling = base / "elsewhere.md"
-        sibling.write_text("x", encoding="utf-8")
-        self.assertTrue(sibling.is_file(), "前置：越界靶必须存在，否则测不到 containment")
-        self.assertFalse(pure_refs.screen_target_exists(ws, "../%s" % sibling.name))
+        # t-257 + ocr2-774：`..` 靶就是上面已建的 outside（与 ws 同父的真实兄弟
+        # 文件）——旧代码又建了一遍同路径的 `sibling`，重复夹具。直接复用：
+        # 只有 containment 判据能拒它，`is_file()` 单独不够。
+        self.assertTrue(outside.is_file(), "前置：越界靶必须存在，否则测不到 containment")
+        self.assertFalse(pure_refs.screen_target_exists(ws, "../%s" % outside.name))
 
     def test_retired_ledger_warns_when_marker_drifted(self) -> None:
         import contextlib

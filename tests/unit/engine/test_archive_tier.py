@@ -1,19 +1,14 @@
 """归档契约：增量去向提醒（ADR-0023 §2.2）+ CLI --include-archive 低权威头。"""
 
 import io
-import subprocess
 from contextlib import redirect_stdout
 from pathlib import Path
 
 from k3dge.cli.main import main
 from k3dge.engine.pure_refs import find_unguarded_archives
 
-_ENV = {"PATH": "/usr/bin:/bin", "HOME": "/tmp", "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
-        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
-
-
-def _git(ws: Path, *a: str) -> None:
-    subprocess.run(["git", "-C", str(ws), *a], check=True, capture_output=True, env=_ENV)
+# ocr2-719：旧 `_git`/`_ENV`/`import subprocess` 在本模块零调用——检查改走显式改动集后
+# git 管道已无用。死帮手不执行就不会腐也不该留，直接删（要用时再按需建真仓）。
 
 
 def test_unguarded_archive_detected(tmp_path: Path) -> None:
@@ -46,7 +41,10 @@ def test_doc_list_archive_prints_low_authority_header(tmp_path: Path, monkeypatc
         rc = main(["doc", "list", "--type", "reviews", "--include-archive"])
     out = buf.getvalue()
     assert rc == 0
-    assert "低权威层" in out and "archive/old.md" in out
+    # ocr2-720：旧写法把两契约并成一个 `and`（坏一半也只报 assert False），且只钉
+    # "低权威层" 四字片段——随手一行提到它也绿。分开断，并钉整行 header（改措辞即红）。
+    assert "[DOC] 低权威层：archive/ 仅为低权威留档，判定以现行视图为准" in out, out
+    assert "archive/old.md" in out, out
 
 
 def test_doc_list_without_include_archive_has_no_low_authority_header(tmp_path, monkeypatch) -> None:
