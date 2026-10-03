@@ -15,7 +15,7 @@ import re
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from k3dge.engine.milestone_files import _DOC_AUX_NAMES  # 单源：doc 辅助文件名集（不另存副本）
+from k3dge.engine.milestone_files import _is_doc_aux  # 单源：doc 辅助名判定（大小写不敏感，不另存副本）
 
 _FM_STATUS = re.compile(r"^Status:\s*(\S+)", re.M)
 _FM_LANDED = re.compile(r"^Landed-by:\s*(.+)$", re.M)
@@ -28,7 +28,7 @@ def _adr_files(workspace: Path) -> List[Path]:
     d = Path(workspace) / "docs" / "adr"
     if not d.is_dir():
         return []
-    return [p for p in sorted(d.glob("*.md")) if p.name not in _DOC_AUX_NAMES]
+    return [p for p in sorted(d.glob("*.md")) if not _is_doc_aux(p.name)]
 
 
 def _status(text: str) -> str:
@@ -217,7 +217,7 @@ def _find_adr_by_id(d: Path, target_id: str) -> Optional[Path]:
         if not search_dir.is_dir():
             continue
         for p in sorted(search_dir.glob(f"{prefix}-*.md")):
-            if p.name not in _DOC_AUX_NAMES:
+            if not _is_doc_aux(p.name):
                 return p
     return None
 
