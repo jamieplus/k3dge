@@ -59,7 +59,7 @@ Note: 修订痕迹见 git 历史。
 - **删除** `docs/adr/README.md` 的 `## Legacy numbers` 表。
   - 按号引用若逻辑不通，读者按标题与内容在 `docs/adr/` 里重找即可。
   - 编号是检索的辅助，不是主键。
-- 「号不复用」继续由 `README` 与 `AUTHORING` 的既有句子守（`Numbers are never reused`）。
+- 「号不复用」继续由 `AUTHORING`（与 `_template.md`）的既有句子守（`Numbers are never reused`；`docs/adr/README.md` 只说「编号永久退役，不再分配」，无此串）。
   - 取号看现存文件名即可；不引入"已烧号"清单，不让任何工具读某张表来判号。
 - Non-goal 明确：不建旧号重定向、不加歧义告警、不新增 `check` 规则、不引入 `Note:` 之外的任何编号元数据。
   - 理由即 §1 的实测需求面积。

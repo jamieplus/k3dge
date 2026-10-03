@@ -69,7 +69,7 @@
 | **Milestone 状态机** | `DRAFT → ALIGNED → AUDIT_SUGGESTED → AUDITING → SEAL_READY → SEALED`（+`ESCALATED`） | [`overview.md`](overview.md) §6 |
 | **`[NEXT]` 提示** | 命令末尾只给合法下一步；**12 态闭集 + priority**（1 pending_findings/escalated → 2 audit_open/doc_fix → 3 rejected → 4 audit_suggested/new_domain/seal_ready → 5 ratchet_open → 9 播报态）；唯一来源 `engine/nextstep.STATE_OPTIONS` + `engine/audit_trigger` | [`overview.md`](overview.md) §6.3 |
 | **审计闭环（封板界限）** | audit 单份 **12 列报告**到 `待修=0`；未审计调 seal → `audit_needed` | ADR-0017；[`overview.md`](overview.md) §6 |
-| **钉语法 markers** | `k3dit:<kind> <ID>[@scope] <一句话≤80字>`；kind ∈ `pending/leftover/disputed/fixnote/fixed`；scope ∈ `line/file/repo`；开放 = `pending+disputed+fixnote`（结项须清零；`leftover` 上主干当长期文献、`fixed` 待 Hall 拔，均非 open） | [`docs/protocols/peer_contract.md`](../protocols/peer_contract.md) §8；`engine/markers.py` |
+| **钉语法 markers** | `k3dit:<kind> <ID>[@scope] sev=<…> prio=<…> type=<…> <描述>`（v2 必填四格写源＝钉）；kind ∈ `pending/leftover/disputed/fixnote/fixed`；scope ∈ `line/file/repo`；开放 = `pending+disputed+fixnote`（结项须清零；`leftover` 上主干当长期文献、`fixed` 待 Hall 拔，均非 open） | [`docs/protocols/peer_contract.md`](../protocols/peer_contract.md) §8；`engine/markers.py` |
 | **pending_findings** | `k3dit:pending` 钉计数（check/status 报 `pending=N`，最高优先）；**钉＝写源**（判读四格 sev/prio/type/desc 写在钉上），账本与 12 列报告＝钉的投影（每轮 harvest 重生成，非席手填）；处置由修席写 `fixnote` 钉承载，复核背书翻 `fixed`，拔钉归 Hall | AGENTS.md §12；`peer_contract §8`；ADR-0025 §2.7 |
 | **审计线 Audit Line** | gate 类唯一输入形式：一单一线（`k3dit/<单>` 分支 + worktree checkout），锁点 L 即 `baseline`；袋/独立库/打包器全部退役 | ADR-0025；`peer_contract §3` |
 | **棘轮 Ratchet** | 一工单 = 一快照，单内审↔修可多程；submit/collect 两态；`claim` 即续租；快照推进一律 `git update-ref` CAS | `peer_contract §1.4` |
@@ -142,7 +142,6 @@
 | ADR-0018 | doc-readme-anchor-governance | 每种文档类型 README 锚点 + AUTHORING 寻址治理 |
 | ADR-0018 | §2 第 11 条（不设装载证明；原独立 ADR 并入） | 协议加载证明废弃；`PIPELINE_PROTOCOL_NOT_FOUND` 静态守卫 |
 | ADR-0023 | low-authority-archive-tier | 低权威归档层（挪走不删） |
-| ADR-0025 | §2.9（审计线与证据交换拓扑；原独立 ADR 并入） | 送检包拓扑：git-tree oid 身份 + 单文件位置 + 棘轮交换 |
 
 ### 生命周期
 | ID | 主题（文件名） | 一句话 |
@@ -163,6 +162,7 @@
 | ADR-0012 | assertion-evidence-chain | 证据链三环节：产物 + 消费者 + 到达 |
 | ADR-0005 | §2.7 harness 职责边界（原独立 ADR 并入） | harness 职责切分（审计/质量/检索各管一块；quality 已并入审计模块，ADR-0025） |
 | ADR-0025 | hall-harness-topology | Hall/harness 拓扑：三窗（判读/修/复核）+ 钉＝写源 + 拔钉归 Hall |
+| ADR-0026 | projection-contract | 投影契约：对 agent 的三维投影与三层拓扑 |
 
 ### 自举与版本
 | ID | 主题（文件名） | 一句话 |

@@ -95,8 +95,9 @@ actions = ["full_matrix"]
 stages_produce = []
 stages_verify = []
 
-["audit.actions.audit"]   # 一份必做（合并审计模块，ADR-0025）
-stages_verify = ["audit.actions.verify"]   # 待修==0 的二次核对
+# （曾有一条 `["audit.actions.audit"]` 顶层表头——带引号的单键，不是子表 ⇒ 其 `stages_verify`
+#   从未被读，verify 腿静默失效。bundle 腿自证在 `audit_bundle.consume` 内，无需在此声明外部步；
+#   该块已删，与上面「显式置空」一致。）
 
 [checks.sync]
 actions = ["sync_extractors", "reconcile_adrs", "sync_domains",
