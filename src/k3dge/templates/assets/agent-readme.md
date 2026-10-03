@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | `.agent/manifest.json` | 机器（`k3dge check` / `sync` / MCP `spec://manifest`） | 域路由：哪段 `src/` 对应哪份 `docs/specs/` 和测试。不可省。 |
 | `.agent/rules/*.md` | 被 `AGENTS.md` **点名路径**读到时 | 协议切片（ADR-0010）。例如「要求简化」时点名的 `.agent/rules/02-simplification.md`。不靠浏览本目录发现。 |
-| `.agent/docs.toml` | `./scripts/generate-docs.sh`（读的就是 `.agent/docs.toml`） | 人读文档生成配方。门禁不读。 |
+| `.agent/docs.toml` | `./scripts/generate-docs.sh`；封板闸 `guides_filled` 等消费方 | 人读文档生成配方，**「应交付文档清单」的唯一源**（消费方一律从此派生；`k3dge check` 本身不读它）。 |
 | `.agent/README.md` | 已经打开本目录的人/工具 | 本文件。说明「不要把这里当成 Agent 入口」。 |
 
 Agent 入口是仓库根 `AGENTS.md`。表里一律写**仓根相对全路径**（本目录没有 `.schema.json`，坐标写裸名就会

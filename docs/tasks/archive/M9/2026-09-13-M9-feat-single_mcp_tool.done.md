@@ -7,11 +7,7 @@ date: 2026-09-13
 
 # 评估 MCP 面收敛单强工具 k3dge_explore
 
-- **Status**: idea
-- **Milestone**: M9
-- **Priority**: P3
 - **可检索摘要**: 评估并把 k3dge MCP 面默认收敛为一个强工具 `k3dge_explore`（NEXT + 事实 + 纵深指针），吸收 codegraph "one strong tool 胜过菜单"；来源 memo §1。
-- **Date**: 2026-09-13
 
 ## Intent
 减少 agent 选错工具/省上下文，呼应 ADR-0008 §2 渐进披露。

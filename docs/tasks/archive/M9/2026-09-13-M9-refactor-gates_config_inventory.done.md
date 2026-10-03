@@ -42,5 +42,6 @@ date: 2026-09-12
 - 契约新增 `[markers]`（`max_note`/`max_note_pending`）与 `[output]`（`default_lines`）→ `gates.DEFAULTS` + `.agent/gates.toml`；`markers.parse_text` 增可选 caps，`extract` / `worktree.strip_pins` 从契约读；`status` 默认行数改读 `output.default_lines`。
 - 修 `search` 二次 clamp：`_snippet_window` 改按调用方 cap（`search.context_max`）而非硬编 3，否则自定义阈值失效。
 - **已配置盘点**：`audit_trigger`(c2/volume)、`search.context_max`、`markers.*`、`output.default_lines`、`[checks.seal|align]`。**仍留代码（有意）**：`nextstep` 各 state 文案（引导文本非阈值）、CLI argparse 派形状。
+- **初始盘点遗漏项归属**：`scripts/pre-commit:37-38` 的 `_CHECK_PREFIXES`/`_CHECK_SUFFIXES` 与 `engine/milestone.py` 的 seal 条件/动作，经查为**既有硬编码**（非契约阈值；seal 条件与 `seal_policy_config` 的边界落在 `gates.DEFAULTS`）——本票不迁移，**有意留**。
 - 测试：`test_gates`（markers/output 缺省+覆盖）、`test_markers`（note cap 可配）。306 passed；check 绿。
 - 注：本票并入了 stdout 预算（`next_hook` 残项），以 `[output].default_lines` 作最小落点；**全体命令**统一 stdout 预算仍属 `context_budget_metrics`。

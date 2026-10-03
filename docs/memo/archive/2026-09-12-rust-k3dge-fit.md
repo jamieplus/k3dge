@@ -3,7 +3,7 @@
 > **Legacy note（补记 2026-09-17）**: 否决已并入 `ADR-0001` §2 第 9 条「实现语言基线（Rust 重写否决）」；
 > §5 分发建议的 #3 落成 `docs/tasks/archive/M9/2026-09-13-M9-feat-dist_singlefile.done.md`。判定以 ADR-0001 为准。
 
-- **类型**: 暂无法落地（需先 supersede `ADR-0001` 的「Python 标准库」实现约束；建议先做尖刀实验）
+- **类型**: 已否决（Rust 重写否决，见 `ADR-0001` §2 第 9 条；尖刀实验已判"不据尖刀 supersede ADR-0001"，supersede 前提不成立）
 - **念头**: 用 Rust 重写 k3dge 的价值不在"快"，而在**语言本身即护栏**：enum + 穷尽 `match`、`Result`、所有权/借用、类型化契约，把"漏分支/吞错/别名/形状错"变成**编译期错误**——对人是啰嗦限制，对 agent 是**规则明确、抽象得当、少自由裁量**，恰好贴 k3dge「Hard Gate / 防漂移」的原意；兼性能与内存管理。
 - **触发场景**: 2026-09-12 会话，维护者问「开发 rust k3dge 的可行性/优缺点」，并明确关注"与 vibe coding 的契合性"。
 - **Date**: 2026-09-12
@@ -56,7 +56,7 @@ Rust 与 vibe coding 的"规约即护栏"确实契合，值得试；但**别全�
 - 故：**不宜据 Phase-1 就 supersede `ADR-0001`**；先做 **Phase-2**（自有闭枚举状态机）验「是否真降 agent 漂移」再定。
 
 ## 8. 尖刀实验 Phase-2 结果（2026-09-13）
-自有**闭枚举状态机**（crate `../k3dge-contract-rs` `src/phase.rs`：`TaskState` + 穷尽 `advance`，无 wildcard）：`compile_fail` doctest 证明漏一状态 ⇒ **编译错 E0004**；对照 Python 同漏分支静默。→ **护栏在自有闭枚举上成立且可证**。合 Phase-1：Rust 化**只在"自有状态机/信封/契约"上是能力增强**，在"解析外部语言语义"上是高成本重写。**不据尖刀 supersede `ADR-0001`**；若走，宜**混合**（核心闸/状态机 Rust，解析留 Python）或仅把护栏用于新增自有逻辑。
+自有**闭枚举状态机**（crate `../k3dge-contract-rs` `src/phase.rs`：`TaskState` + 穷尽 `advance`，无 wildcard）：`compile_fail` doctest 证明漏一状态 ⇒ **编译错 E0004**；对照 Python 同漏分支静默。→ 护栏在自有闭枚举上成立且可证（"外部语义解析不成立"见 §7，不再复述）。
 
 ## 9. 尖刀实验 Phase-3 结果（2026-09-13，双语言对照）
-同变更「新增状态并处理所有消费点」：Rust 只加 `TaskState::Blocked`（不改 match）⇒ `cargo build` **E0004 逐点列出 2 处待更新**；补点即绿（迭代 2）。Python 对照：`if/elif` 漏分支⇒**静默 None**，`dict` 漏键⇒**仅调用时 KeyError**（静态不可知）。→ 自有闭枚举上 Rust 把"漏分支"从**人自觉/运行时**变**编译期强制**（能力增强）；外部语义解析上不成立。详见 crate `../k3dge-contract-rs/EXPERIMENT.md`。
+同变更「新增状态并处理所有消费点」：Rust 只加 `TaskState::Blocked`（不改 match）⇒ `cargo build` **E0004 逐点列出 2 处待更新**；补点即绿（迭代 2）。Python 对照：`if/elif` 漏分支⇒**静默 None**，`dict` 漏键⇒**仅调用时 KeyError**（静态不可知）。详见 crate `../k3dge-contract-rs/EXPERIMENT.md`。
