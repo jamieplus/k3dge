@@ -289,7 +289,24 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
         "",
         "def _is_generated(path: Path) -> bool:",
         "    name = path.name",
-        "    return any(m in name for m in _GENERATED_MARKERS) or name.endswith(_GENERATED_SUFFIXES)",
+        '    return any(m in name for m in _GENERATED_MARKERS) or name.endswith(_GENERATED_SUFFIXES)',
+        "",
+        "",
+        "# 未识别 node 类型的 **一次性** 告警（进程内每类一次）：把静默丢弃变成可观察降级",
+        "# （README L67「坏插件只 WARN、不红门禁」的口径：可见但不致命）。判读面据此知道契约可能残缺。",
+        "_UNRECOGNIZED: set = set()",
+        "_UNRECOGNIZED_LOCK = threading.Lock()",
+        "",
+        "",
+        "def _warn_unrecognized(kind: str, node_type: str) -> None:",
+        "    import sys",
+        "    with _UNRECOGNIZED_LOCK:",
+        "        key = (kind, node_type)",
+        "        if key in _UNRECOGNIZED:",
+        "            return",
+        "        _UNRECOGNIZED.add(key)",
+        '    print(f"[WARN][EXTRACTOR] ' + slug + ': unrecognized {kind} node type {node_type!r}",',
+        '          file=sys.stderr)',
         "",
         "",
         "def _slice(source: bytes, node) -> str:",
@@ -321,6 +338,8 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
             "                sig = _strip_impl_body(_slice(source, member))",
             "                if sig:",
             '                    methods.append("  " + sig)',
+            "            else:",
+            '                _warn_unrecognized("class member", member.type)',
             "    if not methods:",
             "        return header",
             '    return header + "\\n" + "\\n".join(methods)',
@@ -368,7 +387,7 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
             f"        if {markers}:\n"
             "            text = _strip_impl_body(text)"
         )
-    branches.append("    else:\n        return None")
+    branches.append('    else:\n        _warn_unrecognized("top-level", node.type)\n        return None')
     decl = ["def _decl_signature(source: bytes, node, exported: bool = False) -> Optional[str]:"] + branches
     if row["wrapper_kw"]:
         kw = row["wrapper_kw"]
@@ -421,6 +440,8 @@ def render_plugin(name: str, row: Dict[str, Any]) -> str:
         "        parser.language = language  # type: ignore[attr-defined]",
         "    source = path.read_bytes()",
         "    tree = parser.parse(source)",
+        "    if tree.root_node.has_error:",
+        '        _warn_unrecognized("parse-error", path.name)   # 残缺树：可见降级，不静默漏接口',
         "    lines = []",
         "    for node in tree.root_node.children:",
         "        text = _decl_signature(source, node)",
