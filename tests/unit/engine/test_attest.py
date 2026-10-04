@@ -176,11 +176,15 @@ def test_wrong_token_in_window_is_refused(tmp_path) -> None:
 
     real = m.group(2)
     when = _dt.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=_dt.timezone.utc)
-    acceptable = {real, token(ws, (when - _dt.timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ"))}
+    acceptable = {
+        real,
+        token(ws, (when - _dt.timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ")),
+        token(ws, (when + _dt.timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ")),
+    }
     bad = ""
     for salt in range(1, 20):
         cand = token(ws, f"2030-01-{salt:02d}T00:0{salt % 10}:00Z")
-        if cand not in acceptable:          # verify 比对**同分钟＋前一分钟**两个窗，都得不撞
+        if cand not in acceptable:          # verify 比对相邻三窗（前后分钟）都得不撞
             bad = cand
             break
     assert bad, f"错误绑定的候选都撞进可接受窗：{acceptable}"
