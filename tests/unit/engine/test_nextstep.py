@@ -213,7 +213,7 @@ class TestPersistedProjection(TestCase):
         self.assertIn("manifest + spec + tests", cli)
 
 
-def _tmp_ws(test: unittest.TestCase) -> Path:
+def _tmp_ws(test: TestCase) -> Path:
     """统一"临时工作区＋随测回收"（t-213 尾账：同一两行在 4 处复制）。
 
     每例都是全新 mkdtemp ⇒ 不存在旧 `next.json`/事件日志继承；清理句柄在建目录的
