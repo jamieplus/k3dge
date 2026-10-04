@@ -441,6 +441,14 @@
       "tokens": "封板收摊清单（上下文压缩）: M11"
     },
     {
+      "path": "docs/reviews/2026-10-04-M12-ocr-scan.md",
+      "type": "reviews",
+      "id": "2026-10-04-M12-ocr-scan",
+      "title": "审计：open-code-review 全文件扫描（M12）",
+      "status": "",
+      "tokens": "审计：open-code-review 全文件扫描（M12）"
+    },
+    {
       "path": "docs/specs/_template/spec.md",
       "type": "specs",
       "id": "spec",

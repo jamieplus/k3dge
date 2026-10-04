@@ -106,6 +106,28 @@ def test_prose_body_still_gets_own_paragraph(tmp_path) -> None:
     assert "\n\nk3dge-commit:" in out
 
 
+def test_single_paragraph_subject_gets_blank_separator(tmp_path) -> None:
+    """单段落消息的主题常长成 `Key: value`（`refactor: split X`），不得被当 trailer 段而
+    紧贴署名、无空行分隔——那样 git 把署名并进正文段，`%(trailers)` 读不回（ocr2-073）。"""
+    ws = _repo(tmp_path)
+    (ws / "a.txt").write_text("x\n", encoding="utf-8")
+    _gitc(ws, "add", "-A")
+    out = append_to_message(ws, "refactor: split the thing", who="t")
+    # 署名与主题之间必须有空行分隔（原 bug：`refactor: ...\nk3dge-commit:` 无空行）。
+    assert "refactor: split the thing\n\nk3dge-commit:" in out, out
+    m = re.search(r"@ (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z", out)
+    assert m, out
+    _gitc(ws, "-c", "user.name=t", "-c", "user.email=t@t",
+          "commit", "-q", "--no-verify", "-m", out,
+          env_extra={"GIT_AUTHOR_DATE": m.group(1) + "Z",
+                     "GIT_COMMITTER_DATE": m.group(1) + "Z"})
+    # 真正的判据：git 的 trailer 解析器读得回署名（旧实现此处为空 ⇒ 恒不成立）。
+    got = _gitc(ws, "log", "-1", "--format=%(trailers:key=k3dge-commit)", "--no-show-signature")
+    assert "k3dge-commit:" in got, got
+    ok, why = verify_commit(ws, _head(ws))
+    assert ok, why
+
+
 def test_verify_commit_rejects_option_shaped_and_blank_ids(tmp_path) -> None:
     """`h` 来自 CI 参数：以 `-` 开头会被 git 当选项（注入面），空/含空白同样拒（393）。
 

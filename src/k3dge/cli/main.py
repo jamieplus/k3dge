@@ -746,6 +746,10 @@ def cmd_audit(args: argparse.Namespace) -> int:
     if landed and not landed.get("ok"):
         print(f"[AUDIT] 落报告/提交失败：{landed.get('error')} {landed.get('detail') or ''}", file=sys.stderr)
         return 1
+    # 非 dry-run 下补丁没落成（`_no_apply`）⇒ 本仓修复未生效，不得对 CI/hook 报成功
+    # （旧实现落到 `return 0 if res.ok` ⇒ 验包通过但 apply 失败仍返回 0，OCR dccff5f6/45）。
+    if _no_apply and not getattr(args, "dry_run", False):
+        return 1
     return 0 if res.get("ok") else 1
 
 

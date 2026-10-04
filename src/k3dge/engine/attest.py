@@ -126,9 +126,16 @@ def append_to_message(workspace: Path, msg: str, who: str = "") -> str:
         return f"{trailer}\n"
     # 末段若已是 trailer 块（每行都 `Token: value`），署名**并进同一段**：另起一段会把别人的
     # 四键挤成倒数第二段 ⇒ `%(trailers)` 只读回署名，封版记录整体读不回（ocr-308）。
-    last_para = [ln for ln in cleaned.split("\n\n")[-1].strip().splitlines() if ln.strip()]
+    #
+    # 但**必须要求这是"正文之后的独立一段"**（`cleaned` 里已有空行 ⇒ `len(paras) > 1`）。单个
+    # 段落的消息（`refactor: split X`）主题行本身常长成 `Key: value`，会被 `_TRAILER_SHAPE`
+    # 误判成 trailer 段：旧实现据此直接 `cleaned\n{trailer}` 粘贴、**无空行分隔**，git 把
+    # 署名并进正文段 ⇒ `%(trailers)` 读不回（ocr2-073）。单段一律补空行；git 对"整段都是
+    # trailer"与"空行后 trailer 块"两种形状都认，故补空行不损 ocr-308 的并段诉求。
+    paras = cleaned.split("\n\n")
+    last_para = [ln for ln in paras[-1].strip().splitlines() if ln.strip()]
     _TRAILER_SHAPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*: .*$")
-    if last_para and all(_TRAILER_SHAPE.match(ln.strip()) for ln in last_para):
+    if len(paras) > 1 and last_para and all(_TRAILER_SHAPE.match(ln.strip()) for ln in last_para):
         return f"{cleaned}\n{trailer}\n"
     return f"{cleaned}\n\n{trailer}\n"
 
