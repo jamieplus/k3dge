@@ -184,7 +184,12 @@ def extract_typescript_interface(path: Path, include_doc: bool = False) -> str:
         source = b"".join(chunks)
     finally:
         os.close(fd)
-    tree = parser.parse(source)
+    try:
+        tree = parser.parse(source)
+    except (ValueError, RuntimeError) as exc:   # 非法字节/超深嵌套：parse 抛的不是 OSError，
+        # 也不是 skip 信号 ImportError，会穿透 extract（code-1）。按契约归一为 skip（可见）。
+        _warn_unrecognized("parse-rejected", path.name)
+        raise ImportError("typescript: parse rejected (" + str(exc) + ")") from exc
     if tree.root_node.has_error:
         _warn_unrecognized("parse-error", path.name)   # 残缺树：可见降级，不静默漏接口
     lines = []
@@ -220,8 +225,9 @@ class TypescriptExtractor(ContractExtractor):
             return False
         if _IGNORED_DIRS.intersection(resolved.parts):
             return False
-        # 黑名单不是包含性校验（code-6）：绝对路径必须落在仓根（cwd）内，否则可能是仓外符号链接靶。
-        if path.is_absolute() and not resolved.is_relative_to(Path.cwd().resolve()):
+        # 黑名单不是包含性校验：解析后必须落在仓根（cwd）内，否则 symlink 指向仓外可绕过
+        # （code-2/code-6；相对路径同样要查，不只绝对路径）。
+        if not resolved.is_relative_to(Path.cwd().resolve()):
             return False
         return True
 

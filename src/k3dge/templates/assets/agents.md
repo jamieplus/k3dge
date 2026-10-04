@@ -26,7 +26,7 @@ This file is the **only auto-loaded surface**. `.agent/` is process config, not 
 
 `scripts/pre-commit` (`git config core.hooksPath scripts`): staged `docs/**` need `docs/<type>/README.md` and `docs/<type>/AUTHORING.md`. Code/spec changes still run `k3dge check`. `.agent/rules/*` are slices (ADR-0010); this file wins.
 
-审计回退（`.agent/pipeline.toml` 指向 `audit_default.md` 且 k3dit 不可达）**不是独立审计**：MCP 挂时，干活 agent 不得自审出报告即 `seal`；须转人工 / 外部 harness 复核（ADR-0006 sidecar：work 与 check 不可由同一 agent 粘合）。
+审计回退（`.agent/pipeline.toml` 指向 `docs/protocols/audit_default.md` 且 k3dit 不可达）**不是独立审计**：MCP 挂时，干活 agent 不得自审出报告即 `seal`；须转人工 / 外部 harness 复核（ADR-0006 sidecar：work 与 check 不可由同一 agent 粘合）。
 
 ## 12. Triggers — do in same turn
 

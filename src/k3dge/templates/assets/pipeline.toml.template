@@ -23,7 +23,7 @@
 bind = "k3dit"
 # 审计腿形状：`bundle`＝冻结基线 → **命令行工具 k3dit** 产包 → 消费侧验包+落补丁（ADR-0025 §2.9.6）。
 # `bind` 只声明"谁审"（工具名，和 `git` 同层）；本地命令行工具**不注册 peer、不声明 transport**。
-# 2026-09-26 从 `ratchet` 迁来：棘轮要的 verb 走 mcp，而 k3dit 的 MCP 服务端面已退役（见下）。
+# 形状史见 ADR-0025（`ratchet` 已退役）。
 mode = "bundle"
 # 工具运行参数（k3dit 的两个旋钮，走声明面、不在腿里写死）：
 #   k3dit_mode = "full"（判读+修+复核，待修=0 才算已审）| "audit-only"（只出证据、不构成封板依据）
@@ -70,8 +70,7 @@ transports = [
 # `stages_verify`（action ref，交 run_action 走 mcp→cli→manual/skip），**内部动作**
 # 声明为 `actions`（注册表 id）；两类 id 不混一张词表（ADR-0026 §2.1）。
 #
-# 审计流的两步即在此声明（原 [pipelines.on_seal_enter] / [on_pre_seal] 已迁走——
-# 那两处只有 schema 校验、没有执行者，属"文档声称的机制不存在"）：
+# 审计流的两步即在此声明（旧 `[pipelines.*]` 已迁走，见 ADR-0025）：
 #   [checks.audit]
 [checks.seal]
 # 预审＝进**审计**的门槛（ADR-0004 §2.1.9 相位 1）。`align_pass` 由第一个动作
@@ -95,9 +94,7 @@ actions = ["full_matrix"]
 stages_produce = []
 stages_verify = []
 
-# （曾有一条 `["audit.actions.audit"]` 顶层表头——带引号的单键，不是子表 ⇒ 其 `stages_verify`
-#   从未被读，verify 腿静默失效。bundle 腿自证在 `audit_bundle.consume` 内，无需在此声明外部步；
-#   该块已删，与上面「显式置空」一致。）
+# 注：悬空顶层表已删，见 ADR-0025。
 
 [checks.sync]
 actions = ["sync_extractors", "reconcile_adrs", "sync_domains",

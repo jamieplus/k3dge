@@ -16,5 +16,9 @@ Read when introducing external patterns, prompts, or architectures.
 - **GPL/AGPL**: Concept only, zero lines copied.
 - **Proprietary**: Only general ergonomics, sanitize payloads.
 
-## 3. Checklist
-- [ ] 1. Abstract into state machine/formula. 2. Close source. 3. Write native. 4. Check diff for trademark leaks. 5. `k3dge sync` + `k3dge check`.
+## 3. Checklist（逐项勾选，不可合并为一条）
+- [ ] 1. Abstract into state machine/formula.
+- [ ] 2. Close source（与 §1 Clean-Room Only 同一约束，此处是执行项）。
+- [ ] 3. Write native.
+- [ ] 4. Check diff for trademark leaks.
+- [ ] 5. `k3dge sync` + `k3dge check`.

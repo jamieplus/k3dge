@@ -13,7 +13,7 @@
     "custom-live": {
       "baseUrl": "http://100.82.98.101:9090/v1",
       "api": "openai-completions",
-      "apiKey": "sk_live_8f3a1c9e4b7d2f0a5c8e1b3d6f9a2c4e7b0d3f5a8c1e4b6d9f2a5c7e0b3d6f8a",
+      "apiKey": "sk_live_REDACTED",
       "models": [
         {
           "id": "qwen-3.8-flash",
@@ -41,7 +41,7 @@ PI_PROVIDER=opencode
 ```bash
 # 文本生成测试
 curl -X POST "http://100.82.98.101:9090/v1/completions" \
-  -H "Authorization: Bearer sk_live_8f3a1c9e4b7d2f0a5c8e1b3d6f9a2c4e7b0d3f5a8c1e4b6d9f2a5c7e0b3d6f8a" \
+  -H "Authorization: Bearer sk_live_REDACTED" \
   -H "Content-Type: application/json" \
   -d '{"model":"Qwen-3.8-27b","prompt":"OK","max_tokens":5}'
 

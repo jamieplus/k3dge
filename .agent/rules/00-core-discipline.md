@@ -3,7 +3,8 @@
 > Protocol slice for tools that look under `.agent/rules/` (ADR-0010).
 > Live agent protocol is repo-root `AGENTS.md`. If this file disagrees, `AGENTS.md` wins; fix this file in the same task.
 
-Immutable, machine-gated invariants. These are enforced by `k3dge check`, not by reading.
+Immutable, machine-gated invariants (1-2, enforced by `k3dge check`, not by reading).
+Items 3-4 are conventions (follow by discipline; no corresponding gate) — do not mistake them for machine invariants.
 
 1. Every code change under `<package_root>/<domain>/`（本仓 `package_root` 见 `.agent/manifest.json`，
    ＝ `src/k3dge` ⇒ 实际路径 `src/k3dge/<domain>/`）that alters a public interface MUST update

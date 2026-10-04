@@ -40,7 +40,6 @@ Note: 修订痕迹见 git 历史。
 ### 2.1.3 封板闸机
 - 机器闸（reviews 文件）：含 `align-pass`、不含 `align-stub`、正文列出该里程碑全部任务、`docs/guides/` 无 `guide-stub`。
 - 资格闸：由 `audit_trigger.audit_closed` 判（审计闭环、`待修=0`，§2.1.4/§2.1.7）；未闭环时 `seal` 返回 `audit_needed`。[^🅰1.2]
-- 不读 `docs/reviews/SUMMARY.md`（禁止手维护类型索引，ADR-0018）；有意留只在 `docs/reviews/LEFTOVERS.md`。
 
 ### 2.1.4 两问拆分：审计是界限，封板只是收摊
 > **🅰1 起**：本节的「两问」形态由 **§2.1.9（一次声明 + 一条链）** 取代；本节的两条不变量
@@ -64,8 +63,9 @@ Note: 修订痕迹见 git 历史。
 ### 2.1.5 审计建议的量化尺子（§2.1.4 的触发条件）[^🅰1.5]
 - "建议审"只用 k3dge 能自量的条件（不连 MCP、不跑 LLM），过线才 `[NEXT] audit_suggested`：
   - **账齐**：当前里程碑顶层任务 N>0 且 in-progress/idea=0。
-  - **C2 嵌套**：触及 `src/` 控制流 AST（if/for/while/try/with）最大深度 ≥ 5。
-  - **体积**：`src/`+`docs/specs/` 变更文件 ≥ 8。
+  - **C2 嵌套**：触及 `src/` 控制流 AST（if/for/while/try/with）最大深度 ≥ 阈值。
+  - **体积**：`src/`+`docs/specs/` 变更文件 ≥ 阈值。
+  - 阈值唯一源：`.agent/pipeline.toml [gates.audit_trigger]`（`c2_nesting_max`/`volume_max`）；标定依据随配置走，不在正文写死魔数。
 - 同一快照只问一次：本里程碑已有报告即视为已审。
 - 不纳入"建议审"的（已有别的闸）：`check` 红（去修/`k3dge sync`）、`guide-stub`（挡真封）。
 - **架构/`overview.md` 更新不再是触发**：没有可数尺子，且"算不算持久设计、写得对不对"归 k3dit/人；改到封板 closure 清单里做（§2.1.4）。

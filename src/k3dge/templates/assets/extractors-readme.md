@@ -30,8 +30,7 @@ lexical = false
 ```
 
 (`fn`/`container`/`type`/… node tables: copy the closest builtin row from
-`src/k3dge/engine/extractor_gen.py` 的 `DEFAULT_LANGS` 里改（名字与 node type 一律实测，不猜）。 Node types must be
-verified against the real grammar — never guessed.)
+`src/k3dge/engine/extractor_gen.py` 的 `DEFAULT_LANGS` 里改（名字与 node type 一律实测，不猜）。)
 
 Generated files carry a `GENERATED` header. `sync` rewrites changed ones and
 prunes stale ones; markerless files are never touched. `k3dge sync` runs the

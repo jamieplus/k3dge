@@ -788,7 +788,7 @@
   "describe_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 597
+      "line": 603
     }
   ],
   "emit": [
@@ -1938,7 +1938,7 @@
   "sync_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 539
+      "line": 545
     }
   ],
   "tag_audit_baseline": [
