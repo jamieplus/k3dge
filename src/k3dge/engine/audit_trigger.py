@@ -124,8 +124,8 @@ def compute_audit_suggestion(workspace: Path) -> Tuple[bool, List[str]]:
         vol_files: Optional[List[str]] = _committed_changed(workspace)
     except Exception:
         vol_files = None
-    # "体积"是"自上次审计以来的改动量"：只看未提交工作区会让每次 commit 把计数清零 ⇒
-    # 按任务提交的里程碑永远攒不够阈值（ocr2-216）。用 committed 窗口 + 工作区的并集。
+    # "体积"是"自上次审计以来的改动量"：committed 窗口可得就取之，缺失退工作区——
+    # 重复计数是它的错，"∪ 工作区"已在 vol_files 选择里给定，二者不相加（ocr2-216）。
     vol = [f for f in (vol_files if vol_files is not None else files)
            if f.startswith("src/") or f.startswith("docs/specs/")]
     if len(vol) >= vol_max:

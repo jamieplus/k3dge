@@ -378,7 +378,7 @@ def search(
     locs: List[Location] = []
     for ln in raw:
         # format: file:line:content —— POSIX 文件名合法可含 `:` ⇒ 按 `:` 硬切会把路径截到
-        # **第一个**冒号并丢行号（静默给错坐标）。用贪婪正则锚定"最后一段数字"即行号（321）。
+        # **第一个**冒号并丢行号（静默给错坐标）。用非贪婪正则锚定**文件名后第一段数字**为行号（321）。
         head, line_no = parsed(ln)
         if line_no is None:
             locs.append(Location(file=head or ln))

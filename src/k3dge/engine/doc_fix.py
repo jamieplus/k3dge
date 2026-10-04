@@ -175,8 +175,9 @@ def _fix_amend_order(text: str) -> str:
 def _fix_footnote_tail(text: str) -> str:
     """把 `[^🅰…]:` 定义块（含缩进续行）整体移到文末（确定性；保持定义间原有顺序）。
 
-    围栏代码块内的同形行不得动：那是示例字面量，不是脚注定义（ocr2-056；与 `_strip_body_meta`、
-    `check_task_body_meta_redundant` 的围栏口径一致）。
+    围栏代码块内的同形行不得动：那是示例字面量，不是脚注定义（ocr2-056）。
+    注意：本函数只跟踪 ``` 围栏切换，未对 ~~~  fences 做等价处理——若引入了 ~~~ 围栏块，
+    同形行判据需扩展（与 `_strip_body_meta` 的两栅栏口径暂不完全一致）。
     """
     lines = text.splitlines()
     blocks: List[List[str]] = []

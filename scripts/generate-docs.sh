@@ -52,7 +52,7 @@ fi
 
 mkdir -p docs/guides
 
-# README has a base version that always exists; refresh its layout when enabled
+# readme=true 且 README.md 缺失时写 base 版；已有 README.md 由用户持有，不重排、不覆盖
 if grep -Eq "^[[:space:]]*readme[[:space:]]*=[[:space:]]*true" "$CONFIG"; then
   if [ ! -f "README.md" ]; then
     echo "[k3dge] README.md not found, creating base version..."

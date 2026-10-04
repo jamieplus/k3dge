@@ -10,7 +10,8 @@ Chain order per ADR-0006 §2.3: `mcp -> cli -> manual`; `skip` records only.
   never a second copy of the connection recipe (ADR-0006 §2.3.3).
 - `cli`:  run `command` via subprocess (the lens's own CLI, e.g. `k3dit check-report`).
 - `manual`: print the `protocol` path and wait for the human/agent to produce the
-  artifact; then verify the artifact exists on disk.
+  artifact. NOTE: this is **not** an on-disk verification, and the returned result is
+  NOT an independent audit (ADR-0006 §2.4).
 
 Identity rule (ADR-0006 §2.2): a transport of peer X may only reach X's own server
 or X's own CLI. The pre-2026-09-02 code resolved every peer's `mcp` transport through

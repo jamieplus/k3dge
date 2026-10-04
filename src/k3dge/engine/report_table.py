@@ -120,7 +120,7 @@ def malformed_rows(text: str) -> list:
 def count_statuses(text: str) -> Dict[str, object]:
     """状态列计数（含 `_ids_<状态>`）。封板闸与 `_count_status` 共用此唯一口径。
 
-    **total＝表内所有数据行**（不因状态未知而漏计）；未知/非法状态进 `_ids_未知状态`；
+    **total＝列数合格的数据行**（列数角色非 12 的畸形行不计，而是进 `malformed`/`_ids_畸形` 供 `audit_closed` 拒闭环）；未知/非法状态进 `_ids_未知状态`；
     开放态别名（`待验证`/`待裁`）并入 `待修` ⇒ fail-closed：有未关行就不可能 `待修==0`（ocr-009）。
     列数不符被跳过的行进 `malformed`/`_ids_畸形`（t-252）——`audit_closed` 据此拒闭环。
     """
