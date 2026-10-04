@@ -409,4 +409,16 @@ freshness 判定**不能跨决策缓存**：内容编辑不改索引 mtime，mem
 两者都属接口设计，P3 性能项按规则 12 需要"实测正向作用"才动。
 
 **reopen 条件**：CI/hook 出现可测量的 `verify-attest` 墙钟占比（先量再改）。
+---
+
+## OCR medium — PowerShell 轨（2026-10-04，`dccff5f6` 扫描有意留）
+
+**事实**：`scripts/*.ps1` 及 `src/k3dge/templates/assets/*.ps1`（`init.ps1`/`gate.ps1`/`generate-docs.ps1`/`k3dge-init-wrapper.ps1`）有关的中低判据（fail-open 面、`$LASTEXITCODE` 未查、`Set-Location` 副作用、横向锁定/路径、symlink 守卫等），本机**没有 `pwsh`**（`which pwsh` 空），无法用 PowerShell 真量实测。
+
+**为什么本轮不改**：各点能否成立/怎么修，需 PowerShell 实测（`pwsh -NoProfile -Command …`）才能判定；本机 macOS 无 pwsh，强改只会加入不受测代码，还有可能把已 fail-closed 的 ps1 面"改松"。
+
+**reopen 条件**：在带 `pwsh` 的 CI/Windows runner 上复跑同等场景并记录结果，再对每条"已修/有意留/待修"重新定论。
+
+**报告**：`docs/reviews/2026-10-04-M12-ocr-scan.md`。
+涉及 ID：`ocr3-046` `ocr3-048` `ocr3-053` `ocr3-173` `ocr3-175` `ocr3-176` `ocr3-178` `ocr3-179` `ocr3-194` `ocr3-282` `ocr3-285` `ocr3-287` `ocr3-288` `ocr3-291`。
 
