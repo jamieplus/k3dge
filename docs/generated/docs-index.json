@@ -497,11 +497,11 @@
       "tokens": "复杂度债续（非 milestone 文件）：CC≥11 函数逐个拆"
     },
     {
-      "path": "docs/tasks/2026-09-30-M12-docs-pipeline_declaration_convergence.md",
+      "path": "docs/tasks/2026-09-30-M12-docs-pipeline_declaration_convergence.done.md",
       "type": "tasks",
-      "id": "2026-09-30-M12-docs-pipeline_declaration_convergence",
+      "id": "2026-09-30-M12-docs-pipeline_declaration_convergence.done",
       "title": "pipeline.toml 声明面收敛：一套路由词表、声明形状数量、规范语义的权威载体",
-      "status": "idea",
+      "status": "done",
       "tokens": "pipeline.toml 声明面收敛：一套路由词表、声明形状数量、规范语义的权威载体"
     },
     {

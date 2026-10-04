@@ -54,3 +54,8 @@ date: 2026-09-30
 - 验证：AST 复扫 `tests/**`＋`src/**` 隐式编码读写均为 **0**；`pytest -q` 922 passed, 2 skipped。
 - 有意不做：切入点 2 的 `tests/helpers.py` 包一层——helper 只是把同一约定挪个地方漂，零容忍守卫已经覆盖。
 
+## 回填（2026-10-04）
+
+复验：`tests/unit/templates/test_test_explicit_encoding.py` 仍 `DEBT = {}`（零容忍）且 3 passed；
+`## 本轮进展` 里的"剩 39 处"是过程快照，已被 `## 结案` 的"75/75 收口"取代，票面无需再动。
+
