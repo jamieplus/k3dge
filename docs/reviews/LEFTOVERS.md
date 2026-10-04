@@ -90,16 +90,17 @@ Denial reason and reopen condition live here only.
 - k3dit 侧 ADAPTER-01 同轮完成：`envelope.py` 删除、CLI 动词改"拒绝并指路"、5 个测试驱动器改直调
   `jobs.create_job`/`collect_job`（副作用 `ingest_prior`/`maybe_run` 显式调）、k3dit 仓 0008 §2.8、spec/指南同步。
 
-## LINE-M10-01 残留 worktree 已清，但线内 5 个提交**没进主干**（待人工判）
+## LINE-M10-01 ✅ 已收口（2026-10-04）：逐文件核验后判定**不并入**，线已删
 
-- **已做**：`git worktree remove .k3dge/wt/M10`（此前 worktree 干净、无未提交改动）；分支 `k3dit/M10` 与
-  救援 tag `rescue/M10-line-20260926 → eb67efb` **都保留**（内容可随时取回）。
-- **证据**：`git cherry -v main k3dit/M10` ⇒ 5 个 "round work M10" 提交**全部带 `+`**（未进主干）；
-  线落后主干 33 个提交；`main...k3dit/M10` 13 文件 +256/−185（含 `milestone_audit.py` 183 行）。
-- **为什么没删分支**：这与先前 `k3dit/M0` 的退役不同——那次线内内容已被主干取代；这次 `git cherry` 说
-  **没有一条进主干** ⇒ 可能是未合并的 M10 审计产物。删线＝丢工作，须人判（合 / 弃 / 只看某几个文件）。
-- **下一步（人）**：`git diff main...k3dit/M10` 逐文件过一遍；要合就 `git merge`/挑提交；要弃就
-  `git branch -D k3dit/M10`（救援 tag 仍在）。
+- **判定**：线内 5 个提交（2026-09-20 "round work M10"，13 文件 +256/−185）**无功能增量**——主体是把主干
+  **已内联**的逻辑抽成函数（`milestone_audit._oneshot_stream_hop/_oneshot_verify_streams`、
+  `contract._domain_file_selected/_file_interface`、`doc_catalog._retired_adr_violations/_id_collision_violations`、
+  `adr_gate._apply_supersedes/_retire_to_obsolete`），行为与主干逐处等价；两处真修正
+  （`seal_flow` 版本不二次 bump、`task_write` 撞名前置）主干**已独立落地**（`seal_flow.py:211`、
+  `task_write.py:548` 并注明 `ocr2-084`）；文档改动（退休 `doc-audit` 措辞等）已被主干后来的 ADR-0022 🅰1 取代。
+  线相对主干落后 261 提交 ⇒ 整条 merge＝高冲突零收益。
+- **处置**：`git worktree remove .k3dge/wt/M10`（更早）；`git tag -d rescue/M10-line-20260926` +
+  `git branch -D k3dit/M10`（2026-10-04，均本地未推）。短期可由 reflog 取回，不再需要救援面。
 
 ## C 验收（2026-09-27，k3dit 上走 `milestone audit M0`）：链路已通，途中修掉 3 个真缺陷
 
