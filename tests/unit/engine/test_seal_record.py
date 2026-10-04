@@ -361,12 +361,18 @@ class TestAuditEvidence(_RepoMixin, TestCase):
         ws = self._repo()
         _git(ws, "-c", "user.name=t", "-c", "user.email=t@t", "tag", "-a", "M10", "-m",
              "备注：中文", "HEAD")
-        orig = locale.getencoding
-        locale.getencoding = lambda: "ascii"
+        # `locale.getencoding` 是 3.11+ 才有的；3.10 没有该属性，用 getattr/setattr 容忍（否则本测试
+        # 在 3.10 直接 AttributeError——被测代码实则硬编 utf-8，不读 locale，此 patch 只是"钉住"意图）。
+        had = hasattr(locale, "getencoding")
+        orig = getattr(locale, "getencoding", None)
+        locale.getencoding = lambda: "ascii"    # type: ignore[attr-defined]
         try:
             ev = audit_evidence(ws, "M10")      # 不得抛 UnicodeDecodeError
         finally:
-            locale.getencoding = orig
+            if had:
+                locale.getencoding = orig       # type: ignore[assignment]
+            else:
+                del locale.getencoding
         self.assertIsInstance(ev, dict)
 
 

@@ -63,15 +63,38 @@ def _source_policy_fallback(text: str) -> str:
     剥注释/空白再比较（`[tool.k3dge] # x` / `[ tool.k3dge ]` 以前被判成"无政策"静默放行，
     ocr2-351）；段存在却取不到值 ⇒ 拒跑，不静默当 legacy。"""
     inside = False
+    in_tool = False
     saw_section = False
     for raw in text.splitlines():
         s = raw.strip()
         if re.match(r"^\[\s*tool\.k3dge\s*\]\s*(#.*)?$", s):
             inside = True
+            in_tool = False
             saw_section = True
+            continue
+        if re.match(r"^\[\s*tool\s*\]\s*(#.*)?$", s):
+            # `[tool]` 下写 `k3dge = ...`（内联表/非表）也是政策声明面：tomllib 路径能判形状，
+            # 回退路径也必须判，否则 `[tool]\nk3dge = "x"` 在 3.10 被当"没政策"静默放行（ocr2-350）。
+            in_tool = True
+            inside = False
             continue
         if s.startswith("["):
             inside = False
+            in_tool = False
+            continue
+        if in_tool:
+            m = re.match(r"^k3dge\s*=\s*(.+)$", s)
+            if m and not m.group(1).strip().startswith("{"):
+                print("[k3dge-source] pyproject 的 [tool.k3dge] 不是表 ⇒ 拒绝静默放行", file=sys.stderr)
+                sys.exit(1)
+            if m:
+                saw_section = True
+                sm = re.search(r"""source\s*=\s*["']([^"']*)["']""", m.group(1))
+                if sm:
+                    return sm.group(1)
+                print("[k3dge-source] pyproject 有 [tool.k3dge] 段但没解析出 source ⇒ 拒跑；请检查该行写法",
+                      file=sys.stderr)
+                sys.exit(1)
             continue
         if inside:
             m = re.match(r"""^source\s*=\s*["']([^"']*)["']\s*(#.*)?$""", s)

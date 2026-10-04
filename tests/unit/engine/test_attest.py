@@ -206,7 +206,7 @@ def test_verify_commit_survives_non_ascii_under_ascii_locale(tmp_path, monkeypat
           "commit", "-q", "--no-verify", "-m", msg,
           env_extra={"GIT_AUTHOR_DATE": m.group(1) + "Z",
                      "GIT_COMMITTER_DATE": m.group(1) + "Z"})
-    monkeypatch.setattr(locale, "getencoding", lambda: "ascii")
+    monkeypatch.setattr(locale, "getencoding", lambda: "ascii", raising=False)  # 3.10 无此属性
     ok, out = verify_commit(ws, _head(ws))     # 不得抛 UnicodeDecodeError
     assert ok, out
 

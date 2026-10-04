@@ -772,7 +772,10 @@ def _post_apply_check(root: Path, workspace: Path) -> dict:
     测试"从"靠人记得跑"变成流程的一步。未声明 ⇒ 跳过（如实报 `cmd=''`）。"""
     cmd = ""
     try:
-        import tomllib
+        try:
+            import tomllib
+        except ModuleNotFoundError:            # pragma: no cover - 3.10（声明面依赖 tomli）
+            import tomli as tomllib  # type: ignore[no-redef]
 
         data = tomllib.loads((Path(workspace) / ".agent" / "pipeline.toml").read_text(encoding="utf-8"))
         cmd = str(((data.get("roles") or {}).get("audit") or {}).get("post_apply_check") or "")
