@@ -2,8 +2,8 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:2b56bd062556187d3d641af240b143112616f22af4e649a25d66ffdc39da40bc`
-- **Last Updated**: 2026-10-03
+- **Contract Hash**: `sha256:d195a7be0a98c3c6d71e0c1714b8cf66c277bd6f61db285000cb4210d93a7595`
+- **Last Updated**: 2026-10-04
 
 ## 1. Domain Boundary & Responsibilities
 - **In Scope**:
@@ -710,11 +710,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict
 from typing import List
+from typing import Optional
 from typing import Tuple
 ACK_REL = '.agent/seal_ack.json'
 load_ack(workspace: Path) -> Dict[str, dict]
 save_ack(workspace: Path, milestone_id: str, baseline: str) -> None
-compute_increment(workspace: Path, b_ack: str, seal_hash: str) -> List[str]
+compute_increment(workspace: Path, b_ack: str, seal_hash: str) -> Optional[List[str]]
 audit_confirmed(workspace: Path, milestone_id: str, head: str) -> Tuple[bool, str, List[str]]
 format_reminder(workspace: Path, milestone_id: str, increment: List[str], head: str) -> str
 from __future__ import annotations

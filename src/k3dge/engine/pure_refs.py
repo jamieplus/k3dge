@@ -717,7 +717,7 @@ def check_retired_adr_dest(rel: str, text: str) -> List[Ref]:
     for key in _DEST_KEYS:
         if fm.get(key.lower()):
             return []
-    if fm.get("status", "").strip() in _DEST_STATUSES:
+    if fm.get("status", "").strip().lower() in {s.lower() for s in _DEST_STATUSES}:
         return []
     return [("ADR_RETIRED_NO_DEST",
              f"{rel}: 退役 ADR 未写去向（需 `merged-into:` / `superseded_by:` / `Status: Rejected` 之一）"

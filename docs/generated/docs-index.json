@@ -409,14 +409,6 @@
       "tokens": "封板收摊清单（上下文压缩）: M7"
     },
     {
-      "path": "docs/reviews/2026-09-10-doc-audit-docs.md",
-      "type": "reviews",
-      "id": "2026-09-10-doc-audit-docs",
-      "title": "审计：文档审计（ADR-0025/0025 + AGENTS/rules/pipeline/protocols/tasks + k3dit spec）",
-      "status": "",
-      "tokens": "审计：文档审计（ADR-0025/0025 + AGENTS/rules/pipeline/protocols/tasks + k3dit spec）"
-    },
-    {
       "path": "docs/reviews/2026-09-12-M8-closure.md",
       "type": "reviews",
       "id": "2026-09-12-M8-closure",

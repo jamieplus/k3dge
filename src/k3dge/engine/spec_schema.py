@@ -62,7 +62,8 @@ def validate_structure(content: str) -> List[str]:
 
 
 def extract_contract_hash(content: str) -> Optional[str]:
-    match = CONTRACT_HASH_RE.search(content)
+    # 与 `validate_structure` 同口径：先去围栏（示例里印的哈希不得顶替真实 digest，ocr2-319 同族）。
+    match = CONTRACT_HASH_RE.search(_strip_fences(content))
     if not match:
         return None
     # 大小写归一：正则带 IGNORECASE，但下游（`contract.py` 的 CONTRACT_DRIFT、sync/generator、

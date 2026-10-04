@@ -391,7 +391,7 @@ def _finalize_task_done(workspace: Path, target: Path, content: str, fm: dict) -
             return False, (
                 f"报告 {report_rel} 不可读（缺失/越界/解码失败），无法验证闭环 ⇒ 不关票；"
                 f"先修好指针或报告（悬空指针另有 DANGLING_REPORT_REF 闸）。"
-            )
+            ), target
         if pending:
             return False, (
                 f"报告 {report_rel} 仍有 {len(pending)} 条待修（{', '.join(pending[:8])}）；"

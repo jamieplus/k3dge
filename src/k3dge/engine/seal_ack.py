@@ -12,7 +12,7 @@ import datetime
 import json
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 ACK_REL = ".agent/seal_ack.json"
 
@@ -52,7 +52,9 @@ def _git(workspace: Path, *argv: str) -> Tuple[int, str]:
     try:
         r = subprocess.run(["git", "-C", str(workspace), *argv],
                            capture_output=True, text=True, timeout=30)
-    except OSError as exc:
+    except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError) as exc:
+        # git 挂起（TimeoutExpired 是 SubprocessError，不是 OSError）/ 输出非 UTF-8 都要按
+        # "git 不可用" fail-clear，不得让异常逃出封板硬闸。
         return 128, str(exc)
     return r.returncode, (r.stdout or "")
 
@@ -71,18 +73,17 @@ def _cites_hash(full_msg: str, seal_hash: str) -> bool:
     return (seal_hash in m) or (len(seal_hash) >= 12 and seal_hash[:12] in m)
 
 
-def compute_increment(workspace: Path, b_ack: str, seal_hash: str) -> List[str]:
+def compute_increment(workspace: Path, b_ack: str, seal_hash: str) -> Optional[List[str]]:
     """`B_ack..HEAD` 中**真更新**（去审计自身 + 去引用 hash）。返回 `["<sha12> <subject>", ...]`。
 
-    读不出（非仓/git 坏）⇒ 当作"算不出增量"返回空，并由调用方另行处理？不：
-    算不出＝无法证明无增量 ⇒ 返回一个哨兵，调用方按"有增量（未知）"提醒。简单起见返回 []，
-    但 `audit_confirmed` 在 git 不可用时直接判未确认（fail-clear），不依赖本函数。
+    git 读不出（非仓/git 坏/超时）⇒ 返回 `None` 哨兵，**不**返回空列表：空列表会被
+    `audit_confirmed` 读成"仅覆盖改动"⇒ 静默判确认（fail-open）。调用方见 None 必须 fail-clear。
     """
     if not b_ack:
         return []
     rc, out = _git(workspace, "log", "--format=%H%x1f%s%x1f%b%x1e", f"{b_ack}..HEAD")
     if rc != 0:
-        return []
+        return None
     inc: List[str] = []
     for rec in out.split("\x1e"):
         rec = rec.strip("\n")
@@ -128,6 +129,9 @@ def audit_confirmed(workspace: Path, milestone_id: str, head: str) -> Tuple[bool
         return True, "已确认（确认基线即当前 HEAD）", []
     if _is_ancestor(workspace, b_ack, head):
         inc = compute_increment(workspace, b_ack, b_ack)
+        if inc is None:
+            # git 读不出增量 ⇒ 无法证明"只有覆盖改动" ⇒ fail-clear（不得当空增量判确认）。
+            return False, "git 不可用，无法核对确认后的增量", []
         if not inc:
             return True, "已确认（确认之后只有覆盖改动：审计自身/引用封版 hash）", []
         return False, f"确认已过期：确认之后有 {len(inc)} 笔真更新", inc

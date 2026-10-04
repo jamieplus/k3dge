@@ -209,7 +209,8 @@ def _closed_job_evidence(workspace: Path, job: dict, fresh_baseline: str) -> Tup
     missing = sign_missing(text)
     if missing:
         return False, f"报告缺署名/来源 {missing}（{path.name}）"
-    if (_field(text, "基线") or "").split()[0].strip("`") != (job.get("baseline") or ""):
+    _baseline = (_field(text, "基线") or "").strip()
+    if not _baseline or _baseline.split()[0].strip("`") != (job.get("baseline") or ""):
         return False, f"报告里的基线≠该单基线（{path.name}）"
     if _ar._parse_audit_stats(text)["待修"] != 0:
         return False, f"报告有待修（{path.name}）"

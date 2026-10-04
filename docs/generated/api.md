@@ -1073,13 +1073,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict
 from typing import List
+from typing import Optional
 from typing import Tuple
 ACK_REL = '.agent/seal_ack.json'
 load_ack(workspace: Path) -> Dict[str, dict]
     # doc: 读确认账（坏/缺 ⇒ 空 dict，不抛）。
 save_ack(workspace: Path, milestone_id: str, baseline: str) -> None
     # doc: 人确认（或授权替打勾）：记 milestone → baseline。失败不抛（调用方按未确认处理）？
-compute_increment(workspace: Path, b_ack: str, seal_hash: str) -> List[str]
+compute_increment(workspace: Path, b_ack: str, seal_hash: str) -> Optional[List[str]]
     # doc: `B_ack..HEAD` 中**真更新**（去审计自身 + 去引用 hash）。返回 `["<sha12> <subject>", ...]`。
 audit_confirmed(workspace: Path, milestone_id: str, head: str) -> Tuple[bool, str, List[str]]
     # doc: 审计确认是否成立（硬闸判据）。返回 (ok, reason, increment)。

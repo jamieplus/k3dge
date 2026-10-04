@@ -67,7 +67,7 @@ def resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]:
     peers = pipeline.get("peers", {})
     parts = action_ref.split(".")
     if len(parts) >= 3 and parts[1] == "actions":
-        peer = peers.get(parts[0], {})
+        peer = peers.get(parts[0], {}) if isinstance(peers, dict) else {}
         acts = peer.get("actions", {}) if isinstance(peer, dict) else {}
         action = acts.get(parts[2]) if isinstance(acts, dict) else None   # 类型守卫，别裸 .get（ocr-094）
         if isinstance(action, dict) and action.get("transports"):

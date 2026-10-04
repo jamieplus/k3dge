@@ -236,7 +236,7 @@
   "audit_confirmed": [
     {
       "file": "src/k3dge/engine/seal_ack.py",
-      "line": 111
+      "line": 112
     }
   ],
   "audit_evidence": [
@@ -818,7 +818,7 @@
   "compute_increment": [
     {
       "file": "src/k3dge/engine/seal_ack.py",
-      "line": 74
+      "line": 76
     }
   ],
   "consume": [
@@ -984,7 +984,7 @@
   "format_reminder": [
     {
       "file": "src/k3dge/engine/seal_ack.py",
-      "line": 137
+      "line": 141
     }
   ],
   "format_seal_trailers": [
@@ -1760,7 +1760,7 @@
   "run_audit_flow": [
     {
       "file": "src/k3dge/engine/milestone_audit.py",
-      "line": 599
+      "line": 600
     }
   ],
   "run_milestone_alignment": [

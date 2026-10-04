@@ -431,7 +431,10 @@ def run_action(
                 # 静默降级 manual ⇒ 可封板（ocr2-290）：非正数与非法值同处理。
                 raise ValueError(f"non-positive timeout {timeout!r}")
         except (TypeError, ValueError):
-            timeout = int(timeout_default) if str(timeout_default).isdigit() else 120
+            # fallback 也要过正数闸：`str(0).isdigit()` 为真 ⇒ 旧式回落会把 0 原样带下去，
+            # 又回到"每次传输瞬间超时 ⇒ 静默降级"（ocr2-290 同一后果）。
+            _td = int(timeout_default) if str(timeout_default).isdigit() else 0
+            timeout = _td if _td > 0 else 120
             print(f"[PEER] WARN: action '{action_ref}' 的 timeout 非法（{t.get('timeout')!r}）⇒ 用 {timeout}s",
                   file=sys.stderr)
         # 下一跳也要过合法集：拼错/缺 provider 的条目会被播报成"降级到 <那个值>"（448）
