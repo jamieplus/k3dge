@@ -30,6 +30,8 @@ k3dge-audit/
 # 审计条件清单同样是运行态投影（开跑即重写）：tracked 会让每次审计
 # 都把工作树弄脏 ⇒ 落补丁相位被自家 DIRTY_TREE 判据挡（ADR-0004 §2.1.10）
 .agent/audit_checklist.json
+# 审计确认（人主观确认全版 audit 的本地记录）：运行态投影，不入库（ADR-0004 §2.1.14）
+.agent/seal_ack.json
 # 弹壳区：一次性施工脚本，seal 即清
 /tmp/
 # understand 技能产物（知识图谱 + 批次中间件，6MB 级派生物，永不入库）

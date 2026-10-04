@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:6a19841939da877e875fb869a4a7986e7df2159bf96ecd19f192efe4897532cf`
+- **Contract Hash**: `sha256:51395cf11153bd7eb0404acfb1f87608a8b0b878ec0bf55d0a72f0b3ca200fc6`
 - **Last Updated**: 2026-10-03
 
 ## 1. Domain Boundary & Responsibilities
@@ -649,6 +649,17 @@ seal_record(workspace: Path, milestone_id: str, *, baseline: str, seat: str='', 
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
 from __future__ import annotations
 from pathlib import Path
+from typing import Dict
+from typing import List
+from typing import Tuple
+ACK_REL = '.agent/seal_ack.json'
+load_ack(workspace: Path) -> Dict[str, dict]
+save_ack(workspace: Path, milestone_id: str, baseline: str) -> None
+compute_increment(workspace: Path, b_ack: str, seal_hash: str) -> List[str]
+audit_confirmed(workspace: Path, milestone_id: str, head: str) -> Tuple[bool, str, List[str]]
+format_reminder(workspace: Path, milestone_id: str, increment: List[str], head: str) -> str
+from __future__ import annotations
+from pathlib import Path
 from typing import Optional
 from typing import Tuple
 from k3dge.engine import gates
@@ -656,7 +667,7 @@ from k3dge.engine.align import run_milestone_alignment
 from k3dge.engine import seal as seal_mod
 from k3dge.engine.seal import seal_milestone
 from k3dge.engine.seal import seal_preconditions_error
-run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False, no_version_bump: bool=False) -> Tuple[str, str]
+run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False, no_version_bump: bool=False, confirm_audit: bool=False) -> Tuple[str, str]
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path

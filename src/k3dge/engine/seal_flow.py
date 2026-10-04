@@ -292,11 +292,13 @@ def run_seal_flow(
     prompter: Optional[_Prompt] = None,
     skip_enter_prompt: bool = False,
     no_version_bump: bool = False,
+    confirm_audit: bool = False,
 ) -> Tuple[str, str]:
-    """封板＝三相位（ADR-0004 §2.1.9）：**预审 → 审计 → 审核后自动**。
+    """封板＝三相位（ADR-0004 §2.1.9/§2.1.14）：**预审 → 审计确认 → 审核后自动**。
 
     唯一入口：人发起 `seal` 就是在宣布"要收这一章"；幂等重入（预审失败可修完再 seal）。
-    审计是封板的**主体**（相位 2，本流程自己跑，不靠外部 hook 先跑一遍）；审计正常返回
+    审计已与 seal 解耦（§2.1.14）：相位 2 不再跑 k3dit，只认**审计确认**（人主观确认全版
+    audit 已做，或 `--confirm-audit` 授权替打勾；硬闸，不可绕过）。未确认 ⇒ 提醒三出路。
     status 闭集＝{sealed, seal_declined, rejected, audit_open, escalated}：审计在办/升级态**原样返回**（不是 docstring 漏掉的野值），只有 `sealed` 代表收章完成（462）
     """
     from k3dge.engine import nextstep
@@ -338,28 +340,32 @@ def run_seal_flow(
         return True, ""
 
     def _audit(ctx):
-        """相位 2：**审计是封板的主体**（ADR-0004 §2.1.9）。
+        """相位 2：**审计确认**（ADR-0004 §2.1.14；seal/audit 已解耦）。
 
-        只在闭集里的 `closed` / `degraded-manual` 能过（§2.1.11）——`skip`/空转会在
-        `run_audit_flow` 里被拦成 `refused`。基线 B 在审计**之前**取（审哪版封哪版），
-        席位取自落盘报告；两者都进相位 3 的封版提交 trailer。
+        不跑 k3dit（`k3dge milestone audit` 是独立入口；第三方可替代）。只认**人主观确认**
+        （`seal_ack`，基线绑定；`--confirm-audit` 授权替打勾）。未确认 ⇒ 硬闸：提醒三出路，
+        不推进（`audit_unconfirmed`）。确认有效 ⇒ 跳过审计执行，直接进相位 3。
         """
-        from k3dge.engine.audit_flow import SEALABLE_AUDIT_RESULTS, audit_result_of
-        from k3dge.engine.milestone_audit import run_audit_flow
+        from k3dge.engine import seal_ack as _ack
 
-        baseline = seal_mod.head_commit(workspace)  # B：审计输入标识（git hash，不用 job id）
-        status, amsg = run_audit_flow(workspace, milestone_id, prompter=prompt)
-        result = audit_result_of(status)
-        ctx["audit_status"] = status
-        if result not in SEALABLE_AUDIT_RESULTS:
-            return False, gates.Rejection(
-                "audit_noop",
-                f"审计未正常返回（status={status}，result={result}）：封板停下。\n{amsg}",
-            )
-        ctx["audit_baseline"] = baseline
-        ctx["audit_result"] = result
-        ctx["audit_seat"] = _report_seat(workspace, milestone_id)
-        return True, f"\n  审计: {result}（{status}；基线 {baseline[:12]}）"
+        if confirm_audit:
+            # 人授权"当前即审后状态"：替打勾（记当前 HEAD）。写不出 ⇒ 按未确认收（fail-clear）。
+            try:
+                _ack.save_ack(workspace, milestone_id, seal_mod.head_commit(workspace))
+            except OSError as exc:
+                return False, gates.Rejection("audit_unconfirmed", f"确认写不进 { _ack.ACK_REL }：{exc}")
+        head = seal_mod.head_commit(workspace)
+        ok, reason, incr = _ack.audit_confirmed(workspace, milestone_id, head)
+        if ok:
+            ctx["audit_baseline"] = head
+            ctx["audit_result"] = "closed"
+            ctx["audit_seat"] = "human-confirmed"
+            ctx["audit_status"] = "audited"
+            return True, f"\n  审计: 已确认（{reason}；基线 {head[:12]}）"
+        return False, gates.Rejection(
+            "audit_unconfirmed",
+            _ack.format_reminder(workspace, milestone_id, incr, head),
+        )
 
     def _archive(_ctx):
         err = seal_preconditions_error(workspace, milestone_id)

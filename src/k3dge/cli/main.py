@@ -870,6 +870,7 @@ def cmd_milestone(args: argparse.Namespace) -> int:
             prompter=_Prompt.default(),
             skip_enter_prompt=getattr(args, "yes", False),
             no_version_bump=getattr(args, "no_version_bump", False),
+            confirm_audit=getattr(args, "confirm_audit", False),
         )
         print(msg)
         _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] milestone seal -> {m_id} status={status}")
@@ -1269,7 +1270,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_milestone.add_argument(
         "--yes",
         action="store_true",
-        help="for seal: skip the enter-seal prompt and enter the flow immediately (audit still mandatory)",
+        help="for seal: skip the enter-seal prompt and enter the flow immediately (audit confirmation still required)",
+    )
+    p_milestone.add_argument(
+        "--confirm-audit",
+        action="store_true",
+        help="for seal: confirm the current tree is post-audit (human authorizes; writes the audit confirmation for HEAD) instead of running an audit",
     )
     p_milestone.set_defaults(func=cmd_milestone)
 

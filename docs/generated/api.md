@@ -983,6 +983,23 @@ seal_record(workspace: Path, milestone_id: str, *, baseline: str, seat: str='', 
     # doc: 相位 3 的持久记录：**封版提交**（归档/提版/收摊/审计产出一起进）+ 边界 tag。
 seal_milestone(workspace: Path, milestone_id: str) -> Tuple[bool, str]
     # doc: 纯归档动作：id 合法 + 有任务 + 状态合法 → `_seal_archive`。策略闸在 `seal_preconditions_error`。
+# seal_ack.py
+from __future__ import annotations
+from pathlib import Path
+from typing import Dict
+from typing import List
+from typing import Tuple
+ACK_REL = '.agent/seal_ack.json'
+load_ack(workspace: Path) -> Dict[str, dict]
+    # doc: 读确认账（坏/缺 ⇒ 空 dict，不抛）。
+save_ack(workspace: Path, milestone_id: str, baseline: str) -> None
+    # doc: 人确认（或授权替打勾）：记 milestone → baseline。失败不抛（调用方按未确认处理）？
+compute_increment(workspace: Path, b_ack: str, seal_hash: str) -> List[str]
+    # doc: `B_ack..HEAD` 中**真更新**（去审计自身 + 去引用 hash）。返回 `["<sha12> <subject>", ...]`。
+audit_confirmed(workspace: Path, milestone_id: str, head: str) -> Tuple[bool, str, List[str]]
+    # doc: 审计确认是否成立（硬闸判据）。返回 (ok, reason, increment)。
+format_reminder(workspace: Path, milestone_id: str, increment: List[str], head: str) -> str
+    # doc: 未确认时的提醒（三出路 + 冻结警告 + 增量清单）。
 # seal_flow.py
 from __future__ import annotations
 from pathlib import Path
@@ -993,8 +1010,8 @@ from k3dge.engine.align import run_milestone_alignment
 from k3dge.engine import seal as seal_mod
 from k3dge.engine.seal import seal_milestone
 from k3dge.engine.seal import seal_preconditions_error
-run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False, no_version_bump: bool=False) -> Tuple[str, str]
-    # doc: 封板＝三相位（ADR-0004 §2.1.9）：**预审 → 审计 → 审核后自动**。
+run_seal_flow(workspace: Path, milestone_id: str, *, prompter: Optional[_Prompt]=None, skip_enter_prompt: bool=False, no_version_bump: bool=False, confirm_audit: bool=False) -> Tuple[str, str]
+    # doc: 封板＝三相位（ADR-0004 §2.1.9/§2.1.14）：**预审 → 审计确认 → 审核后自动**。
 # search.py
 from __future__ import annotations
 from dataclasses import dataclass

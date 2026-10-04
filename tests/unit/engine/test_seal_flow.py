@@ -42,10 +42,22 @@ def _record_ok():
 
 
 def _audit_ok(status: str = "audited"):
-    """seal 相位 2 的审计桩：`run_audit_flow` 自身的语义由 TestAuditFlow/TestAuditNoNoop 管，
-    seal 这边只关心"审计返回了什么 ⇒ 封板走不走"（ADR-0004 §2.1.9/§2.1.11）。"""
-    return mock.patch("k3dge.engine.milestone_audit.run_audit_flow",
-                      return_value=(status, f"audit {status}"))
+    """seal 相位 2 只认审计确认（ADR-0004 §2.1.14），不再跑 k3dit。
+
+    mock 确认通过；同时把 `run_audit_flow` 换成必抛，证明解耦（seal 若还调 k3dit 即红）。
+    `run_audit_flow` 自身的语义由 TestAuditFlow/TestAuditNoNoop 管。
+    """
+    import contextlib
+
+    @contextlib.contextmanager
+    def _both():
+        with mock.patch("k3dge.engine.seal_ack.audit_confirmed",
+                        return_value=(True, "已确认（测试）", [])), \
+             mock.patch("k3dge.engine.milestone_audit.run_audit_flow",
+                        side_effect=AssertionError("seal must not run k3dit (audit decoupled)")):
+            yield
+
+    return _both()
 
 
 def _mk_task(ws, mid="M1"):
@@ -250,20 +262,50 @@ class TestAuditFlow(TestCase):
 
 
 class TestSealFlow(TestCase):
-    def test_seal_runs_the_audit_itself_and_refusal_stops_it(self) -> None:
-        """相位 2（ADR-0004 §2.1.9）：审计由 **seal 自己**跑（不再靠外部 hook 先跑）。
-        审计没正常返回（refused/escalated）⇒ 不归档、不前进版号。"""
+    def test_seal_refuses_without_audit_confirmation_and_points_to_options(self) -> None:
+        """相位 2（ADR-0004 §2.1.14）：seal 不跑 k3dit，只认审计确认。未确认 ⇒ 硬闸，
+        给三出路提醒（第三方/跑 audit/`--confirm-audit`），不归档、不前进版号。
+        且 `run_audit_flow`（k3dit）必须**不被调用**（解耦证据）。"""
         ws = _ws(self)
         _mk_task(ws)
         with mock.patch("k3dge.engine.milestone_audit.run_audit_flow",
-                        return_value=("refused", "审计未成（跳被跳过）")) as audit, \
+                        side_effect=AssertionError("seal must not run k3dit")) as audit, \
              mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])), \
              mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed")) as seal:
             status, msg = run_seal_flow(ws, "M1", prompter=_Prompt(answers=["y"]))
         self.assertEqual(status, "rejected")
-        self.assertIn("refused", msg)
-        audit.assert_called_once()
+        # 硬闸编码 `audit_unconfirmed`（见 Rejection）；消息给三出路提醒 + 冻结警告。
+        self.assertIn("审计未确认", msg)
+        self.assertIn("--confirm-audit", msg)
+        self.assertIn("k3dge milestone audit M1", msg)
+        self.assertIn("不要再改源码", msg)
+        audit.assert_not_called()
         seal.assert_not_called()
+
+    def test_confirm_audit_flag_checks_the_box(self) -> None:
+        """`--confirm-audit`＝人授权"当前即审后状态"：替打勾后不再拦（不跑 k3dit）。"""
+        import subprocess as _sp
+
+        ws = _ws(self)
+        _mk_task(ws)
+        for cmd in (["init", "-q", "-b", "main"],
+                    ["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+            _sp.run(["git", "-C", str(ws), *cmd], check=True, capture_output=True)
+        _sp.run(["git", "-C", str(ws), "add", "-A"], check=True, capture_output=True)
+        _sp.run(["git", "-C", str(ws), "-c", "user.name=t", "-c", "user.email=t@t",
+                 "commit", "-qm", "chore: seed"], check=True, capture_output=True)
+        with mock.patch("k3dge.engine.milestone_audit.run_audit_flow",
+                        side_effect=AssertionError("seal must not run k3dit")), \
+             mock.patch("k3dge.engine.seal_flow.run_milestone_alignment", return_value=(True, "ok", [])), \
+             mock.patch("k3dge.engine.seal_flow.seal_preconditions_error", return_value=None), \
+             mock.patch("k3dge.engine.seal_flow.seal_milestone", return_value=(True, "sealed M1")) as seal:
+            status, msg = run_seal_flow(ws, "M1", skip_enter_prompt=True, prompter=_Prompt(answers=[]),
+                                        confirm_audit=True)
+        self.assertEqual(status, "sealed", msg)
+        seal.assert_called_once()
+        from k3dge.engine import seal_ack as _ack
+
+        self.assertTrue(_ack.load_ack(ws).get("M1", {}).get("baseline"), "确认必须落盘")
 
     def test_rerun_does_not_bump_version_twice(self) -> None:
         """幂等重入：已立边界 tag ⇒ 第二次 seal **不再推版号**（09-28 code-7 / ocr-443 同族）。"""
