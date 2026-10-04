@@ -6,8 +6,15 @@ set -euo pipefail
 _resolve_dir() {
   # 跟随符号链接求脚本**真实**所在目录（ocr2-378）：`dirname "$SELF"` 只给链接所在目录，
   # `ln -s .../k3dge-init.sh ~/bin` 后会去 `~/bin/scripts/init.sh` 找错地方。
-  local target="$1" dir link
+  local target="$1" dir link _n=0
   while [ -L "$target" ]; do
+    _n=$((_n + 1))
+    if [ "$_n" -gt 40 ]; then
+      # 自引用/环形链接（`ln -s self self`、`a->b,b->a`）会让下面的 readlink 永远解不完 ⇒
+      # 死循环挂死。设层数上限，超了拒跑（ocr3）。
+      echo "[k3dge] 符号链接解析超过 40 层（自引用/环？）⇒ 拒跑：$1" >&2
+      exit 1
+    fi
     dir="$(cd "$(dirname "$target")" && pwd -P)"
     link="$(readlink "$target")"
     case "$link" in

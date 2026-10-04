@@ -37,9 +37,25 @@ if [ -z "$_WANT" ] && [ -f "$ROOT/pyproject.toml" ]; then
     _WANT="${_WANT%%$'\n'*}"
     # 段里写了 `source =` 却没解析出值（值非字符串/写法畸形）≠ 没声明政策：拒跑，别静默当 legacy
     # 放行一个未校验的判定核（ocr2-356，与 gate.ps1 同口径）。
-    if [ -z "$_WANT" ] && awk '/^\[[[:space:]]*tool\.k3dge[[:space:]]*\]/{f=1;next} /^\[/{f=0} f' \
-        pyproject.toml 2>/dev/null | grep -Eq '^[[:space:]]*source[[:space:]]*='; then
+    # 单条 awk + END 退出码：不用 `awk | grep -q`（grep 首匹配即关管道 ⇒ awk 收 SIGPIPE 141，
+    # `set -o pipefail` 下整段判据静默为假 ⇒ fail-open，ocr3）。
+    if [ -z "$_WANT" ] && awk '
+        /^\[[[:space:]]*tool\.k3dge[[:space:]]*\]/ {f=1; next}
+        /^\[/ {f=0}
+        f && /^[[:space:]]*source[[:space:]]*=/ {found=1}
+        END {exit(found?0:1)}
+      ' pyproject.toml 2>/dev/null; then
       echo "[k3dge-source] pyproject 有 [tool.k3dge].source 但没解析出值 ⇒ 拒跑；请检查该行写法" >&2
+      exit 2
+    fi
+    # `[tool]` 下写 `k3dge = <非表>`（字符串/数组/数字）也是非法政策形状：与 gate.py 同口径拒跑。
+    if [ -z "$_WANT" ] && awk '
+        /^\[[[:space:]]*tool[[:space:]]*\]/ {f=1; next}
+        /^\[/ {f=0}
+        f && /^[[:space:]]*k3dge[[:space:]]*=/ && $0 !~ /\{/ {bad=1}
+        END {exit(bad?0:1)}
+      ' pyproject.toml 2>/dev/null; then
+      echo "[k3dge-source] pyproject 的 [tool] 下 k3dge 不是表（非法政策形状）⇒ 拒跑" >&2
       exit 2
     fi
   fi

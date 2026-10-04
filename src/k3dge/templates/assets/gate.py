@@ -48,7 +48,12 @@ def _source_policy(pyproject: pathlib.Path) -> str:
         if not isinstance(sec, dict):
             print("[k3dge-source] pyproject 的 [tool.k3dge] 不是表 ⇒ 拒绝静默放行", file=sys.stderr)
             sys.exit(1)
-        src = sec.get("source", "")
+        if "source" not in sec:
+            # 段存在却没声明 source：与文本回退路径（`saw_section` ⇒ 拒跑）同口径，不静默当 legacy。
+            print("[k3dge-source] pyproject 有 [tool.k3dge] 段但没声明 source ⇒ 拒绝静默放行",
+                  file=sys.stderr)
+            sys.exit(1)
+        src = sec["source"]
         if not isinstance(src, str):
             print(f"[k3dge-source] pyproject 的 source 不是字符串（{type(src).__name__}）⇒ 拒绝静默放行",
                   file=sys.stderr)

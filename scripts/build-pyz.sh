@@ -57,6 +57,17 @@ if [ -n "$_found" ]; then
   printf '%s\n' "$_found" >&2
   exit 1
 fi
+# zipapp 会把符号链接**解引用**后打进产物：`src/x -> ~/.aws/credentials` 这类链接目标会外发，
+# 而上面的 find 只按**名字**匹配、`-type f` 又不跟随软链 ⇒ 漏。src 本不该有符号链接，一律拒（ocr3）。
+if ! _links="$(find src -type l 2>/dev/null)"; then
+  echo "[build-pyz] 符号链接扫描的 find 失败 ⇒ 无法证明干净，拒绝打包" >&2
+  exit 1
+fi
+if [ -n "$_links" ]; then
+  echo "[build-pyz] src/ 含符号链接（zipapp 会解引用其目标，可能外发仓外文件）⇒ 拒绝打包：" >&2
+  printf '%s\n' "$_links" >&2
+  exit 1
+fi
 # 产物 shebang 可配（缺省 env python3）；与构建解释器不一致时提示——下游无 `python3` 或版本 < 3.10
 # 会在**别人的机器上**启动失败，且很难归因（ocr-013）。
 SHEBANG="${PYZ_SHEBANG:-/usr/bin/env python3}"
