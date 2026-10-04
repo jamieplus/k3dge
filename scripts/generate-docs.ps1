@@ -35,18 +35,25 @@ $script:Fails = 0
 if (-not (Test-Path $CONFIG)) {
   Write-Host "[k3dge] $CONFIG not found, creating from preset..."
   New-Item -ItemType Directory -Force -Path ".agent" | Out-Null
-  try {
-    Write-TextFile $CONFIG @(
-      "[docs]",
-      "readme = true",
-      "user_guide = true",
-      "architecture = true",
-      "api_guide = false",
-      "deployment = false",
-      "changelog = true",
-      "faq = false"
-    )
-  } catch { $script:Fails++; Write-Host "[k3dge] FAIL: $CONFIG：$_" }
+  # 首选**字节锁定的模板**（`pairs.PAIRS` 把 `.agent/docs.toml` 与它对锁）；就地重写内联预设会让
+  # "配置丢失→恢复"造出与模板不一致的内容 ⇒ 自举下 TEMPLATE_DRIFT 红（与 .sh 轨 ocr-164 同口径）。
+  $Tpl = Join-Path $Root "src/k3dge/templates/assets/docs.toml.template"
+  if (Test-Path -LiteralPath $Tpl -PathType Leaf) {
+    Copy-Item -LiteralPath $Tpl -Destination $CONFIG -Force
+  } else {
+    try {
+      Write-TextFile $CONFIG @(
+        "[docs]",
+        "readme = true",
+        "user_guide = true",
+        "architecture = true",
+        "api_guide = false",
+        "deployment = false",
+        "changelog = true",
+        "faq = false"
+      )
+    } catch { $script:Fails++; Write-Host "[k3dge] FAIL: $CONFIG：$_" }
+  }
 }
 
 New-Item -ItemType Directory -Force -Path "docs/guides" | Out-Null

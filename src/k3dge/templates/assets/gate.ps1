@@ -1,5 +1,11 @@
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
+# 布局假设校验（与 gate.py:13-15 / gate.sh 同口径）：被复制/软链到别的深度会指错根，
+# 政策/收据/venv 全在错根上算，且以"没声明政策"静默放行（ocr2-349）。
+if (-not (Test-Path (Join-Path $Root ".agent"))) {
+  [Console]::Error.WriteLine("[k3dge] gate.ps1: 推断的仓根 '$Root' 里没有 .agent/ ⇒ 布局假设不成立，拒跑")
+  exit 1
+}
 Set-Location $Root
 $cmdArgs = if ($args.Count -eq 0) { @("check") } else { $args }
 
@@ -76,7 +82,12 @@ if (Test-Path -LiteralPath $venvExe -PathType Leaf) {
 $k3dge = Get-Command k3dge -ErrorAction SilentlyContinue
 if ($k3dge) {
   if ($want) {
-    # 收据只覆盖 `.venv`；全局那份来源未经校验 ⇒ 至少出声（与 gate.sh 同口径，ocr-158）。
+    # 收据只覆盖 `.venv`；全局那份来源未经校验。默认**拒跑**（与 gate.py:138-142 / gate.sh:91-94
+    # 同口径）——删 .venv 二进制比伪造收据省事，出声回落＝把来源校验变噪音（ocr3）。
+    if ($env:K3DGE_ALLOW_GLOBAL -ne "1") {
+      [Console]::Error.WriteLine("[k3dge-source] 政策已声明但 .venv/Scripts/k3dge.exe 缺失：全局 k3dge 来源未经校验 ⇒ 拒跑（K3DGE_ALLOW_GLOBAL=1 可强制回落）")
+      exit 2
+    }
     [Console]::Error.WriteLine("[k3dge-source] WARN: 政策已声明但 .venv/Scripts/k3dge.exe 缺失 ⇒ 回落全局 k3dge（其来源未经收据校验）：$($k3dge.Source)")
   }
   # 走解析到的那一条（`Get-Command` 可能命中 function/alias/.ps1 垫片；裸名 `& k3dge`

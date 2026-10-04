@@ -98,9 +98,12 @@ if ($self) {
   Write-Host "[k3dge] pip install -e .[dev] (self)"
   & $PyVenv -m pip install -q -e ".[dev]"
   if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] pip install 失败 (exit $LASTEXITCODE)"); exit 1 }
-  # self 分支不设 `$InstallTarget` ⇒ 后文收据推导落空，写出空收据（而 gate 现拒空收据，ocr2-102）。
   # self 装的就是本 checkout，收据记其路径（与 K3DGE_HOME editable 同形）。
   $InstallTarget = "$K3dgeHome[mcp]"
+  # 收据原先只在 else 分支落盘 ⇒ self 路径**从不写收据**，而 gate 在"政策已声明但收据缺失"
+  # 时 exit 2 ⇒ self-bootstrap 后每次 gate 都拒跑（ocr3）。self 分支同样落盘。
+  $selfRec = ($InstallTarget -replace '\[mcp\]$','') -replace '^git\+',''
+  [System.IO.File]::WriteAllText((Join-Path $Target ".venv/k3dge-source.txt"), $selfRec + "`n", (New-Object System.Text.UTF8Encoding($false)))
 } else {
   $InstallFlags = @()
   if ([string]::IsNullOrWhiteSpace($env:K3DGE_SOURCE) -or $env:K3DGE_SOURCE -eq "pypi") {
