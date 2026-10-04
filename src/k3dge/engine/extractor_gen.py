@@ -189,7 +189,9 @@ def _check_row(name: str, row: Any) -> Dict[str, Any]:
         if not isinstance(v, list) or not all(isinstance(x, str) for x in v):
             raise ExtractorConfigError(f"[languages.{name}] '{k}' must be a list of strings")
     # 这些值会被**直接内联**进生成的源码字面量 ⇒ 挡引号/反斜杠/换行（否则语法错或注入，ocr-076）。
-    for k in ("grammar", "lang_func", "lang_name"):
+    # `lang_name` **只作字符串字面量**（`Language(ptr, "{lang_name}")`）⇒ 不该按点分标识符校验，
+    # 否则合法的 `"c++"`/`"c-sharp"` 被误拒；其内联安全由下面的 `_BAD_INLINE` 管。
+    for k in ("grammar", "lang_func"):
         if not _TOKEN_RE.fullmatch(row[k]):
             raise ExtractorConfigError(f"[languages.{name}] '{k}' 只能是标识符/模块名（{row[k]!r}）")
     _inline = [row["package"], row["wrapper_kw"]] + [x for k in ("suffixes", "wrapper", "fn", "container",
@@ -562,7 +564,9 @@ def sync_extractors(workspace: Path) -> Dict[str, Any]:
         dest = plugdir / f"{name}.py"
         try:
             existing = dest.read_text(encoding="utf-8")
-        except OSError:
+        except (OSError, UnicodeDecodeError):
+            # 非 UTF-8 的手写/陈旧文件正是本冲突守卫要挡的对象；`UnicodeDecodeError` 是 ValueError、
+            # 不被 `OSError` 接住 ⇒ 会裸崩 sync_extractors（ocr3）。
             existing = None
         # 空文件没有首行：`splitlines()[0]` 直接 IndexError，抢在冲突守卫之前崩（ocr2-060）。
         # 空文件＝无标记＝非生成产物，按同一规则记冲突（不覆盖），不抛异常。
@@ -580,7 +584,7 @@ def sync_extractors(workspace: Path) -> Dict[str, Any]:
             continue
         try:
             head = p.read_text(encoding="utf-8")[:200]
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             continue
         # 只看**首行**：以前 `MARKER in head`（前 200 字符子串）会把手工维护文件里
         # "提到这行标记"的注释/docstring 当成生成件直接 unlink（破坏性误判，422）

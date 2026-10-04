@@ -866,7 +866,7 @@
   "describe_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 603
+      "line": 607
     }
   ],
   "emit": [
@@ -1676,7 +1676,7 @@
   "render_plugin": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 259
+      "line": 261
     }
   ],
   "render_readme_layout": [
@@ -1730,7 +1730,7 @@
   "resolve_languages": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 213
+      "line": 215
     }
   ],
   "resolve_role": [
@@ -2016,7 +2016,7 @@
   "sync_extractors": [
     {
       "file": "src/k3dge/engine/extractor_gen.py",
-      "line": 545
+      "line": 547
     }
   ],
   "tag_audit_baseline": [
