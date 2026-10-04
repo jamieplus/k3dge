@@ -170,7 +170,7 @@
   "amend_format": [
     {
       "file": "src/k3dge/engine/adr_gate.py",
-      "line": 279
+      "line": 288
     }
   ],
   "analyze_adr_coverage": [
@@ -260,7 +260,7 @@
   "begin_run": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 300
+      "line": 320
     }
   ],
   "blocking_cycles": [
@@ -338,7 +338,7 @@
   "bump_milestone": [
     {
       "file": "src/k3dge/engine/milestone_pointer.py",
-      "line": 120
+      "line": 126
     }
   ],
   "bump_verify_attempt": [
@@ -788,7 +788,7 @@
   "collect_domain_interface": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 384
+      "line": 387
     }
   ],
   "commit_applied": [
@@ -812,7 +812,7 @@
   "compute_hash": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 380
+      "line": 383
     }
   ],
   "compute_increment": [
@@ -876,13 +876,13 @@
     },
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 343
+      "line": 363
     }
   ],
   "emit_all": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 377
+      "line": 397
     }
   ],
   "ensure": [
@@ -918,7 +918,7 @@
   "extract_python_interface": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 350
+      "line": 353
     }
   ],
   "facts_of": [
@@ -1314,7 +1314,7 @@
   "load_all": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 423
+      "line": 443
     }
   ],
   "load_mcp_document": [
@@ -1332,7 +1332,7 @@
   "load_persisted": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 444
+      "line": 464
     }
   ],
   "load_pipeline_config": [
@@ -1424,13 +1424,13 @@
   "next_for_rejection": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 495
+      "line": 515
     }
   ],
   "normalize": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 374
+      "line": 377
     }
   ],
   "old_name_warnings": [
@@ -1514,7 +1514,7 @@
   "persist": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 312
+      "line": 332
     }
   ],
   "persist_external_audit_report": [
@@ -1580,7 +1580,7 @@
   "question_text": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 531
+      "line": 551
     }
   ],
   "read_checklist": [
@@ -1796,7 +1796,7 @@
   "run_seal_flow": [
     {
       "file": "src/k3dge/engine/seal_flow.py",
-      "line": 288
+      "line": 293
     }
   ],
   "salvage_bundle": [
@@ -1886,7 +1886,7 @@
   "seal_ready_for": [
     {
       "file": "src/k3dge/engine/nextstep.py",
-      "line": 464
+      "line": 484
     }
   ],
   "seal_record": [
@@ -1998,7 +1998,7 @@
   "symbol_diff": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 533
+      "line": 536
     }
   ],
   "sync_all": [
@@ -2136,7 +2136,7 @@
   "verify_contract": [
     {
       "file": "src/k3dge/engine/contract.py",
-      "line": 447
+      "line": 450
     }
   ],
   "violations_for": [

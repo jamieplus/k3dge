@@ -265,7 +265,12 @@ def _write_closure_note(workspace: Path, milestone_id: str) -> Path:
             return p
         if keep:
             return p          # 幂等重入：人勾过的清单不擦（旧实现无条件 write_text 覆盖）
-    p.write_text(body + "\n", encoding="utf-8")
+    try:
+        p.write_text(body + "\n", encoding="utf-8")
+    except OSError as exc:
+        # 写盘失败（权限/只读 FS）不得在此抛穿 `run_phase`——那会在 archive/version/tag 已推进后
+        # 崩溃封板（半封状态）。收摊清单是 advisory，失败出声、跳过。
+        print(f"[seal_flow] WARN: 收摊清单写入失败（{type(exc).__name__}: {exc}）⇒ 跳过", file=sys.stderr)
     return p
 
 

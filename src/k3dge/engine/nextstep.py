@@ -285,9 +285,29 @@ def _write_cards(workspace: Path, cards: list, primary: Optional[str]) -> None:
         payload = {"next": list(cards), "primary": primary}
         # 侧车被 CLI（含 git hook 进程）与 MCP server 共享：`write_text` 先截断 ⇒ 并发读者
         # 可能读到空/半个 JSON，`load_all` 又把解析失败当"本轮无处理点"（ocr-272）。原子替换。
-        tmp = path.with_name(path.name + ".tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
-        tmp.replace(path)
+        # tmp 名**必须唯一**（mkstemp，O_EXCL 不跟随 symlink）：固定 `.tmp` 名会被两个写者
+        # 同时截断/覆盖 ⇒ replace 发布半截 JSON（与 milestone_pointer ocr2-065 同族）。
+        import os as _os
+        import tempfile as _tf
+
+        # 清掉**旧固定名**实现的残留 `next.json.tmp`（本轮换成唯一名后不再产生该名，只删这一个
+        # 字面名——不 glob 通配，避免误删并发写者正在用的唯一 tmp）。
+        try:
+            path.with_name(path.name + ".tmp").unlink(missing_ok=True)
+        except OSError:
+            pass
+        _text = json.dumps(payload, ensure_ascii=False) + "\n"   # 先序列化（TypeError 早抛，不留 tmp）
+        _fd, _name = _tf.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
+        try:
+            with _os.fdopen(_fd, "w", encoding="utf-8") as _f:
+                _f.write(_text)
+            _os.replace(_name, path)
+        except Exception:
+            try:
+                _os.unlink(_name)
+            except OSError:
+                pass
+            raise
     except OSError as exc:
         # 静默吞 ⇒ 操作者与 harness 读到的是上一轮遗留的提示，且没有任何信号（ocr-273）
         print(f"[nextstep] WARN: 侧车写入失败（{exc}）⇒ 本轮提示未持久化", file=sys.stderr)

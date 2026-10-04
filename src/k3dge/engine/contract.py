@@ -231,7 +231,10 @@ def _load_dropin_extractors(root: Path) -> None:
         _PLUGIN_ATTEMPTED.add(str(plug_file))
         # import 时 `register_extractor()` 先执行、后半模块再抛 ⇒ 半注册的 extractor
         # 留在 `_EXTRACTORS` 里认领文件却抽不出接口（ocr2-225）。失败即回滚本文件加进去的。
-        _depth = len(_EXTRACTORS)
+        # 快照整表（而非只记长度）：`register_extractor(..., override=True)` 是公开 API，
+        # 会 `insert(0, ext)` 而非 append ⇒ `del _EXTRACTORS[len_before:]` 会把内置抽取器从尾部
+        # 删掉、留下插进来的半成品。失败即整表还原。
+        _snapshot = list(_EXTRACTORS)
         try:
             spec_obj = importlib.util.spec_from_file_location(mod_name, plug_file)
             if spec_obj is None or spec_obj.loader is None:
@@ -240,7 +243,7 @@ def _load_dropin_extractors(root: Path) -> None:
             sys.modules[mod_name] = mod
             spec_obj.loader.exec_module(mod)
         except Exception as exc:  # noqa: BLE001 — one bad file must not block the rest
-            del _EXTRACTORS[_depth:]
+            _EXTRACTORS[:] = _snapshot
             sys.modules.pop(mod_name, None)
             print(f"[WARN][EXTRACTOR] skipping '{plug_file.name}': {exc}", file=sys.stderr)
 

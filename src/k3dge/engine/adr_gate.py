@@ -185,6 +185,15 @@ def reconcile_supersedes(workspace: Path) -> Optional[str]:
                     "（Rejected 归档与 Supersedes 同规则，请人工裁决）")
         rej_plan.append((p, text))
 
+    # 跨两支的去向冲突：同一 ADR 既被判 `Rejected`（rej_plan）又被别的 `Supersedes:` 指为旧号
+    # （plan 的 target）⇒ 写相同 `obsolete/<name>`，后写覆盖先写、provenance 错（且都在计划相
+    # 只读构建，`dest.is_file()` 守卫看不见）。计划相拒绝。
+    _plan_targets = {target.resolve() for _p, target, _m, _mk in plan}
+    for _p, _text in rej_plan:
+        if _p.resolve() in _plan_targets:
+            return (f"[SEAL REJECTED] {_p.name} 既被判 `Rejected` 又被 `Supersedes:` 指为旧号"
+                    "——两种归档去向冲突，请人工裁决")
+
     # 3. 写相：只剩 tmp+replace（计划相把可预见的失败全部拦在动盘之前）。
     if plan or rej_plan:
         obsolete.mkdir(parents=True, exist_ok=True)

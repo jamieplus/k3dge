@@ -57,8 +57,14 @@ def set_current_milestone(workspace: Path, milestone_id: str) -> None:
     p = _milestone_file(workspace)
     p.parent.mkdir(parents=True, exist_ok=True)
     # 符号链接游标：rename 到链接位会替换链接本身、留下真实目标 stale（ocr2-491）。
-    # 写穿目标，链接保持不动。
-    dest = p.resolve() if p.is_symlink() else p
+    # 写穿目标，链接保持不动；但**目标必须仍在 workspace 内**——否则被植入的
+    # `.agent/milestone -> /outside/x` 会让下面的 mkstemp+replace 覆写仓外任意文件（CWE-59）。
+    if p.is_symlink():
+        dest = p.resolve()
+        if not dest.is_relative_to(Path(workspace).resolve()):
+            raise MilestoneError(f"里程碑游标是越出 workspace 的符号链接（{dest}）⇒ 拒写")
+    else:
+        dest = p
     dest.parent.mkdir(parents=True, exist_ok=True)
     # 原子写：游标留下半行（`M1`→`M`）会让下次读走"内容非法"分支，与 bump 的读-改-写
     # 叠加成不可恢复的回退（ocr-270）。
