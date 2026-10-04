@@ -188,7 +188,7 @@
   "append_to_message": [
     {
       "file": "src/k3dge/engine/attest.py",
-      "line": 112
+      "line": 115
     }
   ],
   "apply": [
@@ -338,7 +338,7 @@
   "bump_milestone": [
     {
       "file": "src/k3dge/engine/milestone_pointer.py",
-      "line": 126
+      "line": 132
     }
   ],
   "bump_verify_attempt": [
@@ -1116,7 +1116,7 @@
   "hunks_overlapping": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 103
+      "line": 106
     }
   ],
   "index_meta_path": [
@@ -1406,7 +1406,7 @@
   "merge_into": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 134
+      "line": 137
     }
   ],
   "milestone_tags": [
@@ -1508,7 +1508,7 @@
   "patch_rels": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 240
+      "line": 243
     }
   ],
   "persist": [
@@ -2064,7 +2064,7 @@
   "union_pins": [
     {
       "file": "src/k3dge/engine/audit_merge.py",
-      "line": 272
+      "line": 275
     }
   ],
   "unmet_seal_preconditions": [
@@ -2130,7 +2130,7 @@
   "verify_commit": [
     {
       "file": "src/k3dge/engine/attest.py",
-      "line": 143
+      "line": 146
     }
   ],
   "verify_contract": [

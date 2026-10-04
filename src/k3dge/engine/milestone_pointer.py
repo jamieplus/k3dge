@@ -107,9 +107,15 @@ def _cursor_lock(workspace: Path):
             lock_path = _milestone_file(workspace).with_name("milestone.lock")
             try:
                 lock_path.parent.mkdir(parents=True, exist_ok=True)
-                fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o644)
+                # `O_NOFOLLOW`：预置 `.agent/milestone.lock -> /outside/x` 会让 open 把锁写到仓外
+                # （与指向 client Cursor 同源的 CWE-59 防御一致，ocr3-128）⇒ 让它以 ELOOP 而不是
+                # 静默落到空锁。非 ELOOP 则仍按"无锁"降级跑。
+                fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o644)
                 fcntl.flock(fd, fcntl.LOCK_EX)
-            except OSError:
+            except OSError as exc:
+                import errno as _errno
+                if getattr(exc, "errno", None) == _errno.ELOOP:
+                    raise MilestoneError(f"里程碑锁是符号链接（{lock_path}）⇒ 拒写，保持含糊") from exc
                 if fd is not None:
                     with contextlib.suppress(OSError):
                         os.close(fd)

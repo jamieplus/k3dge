@@ -104,7 +104,10 @@ def line(workspace: Path, who: str = "") -> str:
         except (OSError, UnicodeDecodeError):
             who = ""
         if not who:
-            who = getpass.getuser()
+            try:
+                who = getpass.getuser()
+            except (OSError, ImportError, KeyError):  # no-tty / minimal env
+                who = "unknown"
     when = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     return f"{PREFIX}{who} @ {when} #{token(workspace, when)}"
 

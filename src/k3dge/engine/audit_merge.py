@@ -49,11 +49,14 @@ def _merge_file(ours: Path, base: Path, theirs: Path) -> Dict[str, Any]:
         a = tmp / "ours"
         b = tmp / "base"
         c = tmp / "theirs"
-        a.write_bytes(ours.read_bytes() if ours.is_file() else b"")
-        b.write_bytes(base.read_bytes() if base.is_file() else b"")
-        c.write_bytes(theirs.read_bytes() if theirs.is_file() else b"")
-        rc = subprocess.run(["git", "merge-file", "-p", str(a), str(b), str(c)],
-                            capture_output=True)
+        try:
+            a.write_bytes(ours.read_bytes() if ours.is_file() else b"")
+            b.write_bytes(base.read_bytes() if base.is_file() else b"")
+            c.write_bytes(theirs.read_bytes() if theirs.is_file() else b"")
+            rc = subprocess.run(["git", "merge-file", "-p", str(a), str(b), str(c)],
+                                capture_output=True)
+        except (OSError, FileNotFoundError) as exc:  # git 未装/无 exec 权/读源文件失败（ocr3-076）
+            return {"ok": False, "error": f"merge-file 不可用: {exc}", "text": "", "conflict": False}
         if rc.returncode == 0:
             try:
                 # `decode(..., "replace")` 把非 UTF-8（GBK/latin-1/二进制）换成 U+FFFD，落盘方

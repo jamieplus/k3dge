@@ -562,4 +562,9 @@ def question_text(state: str, milestone: str, *, n: Optional[int] = None) -> str
     out = text.replace("<id>", milestone)
     if n is not None:
         out = out.replace("<n>", str(n))
+    # 与 `NextStep._fill` 同口径：遗漏 `n` 时占位符残留直接印进交互 prompt，静默把"待修"计数吞掉（ocr3-130）。
+    import re as _re
+
+    if _re.search(r"<[a-z_]+>", out):
+        print(f"[NEXT] WARN: question_text 投影残留未解析占位符：{out!r}", file=sys.stderr)
     return out
