@@ -513,11 +513,11 @@
       "tokens": "seal 动作声明序的不变量层封堵 + kind/on_rerun 通用强制"
     },
     {
-      "path": "docs/tasks/2026-09-30-M12-refactor-split_cli_and_bundle_cc.md",
+      "path": "docs/tasks/2026-09-30-M12-refactor-split_cli_and_bundle_cc.done.md",
       "type": "tasks",
-      "id": "2026-09-30-M12-refactor-split_cli_and_bundle_cc",
+      "id": "2026-09-30-M12-refactor-split_cli_and_bundle_cc.done",
       "title": "降分支复杂度：cli/main.py cmd_audit/cmd_doc 与 audit_bundle 五函数",
-      "status": "idea",
+      "status": "done",
       "tokens": "降分支复杂度：cli/main.py cmd_audit/cmd_doc 与 audit_bundle 五函数"
     },
     {

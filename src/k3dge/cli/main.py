@@ -377,142 +377,165 @@ def cmd_version(args: argparse.Namespace) -> int:
     return 1
 
 
-def cmd_doc(args: argparse.Namespace) -> int:
+def _doc_list(workspace: Path, args: argparse.Namespace) -> int:
+    from k3dge.engine.doc_catalog import list_docs
+
+    rows = list_docs(
+        workspace,
+        typ=getattr(args, "doc_type", None),
+        ident=getattr(args, "doc_id", None),
+        q=getattr(args, "q", None),
+        include_archive=getattr(args, "include_archive", False),
+        include_retired=getattr(args, "include_retired", False),
+    )
+    if getattr(args, "as_json", False):
+        print(json.dumps({"ok": True, "count": len(rows), "docs": rows}, indent=2, ensure_ascii=False))
+    else:
+        if getattr(args, "include_archive", False):
+            print("[DOC] 低权威层：archive/ 仅为低权威留档，判定以现行视图为准")
+        if getattr(args, "include_retired", False):
+            print("[DOC] 退役面：obsolete/ 与退役账本（号已永久退役，无墓碑文件的看账本表）")
+        if not rows:
+            print("[DOC] no matches")
+        for c in rows:
+            mark = "\t[retired]" + (f" → {c['dest']}" if c.get("dest") else "") if c.get("retired") else ""
+            print(f"{c['id']}\t{c['path']}\t{c['title']}{mark}")
+    return 0
+
+
+def _doc_where(workspace: Path, args: argparse.Namespace) -> int:
+    from k3dge.engine.doc_catalog import where_doc
+
+    rows = where_doc(workspace, args.ident)
+    if getattr(args, "as_json", False):
+        print(json.dumps({"ok": True, "count": len(rows), "docs": rows}, indent=2, ensure_ascii=False))
+    else:
+        for c in rows:
+            print(c["path"])
+        if not rows:
+            print(f"[DOC] not found: {args.ident}", file=sys.stderr)
+            return 1
+    return 0
+
+
+def _doc_grep(workspace: Path, args: argparse.Namespace) -> int:
+    from k3dge.engine.doc_catalog import grep_docs
+
+    rows = grep_docs(
+        workspace,
+        args.query,
+        typ=getattr(args, "doc_type", None),
+        line=getattr(args, "line", False),
+        include_archive=getattr(args, "include_archive", False),
+    )
+    if getattr(args, "as_json", False):
+        print(json.dumps({"ok": True, "count": len(rows), "hits": rows}, indent=2, ensure_ascii=False))
+    else:
+        if getattr(args, "include_archive", False):
+            print("[DOC] 低权威层：archive/ 仅为低权威留档，判定以现行视图为准")
+        if not rows:
+            print("[DOC] no matches")
+        for h in rows:
+            if "line" in h:
+                print(f"{h['path']}:{h['line']}")
+            else:
+                print(h["path"])
+    return 0
+
+
+def _doc_screen(workspace: Path, args: argparse.Namespace) -> int:
+    # 新建受管文档的排查回执：判定归 agent（进程判不了语义覆盖），此处只记事实。
+    from k3dge.engine.pure_refs import (
+        is_screenable_new_doc,
+        record_screen_ack,
+        screen_target_exists,
+    )
+
+    rel = args.path.strip().replace("\\", "/")
+    while rel.startswith("./"):
+        rel = rel[2:]
+    if not is_screenable_new_doc(rel):
+        print(f"[DOC] 不在排查面（确定性流程生成 / aux / archive / 非 docs）：{rel}")
+        return 0
+    into = getattr(args, "into", None)
+    if into and not screen_target_exists(workspace, into):
+        # 回执声称"并入 X"，X 必须存在——否则记的是不存在的去向（C 线残渣）
+        print(f"[DOC] --into 指向的文件不存在：{into}", file=sys.stderr)
+        return 1
+    ack = record_screen_ack(workspace, rel, into=into)
+    concl = f"merged-into {args.into}" if getattr(args, "into", None) else "new-no-overlap"
+    print(f"[DOC] 排查回执已记（{concl}）：{ack.relative_to(workspace)}")
+    print(f"      {rel} 本次提交放行；回执是 ephemeral（.protocol-ack/，不入库）")
+    _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc screen -> {rel} -> {concl}")
+    return 0
+
+
+def _doc_fix(workspace: Path, args: argparse.Namespace) -> int:
+    # 主动动作：按闭集规则规范化受管文档（幂等；--dry-run 只报不改）
+    from k3dge.engine import doc_fix
+
+    dry = bool(getattr(args, "dry_run", False))
+    report = doc_fix.apply(workspace, dry_run=dry)
+    n = len(report["fixed"])
+    files = report["changed_files"]
+    print(f"[DOC] {'dry-run：将修' if dry else '已修'} {n} 处（{len(files)} 个文件）"
+          + ("" if dry else "；请 review diff 后提交"))
+    for f in report["fixed"][:20]:
+        print(f"  - [{f['rule']}] {f['path']}")
+    if len(report["fixed"]) > 20:
+        print(f"  … {len(report['fixed']) - 20} more")
+    if report.get("remaining"):
+        print(f"  ! {report['remaining']} 处检测到但未能改（需人处理）")
+    _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc fix -> fixed={n} dry_run={dry}")
+    return 0 if not report.get("remaining") else 1
+
+
+def _doc_sync(workspace: Path, args: argparse.Namespace) -> int:
     import subprocess
 
-    workspace = _find_workspace(Path.cwd())
-    action = getattr(args, "doc_action", None)
-    if action == "list":
-        from k3dge.engine.doc_catalog import list_docs
+    from k3dge.sync.generator import sync_all
 
-        rows = list_docs(
-            workspace,
-            typ=getattr(args, "doc_type", None),
-            ident=getattr(args, "doc_id", None),
-            q=getattr(args, "q", None),
-            include_archive=getattr(args, "include_archive", False),
-            include_retired=getattr(args, "include_retired", False),
-        )
-        if getattr(args, "as_json", False):
-            print(json.dumps({"ok": True, "count": len(rows), "docs": rows}, indent=2, ensure_ascii=False))
-        else:
-            if getattr(args, "include_archive", False):
-                print("[DOC] 低权威层：archive/ 仅为低权威留档，判定以现行视图为准")
-            if getattr(args, "include_retired", False):
-                print("[DOC] 退役面：obsolete/ 与退役账本（号已永久退役，无墓碑文件的看账本表）")
-            if not rows:
-                print("[DOC] no matches")
-            for c in rows:
-                mark = "\t[retired]" + (f" → {c['dest']}" if c.get("dest") else "") if c.get("retired") else ""
-                print(f"{c['id']}\t{c['path']}\t{c['title']}{mark}")
-        return 0
-    if action == "where":
-        from k3dge.engine.doc_catalog import where_doc
-
-        rows = where_doc(workspace, args.ident)
-        if getattr(args, "as_json", False):
-            print(json.dumps({"ok": True, "count": len(rows), "docs": rows}, indent=2, ensure_ascii=False))
-        else:
-            for c in rows:
-                print(c["path"])
-            if not rows:
-                print(f"[DOC] not found: {args.ident}", file=sys.stderr)
-                return 1
-        return 0
-    if action == "grep":
-        from k3dge.engine.doc_catalog import grep_docs
-
-        rows = grep_docs(
-            workspace,
-            args.query,
-            typ=getattr(args, "doc_type", None),
-            line=getattr(args, "line", False),
-            include_archive=getattr(args, "include_archive", False),
-        )
-        if getattr(args, "as_json", False):
-            print(json.dumps({"ok": True, "count": len(rows), "hits": rows}, indent=2, ensure_ascii=False))
-        else:
-            if getattr(args, "include_archive", False):
-                print("[DOC] 低权威层：archive/ 仅为低权威留档，判定以现行视图为准")
-            if not rows:
-                print("[DOC] no matches")
-            for h in rows:
-                if "line" in h:
-                    print(f"{h['path']}:{h['line']}")
-                else:
-                    print(h["path"])
-        return 0
-    if action == "screen":
-        # 新建受管文档的排查回执：判定归 agent（进程判不了语义覆盖），此处只记事实。
-        from k3dge.engine.pure_refs import (
-            is_screenable_new_doc,
-            record_screen_ack,
-            screen_target_exists,
-        )
-
-        rel = args.path.strip().replace("\\", "/")
-        while rel.startswith("./"):
-            rel = rel[2:]
-        if not is_screenable_new_doc(rel):
-            print(f"[DOC] 不在排查面（确定性流程生成 / aux / archive / 非 docs）：{rel}")
-            return 0
-        into = getattr(args, "into", None)
-        if into and not screen_target_exists(workspace, into):
-            # 回执声称"并入 X"，X 必须存在——否则记的是不存在的去向（C 线残渣）
-            print(f"[DOC] --into 指向的文件不存在：{into}", file=sys.stderr)
-            return 1
-        ack = record_screen_ack(workspace, rel, into=into)
-        concl = f"merged-into {args.into}" if getattr(args, "into", None) else "new-no-overlap"
-        print(f"[DOC] 排查回执已记（{concl}）：{ack.relative_to(workspace)}")
-        print(f"      {rel} 本次提交放行；回执是 ephemeral（.protocol-ack/，不入库）")
-        _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc screen -> {rel} -> {concl}")
-        return 0
-    if action == "fix":
-        # 主动动作：按闭集规则规范化受管文档（幂等；--dry-run 只报不改）
-        from k3dge.engine import doc_fix
-
-        dry = bool(getattr(args, "dry_run", False))
-        report = doc_fix.apply(workspace, dry_run=dry)
-        n = len(report["fixed"])
-        files = report["changed_files"]
-        print(f"[DOC] {'dry-run：将修' if dry else '已修'} {n} 处（{len(files)} 个文件）"
-              + ("" if dry else "；请 review diff 后提交"))
-        for f in report["fixed"][:20]:
-            print(f"  - [{f['rule']}] {f['path']}")
-        if len(report["fixed"]) > 20:
-            print(f"  … {len(report['fixed']) - 20} more")
-        if report.get("remaining"):
-            print(f"  ! {report['remaining']} 处检测到但未能改（需人处理）")
-        _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc fix -> fixed={n} dry_run={dry}")
-        return 0 if not report.get("remaining") else 1
-    if args.doc_action == "sync":
-        from k3dge.sync.generator import sync_all
-
+    try:
+        changed, docs_updated = sync_all(workspace)
+    except Exception as exc:
+        # `sync_all` 中止即抛（不再回落成功形元组）：这里按失败收（ocr2-005）。
+        print(f"[DOC] sync FAILED: {exc}", file=sys.stderr)
+        return 1
+    print(f"[DOC] sync: changed={changed} docs_updated={docs_updated}")
+    # Run generate-docs.sh if present
+    gen = workspace / "scripts" / "generate-docs.sh"
+    if gen.is_file():
         try:
-            changed, docs_updated = sync_all(workspace)
-        except Exception as exc:
-            # `sync_all` 中止即抛（不再回落成功形元组）：这里按失败收（ocr2-005）。
-            print(f"[DOC] sync FAILED: {exc}", file=sys.stderr)
-            return 1
-        print(f"[DOC] sync: changed={changed} docs_updated={docs_updated}")
-        # Run generate-docs.sh if present
-        gen = workspace / "scripts" / "generate-docs.sh"
-        if gen.is_file():
-            try:
-                result = subprocess.run(["bash", str(gen)], cwd=workspace, capture_output=True, text=True, timeout=60)
-                print(result.stdout or "")
-                if result.stderr:
-                    print(result.stderr, file=sys.stderr)
-                # 生成器退出码/异常只打印不影响返回码 ⇒ 自动化以为成功（ocr2-023）。失败即按失败收。
-                if result.returncode != 0:
-                    print(f"[DOC] generate-docs.sh exit={result.returncode} ⇒ doc sync 按失败收", file=sys.stderr)
-                    return 1
-            except Exception as exc:
-                print(f"[DOC] generate-docs.sh failed: {exc}", file=sys.stderr)
+            result = subprocess.run(["bash", str(gen)], cwd=workspace, capture_output=True, text=True, timeout=60)
+            print(result.stdout or "")
+            if result.stderr:
+                print(result.stderr, file=sys.stderr)
+            # 生成器退出码/异常只打印不影响返回码 ⇒ 自动化以为成功（ocr2-023）。失败即按失败收。
+            if result.returncode != 0:
+                print(f"[DOC] generate-docs.sh exit={result.returncode} ⇒ doc sync 按失败收", file=sys.stderr)
                 return 1
-        _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc sync -> changed={changed}")
-        return 0
-    return 1
+        except Exception as exc:
+            print(f"[DOC] generate-docs.sh failed: {exc}", file=sys.stderr)
+            return 1
+    _append_log(workspace, f"[{__import__('datetime').datetime.now().isoformat()}] doc sync -> changed={changed}")
+    return 0
+
+
+#: `cmd_doc` 的动作表（动作名 → 处理函数）：分发在此，各动作的实现各自独立。
+_DOC_ACTIONS = {
+    "list": _doc_list,
+    "where": _doc_where,
+    "grep": _doc_grep,
+    "screen": _doc_screen,
+    "fix": _doc_fix,
+    "sync": _doc_sync,
+}
+
+
+def cmd_doc(args: argparse.Namespace) -> int:
+    workspace = _find_workspace(Path.cwd())
+    handler = _DOC_ACTIONS.get(getattr(args, "doc_action", None))
+    return handler(workspace, args) if handler else 1
 
 
 def cmd_task(args: argparse.Namespace) -> int:
@@ -634,6 +657,50 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     return 1
 
 
+def _audit_run_bundle(workspace: Path, args: argparse.Namespace, bundle: Path) -> "tuple[Path, int | None]":
+    """`--run` 或包缺 manifest：调工具产包，失败再抢救。返回 `(bundle, rc)`；`rc` 非 None ⇒ 直接返回。"""
+    from k3dge.engine import audit_bundle as ab
+
+    out_dir = Path(getattr(args, "bundle_out", "") or bundle)
+    _m = getattr(args, "bundle_mode", "full") or "full"
+    _tmo = int(getattr(args, "bundle_timeout", 0) or 0) or (7200 if _m == "full" else 3600)
+    ran = ab.run_path_audit(workspace, out_dir, mode=_m,
+                            pins=getattr(args, "bundle_pins", "inplace") or "inplace",
+                            scope=getattr(args, "bundle_scope", "") or "", timeout=_tmo)
+    print(json.dumps({"stage": "run", "out": str(out_dir), "rc": ran.get("rc"), "ok": ran.get("ok"),
+                      "payload": ran.get("payload"), "detail": ran.get("detail")}, ensure_ascii=False))
+    if ran.get("ok"):
+        return out_dir, None
+    # **抢救**（用户裁定：超时也要出报告）：工具被掐断 ⇒ `k3dit hall export --latest` 出"未完成导出"包
+    _salv = ab.salvage_bundle(workspace, out_dir)
+    _dig = ab.write_run_digest(out_dir, stage=("salvage-ok" if _salv.get("ok") else "run-failed"),
+                               rc=ran.get("rc"), detail=(ran.get("detail") or "")[:400],
+                               salvage_rc=_salv.get("rc"), salvage_detail=_salv.get("detail", ""))
+    print(json.dumps({"stage": "salvage", "ok": _salv.get("ok"), "rc": _salv.get("rc"),
+                      "digest": _dig, "detail": _salv.get("detail", "")}, ensure_ascii=False),
+          file=sys.stderr)
+    return out_dir, (None if _salv.get("ok") else 1)
+
+
+def _audit_land_report(target: Path, bundle: Path, res: dict, args: argparse.Namespace) -> dict:
+    """验包+补丁落成后落报告（唯一入口 `land_report`）。返回 `landed`。"""
+    from k3dge.engine import audit_bundle as ab
+
+    # 里程碑 id **必须**来自显式参数（缺省 `local`，与 k3dit 的约定一致）：绝不能用**包路径**当 id
+    #（真跑实测：`/tmp/ctl` 被 `persist_external_audit_report` 拒 ⇒ 钉已落、报告没落、提交没做）。
+    _ap = res.get("apply") or {}
+    _note = ""
+    if _ap.get("strategy") == "three-way-merge":
+        _note = (f"> **落地方式**：`git apply` 与当前主干冲突 ⇒ **三路合并**（base＝包的可重放基线）落树；"
+                 f"落库后校验（`post_apply_check`）通过。"
+                 + (f"\n> **排除**：{', '.join(_ap.get('excluded') or [])}"
+                    f"（其修复与主干/现测试冲突，**未落**，需人工重做）。" if _ap.get("excluded") else ""))
+    return ab.land_report(target, (getattr(args, "bundle_milestone", "") or "local"), bundle,
+                          extra_files=list(_ap.get("files") or []),
+                          why=f"手动入口 包 {str(ab.bundle_digest(bundle))[:12]}", note=_note,
+                          excluded=list(_ap.get("excluded") or []))
+
+
 def cmd_audit(args: argparse.Namespace) -> int:
     """审计线动词（工作区=CWD）：submit 锁线建单 / status 问对端 / show 读本地账 /
     advance 提版重钉基线 / materialize 只读物化 / close 取回落盘（closure merge 自动附带）。"""
@@ -647,26 +714,9 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
     bundle = Path(tok) if tok else Path(getattr(args, "bundle_out", "") or (workspace / ".k3dit" / "bundle"))
     if getattr(args, "run", False) or not (bundle / "manifest.json").is_file():
-        out_dir = Path(getattr(args, "bundle_out", "") or bundle)
-        _m = getattr(args, "bundle_mode", "full") or "full"
-        _tmo = int(getattr(args, "bundle_timeout", 0) or 0) or (7200 if _m == "full" else 3600)
-        ran = ab.run_path_audit(workspace, out_dir, mode=_m,
-                                pins=getattr(args, "bundle_pins", "inplace") or "inplace",
-                                scope=getattr(args, "bundle_scope", "") or "", timeout=_tmo)
-        print(json.dumps({"stage": "run", "out": str(out_dir), "rc": ran.get("rc"), "ok": ran.get("ok"),
-                          "payload": ran.get("payload"), "detail": ran.get("detail")}, ensure_ascii=False))
-        if not ran.get("ok"):
-            # **抢救**（用户裁定：超时也要出报告）：工具被掐断 ⇒ `k3dit hall export --latest` 出"未完成导出"包
-            _salv = ab.salvage_bundle(workspace, out_dir)
-            _dig = ab.write_run_digest(out_dir, stage=("salvage-ok" if _salv.get("ok") else "run-failed"),
-                                       rc=ran.get("rc"), detail=(ran.get("detail") or "")[:400],
-                                       salvage_rc=_salv.get("rc"), salvage_detail=_salv.get("detail", ""))
-            print(json.dumps({"stage": "salvage", "ok": _salv.get("ok"), "rc": _salv.get("rc"),
-                              "digest": _dig, "detail": _salv.get("detail", "")}, ensure_ascii=False),
-                  file=sys.stderr)
-            if not _salv.get("ok"):
-                return 1
-        bundle = out_dir
+        bundle, _rc = _audit_run_bundle(workspace, args, bundle)
+        if _rc is not None:
+            return _rc
     target = Path(getattr(args, "into", "") or workspace).resolve()
     res = ab.consume(target, bundle, dry_run=bool(getattr(args, "dry_run", False)),
                      expect_input=str(target),
@@ -685,19 +735,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
     # `docs/reviews/` 只放**审计结果**，不放"这轮什么都没产出"的运行痕迹。
     _no_apply = not (bool(res.get("ok")) and bool((res.get("apply") or {}).get("ok")))
     if not getattr(args, "dry_run", False) and not _no_apply:
-        # 里程碑 id **必须**来自显式参数（缺省 `local`，与 k3dit 的约定一致）：绝不能用**包路径**当 id
-        #（真跑实测：`/tmp/ctl` 被 `persist_external_audit_report` 拒 ⇒ 钉已落、报告没落、提交没做）。
-        _ap = res.get("apply") or {}
-        _note = ""
-        if _ap.get("strategy") == "three-way-merge":
-            _note = (f"> **落地方式**：`git apply` 与当前主干冲突 ⇒ **三路合并**（base＝包的可重放基线）落树；"
-                     f"落库后校验（`post_apply_check`）通过。"
-                     + (f"\n> **排除**：{', '.join(_ap.get('excluded') or [])}"
-                        f"（其修复与主干/现测试冲突，**未落**，需人工重做）。" if _ap.get("excluded") else ""))
-        landed = ab.land_report(target, (getattr(args, "bundle_milestone", "") or "local"), bundle,
-                                extra_files=list(_ap.get("files") or []),
-                                why=f"手动入口 包 {str(ab.bundle_digest(bundle))[:12]}", note=_note,
-                                excluded=list(_ap.get("excluded") or []))
+        landed = _audit_land_report(target, bundle, res, args)
     if _no_apply:
         print(f"[AUDIT] 补丁未落（{(res.get('apply') or {}).get('error')}）⇒ **不落报告**："
               f"报告留在包内 {bundle}", file=sys.stderr)

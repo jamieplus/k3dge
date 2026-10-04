@@ -545,6 +545,64 @@ def _dry_run_via_worktree(workspace: Path, bundle: Path, order: List[str]) -> di
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _apply_guards(workspace: Path, allow_dirty: bool) -> Optional[dict]:
+    """apply 前的结构闸：仓 + 脏树。返回错误 dict，或 None（可继续）。"""
+    rc, _ = _git(workspace, "rev-parse", "--git-dir")
+    if rc != 0:
+        return {"ok": False, "error": "NOT_A_REPO", "detail": f"{workspace} 不是 git 仓库"}
+    rc, dirty = _git(workspace, "status", "--porcelain")
+    if rc == 0 and dirty.strip() and not allow_dirty:
+        return {"ok": False, "error": "DIRTY_TREE",
+                "detail": "工作树不干净，先提交或 stash（审计产物不得与在途改动混在一起）",
+                "dirty": dirty.strip().splitlines()[:10]}
+    return None
+
+
+def _apply_fast_path(workspace: Path, bundle: Path, order: List[str], *,
+                     exclude, exclude_hunks, dry_run: bool, snap0) -> "tuple[Optional[dict], dict]":
+    """`git apply`（精确）快路。返回 `(final, state)`：
+
+    `final` 非 None ⇒ 直接作为 `apply_bundle` 结果（成功或终止性失败）；
+    `final` is None ⇒ 快路不可用/失败，调用方退**三路合并**。
+    `state` 携带 `pre`/`rolled`/`applied`，供失败面报告与降级判定。
+    """
+    state = {"pre": {}, "rolled": [], "applied": []}
+    # **有 hunk 级剔除要求时不许走"精确 git apply"快路**：那条路会把未关项所在 hunk 一起落进去
+    #（真跑/测试实测：`git apply` 成功 ⇒ 过滤从未发生 ⇒ 未验证的改动进了主干）。一律走合并路径。
+    # `exclude`（文件级）也只在三路合并里被尊重 ⇒ 有剔除要求就强制绕开快路，否则被排除文件照样落树、
+    # 报告还写"已排除"（ocr-040）。
+    pre = ({"ok": False, "detail": "（有剔除要求 ⇒ 强制走合并路径）"} if (exclude_hunks or exclude)
+           else _dry_run_via_worktree(workspace, bundle, order))
+    state["pre"] = pre
+    if not pre.get("ok"):
+        return None, state
+    if dry_run:
+        return {"ok": True, "applied": order, "files": pre.get("files") or [], "dry_run": True,
+                "strategy": "git-apply", "excluded": sorted({str(x) for x in (exclude or [])})}, state
+    # code-1：真打前**复核快照**——窗口内 HEAD/工作树被并发改动 ⇒ `TREE_MOVED`，不真打
+    if _snapshot(workspace) != snap0:
+        return {"ok": False, "error": "TREE_MOVED", "applied": [], "files": [],
+                "detail": "dry-run 与真打之间工作树/HEAD 变了（并发改动）⇒ 不真打；请重跑"}, state
+    res = _apply_sequential(workspace, bundle, order)
+    state["applied"] = res.get("applied") or []
+    if res.get("ok"):
+        return {"ok": True, "applied": order, "files": res.get("files") or [], "dry_run": False,
+                "strategy": "git-apply", "excluded": sorted({str(x) for x in (exclude or [])})}, state
+    # code-7：半落 ⇒ **先逆序回滚**再考虑降级合并（否则合并的 ours 被污染）
+    rolled = _rollback_applied(workspace, bundle, res.get("applied") or [])
+    state["rolled"] = rolled
+    if len(rolled) != len([x for x in (res.get("applied") or []) if x]):
+        # 回滚不完整 ⇒ 树里留着半条补丁；此时**不许**继续三路合并（ours 已被污染，ocr-041）。
+        return {"ok": False, "error": "ROLLBACK_INCOMPLETE", "applied": res.get("applied") or [],
+                "rolled_back": rolled, "detail": "半落补丁回滚不完整 ⇒ 停止（树可能残留半条补丁，请人工核对）"}, state
+    return None, state
+
+
+#: `git apply` 打不上时**不该**退三路合并的结构性失败（不是"打不上"，是输入不对）。
+_STRUCTURAL_APPLY_ERRORS = {"PATCH_MISSING", "NOT_A_REPO", "DIRTY_TREE",
+                            "WORKTREE_UNAVAILABLE", "APPLY_PATH_ESCAPE"}
+
+
 def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
                  allow_dirty: bool = False, exclude: Optional[List[str]] = None,
                  exclude_hunks: Optional[Dict[str, List[int]]] = None) -> dict:
@@ -563,48 +621,20 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
     if not order:
         return {"ok": True, "applied": [], "files": [], "dry_run": dry_run,
                 "detail": "apply_order 为空（无补丁要打）"}
-    rc, _ = _git(workspace, "rev-parse", "--git-dir")
-    if rc != 0:
-        return {"ok": False, "error": "NOT_A_REPO", "detail": f"{workspace} 不是 git 仓库"}
-    rc, dirty = _git(workspace, "status", "--porcelain")
-    if rc == 0 and dirty.strip() and not allow_dirty:
-        return {"ok": False, "error": "DIRTY_TREE",
-                "detail": "工作树不干净，先提交或 stash（审计产物不得与在途改动混在一起）",
-                "dirty": dirty.strip().splitlines()[:10]}
-    # **有 hunk 级剔除要求时不许走"精确 git apply"快路**：那条路会把未关项所在 hunk 一起落进去
-    #（真跑/测试实测：`git apply` 成功 ⇒ 过滤从未发生 ⇒ 未验证的改动进了主干）。一律走合并路径。
+    guard = _apply_guards(workspace, allow_dirty)
+    if guard:
+        return guard
     snap0 = _snapshot(workspace)          # code-1：dry-run 之前
-    # `exclude`（文件级）也只在三路合并里被尊重 ⇒ 有剔除要求就**强制**绕开"精确 git apply"快路，
-    # 否则被排除文件照样落树、报告还写"已排除"（ocr-040）。
-    pre = {"ok": False, "detail": "（有剔除要求 ⇒ 强制走合并路径）"} if (exclude_hunks or exclude) else \
-        _dry_run_via_worktree(workspace, bundle, order)
-    rolled: List[str] = []
-    res: dict = {}
-    if pre.get("ok"):
-        if dry_run:
-            return {"ok": True, "applied": order, "files": pre.get("files") or [], "dry_run": True,
-                    "strategy": "git-apply", "excluded": sorted({str(x) for x in (exclude or [])})}
-        # code-1：真打前**复核快照**——窗口内 HEAD/工作树被并发改动 ⇒ `TREE_MOVED`，不真打
-        if _snapshot(workspace) != snap0:
-            return {"ok": False, "error": "TREE_MOVED", "applied": [], "files": [],
-                    "detail": "dry-run 与真打之间工作树/HEAD 变了（并发改动）⇒ 不真打；请重跑"}
-        res = _apply_sequential(workspace, bundle, order)
-        if res.get("ok"):
-            return {"ok": True, "applied": order, "files": res.get("files") or [], "dry_run": False,
-                    "strategy": "git-apply", "excluded": sorted({str(x) for x in (exclude or [])})}
-        # code-7：半落 ⇒ **先逆序回滚**再考虑降级合并（否则合并的 ours 被污染）
-        rolled = _rollback_applied(workspace, bundle, res.get("applied") or [])
-        if len(rolled) != len([x for x in (res.get("applied") or []) if x]):
-            # 回滚不完整 ⇒ 树里留着半条补丁；此时**不许**继续三路合并（ours 已被污染，ocr-041）。
-            return {"ok": False, "error": "ROLLBACK_INCOMPLETE", "applied": res.get("applied") or [],
-                    "rolled_back": rolled, "detail": "半落补丁回滚不完整 ⇒ 停止（树可能残留半条补丁，请人工核对）"}
+    final, st = _apply_fast_path(workspace, bundle, order, exclude=exclude,
+                                 exclude_hunks=exclude_hunks, dry_run=dry_run, snap0=snap0)
+    if final is not None:
+        return final
+    pre, rolled = st["pre"], st["rolled"]
     # `git apply` 打不上**不等于修复不可用**：补丁是对审计当时的基线生成的，而主干可能已经往前走
     #（落钉、别的修复、重构）。两侧信息都全 ⇒ 退到**三路合并**（base＝包的可重放基线）。
-    # **结构性**失败（补丁缺/不是仓/脏树/无 worktree）不该退合并——那不是"打不上"，是输入不对。
-    # 结构性失败（补丁缺/越界路径/不是仓/脏树/无 worktree）不该退合并——那不是"打不上"，是输入不对。
+    # **结构性**失败（补丁缺/越界路径/不是仓/脏树/无 worktree）不该退合并——那不是"打不上"，是输入不对。
     #  `APPLY_PATH_ESCAPE` 是 code-2 的闸：**包有问题**，退合并只会得到更绕的错误（真跑实测过一次）。
-    if str(pre.get("error") or "").split(":")[0] in {"PATCH_MISSING", "NOT_A_REPO", "DIRTY_TREE",
-                                                     "WORKTREE_UNAVAILABLE", "APPLY_PATH_ESCAPE"}:
+    if str(pre.get("error") or "").split(":")[0] in _STRUCTURAL_APPLY_ERRORS:
         return {"ok": False, "error": pre.get("error"), "detail": pre.get("detail", ""),
                 "phase": "dry-run", "applied": pre.get("applied") or [], "rolled_back": rolled}
     got = _apply_sequential_merged(workspace, bundle, exclude=exclude, dry_run=dry_run,
@@ -619,8 +649,8 @@ def apply_bundle(workspace: Path, bundle: Path, *, dry_run: bool = False,
     # code-10（报告）：失败面**不许硬编码 `applied: []`**——调用方要据此判断"是否需人工收拾现场"。
     return {"ok": False, "error": got.get("error") or pre.get("error") or "MERGE_FAILED",
             "detail": got.get("detail") or pre.get("detail", ""),
-            "phase": "merge", "applied": res.get("applied") or [], "rolled_back": rolled,
-            "files": res.get("files") or [], "conflicts": got.get("conflicts") or []}
+            "phase": "merge", "applied": st["applied"], "rolled_back": rolled,
+            "files": [], "conflicts": got.get("conflicts") or []}
 
 
 def _restore_files(workspace: Path, files: List[str]) -> Dict[str, object]:
@@ -653,6 +683,77 @@ def _restore_files(workspace: Path, files: List[str]) -> Dict[str, object]:
     return {"restored": restored, "removed": removed, "failed": failed}
 
 
+def _exclude_unclosed_hunks(bundle: Path, wt: Path, files: List[str],
+                            exclude_hunks: Optional[Dict[str, List[int]]]) -> dict:
+    """在临时 worktree 里把与未关项位置重叠的 hunk 反向应用掉（git 本是按 hunk 的）。
+
+    只剔重叠的那几段，同文件里的其它修复照落（文件级排除会把它们一起挡掉）。
+    返回 {ok, dropped} 或 {ok: False, error, conflicts, detail}（fail-close）。
+    """
+    dropped: Dict[str, list] = {}
+    if not exclude_hunks:
+        return {"ok": True, "dropped": dropped}
+    from k3dge.engine.audit_merge import hunks_overlapping
+
+    order = [str(x) for x in (bundle_facts(bundle).get("apply_order") or [])]
+    patch_srcs = [Path(bundle) / x for x in order if (Path(bundle) / x).is_file()]
+    if not patch_srcs:
+        return {"ok": False, "error": "HUNK_SOURCE_MISSING", "conflicts": [],
+                "detail": "有 hunk 级剔除要求，但 apply_order 里没有可读的补丁 ⇒ 不落地（fail-close，ocr-203）"}
+    for rel, lines_ in sorted(exclude_hunks.items()):
+        if rel not in files:
+            continue
+        sel: dict = {"patch": ""}
+        for src in patch_srcs:      # 源可以是 fix.patch **或** 含该改动的其它补丁
+            sel = hunks_overlapping(src.read_text(encoding="utf-8", errors="replace"),
+                                    rel, list(lines_))
+            if sel.get("patch"):
+                break
+        if not sel.get("patch"):
+            continue                  # 无重叠 hunk ⇒ 本就没有要剔的（正常路径）
+        tmpf = wt / ".k3dge-drop.patch"
+        tmpf.write_text(str(sel["patch"]), encoding="utf-8")
+        rc, out = _git(wt, "apply", "-R", "-p1", str(tmpf))
+        tmpf.unlink(missing_ok=True)
+        if rc != 0:
+            return {"ok": False, "error": "HUNK_EXCLUDE_FAILED", "conflicts": [rel],
+                    "detail": f"{rel}: 未关项所在 hunk 剔不出去（{out.strip()[:160]}）⇒ 不落地（fail-close）"}
+        dropped[rel] = sel.get("dropped") or []
+    return {"ok": True, "dropped": dropped}
+
+
+def _land_pins_in_worktree(bundle: Path, wt: Path, res: dict, files: List[str]) -> dict:
+    """钉（标注层，纯增量）：正向应用；打不上就对**该文件**并集合并（"两边都加钉"的正解＝两枚都留）。
+
+    返回 {ok, added}：`added` ＝本次新增（此前不在 `files`）的文件；失败 {ok: False, error, conflicts, detail}。
+    """
+    pins = str(res.get("pins_patch") or "")
+    if not pins:
+        return {"ok": True, "added": []}
+    from k3dge.engine import audit_merge      # 单源：补丁→文件集合只认 `patch_rels`
+
+    # `pins.patch` 非空但 `pins_rels` 为空 ⇒ 钉层被静默丢掉（路径全被过滤或解析不出），
+    # `ok: True` 会让调用方以为钉已落（ocr2-045）。fail-clear。
+    _pins_path = Path(bundle) / pins
+    _pins_rels = sorted(res.get("pins_rels") or audit_merge.patch_rels(Path(bundle), pins))
+    if _pins_path.is_file() and _pins_path.stat().st_size > 0 and not _pins_rels:
+        return {"ok": False, "error": "PINS_UNACCOUNTED", "conflicts": [],
+                "detail": f"{pins}: 补丁非空但解析不出可落文件（路径被过滤？），钉层未落，不静默通过"}
+    rc, _apply_out = _git(wt, "apply", "-p1", str(Path(bundle) / pins))
+    added: List[str] = []
+    if rc != 0:
+        for rel in _pins_rels:
+            u = audit_merge.union_pins(wt, Path(bundle), rel)
+            if not u.get("ok"):
+                return {"ok": False, "error": "PINS_MERGE_FAILED", "conflicts": [rel],
+                        "detail": f"{rel}: 钉并集失败 {u.get('detail', '')}"}
+            (wt / rel).parent.mkdir(parents=True, exist_ok=True)
+            (wt / rel).write_text(str(u["text"]), encoding="utf-8")
+            if rel not in files:
+                added.append(rel)
+    return {"ok": True, "added": added}
+
+
 def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry_run: bool = False,
                              exclude_hunks: Optional[Dict[str, List[int]]] = None) -> dict:
     """三路合并落补丁（在**临时 worktree** 里先做一遍并跑声明的落库后校验，再就地写）。
@@ -683,59 +784,16 @@ def _apply_sequential_merged(workspace: Path, bundle: Path, *, exclude=None, dry
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(text, encoding="utf-8")
             files.append(rel)
-        # **hunk 级剔除未关项那几段**（用户裁定："已修的为什么不能落，不是 git 管理吗？"）：git 本是按 hunk 的
-        # ⇒ 只把与未关项位置重叠的 hunk 反向应用掉，同文件里的其它修复**照落**（文件级排除会把它们一起挡掉）。
-        dropped: Dict[str, list] = {}
-        if exclude_hunks:
-            from k3dge.engine.audit_merge import hunks_overlapping
-
-            order = [str(x) for x in (bundle_facts(bundle).get("apply_order") or [])]
-            patch_srcs = [Path(bundle) / x for x in order if (Path(bundle) / x).is_file()]
-            if exclude_hunks and not patch_srcs:
-                return {"ok": False, "error": "HUNK_SOURCE_MISSING", "conflicts": [],
-                        "detail": "有 hunk 级剔除要求，但 apply_order 里没有可读的补丁 ⇒ 不落地（fail-close，ocr-203）"}
-            for rel, lines in sorted(exclude_hunks.items()):
-                if rel not in files:
-                    continue
-                sel: dict = {"patch": ""}
-                for src in patch_srcs:      # 源可以是 fix.patch **或** 含该改动的其它补丁
-                    sel = hunks_overlapping(src.read_text(encoding="utf-8", errors="replace"),
-                                            rel, list(lines))
-                    if sel.get("patch"):
-                        break
-                if not sel.get("patch"):
-                    continue                  # 无重叠 hunk ⇒ 本就没有要剔的（正常路径）
-                tmpf = wt / ".k3dge-drop.patch"
-                tmpf.write_text(str(sel["patch"]), encoding="utf-8")
-                rc, out = _git(wt, "apply", "-R", "-p1", str(tmpf))
-                tmpf.unlink(missing_ok=True)
-                if rc != 0:
-                    return {"ok": False, "error": "HUNK_EXCLUDE_FAILED", "conflicts": [rel],
-                            "detail": f"{rel}: 未关项所在 hunk 剔不出去（{out.strip()[:160]}）⇒ 不落地（fail-close）"}
-                dropped[rel] = sel.get("dropped") or []
-        # 钉（标注层，纯增量）：正向应用；打不上就对**该文件**并集合并（"两边都加钉"的正解＝两枚都留）
-        pins = str(res.get("pins_patch") or "")
-        if pins:
-            from k3dge.engine import audit_merge      # 单源：补丁→文件集合只认 `patch_rels`
-
-            # `pins.patch` 非空但 `pins_rels` 为空 ⇒ 钉层被静默丢掉（路径全被过滤或解析不出），
-            # `ok: True` 会让调用方以为钉已落（ocr2-045）。fail-clear。
-            _pins_path = Path(bundle) / pins
-            _pins_rels = sorted(res.get("pins_rels") or audit_merge.patch_rels(Path(bundle), pins))
-            if _pins_path.is_file() and _pins_path.stat().st_size > 0 and not _pins_rels:
-                return {"ok": False, "error": "PINS_UNACCOUNTED", "conflicts": [],
-                        "detail": f"{pins}: 补丁非空但解析不出可落文件（路径被过滤？），钉层未落，不静默通过"}
-            rc, apply_out = _git(wt, "apply", "-p1", str(Path(bundle) / pins))
-            if rc != 0:
-                for rel in _pins_rels:
-                    u = audit_merge.union_pins(wt, Path(bundle), rel)
-                    if not u.get("ok"):
-                        return {"ok": False, "error": "PINS_MERGE_FAILED", "conflicts": [rel],
-                                "detail": f"{rel}: 钉并集失败 {u.get('detail', '')}"}
-                    (wt / rel).parent.mkdir(parents=True, exist_ok=True)
-                    (wt / rel).write_text(str(u["text"]), encoding="utf-8")
-                    if rel not in files:
-                        files.append(rel)
+        drop = _exclude_unclosed_hunks(bundle, wt, files, exclude_hunks)
+        if not drop["ok"]:
+            return {"ok": False, "error": drop["error"], "conflicts": drop.get("conflicts") or [],
+                    "detail": drop["detail"]}
+        dropped = drop["dropped"]
+        pin_land = _land_pins_in_worktree(bundle, wt, res, files)
+        if not pin_land["ok"]:
+            return {"ok": False, "error": pin_land["error"], "conflicts": pin_land.get("conflicts") or [],
+                    "detail": pin_land["detail"]}
+        files.extend(pin_land["added"])
         if dry_run:
             return {"ok": True, "files": files, "excluded": res.get("excluded") or [],
                     "conflicts": [], "post_apply_check": {"cmd": "", "ok": True,
@@ -822,6 +880,31 @@ ESCALATION_NOTLANDED = "升级：本次未落"
 ESCALATION_MARKERS = (ESCALATION_UNCLOSED, ESCALATION_NOTLANDED)
 
 
+def _escalation_mark(row: dict, excluded: List[str], esc: set) -> str:
+    """一行报告的升级标记（写进**验证**列）：空串＝不改。
+
+    - 未关 finding（`esc`）⇒ `待验：未闭环（转人工）`；
+    - 位置列指向**被排除文件**、且状态自称"已修"⇒ `升级：本次未落`（"有意留"本无东西可落，标它误导）。
+    """
+    rid = str(row.get("ID") or "").strip()
+    if rid and rid in esc:
+        return ESCALATION_UNCLOSED
+    f = str(row.get("位置") or "").split(":")[0].strip()
+    if f and f in excluded and str(row.get("状态") or "").strip() == "已修":
+        return ESCALATION_NOTLANDED + "（`--exclude`）待人工"
+    return ""
+
+
+def _insert_ver_mark(line: str, i_ver: int, i_min: int, mark: str) -> Optional[str]:
+    """把 `mark` 追加进第 `i_ver` 格；表行格数不足 ⇒ None（不冒险改坏报告）。"""
+    parts = line.split("|")
+    if len(parts) <= i_min:
+        return None
+    if mark not in parts[i_ver]:
+        parts[i_ver] = (parts[i_ver].rstrip() + ("；" if parts[i_ver].strip() else " ") + mark + " ")
+    return "|".join(parts)
+
+
 def reconcile_report_rows(body: str, excluded: Optional[List[str]] = None,
                           escalated: Optional[List[str]] = None) -> Dict[str, object]:
     """报告行 ↔ **实际落了什么/未关什么**的机械对账（写在**验证**列，**不动状态列**）。
@@ -851,24 +934,16 @@ def reconcile_report_rows(body: str, excluded: Optional[List[str]] = None,
     except ValueError:
         return {"body": body, "changed": 0, "ids": []}
     changed: List[str] = []
+    i_min = max(i_ver, i_id, i_pos)
     for idx, row in rows:
-        rid = str(row.get("ID") or "").strip()
-        f = str(row.get("位置") or "").split(":")[0].strip()
-        mark = ""
-        if rid and rid in esc:
-            mark = ESCALATION_UNCLOSED
-        elif f and f in excluded and str(row.get("状态") or "").strip() == "已修":
-            # 只标"声称已修却没落"的行（"有意留"本无东西可落 ⇒ 标它等于误导）
-            mark = ESCALATION_NOTLANDED + "（`--exclude`）待人工"
+        mark = _escalation_mark(row, excluded, esc)
         if not mark:
             continue
-        parts = lines[idx].split("|")
-        if len(parts) <= max(i_ver, i_id, i_pos):
+        new_line = _insert_ver_mark(lines[idx], i_ver, i_min, mark)
+        if new_line is None:
             continue
-        if mark not in parts[i_ver]:
-            parts[i_ver] = (parts[i_ver].rstrip() + ("；" if parts[i_ver].strip() else " ") + mark + " ")
-        lines[idx] = "|".join(parts)
-        changed.append(rid or str(row.get("ID") or ""))
+        lines[idx] = new_line
+        changed.append(str(row.get("ID") or "").strip())
     return {"body": "\n".join(lines) + "\n", "changed": len(changed), "ids": changed}
 
 
@@ -982,6 +1057,41 @@ def commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str
     return (out.strip() if rc == 0 else ""), ""
 
 
+def _resolve_unclosed_scope(bundle: Path, unclosed: List[str]) -> "tuple[List[str], Dict[str, List[int]], List[str]]":
+    """把未关 finding id 映射回树内位置：返回 `(files, hunks_by_file, whole_files)`。
+
+    行号可解 ⇒ hunk 级排除（同文件别的修复照落）；解不出 ⇒ 退**文件级**（别让它偷渡）。
+    读不出 findings ⇒ 三者皆空（调用方按 landing 策略 fail-close）。
+    """
+    files: List[str] = []
+    hunks: Dict[str, List[int]] = {}
+    whole: List[str] = []   # 位置解不出行号 ⇒ 整文件排除
+    if not unclosed:
+        return files, hunks, whole
+    try:
+        items = json.loads((Path(bundle) / "findings.json").read_text(encoding="utf-8"))
+        rows = items.get("items") if isinstance(items, dict) else items
+        for it in (rows or []):
+            if str((it or {}).get("id") or "") not in unclosed:
+                continue
+            loc = str((it or {}).get("location") or "")
+            f, _sep, ln = loc.partition(":")
+            f = f.strip()
+            if not f:
+                continue
+            files.append(f)
+            if ln.strip().isdigit():
+                hunks.setdefault(f, []).append(int(ln.strip()))
+            else:
+                # 空串 / `src/x.py` 无行号 / `12-15` 区间 / `N/A`：只进 files 的话，partial 的
+                # fail-close 判据看的是"有没有任何 hunk 可剔" ⇒ 只要**别的项**解出了行号就整体放行，
+                # 这一项照样落进主干（ocr-206）。退到文件级排除。
+                whole.append(f)
+    except Exception:      # pragma: no cover - 读不出就 fail-close（宁可不落也不乱落）
+        files, hunks, whole = [], {}, []
+    return files, hunks, whole
+
+
 def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
             k3dit: Optional[List[str]] = None, expect_input: Optional[str] = None,
             require_closed: bool = True, accept_baseline_drift: str = "",
@@ -1015,29 +1125,7 @@ def consume(workspace: Path, bundle: Path, *, dry_run: bool = False,
                 "detail": "消费侧验收未通过：" + "; ".join(verified.get("errors") or [])[:400]}
     local = (verified.get("local") or {})
     unclosed = [str(x) for x in (local.get("unclosed") or [])]
-    unclosed_files: List[str] = []
-    unclosed_hunks: Dict[str, List[int]] = {}
-    unclosed_whole_files: List[str] = []   # 位置解不出行号 ⇒ 整文件排除
-    if unclosed:
-        try:
-            items = json.loads((Path(bundle) / "findings.json").read_text(encoding="utf-8"))
-            rows = items.get("items") if isinstance(items, dict) else items
-            for it in (rows or []):
-                if str((it or {}).get("id") or "") in unclosed:
-                    loc = str((it or {}).get("location") or "")
-                    f, _sep, ln = loc.partition(":")
-                    f = f.strip()
-                    if f:
-                        unclosed_files.append(f)
-                        if ln.strip().isdigit():
-                            unclosed_hunks.setdefault(f, []).append(int(ln.strip()))
-                        else:
-                            # 空串 / `src/x.py` 无行号 / `12-15` 区间 / `N/A`：只进 unclosed_files 的话，
-                            # partial 的 fail-close 判据看的是"有没有任何 hunk 可剔" ⇒ 只要**别的项**
-                            # 解出了行号就整体放行，这一项照样落进主干（ocr-206）。退到文件级排除。
-                            unclosed_whole_files.append(f)
-        except Exception:      # pragma: no cover - 读不出就 fail-close（宁可不落也不乱落）
-            unclosed_files, unclosed_hunks, unclosed_whole_files = [], {}, []
+    unclosed_files, unclosed_hunks, unclosed_whole_files = _resolve_unclosed_scope(bundle, unclosed)
     _landing = str(landing or "partial")
     if _landing not in ("closed-only", "partial", "all"):
         return {"ok": False, "error": "BAD_LANDING", "facts": facts,
