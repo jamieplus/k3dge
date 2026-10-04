@@ -525,7 +525,7 @@
       "type": "tasks",
       "id": "2026-09-30-M12-refactor-split_consistency_engine",
       "title": "拆 ConsistencyEngine：检查组各自成模块，只共享 workspace_root",
-      "status": "idea",
+      "status": "in-progress",
       "tokens": "拆 ConsistencyEngine：检查组各自成模块，只共享 workspace_root"
     },
     {

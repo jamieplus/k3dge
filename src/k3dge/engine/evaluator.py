@@ -486,20 +486,10 @@ class ConsistencyEngine:
         return _run_batch_tests(self.workspace_root, manifest, batch_refs)
 
     def _check_version_consistency(self) -> List[Violation]:
-        """pyproject ↔ manifest ↔ __init__ 版本同值；异常即 VERSION_MISMATCH。"""
-        try:
-            from k3dge.engine.version import validate_versions
+        """pyproject ↔ manifest ↔ __init__ 版本同值；异常即 VERSION_MISMATCH（实现见 checks/version）。"""
+        from k3dge.engine.checks import version as _c
 
-            return list(validate_versions(self.workspace_root))
-        except Exception as exc:
-            return [
-                Violation(
-                    "VERSION_MISMATCH",
-                    f"validation failed: {exc}",
-                    file_path=str(self.workspace_root / "pyproject.toml"),
-                    detail={"drift": f"版本校验未能完成：{exc}"},
-                )
-            ]
+        return _c.check_version_consistency(self.workspace_root)
 
     def _check_template_drift(self, manifest: Manifest) -> List[Violation]:
         """脚手架镜像漂移：assets ↔ 本仓文件一致（仅 self_hosting=true，ADR-0001）。"""
@@ -573,92 +563,16 @@ class ConsistencyEngine:
         return out
 
     def _check_pipeline(self) -> List[Violation]:
-        """pipeline.toml 语义硬门控（纯静态；文件不存在则优雅跳过）。"""
-        out: List[Violation] = []
-        try:
-            from k3dge.engine.pipeline_schema import validate_pipeline_config
+        """pipeline.toml 语义硬门控（纯静态；文件不存在则优雅跳过）。实现见 checks/pipeline。"""
+        from k3dge.engine.checks import pipeline as _c
 
-            for code, msg in validate_pipeline_config(self.workspace_root):
-                out.append(
-                    Violation(code, msg, domain="pipelines", file_path=".agent/pipeline.toml")
-                )
-        except Exception as exc:
-            out.append(
-                Violation(
-                    "PIPELINE_SCHEMA_INVALID",
-                    f"pipeline validation crashed: {exc}",
-                    domain="pipelines",
-                    file_path=".agent/pipeline.toml",
-                    detail={"path": ".agent/pipeline.toml", "reason": str(exc)},
-                )
-            )
-        return out
+        return _c.check_pipeline(self.workspace_root)
 
     def _check_audit_trail(self) -> List[Violation]:
-        """`ADR-0008`：审计痕迹只可追加。静态扫 `src/**` 里对 `logs/` 的**覆写式**写入（write_text / open 'w'）。
+        """`ADR-0008`：审计痕迹只可追加（静态扫覆写式写入）。实现见 checks/audit_trail。"""
+        from k3dge.engine.checks import audit_trail as _c
 
-        只判盘上事实（AST 字符串常量 + 写模式），不跑进程。追加式（`open(...,'a')` / 无 `write_text`）不报。
-        """
-        import ast
-
-        src = self.workspace_root / "src"
-        out: List[Violation] = []
-        if not src.is_dir():
-            return out
-        for path in src.rglob("*.py"):
-            if "__pycache__" in path.parts:
-                continue
-            try:
-                tree = ast.parse(path.read_text(encoding="utf-8"))
-            except (OSError, SyntaxError, ValueError):
-                continue
-            rel = path.relative_to(self.workspace_root).as_posix()
-            for node in ast.walk(tree):
-                if not isinstance(node, ast.Call):
-                    continue
-                msg = self._logs_overwrite(node)
-                if msg:
-                    out.append(Violation("AUDIT_TRAIL_APPEND_ONLY", msg, file_path=rel,
-                                         detail={"path": rel, "reason": msg}))
-        return out
-
-    @staticmethod
-    def _logs_literal(node) -> bool:
-        # 只看**写入目标**侧的字面量：`Path("README.md").write_text("logs")` 的内容参数含 "logs"
-        # 并不代表写进 logs/；旧实现扫整个调用节点的全部字符串常量 ⇒ 误报（ocr-241）。
-        # 调用方也会传非 Call 的表达式（BinOp/Constant 目标）⇒ 先收类型再取 .func。
-        def _hits(expr) -> bool:
-            for sub in ast.walk(expr):
-                if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
-                    v = sub.value.replace("\\", "/")
-                    if "logs" in v.split("/") or v.startswith("logs/"):
-                        return True
-            return False
-
-        if not isinstance(node, ast.Call):
-            return _hits(node)                   # 传进来的可能直接就是目标表达式
-        f = node.func
-        if isinstance(f, ast.Attribute):           # Path("...").write_text(...) / open(...).write(...)
-            return _hits(f.value)
-        if isinstance(f, ast.Name) and f.id == "open":
-            return bool(node.args) and _hits(node.args[0])
-        return False
-
-    @classmethod
-    def _logs_overwrite(cls, node) -> str:
-        func = node.func
-        name = func.attr if isinstance(func, ast.Attribute) else (func.id if isinstance(func, ast.Name) else "")
-        if name == "write_text" and cls._logs_literal(node):
-            return "对 logs/ 的 write_text 覆写：审计痕迹只可追加（ADR-0008），改用追加写入。"
-        if name == "open" and node.args:
-            target = node.args[0]
-            mode = node.args[1] if len(node.args) > 1 else None
-            if mode is None:
-                mode = next((kw.value for kw in node.keywords if kw.arg == "mode"), None)
-            wr = isinstance(mode, ast.Constant) and isinstance(mode.value, str) and any(c in mode.value for c in "wx")
-            if cls._logs_literal(target) and wr:
-                return "对 logs/ 的 open(...,'w') 覆写：审计痕迹只可追加（ADR-0008），改用 'a'。"
-        return ""
+        return _c.check_audit_trail(self.workspace_root)
 
     def _check_assert_tautology(self, files, force_full: bool) -> List[Violation]:
         """真值已写死的测试断言。全量扫 `tests/`；增量只扫本批里的测试路径。"""
@@ -962,108 +876,16 @@ class ConsistencyEngine:
         return out
 
     def _check_mcp_json(self) -> List[Violation]:
-        """`.mcp.json` 的 peer 面 vs `.agent/pipeline.toml` 声明（同一探测函数，不开第二判据）。"""
-        from k3dge.engine import mcp_json as mj
+        """`.mcp.json` 的 peer 面 vs `pipeline.toml` 声明（同一探测函数）。实现见 checks/mcp_json。"""
+        from k3dge.engine.checks import mcp_json as _c
 
-        cfg_path = self.workspace_root / ".agent" / "pipeline.toml"
-        doc = mj.load_mcp_document(self.workspace_root)
-        if not cfg_path.is_file() or doc is None:
-            return []  # 无声明/无文件 ⇒ 不造违例（缺文件归 PIPELINE_* 与 init 面）
-        try:
-            import tomllib as _toml
-        except ModuleNotFoundError:  # py3.10
-            try:
-                import tomli as _toml  # type: ignore
-            except ModuleNotFoundError:
-                return []
-        try:
-            cfg = _toml.loads(cfg_path.read_text(encoding="utf-8"))
-        except Exception:
-            return []  # 语法错由 PIPELINE_SCHEMA_INVALID 报，不在这里凑第二份
-        servers = doc.get("mcpServers")
-        if not isinstance(servers, dict):
-            return [
-                Violation(
-                    "MCP_JSON_PEER_MISSING",
-                    "`.mcp.json` has no mcpServers map",
-                    file_path=".mcp.json",
-                    detail={"path": ".mcp.json", "peer": "（缺 mcpServers 表）", "reason": "缺 mcpServers"},
-                )
-            ]
-        out: List[Violation] = []
-        if "k3dge" not in servers:
-            out.append(
-                Violation(
-                    "MCP_JSON_PEER_MISSING",
-                    "`.mcp.json` does not declare the k3dge server itself",
-                    file_path=".mcp.json",
-                    detail={"path": ".mcp.json", "peer": "k3dge"},
-                )
-            )
-        for pid, pcfg in (cfg.get("peers") or {}).items():
-            if not isinstance(pcfg, dict) or not pcfg.get("enabled", True) or pid == "k3dge":
-                continue
-            probe, mod, _pp = mj.probe_peer_mcp(self.workspace_root, pid)
-            if pid in servers or probe is None or mod is None:
-                continue  # 已声明 / sibling 不在（写侧本就会跳过，见 cli.mcp_peers 的回退告警）
-            out.append(
-                Violation(
-                    "MCP_JSON_PEER_MISSING",
-                    f"peer '{pid}' is declared enabled and resolvable but missing from `.mcp.json`",
-                    file_path=".mcp.json",
-                    detail={"path": ".mcp.json", "peer": pid},
-                )
-            )
-        return out
+        return _c.check_mcp_json(self.workspace_root)
 
     def _check_state_doc_coverage(self) -> List[Violation]:
-        """`docs/architecture/overview.md` 必须列全两个**闭集**：`[NEXT]` 态与 task 态。
+        """`overview.md` 状态闭集覆盖。实现见 checks/state_doc。"""
+        from k3dge.engine.checks import state_doc as _c
 
-        2026-09-21 盘点：这两个闭集是代码里的唯一源，文档里此前只零星出现几个名字 ⇒ 新增/改名
-        状态时文档静默过时。只做**标识符级出现性**检查（要求反引号形式，避免撞普通英文词），
-        不解析表格格式。
-        """
-        rel = "docs/architecture/overview.md"
-        path = self.workspace_root / rel
-        if not path.is_file():
-            return []
-        try:
-            text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            return []
-        from k3dge.engine import nextstep, state_machine
-
-        states = sorted(nextstep.STATE_OPTIONS) + [s.value for s in state_machine.TaskState]
-        # 「要么不写、要么写全」：一个状态名都没列 ⇒ 本文件没打算做状态总览（下游骨架即如此），
-        # 不报；列了一部分 ⇒ 那才是会误导人的半张表（漏项＝新状态在总览里不存在）。
-        if not any(f"`{s}`" in text for s in states):
-            return []
-        missing = [s for s in states if f"`{s}`" not in text]
-        out: List[Violation] = []
-        if missing:
-            out.append(
-                Violation(
-                    "ARCH_STATE_DOC_DRIFT",
-                    f"{rel} 未列全状态闭集（缺 {missing}）——状态源在 `engine/nextstep.STATE_OPTIONS` / "
-                    f"`engine/state_machine.TaskState`，文档缺项等于静默过时",
-                    file_path=rel,
-                    detail={"path": rel, "missing": missing},
-                )
-            )
-        # 表里写了 priority 就要与代码一致（**数字**也漂移过：2026-09-21 发现旧文写反了 ratchet_open）
-        for prio, state in re.findall(r"^\|\s*(\d+)\s*\|\s*`([a-z_]+)`\s*\|", text, re.MULTILINE):
-            want = nextstep.STATE_OPTIONS.get(state, {}).get("priority")
-            if want is not None and int(prio) != int(want):
-                out.append(
-                    Violation(
-                        "ARCH_STATE_DOC_DRIFT",
-                        f"{rel} 的 `{state}` priority 写成 {prio}，代码是 {want}",
-                        file_path=rel,
-                        detail={"path": rel, "missing": f"{state}.priority（文档 {prio}，代码 {want}）",
-                                "state": state, "got": int(prio), "want": int(want)},
-                    )
-                )
-        return out
+        return _c.check_state_doc_coverage(self.workspace_root)
 
     def _check_architecture_tables(self, manifest: Manifest) -> List[Violation]:
         """设计文档里的**域表**必须与 manifest 对齐（表行是事实，不是散文）。
@@ -1119,78 +941,16 @@ class ConsistencyEngine:
         return out
 
     def _check_extractor_plugins(self) -> List[Violation]:
-        """`.agent/extractors/<lang>.py` 必须是 `.agent/extractors.toml` 的**当前渲染**（改了配置没 sync ⇒ 静默用过时插件）。"""
-        try:
-            from k3dge.engine import extractor_gen
+        """`.agent/extractors/<lang>.py` 必须是 `extractors.toml` 的当前渲染。实现见 checks/extractors。"""
+        from k3dge.engine.checks import extractors as _c
 
-            ws = self.workspace_root
-            if not ((ws / ".agent" / "extractors.toml").is_file() or (ws / ".agent" / "extractors").is_dir()):
-                return []
-            missing = []
-            for name, row in extractor_gen.resolve_languages(ws).items():
-                dest = ws / extractor_gen.PLUGDIR_REL / f"{name}.py"
-                want = extractor_gen.render_plugin(name, row)
-                got = dest.read_text(encoding="utf-8") if dest.is_file() else None
-                if got != want:
-                    missing.append(name)
-            if not missing:
-                return []
-            return [
-                Violation(
-                    "EXTRACTOR_PLUGIN_STALE",
-                    f"plugin drift: {missing}",
-                    file_path=extractor_gen.PLUGDIR_REL,
-                    detail={"path": extractor_gen.PLUGDIR_REL, "languages": missing},
-                )
-            ]
-        except Exception as exc:
-            return [
-                Violation(
-                    "EXTRACTOR_PLUGIN_STALE",
-                    f"extractor plugin check crashed: {exc}",
-                    file_path=".agent/extractors",
-                    detail={"path": ".agent/extractors", "languages": "（校验崩溃，未定位）",
-                            "reason": str(exc)},
-                )
-            ]
+        return _c.check_extractor_plugins(self.workspace_root)
 
     def _check_docs_toml(self) -> List[Violation]:
-        """`.agent/docs.toml` 的 `= true` 键必须真的会被 `scripts/generate-docs.sh` 处理，且目标文件在。
+        """`.agent/docs.toml` 的 `= true` 键必须被 `generate-docs.sh` 处理。实现见 checks/docs_toml。"""
+        from k3dge.engine.checks import docs_toml as _c
 
-        键表**不在这里另造一份**：直接从写脚本自己的 `gen "<key>" "<file>" "<title>"` 行读
-        （写侧是唯一声明处）；读不到任何 `gen` 行 ⇒ 跳过（脚本形态变了不误报）。
-        """
-        cfg = self.workspace_root / ".agent" / "docs.toml"
-        script = self.workspace_root / "scripts" / "generate-docs.sh"
-        if not cfg.is_file() or not script.is_file():
-            return []
-        try:
-            table = dict(
-                (k, f) for k, f, _t in re.findall(r'gen\s+"([a-z_]+)"\s+"([^"]+)"\s+"([^"]*)"', script.read_text(encoding="utf-8"))
-            )
-            enabled = re.findall(r"^\s*([a-z_]+)\s*=\s*true\b", cfg.read_text(encoding="utf-8"), re.MULTILINE)
-        except (OSError, UnicodeDecodeError):
-            return []
-        if not table:
-            return []
-        out: List[Violation] = []
-        for key in enabled:
-            target = table.get(key)
-            if key == "readme":
-                target = "README.md"   # readme 走专门分支（刷新布局/基础版），不在 gen 表里
-            if target is None:
-                out.append(
-                    Violation(
-                        "DOCS_TOML_KEY_UNKNOWN",
-                        f"`.agent/docs.toml` 的 `{key} = true` 不会被 `scripts/generate-docs.sh` 处理（键表见该脚本的 gen 行）",
-                        file_path=".agent/docs.toml",
-                        detail={"path": ".agent/docs.toml", "key": key},
-                    )
-                )
-                continue
-            # 只查"键脚本认不认识"：`= true` 而文件尚未生成是**收尾流程的常态**（`generate-docs.sh` 在
-            # 工程收尾时才落桩），报它会把每个刚 init 的仓都打红。
-        return out
+        return _c.check_docs_toml(self.workspace_root)
 
     def _check_domain_imports(self, domain: str, manifest: Manifest) -> List[Violation]:
         """Reverse-import ban: a domain may import another domain only if declared in depends_on (ADR-0001 decision 6)."""

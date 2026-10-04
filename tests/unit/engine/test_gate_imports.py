@@ -57,6 +57,7 @@ _ENGINE_HELPER_OK = {
     "search": "受控搜索（只读）",
     "state_machine": "task 状态定义（枚举/迁移表）",
     "version": "只用 validate_versions（bump_version 在 seal 线里跑）",
+    "checks": "ConsistencyEngine 拆出的检查组（盘上事实 → Violation，只读；包内函数私有）",
 }
 
 
@@ -98,8 +99,12 @@ class TestGateClusterImports(unittest.TestCase):
         """
         allowed_engine = {Path(n).stem for n in _GATE} | set(_ENGINE_HELPER_OK)
         offenders = []
-        for name in sorted(_GATE):
-            path = ENGINE / name
+        # 闸核拆出的 `checks/` 也是闸核面：一并扫，别让新包成为 allowlist 的盲区。
+        checks_dir = ENGINE / "checks"
+        targets = [(n, ENGINE / n) for n in sorted(_GATE)]
+        if checks_dir.is_dir():
+            targets += [(f"checks/{p.name}", p) for p in sorted(checks_dir.glob("*.py"))]
+        for name, path in targets:
             self.assertTrue(path.is_file(), f"missing gate module {name}")
             for mod in _imported_modules(path):
                 if not mod.startswith("k3dge."):

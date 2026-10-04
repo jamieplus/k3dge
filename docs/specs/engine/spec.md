@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:51395cf11153bd7eb0404acfb1f87608a8b0b878ec0bf55d0a72f0b3ca200fc6`
+- **Contract Hash**: `sha256:018ff36a5a43680aa624c7b186927110fd333b938166ad40b3721e45311fe467`
 - **Last Updated**: 2026-10-03
 
 ## 1. Domain Boundary & Responsibilities
@@ -180,6 +180,34 @@ from __future__ import annotations
 from pathlib import Path
 mechanical_commit(subject: str, body: str) -> bool
 build_notes_from_range(workspace: Path, previous_tag: str='') -> tuple
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_audit_trail(workspace: Path) -> List[Violation]
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_docs_toml(workspace: Path) -> List[Violation]
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_extractor_plugins(workspace: Path) -> List[Violation]
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_mcp_json(workspace: Path) -> List[Violation]
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_pipeline(workspace: Path) -> List[Violation]
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_state_doc_coverage(workspace: Path) -> List[Violation]
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_version_consistency(workspace: Path) -> List[Violation]
 from __future__ import annotations
 from pathlib import Path
 from typing import List

@@ -419,6 +419,12 @@
       "line": 347
     }
   ],
+  "check_audit_trail": [
+    {
+      "file": "src/k3dge/engine/checks/audit_trail.py",
+      "line": 48
+    }
+  ],
   "check_completeness": [
     {
       "file": "src/k3dge/engine/state_machine.py",
@@ -435,6 +441,18 @@
     {
       "file": "src/k3dge/engine/pure_refs.py",
       "line": 104
+    }
+  ],
+  "check_docs_toml": [
+    {
+      "file": "src/k3dge/engine/checks/docs_toml.py",
+      "line": 10
+    }
+  ],
+  "check_extractor_plugins": [
+    {
+      "file": "src/k3dge/engine/checks/extractors.py",
+      "line": 9
     }
   ],
   "check_file": [
@@ -497,10 +515,22 @@
       "line": 309
     }
   ],
+  "check_mcp_json": [
+    {
+      "file": "src/k3dge/engine/checks/mcp_json.py",
+      "line": 9
+    }
+  ],
   "check_one": [
     {
       "file": "src/k3dge/engine/doc_gate.py",
       "line": 104
+    }
+  ],
+  "check_pipeline": [
+    {
+      "file": "src/k3dge/engine/checks/pipeline.py",
+      "line": 9
     }
   ],
   "check_report_pointer": [
@@ -539,6 +569,12 @@
       "line": 178
     }
   ],
+  "check_state_doc_coverage": [
+    {
+      "file": "src/k3dge/engine/checks/state_doc.py",
+      "line": 10
+    }
+  ],
   "check_supersede_unreconciled": [
     {
       "file": "src/k3dge/engine/pure_refs.py",
@@ -561,6 +597,12 @@
     {
       "file": "src/k3dge/engine/pure_refs.py",
       "line": 178
+    }
+  ],
+  "check_version_consistency": [
+    {
+      "file": "src/k3dge/engine/checks/version.py",
+      "line": 9
     }
   ],
   "closure_ok": [

@@ -341,6 +341,48 @@ mechanical_commit(subject: str, body: str) -> bool
     # doc: **机器造的**提交（不该进 CHANGELOG，也不算"漏项"）。
 build_notes_from_range(workspace: Path, previous_tag: str='') -> tuple
     # doc: `<previous_tag>..HEAD` 的非机械提交 → `(notes, uncovered)`。
+# audit_trail.py
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_audit_trail(workspace: Path) -> List[Violation]
+    # doc: `ADR-0008`：审计痕迹只可追加。静态扫 `src/**` 里对 `logs/` 的**覆写式**写入（write_text / open 'w'）。
+# docs_toml.py
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_docs_toml(workspace: Path) -> List[Violation]
+    # doc: `.agent/docs.toml` 的 `= true` 键必须真的会被 `scripts/generate-docs.sh` 处理，且目标文件在。
+# extractors.py
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_extractor_plugins(workspace: Path) -> List[Violation]
+    # doc: `.agent/extractors/<lang>.py` 必须是 `.agent/extractors.toml` 的**当前渲染**（改了配置没 sync ⇒ 静默用过时插件）。
+# mcp_json.py
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_mcp_json(workspace: Path) -> List[Violation]
+    # doc: `.mcp.json` 的 peer 面 vs `.agent/pipeline.toml` 声明（同一探测函数，不开第二判据）。
+# pipeline.py
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_pipeline(workspace: Path) -> List[Violation]
+    # doc: pipeline.toml 语义硬门控（纯静态；文件不存在则优雅跳过）。
+# state_doc.py
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_state_doc_coverage(workspace: Path) -> List[Violation]
+    # doc: `docs/architecture/overview.md` 必须列全两个**闭集**：`[NEXT]` 态与 task 态。
+# version.py
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_version_consistency(workspace: Path) -> List[Violation]
+    # doc: pyproject ↔ manifest ↔ __init__ 版本同值；异常即 VERSION_MISMATCH。
 # contract.py
 from __future__ import annotations
 from pathlib import Path
