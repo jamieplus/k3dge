@@ -123,8 +123,11 @@ class TestBlockingDangling(unittest.TestCase):
         self.assertTrue(tasks.is_dir(), f"根不指本仓（parents[3] 漂了？）：{repo}")
         scanned = [p for p in tasks.glob("*.md")
                    if not _is_doc_aux(p.name) and not p.name.endswith(".done.md")]
-        n = len(scanned)
-        self.assertGreater(n, 0, "docs/tasks 没有可查的开票——本测在空转")
+        if not scanned:
+            # 合法状态：本仓当前没有开票（全 done/aux，如里程碑刚清空、新里程碑票未开）。
+            # 此时"全仓零悬空"是空集真值，本测无从区分"对"与"scanner 漂了"——显式 skip，
+            # 不假装在验。scanner 的**能力**由 test_scanner_actually_emits_refs 用夹具钉住。
+            self.skipTest("docs/tasks 无开票（全 done/aux）⇒ 全仓扫描无对象")
         out = task_dag.blocking_dangling(repo)
         self.assertEqual(out, {"closed": [], "unknown": []})
 
