@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-10-04
+
+### Added
+- seal 声明序不变量层封堵 + ADR-0004 §2.1.9 记取舍
+
+### Changed
+- M12 预审刷新 docs-index 投影 + align 报告
+- pwsh 实测场景收录进 LEFTOVERS.md 统一有意留条目（14 条 ps1/模板资产）
+- ocr3 报告批量核验——源内已含 ocr 注释/守卫或代码已改的 106 条翻已修
+- 落地 k3dge OCR dccff5f6 全文件扫描报告（ocr3-，298 条）
+- 归档 untagged/M8 遗留 review（seal 收尾遗留的工作树移动）
+- 拆 ConsistencyEngine 完成——检查组各自成模块（evaluator 1294→435 行）
+- 拆 ConsistencyEngine 第一批——workspace-only 检查组各自成模块
+- 降分支复杂度——cmd_doc/cmd_audit 与 audit_bundle 五函数抽函数（行为保持）
+- M12 四票按当前实际核验回填（1 关 / 1 缩窄 / 2 复核仍在）
+- LINE-M10-01 收口——核验后判定不并入，删救援 tag 与 k3dit/M10 线
+
+### Fixed
+- test_attest wrong-token accept 窗口同步为相邻三窗（前后分钟），驱动 seal 全量过
+- OCR scan 报告列对齐（描述列移除裸 |，改全角｜），通过 audit report shape 契约
+- 对齐注释/docstring 与实现一批
+- ocr3 逐条核定收尾——真修 4 条（attest/audit_merge/milestone_pointer/nextstep）
+- scripts/ 批咨下 ocr3 逐条核定；init.ps1 git init 失败即拒；gate.ps1 注释对齐 Trim
+- ocr3 scan 报告回填列对齐——状态/处置/验证落回正确列（c[8]/c[9]/c[10]），位置列不再被覆写
+- k3dge-init-wrapper.ps1 拒转发参数并取回退码；同步 k3dge-init.ps1 (PAIR)
+- ocr3 高档一批核实修复（mcp_json/models/pipeline_schema/audit_bundle/cli.main）
+- gate.ps1 全局回落判断用 -cne（守代码行禁 -ne 的大小写敏感守卫）
+- OCR medium 批次收尾——extractor_gen（2 条）
+- OCR medium 首批核实修复（14 条）
+- OCR .ps1 轨核实修复（4 条，按同名 .sh/.py 口径镜像）
+- OCR 脚本类核实修复（5 条）
+- OCR 第三批核实修复（5 条）
+- OCR 第二批核实修复（6 条）
+- OCR 审计首批核实修复（7 条）
+- test_task_dag 全 done 仓（无开票）时显式 skip，不再误红
+- CI（Python 3.10）剩余 7 处红——tomllib 回退/gate.py 回退形状/locale.getencoding
+- test_nextstep 注解引用未导入的 unittest 模块（py3.10 即时求值炸，py3.14 藏住）
+
 ## [0.1.13] - 2026-10-03
 
 ### Added

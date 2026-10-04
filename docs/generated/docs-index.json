@@ -441,22 +441,6 @@
       "tokens": "封板收摊清单（上下文压缩）: M11"
     },
     {
-      "path": "docs/reviews/2026-10-04-M12-align.md",
-      "type": "reviews",
-      "id": "2026-10-04-M12-align",
-      "title": "里程碑对齐与验收报告: M12",
-      "status": "",
-      "tokens": "里程碑对齐与验收报告: M12"
-    },
-    {
-      "path": "docs/reviews/2026-10-04-M12-ocr-scan.md",
-      "type": "reviews",
-      "id": "2026-10-04-M12-ocr-scan",
-      "title": "审计：open-code-review 全文件扫描（M12）",
-      "status": "",
-      "tokens": "审计：open-code-review 全文件扫描（M12）"
-    },
-    {
       "path": "docs/specs/_template/spec.md",
       "type": "specs",
       "id": "spec",
@@ -503,46 +487,6 @@
       "title": "复杂度债续（非 milestone 文件）：CC≥11 函数逐个拆",
       "status": "done",
       "tokens": "复杂度债续（非 milestone 文件）：CC≥11 函数逐个拆"
-    },
-    {
-      "path": "docs/tasks/2026-09-30-M12-docs-pipeline_declaration_convergence.done.md",
-      "type": "tasks",
-      "id": "2026-09-30-M12-docs-pipeline_declaration_convergence.done",
-      "title": "pipeline.toml 声明面收敛：一套路由词表、声明形状数量、规范语义的权威载体",
-      "status": "done",
-      "tokens": "pipeline.toml 声明面收敛：一套路由词表、声明形状数量、规范语义的权威载体"
-    },
-    {
-      "path": "docs/tasks/2026-09-30-M12-refactor-seal_order_invariant.done.md",
-      "type": "tasks",
-      "id": "2026-09-30-M12-refactor-seal_order_invariant.done",
-      "title": "seal 动作声明序的不变量层封堵 + kind/on_rerun 通用强制",
-      "status": "done",
-      "tokens": "seal 动作声明序的不变量层封堵 + kind/on_rerun 通用强制"
-    },
-    {
-      "path": "docs/tasks/2026-09-30-M12-refactor-split_cli_and_bundle_cc.done.md",
-      "type": "tasks",
-      "id": "2026-09-30-M12-refactor-split_cli_and_bundle_cc.done",
-      "title": "降分支复杂度：cli/main.py cmd_audit/cmd_doc 与 audit_bundle 五函数",
-      "status": "done",
-      "tokens": "降分支复杂度：cli/main.py cmd_audit/cmd_doc 与 audit_bundle 五函数"
-    },
-    {
-      "path": "docs/tasks/2026-09-30-M12-refactor-split_consistency_engine.done.md",
-      "type": "tasks",
-      "id": "2026-09-30-M12-refactor-split_consistency_engine.done",
-      "title": "拆 ConsistencyEngine：检查组各自成模块，只共享 workspace_root",
-      "status": "done",
-      "tokens": "拆 ConsistencyEngine：检查组各自成模块，只共享 workspace_root"
-    },
-    {
-      "path": "docs/tasks/2026-09-30-M12-refactor-tests_explicit_encoding.done.md",
-      "type": "tasks",
-      "id": "2026-09-30-M12-refactor-tests_explicit_encoding.done",
-      "title": "测试面的显式编码：read_text/write_text 缺 encoding 的 271 处统一收口（连同一次性 helper）",
-      "status": "done",
-      "tokens": "测试面的显式编码：read_text/write_text 缺 encoding 的 271 处统一收口（连同一次性 helper）"
     }
   ]
 }
