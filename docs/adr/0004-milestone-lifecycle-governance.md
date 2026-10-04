@@ -5,6 +5,7 @@ Amended-by:
   - 🅰1 | Core Maintainer | 2026-09-20 | 审计＝封版主体：唯一入口 `seal`（预审 align → 审计 → 审核后自动化）；版号由**审计正常返回**推进；边界＝审计基线（`tag <M> = <B>`），基线之后归下一里程碑；报告降级为可选产物；完成记录＝封版提交 trailer；运行态与 durable 分层；CHANGELOG 由提交区间生成
   - 🅰2 | Core Maintainer | 2026-09-20 | `degraded-manual` 的定义扩到「**manual 传输**（不论它在链里是不是首选）」——判"有没有独立透镜"（事实），不判"相对预期链的位置"
   - 🅰3 | Core Maintainer | 2026-09-21 | 相位 3 先刷**纯投影**、不跑整条 `sync`（事实源写归审前）；派生件新鲜度归闸（`DOC_INDEX_STALE`/`DOCS_GENERATED_STALE`/`SYMBOL_INDEX_STALE`/`EXTRACTOR_PLUGIN_STALE`）+ `k3dge where` 自愈
+  - 🅰4 | Core Maintainer | 2026-10-03 | §2.1.14 审计确认硬闸（人主观）与封板增量：seal/audit 解耦；未确认提醒三出路；确认绑定基线；增量排除审计自身+引用封版 hash 的提交；启动必终态
 Landed-by: src/k3dge/engine/seal_flow.py
 Date: 2026-08-23
 Deciders: Core Maintainer
@@ -143,6 +144,15 @@ Note: 修订痕迹见 git 历史。
 - **对外发布动作（push 等）归人**：k3dge 只打印待执行命令。
 - closure 清单的人判项（落盘未采用方案 / 清理上下文 / 更新设计文档）保持 **advisory**，不塞硬闸。
 
+### 2.1.14 审计确认（硬闸，主观）与封板增量（🅰4）[^🅰4.1]
+
+- **解耦**：`seal` 不再强制跑审计（`[checks.seal].actions` 的 `audit` 节点降为可选/按需）；"审计是封板主体"退为"**审计确认是封板硬闸**"。
+- **硬闸**：`audit 已确认`（人主观确认全版 audit 已做，或授权机器替打勾），**不可绕过**；机器/agent 不验证"审没审过"（第三方可替代 audit；"只审计、再让 agent 修"不受限）。
+- **未确认 ⇒ 提醒（非死拒）**：打印第三方审计命令信息 + `k3dge milestone audit <id>` + `--confirm-audit`（确认当前即审后状态，替人打勾）。
+- **基线绑定**：确认记基线 `B_ack`；封版时算增量 `B_ack..HEAD`，**排除**审计自身改动（job/报告 provenance、`Audit-*` trailer/审计基线）与**引用本次封版 hash 的提交**（trailer 如 `Audit-covered: <seal-hash>`，带即豁免；机械/审计归因小提交不再逐次弹提醒；不防伪造、不限提交类型、不追责）。
+- **非空增量 ⇒ 提醒增量审计**（+ 冻结源码警告：再改触发新提醒）；**审计时点自由**。
+- **启动必终态**：audit 一旦启动必须跑到终态（`closed`/`degraded-manual`/`escalated`/`refused`），不留 `incomplete` 悬空（salvage→落报告→记终态）。
+
 ### 2.2 为什么通过文件系统物理移动实现上下文压缩
 `k3dge milestone seal` 将 `docs/tasks/*.md` 物理移入 `docs/tasks/archive/<id>/`。
 `k3dge task list` 只扫顶层活跃文件，`archive/` 不在扫描面——Token 零浪费的上下文重置，且符合 `docs/tasks/archive/` 的 append-only 审计需求。
@@ -187,3 +197,5 @@ Note: 修订痕迹见 git 历史。
 [^🅰2.1]: 修改（🅰2）：`degraded-manual` 原表述是"降级到 manual 协议"，容易被读成"只有**降级**才算" ——于是"把 manual 排在 transports 首位"就成了绕开署名要求的路（`downgrades` 为空 ⇒ 判 `closed`）。 裁定：判据是**事实**（有没有独立透镜），不是**相对位置**（链里排在哪儿）。故 `provider == "manual"` 一律 `degraded-manual`、一律须署名；本仓 `[mcp, manual]` 不受影响（本就落在降级位）。
 
 [^🅰3.1]: 修改（🅰3）：新增"相位 3 先刷纯投影"。为什么不是整条 `sync`：`sync` 链里 `sync_domains` （spec 接口块 + `Contract Hash`）与 `reconcile_adrs`（ADR frontmatter + 移文件）是**事实源写**， 审计之后执行等于让"审的那一版"与封版内容脱钩（§2.1.9「审哪版封哪版」）。纯投影刷新与新鲜度闸 是同一件事的两半：**闸管发现**（重算比对，红了给重生命令）、**刷管及时**（封版那一刻与 `k3dge where` 自愈）。 落地：`src/k3dge/engine/seal_flow.py::_refresh_projections`、`engine/evaluator.py`（三闸）、 `engine/search.py::_is_stale_cheaply`；见 `docs/tasks/2026-09-21-M11-feat-projection_refresh.done.md`。
+
+[^🅰4.1]: 修改（🅰4）：seal/audit 解耦 + 审计确认硬闸（人主观）+ 增量豁免。驱动缘由：k3dit 一轮闭环不可靠（多轮 `incomplete`/未关，封板被机器验证卡死）+ 第三方工具可替代 audit + 审计时点应自由；本地确认丢了大不了再提醒一次，不防伪造/不限类型/不追责（单人流，hash 引用是公开声明）。
