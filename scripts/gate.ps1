@@ -12,7 +12,7 @@ $cmdArgs = if ($args.Count -eq 0) { @("check") } else { $args }
 # K3DGE_SOURCE 统管校验：环境声明的源 vs 本 venv 的装时落盘，不一致即拦。
 # 优先级与 gate.sh / gate.py 同：环境 > 本仓 pyproject [tool.k3dge].source；都没有 = legacy。
 $srcFile = Join-Path $Root ".venv/k3dge-source.txt"
-# 环境值原样用 ⇒ 纯空白会被当成"已声明政策"（后文 `if ($want)` 非空即真），与 gate.py 的 `.strip()` 不同口径（ocr2-093）。
+# 环境值先 Trim（空白-only 视为未声明），与 gate.py 的 `.strip()` 同口径（ocr2-093）。
 $want = if ($null -eq $env:K3DGE_SOURCE) { "" } else { "$($env:K3DGE_SOURCE)".Trim() }
 if ([string]::IsNullOrWhiteSpace($want) -and (Test-Path (Join-Path $Root "pyproject.toml"))) {
   # 原生命令 + Stop 下 `2>$null` 会抛 NativeCommandError ⇒ 临时降为 Continue（WinPS 5.1），失败按"取不到"处理（ocr-144/147）。

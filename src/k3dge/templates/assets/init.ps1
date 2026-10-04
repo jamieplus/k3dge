@@ -51,6 +51,7 @@ finally { $ErrorActionPreference = $prevPref }
 if ($LASTEXITCODE -ne 0 -or -not $top) {
   Write-Host "[k3dge] git init -b main  ($Target)"
   git init -b main
+  if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("[k3dge] git init -b main 失败 (exit $LASTEXITCODE)"); exit 1 }
 } elseif (((Resolve-Path -LiteralPath $top).Path).TrimEnd('\','/') -ne ((Resolve-Path -LiteralPath $Target).Path).TrimEnd('\','/')) {
   [Console]::Error.WriteLine("[k3dge] 当前目录在既有仓库里（toplevel=$top）但根不是目标目录 ⇒ 拒跑（会造嵌套仓，绕过外层闸口）")
   exit 1
