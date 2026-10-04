@@ -36,3 +36,4 @@ k3dge-audit/
 /tmp/
 # understand 技能产物（知识图谱 + 批次中间件，6MB 级派生物，永不入库）
 .ua/
+.mcp.json
