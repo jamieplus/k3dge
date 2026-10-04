@@ -9,6 +9,21 @@ Spec-gate harness：为 vibecoding agent 提供确定性的契约漂移检测与
 核心思路：把对 agent 的口头约束（Soft Prompting）降维成文件系统事实（`spec.md` 契约哈希）
 与 git hook 硬门禁，杜绝跨会话语义漂移。
 
+## 使用说明（Usage）
+
+- 使用 / 快速开始：见 [`docs/guides/user_guide.md`](docs/guides/user_guide.md)（基础版随仓库，工程收尾由 `./scripts/generate-docs.sh` 刷新）
+- 下游仓升级后的整流：见 [`docs/guides/downstream.md`](docs/guides/downstream.md)
+- MCP bridge 接入外部 harness：见 [`docs/guides/mcp-bridge.md`](docs/guides/mcp-bridge.md)
+
+## 维护协议
+
+- Contribution：见 [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- 报告安全问题：见 [`SECURITY.md`](SECURITY.md)
+- 对外主导条款：Copyright (c) 2026 Jamie Cheng，协议 MIT；详见 [`LICENSE`](LICENSE)
+- 第三方/吸收说明：见 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)
+
+审计/扫描报告在 [`docs/reviews/`](docs/reviews/)（最近 CI seal 后的 review 见 `docs/reviews/<date>-*.md`）。
+
 ## 初始化（Init）
 
 一次性初始化环境——由人执行，或由 agent 按本 README 执行：
