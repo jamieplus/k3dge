@@ -105,6 +105,12 @@ Note: 修订痕迹见 git 历史。
   3. **审核后（自动）**：**先刷纯投影**（`docs/generated/{api,domains}.md`、`docs-index.json`、符号索引、README 自动块——全部派生、幂等），**再**写收摊清单
      → 封版提交（提版 + 归档 + 收摊清单 + 记录 trailer，见 §2.1.10）→ `tag <M> = <B>` → 指针前进 → 交接（打印待执行命令）。
      相位 3 **不跑整条 `sync`**：spec 接口块/契约哈希与 ADR reconcile 是**事实源写**，审计之后动它们等于改审计看过的内容；派生件的新鲜度另有闸（`DOC_INDEX_STALE` / `DOCS_GENERATED_STALE` / `SYMBOL_INDEX_STALE` / `EXTRACTOR_PLUGIN_STALE`），`k3dge where` 遇陈旧索引自愈。[^🅰3.1]
+- **声明序＝正确性（不变量，带闸）**：相位 3 的自动收尾由 `[checks.seal].actions` 的**相对序**承载
+  （`archive → version_bump → closure_note → seal_record → prune`：后项依赖前项的写盘已进工作树，
+  再由 `seal_record` 的 `_commit_all` 一次提交）。该序**不是**可随手调的配置——`pipeline_schema._validate_seal_action_order`
+  在 `k3dge check` 里静态校验成对相对序（乱序 ⇒ `PIPELINE_SCHEMA_INVALID`）。已证乱序症状：`closure_note`
+  晚于 `seal_record` ⇒ 收摊清单/派生投影漏进封版提交（下一轮 `DOC_INDEX_STALE`）；`version_bump` 晚于
+  `seal_record` ⇒ 版本多记一拍（2026-09-30 审计 `value-13`）。这是"保留声明序"的**代价被闸封住**的取舍。
 - **机械验证两道**：相位 1 的预审，以及**落点闸**（审计线的修复合并回主干时跑
   sync/check/doc-gate/pytest，红则回滚主干——先验后并）。
 - **边界与标识**：审计的输入标识＝**基线 B 的 git hash**（不用 job id 作标识）；

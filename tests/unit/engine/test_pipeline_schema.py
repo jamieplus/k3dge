@@ -173,6 +173,37 @@ class TestPipelineSchema(unittest.TestCase):
         errs = validate_pipeline_config(root)
         self.assertEqual(errs, [], f"unexpected pipeline violations: {errs}")
 
+    def test_seal_action_order_invariant(self):
+        """`[checks.seal].actions` 的相对序是声明面不变量：有依赖的两项调反 ⇒ PIPELINE_SCHEMA_INVALID。
+
+        value-13：closure_note 晚于 seal_record、version_bump 晚于 seal_record 都出过半套状态。
+        """
+        import tempfile
+
+        # 缺省（不声明 actions）＝ gates.DEFAULTS 的合法序 ⇒ 无"序错"。
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            _write(root, ".agent/pipeline.toml",
+                   '[peers.x.actions.a]\ntransports = [ { provider = "skip" } ]\n')
+            msgs = [m for _c, m in validate_pipeline_config(root) if "序错" in m]
+            self.assertEqual(msgs, [], msgs)
+
+        bad = [
+            # closure_note 被挪到 seal_record 之后
+            '["full_matrix", "audit", "archive", "version_bump", "seal_record", "closure_note", "prune"]',
+            # version_bump 被挪到 closure_note 之后
+            '["full_matrix", "audit", "archive", "closure_note", "version_bump", "seal_record", "prune"]',
+            # prune 被挪到 seal_record 之前
+            '["full_matrix", "audit", "prune", "archive", "version_bump", "closure_note", "seal_record"]',
+        ]
+        for actions in bad:
+            with self.subTest(actions=actions), tempfile.TemporaryDirectory() as d:
+                root = pathlib.Path(d)
+                _write(root, ".agent/pipeline.toml", f"[checks.seal]\nactions = {actions}\n")
+                errs = validate_pipeline_config(root)
+                self.assertIn("PIPELINE_SCHEMA_INVALID", [c for c, _ in errs], errs)
+                self.assertTrue(any("序错" in m for _c, m in errs), errs)
+
     def test_syntax_error(self):
         import tempfile
 

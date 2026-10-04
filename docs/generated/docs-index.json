@@ -505,11 +505,11 @@
       "tokens": "pipeline.toml 声明面收敛：一套路由词表、声明形状数量、规范语义的权威载体"
     },
     {
-      "path": "docs/tasks/2026-09-30-M12-refactor-seal_order_invariant.md",
+      "path": "docs/tasks/2026-09-30-M12-refactor-seal_order_invariant.done.md",
       "type": "tasks",
-      "id": "2026-09-30-M12-refactor-seal_order_invariant",
+      "id": "2026-09-30-M12-refactor-seal_order_invariant.done",
       "title": "seal 动作声明序的不变量层封堵 + kind/on_rerun 通用强制",
-      "status": "idea",
+      "status": "done",
       "tokens": "seal 动作声明序的不变量层封堵 + kind/on_rerun 通用强制"
     },
     {

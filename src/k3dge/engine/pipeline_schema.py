@@ -238,6 +238,46 @@ def _validate_declared_stages(workspace: Path, data: dict) -> List[PipelineViola
     return errors
 
 
+#: seal 动作的**相对序不变量**：后项依赖前项的副作用（写盘）已进工作树，最后由
+#: `seal_record` 的 `_commit_all` 一次提交（ADR-0004 §2.1.9/§2.1.11）。声明序仍是承载面，
+#: 但"谁在谁之前"不是人可以随便调的——这里把它变成声明面静态校验。
+#: 已证乱序症状（value-13）：`closure_note` 晚于 `seal_record` ⇒ 收摊清单/派生投影不进封版提交
+#: （下一轮 `DOC_INDEX_STALE`）；`version_bump` 晚于 `seal_record` ⇒ 版本多记一拍。
+_SEAL_ORDER: tuple = (
+    ("full_matrix", "audit"),
+    ("audit", "archive"),
+    ("archive", "version_bump"),
+    ("version_bump", "closure_note"),
+    ("closure_note", "seal_record"),
+    ("seal_record", "prune"),
+)
+
+
+def _validate_seal_action_order(data: dict) -> List[PipelineViolation]:
+    """`[checks.seal].actions` 的相对序必须满足 `_SEAL_ORDER`（声明面环/序校验）。
+
+    缺省（不声明 `actions`）用 `gates.DEFAULTS` 的合法序 ⇒ 不报。只校验**成对相对序**，
+    不要求精确列表 ⇒ 下游可在合法位置插入新动作，但不得把有依赖的两项调反。
+    """
+    checks = data.get("checks") if isinstance(data, dict) else None
+    seal = checks.get("seal") if isinstance(checks, dict) else None
+    ids = seal.get("actions") if isinstance(seal, dict) else None
+    if not isinstance(ids, list):
+        from k3dge.engine import gates
+
+        ids = list(gates.DEFAULTS.get("checks", {}).get("seal", {}).get("actions") or [])
+    pos = {str(n): i for i, n in enumerate(ids)}
+    errs: List[PipelineViolation] = []
+    for before, after in _SEAL_ORDER:
+        if before in pos and after in pos and pos[before] > pos[after]:
+            errs.append((
+                "PIPELINE_SCHEMA_INVALID",
+                f"[checks.seal].actions 序错：'{before}' 必须在 '{after}' 之前"
+                f"（后项依赖前项已写盘，再由 seal_record 一次提交；ADR-0004 §2.1.9）",
+            ))
+    return errs
+
+
 # k3dit:leftover Q-6 CC28 validate_pipeline_config 分拆校验
 def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
     """Validate `.agent/pipeline.toml`. Returns [] when valid or file absent.
@@ -275,6 +315,7 @@ def validate_pipeline_config(workspace: Path) -> List[PipelineViolation]:
     errors.extend(_validate_pipelines(data.get("pipelines", {})))
     errors.extend(_validate_legacy_gates_toml(workspace))
     errors.extend(_validate_declared_stages(workspace, data))
+    errors.extend(_validate_seal_action_order(data))
     return errors
 
 

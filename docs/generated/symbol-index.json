@@ -2100,7 +2100,7 @@
   "validate_pipeline_config": [
     {
       "file": "src/k3dge/engine/pipeline_schema.py",
-      "line": 242
+      "line": 282
     }
   ],
   "validate_structure": [
