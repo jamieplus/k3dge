@@ -122,8 +122,10 @@ def _shape_change_documented(workspace: Path, domain: str, spec_content: str, sy
                 return True
     m = re.search(r"^#{2,3}\s+.*(?:Domain Boundary|边界)", spec_content, re.MULTILINE)
     if m:
+        # `nxt` 在**切片**上搜 ⇒ 其 offset 相对切片起点，用回原文要加 `m.start()+1`。
         nxt = re.search(r"\n#{2,3}\s+", spec_content[m.start() + 1:])
-        sec = spec_content[m.start(): nxt.start() if nxt else len(spec_content)]
+        end = (m.start() + 1 + nxt.start()) if nxt else len(spec_content)
+        sec = spec_content[m.start():end]
         if any(n in sec for n in needles):
             return True
     return False
@@ -186,7 +188,10 @@ def _check_verification_matrix(
             ref == tests_root or ref.startswith(tests_root.rstrip("/") + "/")
         )
         if "::" in ref:
-            fpath, _, tname = ref.partition("::")
+            # 末段才是测试名：class-qualified id 形如 `test_y.py::TestClass::test_method`
+            # （partition 会给出 `TestClass::test_method`，`def\s+…` 永不匹配 ⇒ 假 MATRIX_TEST_UNRESOLVED）。
+            _parts = ref.split("::")
+            fpath, tname = _parts[0], _parts[-1]
         else:
             fpath, tname = ref, ""
         target = workspace / fpath
@@ -272,7 +277,12 @@ def _check_domain_contract(
         detail = None
         try:
             detail = contract.symbol_diff(content, src_dir, manifest, workspace)
-        except Exception:
+        except Exception as exc:
+            # 不吞成静默 `None`：symbol_diff 崩了，CONTRACT_DRIFT 会丢掉符号明细且无从归因。
+            import sys
+
+            print(f"[WARN] symbol_diff failed for domain '{domain}': {type(exc).__name__}: {exc}",
+                  file=sys.stderr)
             detail = None
         if detail and any(detail.get(k) for k in ("added", "removed", "changed")):
             if not _shape_change_documented(workspace, domain, content, detail):
@@ -312,10 +322,19 @@ def _check_domain_imports(workspace: Path, domain: str, manifest: Manifest) -> L
         return out
     pkg = _package_prefix(manifest, domain)
     if not pkg:
+        # 推导不出包前缀（异常布局）⇒ 反向 import 禁令整条失效（code-6 回归的形状）。出声，
+        # 不静默 fail-open。
+        import sys
+
+        print(f"[WARN] 无法从 manifest 推导 domain '{domain}' 的包前缀 ⇒ 反向 import 禁令跳过",
+              file=sys.stderr)
         return out
     allowed = set(manifest.depends_on(domain))
     for py in sorted(src_dir.rglob("*.py")):
         if py.name == "__init__.py":
+            # 有意跳过包初始化器：它常做同包 re-export，`_imported_domains` 的"pkg 后首段"启发式
+            # 在 `__init__` 上噪声大（会把同域子模块当跨域）。代价：跨域 re-export 可经此逃逸
+            # （已知缺口，登记于 ocr3 medium）；真要封需按符号级 import 归属，另议。
             continue
         try:
             text = py.read_text(encoding="utf-8")

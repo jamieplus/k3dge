@@ -41,10 +41,19 @@ def _acquire_lock(path: Path) -> "int | None":
         return None
     try:
         fd = os.open(str(path.with_name(path.name + ".lock")), os.O_CREAT | os.O_RDWR, 0o644)
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        return fd
     except OSError:
         return None
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+    except OSError:
+        # flock 失败（ENOLCK/不支持的 FS 如 NFS）⇒ 降级无锁可以，但**必须关掉刚开的 fd**，
+        # 否则每次 emit 泄漏一个描述符，反复调用最终 EMFILE。
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        return None
+    return fd
 
 
 def emit(workspace: Path, evt: str, **data: Any) -> None:
@@ -68,7 +77,13 @@ def emit(workspace: Path, evt: str, **data: Any) -> None:
         # 吞可以，但不得无声：整条事件流消失还 exit 0，消费者会把"没事件"读成"没发生"（ocr2-250）。
         import sys as _sys
 
-        print(f"[events] WARN: 写入失败（{type(exc).__name__}: {exc}）⇒ 本条事件丢失", file=_sys.stderr)
+        try:
+            # 告警打印自身也可能抛（stderr 关闭/broken pipe）——不得让它逃出 `emit()`（docstring
+            # 承诺 Never raises）。措辞用"可能"：失败也可能发生在 append 之后的 `_rotate`。
+            print(f"[events] WARN: 写入/轮转失败（{type(exc).__name__}: {exc}）⇒ 本条事件可能未持久化",
+                  file=_sys.stderr)
+        except Exception:
+            pass
     finally:
         if lock_fd is not None:
             try:
@@ -96,7 +111,11 @@ def _rotate(path: Path) -> None:
             os.fsync(f.fileno())
         os.replace(tmp, path)
     except OSError:
-        pass
+        # fsync/replace 反复失败时 PID tmp 会在 `.k3dge/` 里堆积 ⇒ 尽力清掉本轮可能留下的那个。
+        try:
+            path.with_name(f"{path.name}.{os.getpid()}.tmp").unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 

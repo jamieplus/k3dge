@@ -8,7 +8,12 @@ from __future__ import annotations
 
 import os
 import tempfile
+import threading
 from pathlib import Path
+
+# 读 umask 要先 `os.umask(0)` 再还原——这段时间是**进程全局**状态：并发线程新建文件会继承 0
+# （world-writable），两个调用者还会互相还原错值。加锁把读-还原窗口串行化（进程内原子）。
+_UMASK_LOCK = threading.Lock()
 
 
 def atomic_write_text(path: Path, text: str, encoding: str = "utf-8") -> None:
@@ -23,23 +28,24 @@ def atomic_write_text(path: Path, text: str, encoding: str = "utf-8") -> None:
     try:
         want_mode = stat.S_IMODE(path.stat().st_mode)
     except OSError:
-        _umask = os.umask(0)
-        os.umask(_umask)
+        with _UMASK_LOCK:
+            _umask = os.umask(0)
+            os.umask(_umask)
         want_mode = 0o666 & ~_umask
     fd, name = tempfile.mkstemp(dir=str(parent), prefix=f".{path.name}.", suffix=".tmp")
     tmp = Path(name)
     try:
         # 直接用 mkstemp 返回的 fd 写：关掉再按名重开会丢掉独占创建的保护窗口
         # （两条指令之间可被换成符号链接 ⇒ write_text 跟随截断任意文件）。
+        # fsync 也走**同一个独占 fd**（`os.fsync(f.fileno())`）：按路径重开（旧做法）又跟随了
+        # 当下 `tmp` 指向的东西（symlink/FIFO 换入即 TOCTOU），把刚关掉的口子重新打开。
         with os.fdopen(fd, "w", encoding=encoding, newline="") as f:
             f.write(text)
-        os.chmod(tmp, want_mode)
-        # 光 `rename` 只保证原子性，不保证落盘：page cache 里的数据 + 延迟分配下，
-        # rename 的元数据可先于数据块持久化 ⇒ 断电丢数据（ocr2-034）。先 fsync 文件，
-        # rename 后再 fsync 目录（目录项落盘），才是崩溃安全的原子写。
-        with open(tmp, "rb") as _f:
-            os.fsync(_f.fileno())
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp, want_mode)   # `os.fchmod` 是 Unix-only；按我们自己的唯一 tmp 名 chmod 即可
         tmp.replace(path)
+        # 光 `rename` 只保证原子性，不保证落盘（ocr2-034）：rename 后再 fsync 父目录让目录项落盘。
         try:
             _dfd = os.open(str(parent), os.O_RDONLY)
             try:
@@ -47,7 +53,10 @@ def atomic_write_text(path: Path, text: str, encoding: str = "utf-8") -> None:
             finally:
                 os.close(_dfd)
         except OSError:
-            pass
+            # 目录 fsync 在 **Windows** 上不支持（os.open 目录即失败）⇒ 容忍；其余平台的 OSError
+            # 是真 I/O 错（EIO 等）⇒ 不得吞（吞了函数仍报成功，durability 承诺落空）。
+            if os.name != "nt":
+                raise
     except BaseException:
         # `except Exception` 接不住 KeyboardInterrupt/SystemExit/CancelledError ⇒
         # Ctrl-C 后 `.spec.md.*.tmp` 永久躺在受管目录里污染 git 快照；放 BaseException。

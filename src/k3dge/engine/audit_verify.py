@@ -213,10 +213,11 @@ def _replay_hashes(bundle: Path) -> Dict[str, Any]:
         # 会抛 `AttributeError`（ocr2-048）。与 manifest 的 `isinstance` 守卫同口径。
         return {"ok": False, "checked": 0, "mismatched": [], "files_with_markers": [], "skipped_pin_files": [],
                 "detail": f"baseline.json 不是对象（{type(baseline).__name__}），哈希链不可核"}
-    want = baseline.get("files") or {}
-    if not want:
+    want = baseline.get("files")
+    if not isinstance(want, dict) or not want:
+        # `files` 也须是对象：非空 list/str（不可信输入）会在下面 `want.items()` 抛 AttributeError。
         return {"ok": False, "checked": 0, "mismatched": [], "files_with_markers": [], "skipped_pin_files": [],
-                "detail": "baseline.json 缺 files"}
+                "detail": f"baseline.json 的 files 缺失或不是对象（{type(want).__name__}）"}
     ver = (_read_json(bundle / "manifest.json") or {}).get("bundle_version")
     algo = _ALGO_BY_VERSION.get(ver)
     if algo is None:
@@ -229,7 +230,7 @@ def _replay_hashes(bundle: Path) -> Dict[str, Any]:
                 "skipped_pin_files": [], "detail": rep.get("detail") or "重放失败"}
     work = Path(rep["root"])
     try:
-        mismatched, with_pins, checked = [], [], 0
+        mismatched, unresolved, with_pins, checked = [], [], [], 0
         work_root = work.resolve()
         for rel, digest in sorted(want.items()):
             # `rel` 来自**不可信**的 `baseline.json`（外部包）：绝对路径/`..` 会逃出重放树、读任意文件
@@ -240,12 +241,14 @@ def _replay_hashes(bundle: Path) -> Dict[str, Any]:
             except (OSError, ValueError):
                 inside = False
             if not inside or not f.is_file():
-                mismatched.append(rel)
+                # 结构性失败（越界/基线文件在重放树里**缺失**）单列 `unresolved`：它不是"摘要漂移"，
+                # 不得被 `accept_baseline_drift` 当"已接受漂移"洗白（删掉的基线文件不是 drift，ocr3）。
+                unresolved.append(rel)
                 continue
             try:
                 raw = f.read_bytes().decode("utf-8", errors="surrogateescape")   # 无损往返
-            except OSError as exc:
-                mismatched.append(rel)
+            except OSError:
+                unresolved.append(rel)
                 continue
             sem = strip_markers(raw, rel)          # **去钉后比语义层**（契约 §8 语法单源）
             if has_marker_line(raw, rel):          # 只按"真匹配到钉行"计数（二进制文件不误标）
@@ -264,9 +267,13 @@ def _replay_hashes(bundle: Path) -> Dict[str, Any]:
                 checked += 1
             else:
                 mismatched.append(rel)             # 含钉文件**不豁免**：篡改一样抓得到
-        return {"ok": not mismatched, "checked": checked, "mismatched": mismatched,
-                "mismatched_preview": mismatched[:10],
-                "files_with_markers": with_pins[:10], "skipped_pin_files": [], "detail": ""}
+        detail = ""
+        if unresolved:
+            detail = f"基线文件在重放树里缺失/越界/不可读（{len(unresolved)}）：{unresolved[:10]}"
+        return {"ok": not mismatched and not unresolved, "checked": checked, "mismatched": mismatched,
+                "mismatched_preview": mismatched[:10], "unresolved": unresolved,
+                "unresolved_preview": unresolved[:10],
+                "files_with_markers": with_pins[:10], "skipped_pin_files": [], "detail": detail}
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -301,7 +308,15 @@ def verify_bundle_local(bundle: Path, *, expect_input: str = "", require_closed:
                 pass
         elif not bundle_input_matches(facts.get("input"), expect_input):
             errors.append(f"输入身份不符：包为 {facts.get('input')!r}，目标是 {expect_input!r}")
-    order = [str(x) for x in (facts.get("apply_order") or [])]
+    _raw_order = facts.get("apply_order")
+    if _raw_order is None:
+        order: List[str] = []
+    elif isinstance(_raw_order, list):
+        order = [str(x) for x in _raw_order]
+    else:
+        # 真值非可迭代标量（5/True/1.5）遍历会 TypeError 逃出 `{ok,...}` 契约；形状错即报违例。
+        errors.append(f"apply_order 形状非法（{type(_raw_order).__name__}，应为数组）")
+        order = []
     for name in order:
         if name not in ("fix.patch", "pins.patch"):
             errors.append(f"apply_order 含未知补丁 {name!r}")
