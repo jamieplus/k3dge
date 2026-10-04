@@ -95,6 +95,15 @@ def _sub_version_in_project(text: str, new_version: str) -> tuple:
     seg = "".join(lines[start + 1:end])
     new_seg, n = _VERSION_RE.subn(f'version = "{new_version}"', seg, count=1)
     if n == 0:
+        # 宽容形（缩进/单引号）也**只在 [project] 段内**替换：全文件搜会命中别的表的
+        # `version = '…'`（ocr2-087 同族，写读须同口径）。保留行首缩进（ocr2-538）。
+        def _repl(m) -> str:
+            g = m.group(0)
+            lead = g[:len(g) - len(g.lstrip(" \t"))]
+            return f'{lead}version = "{new_version}"'
+
+        new_seg, n = _VERSION_LINE_RELAXED.subn(_repl, seg, count=1)
+    if n == 0:
         return text, 0
     return "".join(lines[:start + 1]) + new_seg + "".join(lines[end:]), n
 
@@ -276,26 +285,17 @@ def _collect_version_updates(workspace: Path, new_version: str) -> list:
             # `[project].version`，写错地方会改掉无关版本（ocr2-087）。
             new_text, n = _sub_version_in_project(text, new_version)
             if n == 0:
-                relaxed = _VERSION_LINE_RELAXED.search(text)
-                if relaxed:
-                    # 保留行首缩进（ocr2-538）：`^[ \t]*version` 命中的前导空白不能丢，
-                    # 否则重写会把合法缩进排版静默拍平。
-                    matched = relaxed.group(0)
-                    lead = matched[:len(matched) - len(matched.lstrip(" \t"))]
-                    new_text = (text[:relaxed.start()] + lead + f'version = "{new_version}"'
-                                + text[relaxed.end():])
-                else:
-                    # 行内表 `project = { … version = "…" }`（合法 TOML，读侧认）：
-                    # 写侧必须同口径，否则 bump 抛 RuntimeError（ocr2-538）。
-                    inline = _VERSION_INLINE_RE.search(text)
-                    if inline:
-                        if inline.group(1) is not None:
-                            s, e = inline.span(1)
-                        else:
-                            s, e = inline.span(2)
-                        new_text = text[:s] + new_version + text[e:]
+                # 段内已含宽容形替换；到这里只剩**行内表** `project = { … version = "…" }`
+                # （合法 TOML，读侧认）——写侧必须同口径，否则 bump 抛 RuntimeError（ocr2-538）。
+                inline = _VERSION_INLINE_RE.search(text)
+                if inline:
+                    if inline.group(1) is not None:
+                        s, e = inline.span(1)
                     else:
-                        raise RuntimeError("Failed to update pyproject.toml version")
+                        s, e = inline.span(2)
+                    new_text = text[:s] + new_version + text[e:]
+                else:
+                    raise RuntimeError("Failed to update pyproject.toml version")
             updates.append((p, new_text))
     mp = _manifest_path(workspace)
     if mp.is_file():

@@ -31,17 +31,29 @@ def _logs_literal(node) -> bool:
 
 def _logs_overwrite(node) -> str:
     func = node.func
-    name = func.attr if isinstance(func, ast.Attribute) else (func.id if isinstance(func, ast.Name) else "")
-    if name == "write_text" and _logs_literal(node):
-        return "对 logs/ 的 write_text 覆写：审计痕迹只可追加（ADR-0008），改用追加写入。"
-    if name == "open" and node.args:
-        target = node.args[0]
-        mode = node.args[1] if len(node.args) > 1 else None
-        if mode is None:
-            mode = next((kw.value for kw in node.keywords if kw.arg == "mode"), None)
-        wr = isinstance(mode, ast.Constant) and isinstance(mode.value, str) and any(c in mode.value for c in "wx")
-        if _logs_literal(target) and wr:
-            return "对 logs/ 的 open(...,'w') 覆写：审计痕迹只可追加（ADR-0008），改用 'a'。"
+    if isinstance(func, ast.Attribute) and func.attr == "write_text":
+        if _logs_literal(node):
+            return "对 logs/ 的 write_text 覆写：审计痕迹只可追加（ADR-0008），改用追加写入。"
+        return ""
+    # `open` 两种形态：`Path(...).open(...)`（Attribute，路径在**接收者** `func.value`）与
+    # `open(...)`（Name，路径在 args[0] 或 `file=`）。旧实现一律取 `node.args[0]` ⇒ 前者把
+    # 模式串当路径、后者 `open(file=...)` 因 args 为空被跳过，都漏报（ocr3）。
+    if isinstance(func, ast.Attribute) and func.attr == "open":
+        target = func.value
+        mode = (node.args[0] if node.args else None) or \
+            next((kw.value for kw in node.keywords if kw.arg == "mode"), None)
+    elif isinstance(func, ast.Name) and func.id == "open":
+        target = (node.args[0] if node.args else None) or \
+            next((kw.value for kw in node.keywords if kw.arg == "file"), None)
+        mode = (node.args[1] if len(node.args) > 1 else None) or \
+            next((kw.value for kw in node.keywords if kw.arg == "mode"), None)
+    else:
+        return ""
+    if target is None:
+        return ""
+    m = mode.value if isinstance(mode, ast.Constant) and isinstance(mode.value, str) else None
+    if m is not None and any(c in m for c in "wx") and _logs_literal(target):
+        return "对 logs/ 的 open(...,'w') 覆写：审计痕迹只可追加（ADR-0008），改用 'a'。"
     return ""
 
 

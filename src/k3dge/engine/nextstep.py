@@ -402,6 +402,11 @@ def emit_all(workspace: Path, steps: list, *, stream: Optional[TextIO] = None) -
         if isinstance(prev_c.get("reasons"), list) and prev_c["reasons"]:
             # 与 `_upsert` 同口径：已 persist 的同态卡 reasons 要合并而非覆盖（ocr2-285）。
             c["reasons"] = _merge_reasons(prev_c["reasons"], c.get("reasons"))
+        for _k in ("pending", "pointers", "question"):
+            # 同 `_upsert`：新卡未设的字段从旧卡继承，否则第二块同态卡会把上一块的
+            # pending/pointers/question 静默清掉（`render_mcp` 在 None/空时省键）。
+            if _k not in c and _k in prev_c:
+                c[_k] = prev_c[_k]
         by_state[c.get("state")] = c
     merged = sorted(by_state.values(),
                     key=lambda c: (_prio(c),

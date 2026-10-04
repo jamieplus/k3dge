@@ -193,15 +193,26 @@ def bump_verify_attempt(workspace: Path, milestone_id: Optional[str] = None) -> 
 
     @contextmanager
     def _locked():
+        # 只把**取锁**包进 try：`yield` 必须留在 try 之外——否则 `with _locked():` 体内抛的
+        # OSError 会被这里当"拿不到锁"吞掉，生成器再 yield 一次 ⇒ contextlib 报
+        # "generator didn't stop after throw()" 并盖掉真实异常。
+        _lf = None
         try:
             import fcntl
 
             _lp = _path(workspace).with_name(_path(workspace).name + ".lock")
-            with open(_lp, "a+b") as _lf:
-                fcntl.flock(_lf.fileno(), fcntl.LOCK_EX)
-                yield
+            _lf = open(_lp, "a+b")
+            fcntl.flock(_lf.fileno(), fcntl.LOCK_EX)
         except (ImportError, OSError):
+            _lf = None
+        try:
             yield
+        finally:
+            if _lf is not None:
+                try:
+                    _lf.close()
+                except OSError:
+                    pass
 
     with _locked():
         data = ensure_checklist(workspace, milestone_id)

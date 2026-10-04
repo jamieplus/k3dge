@@ -1039,20 +1039,12 @@ def commit_applied(workspace: Path, message: str, files: List[str]) -> Tuple[str
     rc, out = _git(workspace, "-c", "user.email=k3dge@local", "-c", "user.name=k3dge",
                    "commit", "-q", "-m", message)
     if rc != 0:
-        # 失败后树停在 staged 态 ⇒ 下一轮 `apply_bundle` 被自家 `DIRTY_TREE` 挡死、要人工 `git reset`（ocr-205）。
+        # 失败后树停在 staged 态 + 已跟踪文件被改写 ⇒ 下一轮 `apply_bundle` 被自家 `DIRTY_TREE` 挡死
+        # （ocr-205）。`git reset` 只退索引、**不动工作树**：已跟踪的改动必须 `checkout` 还原，
+        # 未跟踪的（报告/投影）删掉。复用 `_restore_files`（分批：坏 pathspec 不连累整条）。
         _git(workspace, "reset", "-q", "--", *files)
-        # `git reset` 只退索引：本次新增的未跟踪文件（报告/投影）会留下 ⇒ 下一轮仍被 DIRTY_TREE 拦。
-        # 把其中"未跟踪"的删掉（已跟踪的已退回 HEAD，无需动）。
-        for rel in files:
-            lr, _ = _git(workspace, "ls-files", "--error-unmatch", "--", rel)
-            if lr != 0:
-                try:
-                    p = workspace / rel
-                    if p.is_file() or p.is_symlink():
-                        p.unlink()
-                except OSError:
-                    pass
-        return "", f"git commit 失败（本轮已退回未暂存并清理新增文件）：{out.strip()[-400:]}"
+        _restore_files(workspace, files)
+        return "", f"git commit 失败（本轮已退索引并还原工作树）：{out.strip()[-400:]}"
     rc, out = _git(workspace, "rev-parse", "HEAD")
     return (out.strip() if rc == 0 else ""), ""
 

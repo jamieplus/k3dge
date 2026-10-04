@@ -340,9 +340,15 @@ class ConsistencyEngine:
     def _run_affected_tests(self, modified_domains: Set[str], manifest: Manifest) -> List[Violation]:
         """批量跑 touched 域测试；跨域：公开哈希变化时带 depends_on 该域的消费方（ADR-0001 决策点 6）。"""
         affected = set(modified_domains)
-        for d in sorted(manifest.domains):
-            if set(manifest.depends_on(d)) & affected:
-                affected.add(d)
+        # 传递闭包要**跑到不动点**：单趟按字母序扫时，依赖链 A←B←C（只改了 C）里 A 可能
+        # 在 B 被加入 affected 之前就被检查 ⇒ 漏掉 A 的测试（ADR-0001 决策点 6 的跨域保证失效）。
+        changed = True
+        while changed:
+            changed = False
+            for d in sorted(manifest.domains):
+                if d not in affected and set(manifest.depends_on(d)) & affected:
+                    affected.add(d)
+                    changed = True
         batch_refs: dict[str, set[str]] = {}
         for domain in sorted(affected):
             ref = manifest.domains.get(domain, {}).get("tests", "")
