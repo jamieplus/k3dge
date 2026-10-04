@@ -84,7 +84,7 @@ if ($k3dge) {
   if ($want) {
     # 收据只覆盖 `.venv`；全局那份来源未经校验。默认**拒跑**（与 gate.py:138-142 / gate.sh:91-94
     # 同口径）——删 .venv 二进制比伪造收据省事，出声回落＝把来源校验变噪音（ocr3）。
-    if ($env:K3DGE_ALLOW_GLOBAL -ne "1") {
+    if ($env:K3DGE_ALLOW_GLOBAL -cne "1") {
       [Console]::Error.WriteLine("[k3dge-source] 政策已声明但 .venv/Scripts/k3dge.exe 缺失：全局 k3dge 来源未经校验 ⇒ 拒跑（K3DGE_ALLOW_GLOBAL=1 可强制回落）")
       exit 2
     }
