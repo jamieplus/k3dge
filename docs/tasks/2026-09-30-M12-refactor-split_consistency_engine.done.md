@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 milestone: M12
 priority: P3
 date: 2026-09-30
@@ -37,3 +37,19 @@ date: 2026-09-30
 余：`_collect_modified_domains` / `_run_affected_tests` / `_check_template_drift` / `_check_docs` /
 `_check_domain`(+`_load_domain_spec`/`_check_verification_matrix`/`_check_domain_contract`/`_check_domain_imports`) /
 `_check_generated_projections` / `_check_architecture_tables` / `_check_assert_tautology`（manifest/files-dependent）。
+
+## 进度（2026-10-04，第二批 + 第三批：manifest/files 与域检查组）
+
+继续拆入 `engine/checks/`：
+
+- 第二批：`template_drift.py`（含 `_without_pins`/`_PIN_LINE_RE`）、`assert_tautology.py`、`docs.py`、
+  `projections.py`、`architecture_tables.py`（含 `_norm_cell`/`_domain_table_rows`/`_TABLE_COL_KEYS`）。
+- 第三批：`domain.py` —— 整族域检查（spec 结构 / 验证矩阵 / 契约哈希 / 反向 import）连同其
+  AST/路径辅助（`_package_prefix`/`_pkg_chain`/`_imported_domains`/`_shape_change_documented`/
+  `_verification_matrix_section`）一并迁出，公开 `check_domain(workspace, domain, manifest)`。
+
+`evaluator.py` **1294 → 435 行**；类内只剩编排（`evaluate`/`_collect_modified_domains`/
+`_run_affected_tests`/`_staged_files`）与 `_run_batch_tests`（测试跑腿）+ 各 `_check_*` 薄委托。
+`test_template_sync` 的 `_without_pins` 导入改指新模块；`test_gate_imports` allowlist/扫描面已覆盖 `checks/**`。
+
+验证：`pytest tests` 1279 passed, 10 skipped；`k3dge check` 绿（契约/符号索引/生成文档已 sync+index）。

@@ -2,7 +2,7 @@
 
 - **Status**: Active
 - **Module Path**: `src/k3dge/engine`
-- **Contract Hash**: `sha256:018ff36a5a43680aa624c7b186927110fd333b938166ad40b3721e45311fe467`
+- **Contract Hash**: `sha256:2b56bd062556187d3d641af240b143112616f22af4e649a25d66ffdc39da40bc`
 - **Last Updated**: 2026-10-03
 
 ## 1. Domain Boundary & Responsibilities
@@ -182,12 +182,35 @@ mechanical_commit(subject: str, body: str) -> bool
 build_notes_from_range(workspace: Path, previous_tag: str='') -> tuple
 from pathlib import Path
 from typing import List
+from typing import Optional
+from k3dge.engine.manifest import Manifest
+from k3dge.engine.models import Violation
+check_architecture_tables(workspace: Path, manifest: Manifest) -> List[Violation]
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_assert_tautology(workspace: Path, files, force_full: bool) -> List[Violation]
+from pathlib import Path
+from typing import List
 from k3dge.engine.models import Violation
 check_audit_trail(workspace: Path) -> List[Violation]
 from pathlib import Path
 from typing import List
 from k3dge.engine.models import Violation
+check_docs(workspace: Path, files, force_full: bool) -> List[Violation]
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
 check_docs_toml(workspace: Path) -> List[Violation]
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Set
+from k3dge.engine import contract
+from k3dge.engine import spec_schema
+from k3dge.engine.manifest import Manifest
+from k3dge.engine.models import Violation
+check_domain(workspace: Path, domain: str, manifest: Manifest) -> List[Violation]
 from pathlib import Path
 from typing import List
 from k3dge.engine.models import Violation
@@ -202,8 +225,20 @@ from k3dge.engine.models import Violation
 check_pipeline(workspace: Path) -> List[Violation]
 from pathlib import Path
 from typing import List
+from k3dge.engine.checks.mcp_json import check_mcp_json
+from k3dge.engine.manifest import Manifest
+from k3dge.engine.models import Violation
+check_generated_projections(workspace: Path, manifest: Manifest) -> List[Violation]
+from pathlib import Path
+from typing import List
 from k3dge.engine.models import Violation
 check_state_doc_coverage(workspace: Path) -> List[Violation]
+from pathlib import Path
+from typing import List
+from k3dge.engine.manifest import Manifest
+from k3dge.engine.models import Violation
+from k3dge.engine.pairs import PAIRS
+check_template_drift(workspace: Path, manifest: Manifest) -> List[Violation]
 from pathlib import Path
 from typing import List
 from k3dge.engine.models import Violation
@@ -295,16 +330,12 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from typing import Set
-from k3dge.engine import assert_tautology
-from k3dge.engine import contract
 from k3dge.engine import diff
-from k3dge.engine import spec_schema
 from k3dge.engine.diff import GitError
 from k3dge.engine.manifest import Manifest
 from k3dge.engine.manifest import ManifestError
 from k3dge.engine.models import GateReport
 from k3dge.engine.models import Violation
-from k3dge.engine.pairs import PAIRS
 class ConsistencyEngine
     evaluate(self, run_tests: bool=False, force_full: bool=False, staged: bool=False) -> GateReport
 from __future__ import annotations

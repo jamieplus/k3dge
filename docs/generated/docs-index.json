@@ -521,11 +521,11 @@
       "tokens": "降分支复杂度：cli/main.py cmd_audit/cmd_doc 与 audit_bundle 五函数"
     },
     {
-      "path": "docs/tasks/2026-09-30-M12-refactor-split_consistency_engine.md",
+      "path": "docs/tasks/2026-09-30-M12-refactor-split_consistency_engine.done.md",
       "type": "tasks",
-      "id": "2026-09-30-M12-refactor-split_consistency_engine",
+      "id": "2026-09-30-M12-refactor-split_consistency_engine.done",
       "title": "拆 ConsistencyEngine：检查组各自成模块，只共享 workspace_root",
-      "status": "in-progress",
+      "status": "done",
       "tokens": "拆 ConsistencyEngine：检查组各自成模块，只共享 workspace_root"
     },
     {

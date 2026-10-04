@@ -2,7 +2,7 @@
   "ConsistencyEngine": [
     {
       "file": "src/k3dge/engine/evaluator.py",
-      "line": 286
+      "line": 151
     }
   ],
   "ContractExtractor": [
@@ -419,6 +419,18 @@
       "line": 347
     }
   ],
+  "check_architecture_tables": [
+    {
+      "file": "src/k3dge/engine/checks/architecture_tables.py",
+      "line": 71
+    }
+  ],
+  "check_assert_tautology": [
+    {
+      "file": "src/k3dge/engine/checks/assert_tautology.py",
+      "line": 10
+    }
+  ],
   "check_audit_trail": [
     {
       "file": "src/k3dge/engine/checks/audit_trail.py",
@@ -443,10 +455,22 @@
       "line": 104
     }
   ],
+  "check_docs": [
+    {
+      "file": "src/k3dge/engine/checks/docs.py",
+      "line": 9
+    }
+  ],
   "check_docs_toml": [
     {
       "file": "src/k3dge/engine/checks/docs_toml.py",
       "line": 10
+    }
+  ],
+  "check_domain": [
+    {
+      "file": "src/k3dge/engine/checks/domain.py",
+      "line": 344
     }
   ],
   "check_extractor_plugins": [
@@ -477,6 +501,12 @@
     {
       "file": "src/k3dge/engine/pure_schema.py",
       "line": 236
+    }
+  ],
+  "check_generated_projections": [
+    {
+      "file": "src/k3dge/engine/checks/projections.py",
+      "line": 12
     }
   ],
   "check_h1": [
@@ -597,6 +627,12 @@
     {
       "file": "src/k3dge/engine/pure_refs.py",
       "line": 178
+    }
+  ],
+  "check_template_drift": [
+    {
+      "file": "src/k3dge/engine/checks/template_drift.py",
+      "line": 26
     }
   ],
   "check_version_consistency": [

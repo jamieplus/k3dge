@@ -341,18 +341,49 @@ mechanical_commit(subject: str, body: str) -> bool
     # doc: **机器造的**提交（不该进 CHANGELOG，也不算"漏项"）。
 build_notes_from_range(workspace: Path, previous_tag: str='') -> tuple
     # doc: `<previous_tag>..HEAD` 的非机械提交 → `(notes, uncovered)`。
+# architecture_tables.py
+from pathlib import Path
+from typing import List
+from typing import Optional
+from k3dge.engine.manifest import Manifest
+from k3dge.engine.models import Violation
+check_architecture_tables(workspace: Path, manifest: Manifest) -> List[Violation]
+    # doc: 设计文档里的**域表**必须与 manifest 对齐（表行是事实，不是散文）。
+# assert_tautology.py
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_assert_tautology(workspace: Path, files, force_full: bool) -> List[Violation]
+    # doc: 真值已写死的测试断言。全量扫 `tests/`；增量只扫本批里的测试路径。
 # audit_trail.py
 from pathlib import Path
 from typing import List
 from k3dge.engine.models import Violation
 check_audit_trail(workspace: Path) -> List[Violation]
     # doc: `ADR-0008`：审计痕迹只可追加。静态扫 `src/**` 里对 `logs/` 的**覆写式**写入（write_text / open 'w'）。
+# docs.py
+from pathlib import Path
+from typing import List
+from k3dge.engine.models import Violation
+check_docs(workspace: Path, files, force_full: bool) -> List[Violation]
+    # doc: docs 目录结构/索引校验（force_full 或本批触 docs 时）。
 # docs_toml.py
 from pathlib import Path
 from typing import List
 from k3dge.engine.models import Violation
 check_docs_toml(workspace: Path) -> List[Violation]
     # doc: `.agent/docs.toml` 的 `= true` 键必须真的会被 `scripts/generate-docs.sh` 处理，且目标文件在。
+# domain.py
+from pathlib import Path
+from typing import List
+from typing import Optional
+from typing import Set
+from k3dge.engine import contract
+from k3dge.engine import spec_schema
+from k3dge.engine.manifest import Manifest
+from k3dge.engine.models import Violation
+check_domain(workspace: Path, domain: str, manifest: Manifest) -> List[Violation]
+    # doc: 一个域的全套检查：spec 结构 → 验证矩阵 → 契约哈希 → 反向 import。
 # extractors.py
 from pathlib import Path
 from typing import List
@@ -371,12 +402,28 @@ from typing import List
 from k3dge.engine.models import Violation
 check_pipeline(workspace: Path) -> List[Violation]
     # doc: pipeline.toml 语义硬门控（纯静态；文件不存在则优雅跳过）。
+# projections.py
+from pathlib import Path
+from typing import List
+from k3dge.engine.checks.mcp_json import check_mcp_json
+from k3dge.engine.manifest import Manifest
+from k3dge.engine.models import Violation
+check_generated_projections(workspace: Path, manifest: Manifest) -> List[Violation]
+    # doc: 生成物的新鲜度闸：符号索引 / `docs/generated/{api,domains}.md` / `.mcp.json`。
 # state_doc.py
 from pathlib import Path
 from typing import List
 from k3dge.engine.models import Violation
 check_state_doc_coverage(workspace: Path) -> List[Violation]
     # doc: `docs/architecture/overview.md` 必须列全两个**闭集**：`[NEXT]` 态与 task 态。
+# template_drift.py
+from pathlib import Path
+from typing import List
+from k3dge.engine.manifest import Manifest
+from k3dge.engine.models import Violation
+from k3dge.engine.pairs import PAIRS
+check_template_drift(workspace: Path, manifest: Manifest) -> List[Violation]
+    # doc: 脚手架镜像漂移：assets ↔ 本仓文件一致（仅 self_hosting=true，ADR-0001）。
 # version.py
 from pathlib import Path
 from typing import List
@@ -500,16 +547,12 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from typing import Set
-from k3dge.engine import assert_tautology
-from k3dge.engine import contract
 from k3dge.engine import diff
-from k3dge.engine import spec_schema
 from k3dge.engine.diff import GitError
 from k3dge.engine.manifest import Manifest
 from k3dge.engine.manifest import ManifestError
 from k3dge.engine.models import GateReport
 from k3dge.engine.models import Violation
-from k3dge.engine.pairs import PAIRS
 class ConsistencyEngine
     evaluate(self, run_tests: bool=False, force_full: bool=False, staged: bool=False) -> GateReport
 # events.py

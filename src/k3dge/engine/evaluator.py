@@ -5,152 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, Set
 
-import ast
-import json
 import re
 
-from k3dge.engine import assert_tautology, contract, diff, spec_schema
-from k3dge.engine.contract import _ExtractError
+from k3dge.engine import diff
 from k3dge.engine.diff import GitError
 from k3dge.engine.manifest import Manifest, ManifestError
 from k3dge.engine.models import GateReport, Violation
-from k3dge.engine.pairs import PAIRS
-
-_TEST_REF_RE = re.compile(r"`(tests/[^\s`]+)`")
-_VERIFICATION_MATRIX_RE = re.compile(r"^#{2,3}\s+.*Verification Matrix", re.MULTILINE)
-_PIN_LINE_RE = re.compile(
-    r"^[ \t]*(?:#|//|<!--)[ \t]*k3dit:(?:pending|leftover|disputed|fixnote|fixed)\b"
-)
-
-
-def _without_pins(text: str) -> str:
-    """Drop whole-line k3dit marker lines so transient audit pins don't trip TEMPLATE_DRIFT.
-
-    Pins live at the finding's location on the audit line and are harvested out by Hall before
-    merge (peer_contract §8 / ADR-0025 §2.7). A pin on a byte-locked PAIRS file is an audit-time
-    artifact, not drift (ADR-0004 §2.1.6), so normalize both sides before comparing.
-    """
-    return "\n".join(ln for ln in text.splitlines() if not _PIN_LINE_RE.match(ln))
-
-
-def _verification_matrix_section(content: str) -> str:
-    m = _VERIFICATION_MATRIX_RE.search(content)
-    return content[m.start():] if m else content
 
 
 def _spec_violation_path(workspace: Path, manifest: Manifest, domain: str) -> Optional[str]:
     rel = manifest.spec_path(domain)
     return str(workspace / rel) if rel else None
-
-
-def _package_prefix(manifest: Manifest, domain: str) -> str:
-    """Top-level import package for the repo's domains (manifest-derived, never hardcoded).
-
-    = basename of the longest common ancestor dir of all domains' `src`. Handles both
-    `package_root` conventions without relying on `__init__.py`:
-      - k3dge: `src/k3dge/{engine,cli,…}` -> `k3dge`  (package_root = src/k3dge)
-      - k3dit: `src/k3dit`               -> `k3dit`   (package_root = src)
-    Downstream repos use a different package name, so a baked-in `k3dge.` made the
-    reverse-import ban silently no-op there (code-6).
-    """
-    srcs = [str(p).replace("\\", "/").strip("/")
-            for p in (manifest.src_path(d) for d in manifest.domains) if p]
-    own = str(manifest.src_path(domain) or "").replace("\\", "/").strip("/")
-    if not srcs and own:
-        srcs = [own]
-    if not srcs:
-        return ""
-    parts = srcs[0].split("/")
-    for s in srcs[1:]:
-        seg = s.split("/")
-        i = 0
-        while i < len(parts) and i < len(seg) and parts[i] == seg[i]:
-            i += 1
-        parts = parts[:i]
-    if not parts:
-        return ""
-    if parts[-1] in {"src", "lib", "source"}:
-        # domains are sibling packages directly under a generic root -> package = next seg
-        own_parts = own.split("/") if own else []
-        if len(own_parts) > len(parts):
-            return own_parts[len(parts)]
-    return parts[-1]
-
-
-def _pkg_chain(workspace_root: Path, py: Path, pkg: str) -> List[str]:
-    """Directories between the shared package root and this file's own directory.
-
-    `src/k3dge/engine/sub/x.py` with pkg `k3dge` -> `["engine", "sub"]`; the first entry is
-    the domain, and the length tells a relative import how many levels stay inside a domain.
-    """
-    try:
-        parts = list(py.relative_to(workspace_root).parts[:-1])
-    except ValueError:
-        return []
-    if pkg in parts:
-        return parts[parts.index(pkg) + 1:]
-    return parts
-
-
-def _imported_domains(tree: "ast.AST", chain: List[str], pkg: str) -> List[str]:
-    """First module segment after `pkg` for every import in the tree (absolute + relative).
-
-    Replaces the line regex (code-3), which only saw `pkg.<name>` with `[a-z_]+` and so missed
-    `from pkg import <domain>`, multi-name imports and `from ..engine import x`.
-    """
-    targets: List[str] = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                seg = alias.name.split(".")
-                if seg[0] == pkg and len(seg) > 1:
-                    targets.append(seg[1])
-        elif isinstance(node, ast.ImportFrom):
-            names = [a.name.split(".")[0] for a in node.names]
-            if node.level:
-                keep = len(chain) - (node.level - 1)
-                if keep < 0:
-                    continue  # escapes the package — no domain attributable
-                resolved = chain[:keep] + (node.module.split(".") if node.module else [])
-                targets.extend(resolved[:1] if resolved else names)
-            elif node.module:
-                seg = node.module.split(".")
-                if seg[0] == pkg:
-                    targets.extend(seg[1:2] if len(seg) > 1 else names)
-    return targets
-
-
-def _shape_change_documented(workspace: Path, domain: str, spec_content: str, sym_diff: dict) -> bool:
-    """C gate (WARN only): a shape change (added/removed/changed symbols) must leave a human trace.
-
-    Either a CHANGELOG `## [Unreleased]` line, or a spec §1 boundary sentence, mentioning the
-    domain or any changed symbol. Structural check only — never NLP over the prose (ADR-0001 decision 6).
-    """
-    names = set(
-        sym_diff.get("added", []) + sym_diff.get("removed", []) + sym_diff.get("changed", [])
-    )
-    if not names:
-        return True
-    needles = {domain, *names}
-    cl = workspace / "CHANGELOG.md"
-    if cl.is_file():
-        try:
-            text = cl.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            text = ""
-        i = text.find("## [Unreleased]")
-        if i != -1:
-            j = text.find("## [", i + 1)
-            block = text[i:j] if j != -1 else text[i:]
-            if any(n in block for n in needles):
-                return True
-    m = re.search(r"^#{2,3}\s+.*(?:Domain Boundary|边界)", spec_content, re.MULTILINE)
-    if m:
-        nxt = re.search(r"\n#{2,3}\s+", spec_content[m.start() + 1 :])
-        sec = spec_content[m.start() : nxt.start() if nxt else len(spec_content)]
-        if any(n in sec for n in needles):
-            return True
-    return False
 
 
 def _run_batch_tests(
@@ -492,75 +357,10 @@ class ConsistencyEngine:
         return _c.check_version_consistency(self.workspace_root)
 
     def _check_template_drift(self, manifest: Manifest) -> List[Violation]:
-        """脚手架镜像漂移：assets ↔ 本仓文件一致（仅 self_hosting=true，ADR-0001）。"""
-        out: List[Violation] = []
-        try:
-            is_self_host = bool(getattr(manifest, "self_hosting", False))
-            if is_self_host:
-                # Prefer installed package assets, fallback to workspace assets for editable install
-                try:
-                    assets_root = Path(__file__).resolve().parents[1] / "templates" / "assets"
-                    if not assets_root.is_dir():
-                        assets_root = self.workspace_root / "src/k3dge/templates/assets"
-                except Exception:
-                    assets_root = self.workspace_root / "src/k3dge/templates/assets"
-                for asset, rel in PAIRS:
-                    try:
-                        asset_path = assets_root / asset
-                        repo_path = self.workspace_root / rel
-                        # 任一侧缺失都报漂移：PAIRS 是字节锁对，"文件没了"正是门控要抓的（ocr-073）。
-                        if not asset_path.is_file():
-                            out.append(Violation(
-                                "TEMPLATE_DRIFT", f"assets/{asset} 缺失（PAIRS 已注册）", file_path=rel,
-                                detail={"asset": f"src/k3dge/templates/assets/{asset}", "repo": rel}))
-                            continue
-                        if not repo_path.is_file():
-                            out.append(Violation(
-                                "TEMPLATE_DRIFT", f"{rel} 缺失（PAIRS 已注册）", file_path=rel,
-                                detail={"asset": f"src/k3dge/templates/assets/{asset}", "repo": rel}))
-                            continue
-                        asset_text = _without_pins(asset_path.read_text(encoding="utf-8")).rstrip("\n")
-                        repo_text = _without_pins(repo_path.read_text(encoding="utf-8")).rstrip("\n")
-                        if asset_text != repo_text:
-                            out.append(
-                                Violation(
-                                    "TEMPLATE_DRIFT",
-                                    f"assets/{asset} != {rel}",
-                                    file_path=rel,
-                                    detail={"asset": f"src/k3dge/templates/assets/{asset}", "repo": rel},
-                                )
-                            )
-                    except (OSError, UnicodeDecodeError) as exc:
-                        # 读不出/坏编码就 `continue` ⇒ 锁对的那一半静默失守，漂移闸假绿（ocr2-248）。
-                        out.append(Violation(
-                            "TEMPLATE_DRIFT", f"{rel} 不可读（{type(exc).__name__}）⇒ 无法比对字节锁",
-                            file_path=rel,
-                            detail={"asset": f"src/k3dge/templates/assets/{asset}", "repo": rel}))
-                        continue
-                # Budget warning: AGENTS.md microkernel should stay <80 lines (self-host only, not a gate)
-                try:
-                    agent_tpl = assets_root / "agents.md"
-                    if agent_tpl.is_file():
-                        n_lines = len(agent_tpl.read_text(encoding="utf-8").splitlines())
-                        if n_lines > 80:
-                            import sys
+        """脚手架镜像漂移（仅 self_hosting=true，ADR-0001）。实现见 checks/template_drift。"""
+        from k3dge.engine.checks import template_drift as _c
 
-                            print(
-                                f"[WARN] AGENTS.md template exceeds micro-kernel budget: {n_lines} > 80 lines",
-                                file=sys.stderr,
-                            )
-                except Exception:
-                    pass
-        except Exception as exc:
-            out.append(
-                Violation(
-                    "TEMPLATE_DRIFT",
-                    f"check failed: {exc}",
-                    file_path="src/k3dge/engine/pairs.py",
-                    detail={"asset": "src/k3dge/templates/assets/", "repo": f"比对未完成：{exc}"},
-                )
-            )
-        return out
+        return _c.check_template_drift(self.workspace_root, manifest)
 
     def _check_pipeline(self) -> List[Violation]:
         """pipeline.toml 语义硬门控（纯静态；文件不存在则优雅跳过）。实现见 checks/pipeline。"""
@@ -575,305 +375,28 @@ class ConsistencyEngine:
         return _c.check_audit_trail(self.workspace_root)
 
     def _check_assert_tautology(self, files, force_full: bool) -> List[Violation]:
-        """真值已写死的测试断言。全量扫 `tests/`；增量只扫本批里的测试路径。"""
-        if force_full:
-            rels = assert_tautology.test_files(self.workspace_root)
-        else:
-            rels = [str(p).replace("\\", "/") for p in files if assert_tautology.is_test_path(str(p))]
-        return assert_tautology.check(self.workspace_root, rels)
+        """真值已写死的测试断言。实现见 checks/assert_tautology。"""
+        from k3dge.engine.checks import assert_tautology as _c
+
+        return _c.check_assert_tautology(self.workspace_root, files, force_full)
 
     def _check_docs(self, files, force_full: bool) -> List[Violation]:
-        """docs 目录结构/索引校验（force_full 或本批触 docs 时）。"""
-        docs_touched = any(str(p).replace("\\", "/").startswith("docs/") for p in files)
-        if not (force_full or docs_touched):
-            return []
-        try:
-            from k3dge.engine.doc_catalog import validate_docs, validate_docs_index
+        """docs 目录结构/索引校验。实现见 checks/docs。"""
+        from k3dge.engine.checks import docs as _c
 
-            types = None
-            if not force_full:
-                types = sorted(
-                    {
-                        Path(p).parts[1]
-                        for p in files
-                        if str(p).replace("\\", "/").startswith("docs/")
-                        and len(Path(p).parts) > 1
-                    }
-                )
-            return list(validate_docs(self.workspace_root, types=types)) + list(
-                validate_docs_index(self.workspace_root)
-            )
-        except Exception as extra:
-            return [
-                Violation(
-                    "DOC_SCHEMA_INVALID",
-                    f"docs catalog check crashed: {extra}",
-                    file_path="docs",
-                    detail={"path": "docs"},
-                )
-            ]
+        return _c.check_docs(self.workspace_root, files, force_full)
 
     def _check_domain(self, domain: str, manifest: Manifest) -> List[Violation]:
-        out, spec_path, content = self._load_domain_spec(domain, manifest)
-        if content is None:
-            return out
-        out.extend(self._check_verification_matrix(domain, manifest, spec_path, content))
-        contract_out, fatal = self._check_domain_contract(domain, manifest, spec_path, content)
-        out.extend(contract_out)
-        if fatal:
-            return out
-        out.extend(self._check_domain_imports(domain, manifest))
-        return out
+        """一个域的全套检查：spec 结构/矩阵/契约/反向 import。实现见 checks/domain。"""
+        from k3dge.engine.checks import domain as _c
 
-    def _load_domain_spec(self, domain: str, manifest: Manifest):
-        """Spec content, or the NOT_FOUND/DECODE violations that block it (content=None)."""
-        spec_rel = manifest.spec_path(domain)
-        if not spec_rel:
-            return [
-                Violation(
-                    "SPEC_NOT_FOUND",
-                    f"domain '{domain}' has no spec path in manifest",
-                    domain=domain,
-                    detail={"domain": domain, "spec": "(manifest 未声明 spec 路径)"},
-                )
-            ], None, None
-
-        spec_path = self.workspace_root / spec_rel
-        if not spec_path.exists():
-            return [
-                Violation(
-                    "SPEC_NOT_FOUND",
-                    f"spec missing for domain '{domain}': {spec_rel}",
-                    domain=domain,
-                    file_path=str(spec_path),
-                    detail={"domain": domain, "spec": spec_rel},
-                )
-            ], None, None
-
-        try:
-            content = spec_path.read_text(encoding="utf-8")
-        except UnicodeDecodeError as exc:
-            return [
-                Violation(
-                    "SPEC_DECODE_FAILED",
-                    f"spec is not UTF-8 for domain '{domain}': {exc}",
-                    domain=domain,
-                    file_path=str(spec_path),
-                    detail={"domain": domain, "spec": str(spec_path), "reason": str(exc)},
-                )
-            ], None, None
-        return [], spec_path, content
-
-    def _check_verification_matrix(
-        self, domain: str, manifest: Manifest, spec_path: Path, content: str
-    ) -> List[Violation]:
-        out: List[Violation] = []
-        for err in spec_schema.validate_structure(content):
-            out.append(
-                Violation("SPEC_MISSING_SECTION", err, domain=domain, file_path=str(spec_path),
-                          detail={"domain": domain, "spec": str(spec_path), "reason": err})
-            )
-        for m in _TEST_REF_RE.finditer(_verification_matrix_section(content)):
-            ref = m.group(1).strip().rstrip(".,)")
-            # 跨域引用标注：tests/unit/<other>/ 不属于本域矩阵，仅提示不计入 selective L2 执行
-            tests_root = manifest.domains.get(domain, {}).get("tests", "")
-            foreign = bool(tests_root) and not (
-                ref == tests_root or ref.startswith(tests_root.rstrip("/") + "/")
-            )
-            if "::" in ref:
-                fpath, _, tname = ref.partition("::")
-            else:
-                fpath, tname = ref, ""
-            target = self.workspace_root / fpath
-            if not target.exists():
-                out.append(
-                    Violation(
-                        "MISSING_TEST_FILE",
-                        f"Verification Matrix references missing test '{ref}'"
-                        + (" (cross-domain reference)" if foreign else ""),
-                        domain=domain,
-                        file_path=str(spec_path),
-                        detail={"domain": domain, "ref": ref},
-                    )
-                )
-                continue
-            # 行级绑定：矩阵行须可解析到具体测试（文件在、场景不在 = 红，ADR-0001 决策点 6）
-            try:
-                _t_src = target.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
-                _t_src = ""
-            if tname:
-                if not re.search(rf"(?:async\s+def|def)\s+{re.escape(tname)}\b", _t_src):
-                    out.append(
-                        Violation(
-                            "MATRIX_TEST_UNRESOLVED",
-                            f"Verification Matrix row binds '{ref}' but no test '{tname}' in {fpath}"
-                            + (" (cross-domain reference)" if foreign else ""),
-                            domain=domain,
-                            file_path=str(spec_path),
-                            detail={"domain": domain, "ref": ref,
-                                    "reason": f"{fpath} 里没有名为 {tname} 的测试"},
-                        )
-                    )
-            elif not re.search(r"\bdef\s+test_", _t_src):
-                out.append(
-                    Violation(
-                        "MATRIX_TEST_UNRESOLVED",
-                        f"Verification Matrix row references '{fpath}' which contains no test functions",
-                        domain=domain,
-                        file_path=str(spec_path),
-                        detail={"domain": domain, "ref": fpath,
-                                "reason": "该文件里没有任何测试函数"},
-                    )
-                )
-        return out
-
-    def _check_domain_contract(
-        self, domain: str, manifest: Manifest, spec_path: Path, content: str
-    ):
-        """Contract check. Returns (violations, fatal); fatal=True stops further checks."""
-        out: List[Violation] = []
-        src_rel = manifest.src_path(domain)
-        if not src_rel:
-            return out, False
-        src_dir = self.workspace_root / src_rel
-        try:
-            ok, expected, actual = contract.verify_contract(
-                src_dir, content, manifest, self.workspace_root
-            )
-        except _ExtractError as exc:
-            out.append(
-                Violation(
-                    "CONTRACT_EXTRACT_FAILED",
-                    str(exc),
-                    domain=domain,
-                    file_path=str(spec_path),
-                    detail={"domain": domain, "spec": str(spec_path), "reason": str(exc)},
-                )
-            )
-            return out, True
-        if expected is None:
-            out.append(
-                Violation(
-                    "CONTRACT_HASH_MISSING",
-                    "no contract hash in spec",
-                    domain=domain,
-                    file_path=str(spec_path),
-                    detail={"domain": domain, "spec": str(spec_path)},
-                )
-            )
-        elif not ok:
-            detail = None
-            try:
-                detail = contract.symbol_diff(content, src_dir, manifest, self.workspace_root)
-            except Exception:
-                detail = None
-            if detail and any(detail.get(k) for k in ("added", "removed", "changed")):
-                if not _shape_change_documented(self.workspace_root, domain, content, detail):
-                    import sys
-
-                    print(
-                        f"[WARN][CONTRACT_SHAPE_NO_TRACE] domain '{domain}' changed contract symbols "
-                        f"{detail} but no CHANGELOG '## [Unreleased]' line or spec §1 boundary mentions it; "
-                        f"sync still required and a human trace is expected (ADR-0001 decision 6)",
-                        file=sys.stderr,
-                    )
-            out.append(
-                Violation(
-                    "CONTRACT_DRIFT",
-                    # 事实摘要（非文案）：措辞/选项/指针归 gate_facts 声明面
-                    f"spec={expected[:12]} code={actual[:12]}",
-                    domain=domain,
-                    file_path=str(spec_path),
-                    detail={
-                        "symbol_diff": detail,
-                        "expected_hash": expected,
-                        "actual_hash": actual,
-                    },
-                )
-            )
-        return out, False
+        return _c.check_domain(self.workspace_root, domain, manifest)
 
     def _check_generated_projections(self, manifest: Manifest) -> List[Violation]:
-        """生成物的新鲜度闸：符号索引 / `docs/generated/{api,domains}.md` / `.mcp.json`。
+        """生成物新鲜度闸：符号索引 / generated docs / `.mcp.json`。实现见 checks/projections。"""
+        from k3dge.engine.checks import projections as _c
 
-        这三件（加上已被 `DOC_INDEX_STALE` 罩住的 `docs-index.json`）都是**可重算的投影**，
-        但此前只有 docs-index 有闸 ⇒ 其余三件“写了就没人管旧”（本仓 2026-09-21 盘点：悬空）。
-        与 `DOC_INDEX_STALE` 同形：重建与盘上比，不等即红，修法＝重生它的那条命令。
-        纯静态、不写盘、不联网。
-        """
-        out: List[Violation] = []
-
-        # ① 符号索引（`k3dge where` 的判据面：旧索引会静默返回错位置）
-        try:
-            from k3dge.engine import search
-
-            idx_path = search.index_path(self.workspace_root)
-            if idx_path.is_file():
-                try:
-                    actual = json.loads(idx_path.read_text(encoding="utf-8"))
-                except (OSError, ValueError):
-                    actual = None
-                if actual != search.build_symbol_index(self.workspace_root):
-                    rel = str(idx_path.relative_to(self.workspace_root)).replace("\\", "/")
-                    out.append(
-                        Violation(
-                            "SYMBOL_INDEX_STALE",
-                            "symbol index is stale (rebuild differs)",
-                            file_path=rel,
-                            detail={"path": rel, "reason": "盘上内容与重建结果不同"},
-                        )
-                    )
-        except Exception as exc:  # 工具坏不得静默：报一次而非吞掉
-            out.append(
-                Violation(
-                    "SYMBOL_INDEX_STALE",
-                    f"symbol index check crashed: {exc}",
-                    file_path="docs/generated/symbol-index.json",
-                    detail={"path": "docs/generated/symbol-index.json", "reason": str(exc)},
-                )
-            )
-
-        # ② docs/generated/{api,domains}.md（`k3dge sync` 的产物）
-        try:
-            from k3dge.engine.generated_docs import render_manual_docs_content
-
-            for path, expected in render_manual_docs_content(self.workspace_root, manifest).items():
-                if not path.is_file():
-                    continue  # 缺文件不是“陈旧”（与 `validate_docs_index` 同口径：缺 ⇒ 不报）
-                rel = str(path.relative_to(self.workspace_root)).replace("\\", "/")
-                if path.read_text(encoding="utf-8") != expected:
-                    out.append(
-                        Violation(
-                            "DOCS_GENERATED_STALE",
-                            "generated doc is stale (re-render differs)",
-                            file_path=rel,
-                            detail={"path": rel, "reason": "与 `k3dge sync` 的重建结果不同"},
-                        )
-                    )
-        except Exception as exc:
-            out.append(
-                Violation(
-                    "DOCS_GENERATED_STALE",
-                    f"generated docs check crashed: {exc}",
-                    file_path="docs/generated",
-                    detail={"path": "docs/generated", "reason": str(exc)},
-                )
-            )
-
-        # ③ .mcp.json：声明 enabled 的 peer（能探到 sibling MCP 模块的）必须在 mcpServers 里
-        try:
-            out.extend(self._check_mcp_json())
-        except Exception as exc:
-            out.append(
-                Violation(
-                    "MCP_JSON_PEER_MISSING",
-                    f".mcp.json check crashed: {exc}",
-                    file_path=".mcp.json",
-                    detail={"path": ".mcp.json", "peer": "（校验崩溃，未定位）", "reason": str(exc)},
-                )
-            )
-        return out
+        return _c.check_generated_projections(self.workspace_root, manifest)
 
     def _check_mcp_json(self) -> List[Violation]:
         """`.mcp.json` 的 peer 面 vs `pipeline.toml` 声明（同一探测函数）。实现见 checks/mcp_json。"""
@@ -888,57 +411,10 @@ class ConsistencyEngine:
         return _c.check_state_doc_coverage(self.workspace_root)
 
     def _check_architecture_tables(self, manifest: Manifest) -> List[Violation]:
-        """设计文档里的**域表**必须与 manifest 对齐（表行是事实，不是散文）。
+        """设计文档域表 vs manifest（表行是事实）。实现见 checks/architecture_tables。"""
+        from k3dge.engine.checks import architecture_tables as _c
 
-        `docs/architecture/overview.md` 头部自称“人写常驻 + `k3dge sync` 聚合校验”——
-        但那道“聚合校验”此前**不存在**（2026-09-21 盘点：`grep architecture evaluator|pure_refs` 零命中）：
-        改 manifest 的域/源码/spec/tests/depends_on 时，两张表可以静静地说着旧话。
-        实质：Diátaxis 里 architecture＝解释（人写），**故意不把它变成生成物**；
-        可机检的只是表里那几列事实 ⇒ 只比事实列，不比 description（散文）。
-        """
-        out: List[Violation] = []
-        for rel, cols in (
-            ("docs/architecture/overview.md", ("src", "spec")),
-            ("docs/architecture/encyclopedia.md", ("src", "spec", "tests", "depends_on")),
-        ):
-            path = self.workspace_root / rel
-            if not path.is_file():
-                continue
-            try:
-                rows = _domain_table_rows(path.read_text(encoding="utf-8"))
-            except (OSError, UnicodeDecodeError):
-                continue
-            if rows is None:
-                continue  # 没找到域表（格式变了也不在这里报，归文档评审）
-            missing = sorted(set(manifest.domains) - set(rows))
-            extra = sorted(set(rows) - set(manifest.domains))
-            detail: dict = {"path": rel}
-            if missing or extra:
-                out.append(
-                    Violation(
-                        "ARCH_TABLE_DRIFT",
-                        f"{rel} 域表与 manifest 的域集不一致“missing={missing} extra={extra}” ",
-                        file_path=rel,
-                        detail={**detail, "missing": missing, "extra": extra},
-                    )
-                )
-            for domain in sorted(set(rows) & set(manifest.domains)):
-                cfg = manifest.domains[domain]
-                for col in cols:
-                    want = _norm_cell(cfg.get(col))
-                    got = _norm_cell(rows[domain].get(col))
-                    if want != got:
-                        out.append(
-                            Violation(
-                                "ARCH_TABLE_DRIFT",
-                                f"{rel} 域表 {domain} 的 {col} 与 manifest 不一致“{got} ≠ {want}” ",
-                                domain=domain,
-                                file_path=rel,
-                                detail={**detail, "domain": domain, "col": col,
-                                        "got": got, "want": want},
-                            )
-                        )
-        return out
+        return _c.check_architecture_tables(self.workspace_root, manifest)
 
     def _check_extractor_plugins(self) -> List[Violation]:
         """`.agent/extractors/<lang>.py` 必须是 `extractors.toml` 的当前渲染。实现见 checks/extractors。"""
@@ -953,101 +429,7 @@ class ConsistencyEngine:
         return _c.check_docs_toml(self.workspace_root)
 
     def _check_domain_imports(self, domain: str, manifest: Manifest) -> List[Violation]:
-        """Reverse-import ban: a domain may import another domain only if declared in depends_on (ADR-0001 decision 6)."""
-        out: List[Violation] = []
-        src_rel = manifest.src_path(domain)
-        if not src_rel:
-            return out
-        src_dir = self.workspace_root / src_rel
-        if not src_dir.exists():
-            return out
-        pkg = _package_prefix(manifest, domain)
-        if not pkg:
-            return out
-        allowed = set(manifest.depends_on(domain))
-        for py in sorted(src_dir.rglob("*.py")):
-            if py.name == "__init__.py":
-                continue
-            try:
-                text = py.read_text(encoding="utf-8")
-                tree = ast.parse(text)
-            except (OSError, SyntaxError, ValueError):
-                continue
-            chain = _pkg_chain(self.workspace_root, py, pkg)
-            reported: Set[str] = set()
-            for target in _imported_domains(tree, chain, pkg):
-                if target == domain or target not in manifest.domains:
-                    continue
-                if target not in allowed and target not in reported:
-                    reported.add(target)
-                    out.append(
-                        Violation(
-                            "DOMAIN_IMPORT_VIOLATION",
-                            f"domain '{domain}' imports '{target}' but does not declare depends_on",
-                            domain=domain,
-                            file_path=str(py),
-                            detail={"domain": domain, "target": target, "path": str(py)},
-                        )
-                    )
-        return out
+        """反向 import 禁令（ADR-0001 决策点 6）。实现见 checks/domain。"""
+        from k3dge.engine.checks import domain as _c
 
-
-#: 域表列名（两种写法）→ 归一列键。**只认事实列**；description/一句话 是散文，不比对。
-_TABLE_COL_KEYS = {
-    "domain": "domain",
-    "source": "src", "源码": "src",
-    "spec": "spec", "契约 spec": "spec",
-    "tests": "tests", "测试": "tests",
-    "depends_on": "depends_on",
-}
-
-
-def _norm_cell(value: object) -> str:
-    """表格单元归一：去反引号/空白、空占位（—/-）归空、逗号列表排序（顺序不敏感）。"""
-    if value is None:
-        return ""
-    if isinstance(value, (list, tuple, set)):
-        value = ", ".join(str(x) for x in value)
-    s = str(value).strip().strip("`").strip()
-    if s in {"—", "–", "-", "/", ""}:
-        return ""
-    if "," in s:
-        s = ", ".join(sorted(p.strip() for p in s.split(",") if p.strip()))
-    return re.sub(r"\s+", " ", s)
-
-
-def _domain_table_rows(text: str) -> Optional[dict]:
-    """抽出文档里的**域表**（表头含 Domain 且至少含一个事实列）→ {domain: {col: cell}}。
-
-    找不到 ⇒ None（格式变了不当违例报：那是文档评审的事，不是这个闸的判据）。
-    """
-    blocks: list[list[str]] = []
-    current: list[str] = []
-    for line in text.splitlines():
-        if line.lstrip().startswith("|"):
-            current.append(line.strip())
-        elif current:
-            blocks.append(current)
-            current = []
-    if current:
-        blocks.append(current)
-
-    for block in blocks:
-        header = [c.strip() for c in block[0].strip("|").split("|")]
-        keys = [_TABLE_COL_KEYS.get(h.lower().strip("`")) for h in header]
-        if "domain" not in keys or not {"src", "spec"} & set(k for k in keys if k):
-            continue
-        rows: dict = {}
-        for raw in block[1:]:
-            cells = [c.strip() for c in raw.strip("|").split("|")]
-            if not cells or set("".join(cells)) <= set("-: "):
-                continue
-            name = _norm_cell(cells[0])
-            if not name:
-                continue
-            rows[name] = {
-                keys[i]: cells[i] for i in range(min(len(keys), len(cells))) if keys[i]
-            }
-        if rows:
-            return rows
-    return None
+        return _c._check_domain_imports(self.workspace_root, domain, manifest)

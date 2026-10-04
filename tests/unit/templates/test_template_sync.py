@@ -4,7 +4,7 @@ import unittest
 from k3dge.engine.pairs import PAIRS
 # ocr2-811：与闸同口径的 pin 过滤器住在 evaluator（`_check_template_drift`
 # 比之前先 `_without_pins` 两边）。从生产侧复用，永不分叉。
-from k3dge.engine.evaluator import _without_pins
+from k3dge.engine.checks.template_drift import _without_pins
 
 def _find_repo_root() -> pathlib.Path:
     """仓根用**标记反查**（t-330）：`parents[3]` 把文件深度焊死——测试挪一层、或从
