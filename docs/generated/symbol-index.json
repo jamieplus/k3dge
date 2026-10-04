@@ -200,7 +200,7 @@
   "apply_bundle": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 606
+      "line": 623
     }
   ],
   "archived_milestone_tasks": [
@@ -794,7 +794,7 @@
   "commit_applied": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 1023
+      "line": 1040
     }
   ],
   "completeness_violations": [
@@ -824,7 +824,7 @@
   "consume": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 1087
+      "line": 1104
     }
   ],
   "consume_unreleased": [
@@ -1266,7 +1266,7 @@
   "land_report": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 950
+      "line": 967
     }
   ],
   "legacy_config_present": [
@@ -1550,7 +1550,7 @@
   "probe_peer_mcp": [
     {
       "file": "src/k3dge/engine/mcp_json.py",
-      "line": 85
+      "line": 89
     }
   ],
   "probe_servers": [
@@ -1610,7 +1610,7 @@
   "reconcile_report_rows": [
     {
       "file": "src/k3dge/engine/audit_bundle.py",
-      "line": 908
+      "line": 925
     }
   ],
   "reconcile_supersedes": [
@@ -2100,7 +2100,7 @@
   "validate_pipeline_config": [
     {
       "file": "src/k3dge/engine/pipeline_schema.py",
-      "line": 282
+      "line": 286
     }
   ],
   "validate_structure": [

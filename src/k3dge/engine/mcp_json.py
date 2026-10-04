@@ -53,7 +53,11 @@ def mcp_server_names(workspace: Path) -> Optional[Set[str]]:
     import stat as _stat
     import sys
     try:
-        st = p.lstat()
+        # `stat()`（跟随软链）而非 `lstat()`：软链指向的合法 `.mcp.json` 是常见布局，`lstat`
+        # 会把它当"非普通文件"返回空集、静默关掉 peer 闸，还与 `load_mcp_document`（用
+        # `is_file()`、跟随软链）口径打架（ocr3 dccff5f6/151）。悬空软链 ⇒ FileNotFoundError
+        # 归"缺失"（None）；指向目录仍因 S_ISREG 落空集。
+        st = p.stat()
     except FileNotFoundError:
         return None
     except OSError as exc:

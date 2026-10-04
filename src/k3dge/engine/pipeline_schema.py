@@ -57,6 +57,10 @@ def resolve_role(pipeline: dict, name: str) -> str:
 
 def resolve_action(pipeline: dict, action_ref: str) -> Optional[List[dict]]:
     """Resolve `role.actions.name` / `peer.actions.name` (or 2-part alias) to transports."""
+    # `pipeline` 是外部 TOML：`[peers]`/整表写成非 mapping（字符串/数组）时下面 `.get` 会
+    # `AttributeError`，破坏"返回违规、从不抛"契约（ocr3 dccff5f6/182）。非 mapping 一律 None。
+    if not isinstance(pipeline, dict):
+        return None
     if not pipeline:
         return None
     parts = action_ref.split(".")

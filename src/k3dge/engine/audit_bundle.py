@@ -586,8 +586,25 @@ def _apply_fast_path(workspace: Path, bundle: Path, order: List[str], *,
     res = _apply_sequential(workspace, bundle, order)
     state["applied"] = res.get("applied") or []
     if res.get("ok"):
-        return {"ok": True, "applied": order, "files": res.get("files") or [], "dry_run": False,
-                "strategy": "git-apply", "excluded": sorted({str(x) for x in (exclude or [])})}, state
+        files = res.get("files") or []
+        # 快路（精确 `git apply`，常态）也必须过**消费侧落库后校验**（`[roles.audit] post_apply_check`）：
+        # 旧实现只在三路合并里跑 ⇒ 声明的校验被静默跳过，"两条策略同一道验收"落空（ocr3 dccff5f6/65）。
+        check = _post_apply_check(workspace, workspace)
+        if check.get("cmd") and not check.get("ok"):
+            roll = (_restore_files(workspace, [f for f in files if f]) if files
+                    else {"restored": [], "removed": [], "failed": []})
+            if (workspace / "docs" / "generated").is_dir():
+                _git(workspace, "checkout", "--", "docs/generated")
+            _nback = len(roll["restored"]) + len(roll["removed"])   # type: ignore[arg-type]
+            _fail = roll["failed"]
+            return {"ok": False, "error": "POST_APPLY_CHECK_FAILED", "applied": [], "files": [],
+                    "detail": f"落库后校验未过（回滚 {_nback} 个文件"
+                              + (f"，**{len(_fail)} 个未退**: {_fail}" if _fail else "")
+                              + f"）：{check.get('cmd')} ⇒ {check.get('detail')}",
+                    "rolled_back": roll}, state
+        return {"ok": True, "applied": order, "files": files, "dry_run": False,
+                "strategy": "git-apply", "post_apply_check": check,
+                "excluded": sorted({str(x) for x in (exclude or [])})}, state
     # code-7：半落 ⇒ **先逆序回滚**再考虑降级合并（否则合并的 ours 被污染）
     rolled = _rollback_applied(workspace, bundle, res.get("applied") or [])
     state["rolled"] = rolled
