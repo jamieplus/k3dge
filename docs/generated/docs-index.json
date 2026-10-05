@@ -113,6 +113,14 @@
       "tokens": "ADR-0026: 投影契约（对 agent 的三维投影与三层拓扑）"
     },
     {
+      "path": "docs/adr/0028-attest-token-entropy.md",
+      "type": "adr",
+      "id": "ADR-0028",
+      "title": "ADR-0028: Attestation token 应有足够熵",
+      "status": "Proposed",
+      "tokens": "ADR-0028: Attestation token 应有足够熵"
+    },
+    {
       "path": "docs/architecture/encyclopedia.md",
       "type": "architecture",
       "id": "encyclopedia",
@@ -439,6 +447,14 @@
       "title": "封板收摊清单（上下文压缩）: M11",
       "status": "",
       "tokens": "封板收摊清单（上下文压缩）: M11"
+    },
+    {
+      "path": "docs/reviews/2026-10-04-M12-closure.md",
+      "type": "reviews",
+      "id": "2026-10-04-M12-closure",
+      "title": "封板收摊清单（上下文压缩）: M12",
+      "status": "",
+      "tokens": "封板收摊清单（上下文压缩）: M12"
     },
     {
       "path": "docs/specs/_template/spec.md",
