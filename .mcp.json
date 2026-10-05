@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "k3dge": {
+      "command": "python",
+      "args": [
+        "-m",
+        "k3dge.cli.mcp"
+      ],
+      "env": {
+        "PYTHONPATH": "src"
+      }
+    },
+    "k3che": {
+      "command": "python",
+      "args": [
+        "-m",
+        "k3che.mcp"
+      ],
+      "env": {
+        "PYTHONPATH": "../k3che/src"
+      }
+    }
+  }
+}
