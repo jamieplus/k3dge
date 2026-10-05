@@ -67,6 +67,25 @@ python dist/k3dge.pyz init my-harness  # 或拷到下游用；也可直接 ./dis
 
 另有标准入口：`[project.scripts] k3dge` ↔ `pip install .` / `pipx install .` / `uv tool install .` 即得 `k3dge` 命令（源码安装；不走 PyPI）。
 
+### 开发下游项目（只装 k3dge 包，不继承自举外壳）
+
+下游只需消费 `k3dge` 包；本仓的自举外壳（`.agent/`、`docs/tasks|memo|reviews/archive`、`scripts/gate.*`）不会进入下游。获取 k3dge 源码一次，下游项目里的虚拟环境单独装：
+
+```bash
+git clone https://github.com/jamieplus/k3dge.git
+# 下游环境（二选一）
+pipx install ./k3dge          # 或 pip install ./k3dge（含 [mcp] 就用 ./k3dge[mcp]）
+
+# 在下游项目根生成它自己的骨架（不会拿走 k3dge 仓的 .agent/docs）
+cd /path/to/your-project
+/path/to/k3dge/k3dge-init.sh
+
+# 下游日常
+k3dge check
+k3dge sync
+```
+
+
 ## 日常流程
 
 ```bash
