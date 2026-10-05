@@ -9,6 +9,8 @@ Spec-gate harness：为 vibecoding agent 提供确定性的契约漂移检测与
 核心思路：把对 agent 的口头约束（Soft Prompting）降维成文件系统事实（`spec.md` 契约哈希）
 与 git hook 硬门禁，杜绝跨会话语义漂移。
 
+本项目本身就是用 vibe coding 方式演进的；上面的契约哈希与硬门禁正是用来管住这类 agent 工作。
+
 ## 使用说明（Usage）
 
 - 使用 / 快速开始：见 [`docs/guides/user_guide.md`](docs/guides/user_guide.md)（基础版随仓库，工程收尾由 `./scripts/generate-docs.sh` 刷新）
