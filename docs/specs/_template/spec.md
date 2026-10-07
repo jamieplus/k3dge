@@ -17,6 +17,14 @@
 
 ## 3. State Machine & Invariants
 
+```mermaid
+stateDiagram-v2
+    [*] --> idle
+    idle --> running
+    running --> done
+    running --> failed
+```
+
 ## 4. Verification Matrix
 | Scenario ID | Level | Input Condition | Expected Outcome | Test File |
 | --- | --- | --- | --- | --- |

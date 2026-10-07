@@ -4,10 +4,22 @@
 > 骨架由 `k3dge init` 落盘；写不写"域表 / 状态机总览"由本仓决定——**要么不写，要么写全**：
 > `k3dge check` 会拿域表与 `.agent/manifest.json`、拿状态清单与代码里的状态闭集对账
 > （`ARCH_TABLE_DRIFT` / `ARCH_STATE_DOC_DRIFT`），半张表比不写更糟。
+> 图形表示约定：`docs/architecture/` 与状态机一律用 ```mermaid``` 块（memo 2026-08-21-mermaid-uml-discussion）；契约与 state 语义仍放在 `docs/specs/*/spec.md` 的代码块。
 
 ## 0. 系统上下文
 
-<!-- C4-C1 或一段话：本系统在谁的链路里、与谁交换什么 -->
+<!-- C4-C1 系统上下文：替换成实际节点与关系 -->
+
+```mermaid
+C4Context
+    title 系统上下文
+    Person(user, "使用方", "")
+    System(me, "本系统", "")
+    System_Ext(ext, "外部依赖/外部 harness", "")
+    Rel(user, me, "交互", "")
+    Rel(me, ext, "依赖", "")
+```
+
 
 ## 1. 域地图（事实源：`.agent/manifest.json`）
 
@@ -16,7 +28,23 @@
 
 ## 2. 依赖方向
 
+```mermaid
+graph TD
+    cli["解析→执行"] --> engine["门禁核心"]
+    cli --> sync["契约同步"]
+    engine --> templates["脚手架"]
+```
+
 ## 3. 数据流
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant W as 本仓
+    U->>W: /path/to/k3dge/k3dge-init.sh
+    W->>W: 生成 .agent/manifest
+    W-->>U: 已就绪
+```
 
 ## 4. 全局不变量
 
@@ -24,3 +52,13 @@
 
 <!-- 写了就列全：`[NEXT]` 12 态（`engine/nextstep.STATE_OPTIONS`）与 task 4 态
      （`engine/state_machine.py`）——k3dge 的闭集，下游同一套代码 -->
+
+```mermaid
+stateDiagram-v2
+    [*] --> 0_Open
+    0_Open --> 1_Align
+    1_Align --> 2_Audit
+    2_Audit --> 3_Sealed
+    3_Sealed --> [*]
+```
+
