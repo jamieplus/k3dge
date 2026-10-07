@@ -21,10 +21,15 @@
 # 质量不在角色表：它是合并审计模块内的窗口（ADR-0025），无独立 peer。
 [roles.audit]
 bind = "k3dit"
-# 审计腿形状：`bundle`＝冻结基线 → **命令行工具 k3dit** 产包 → 消费侧验包+落补丁（ADR-0025 §2.9.6）。
-# `bind` 只声明"谁审"（工具名，和 `git` 同层）；本地命令行工具**不注册 peer、不声明 transport**。
-# 形状史见 ADR-0025（`ratchet` 已退役）。
-mode = "bundle"
+# 审计腿形状**必须由人显式选择**，模板不预选：空着＝还没选，封版会 fail-closed 拒掉并把选项摆出来。
+#   `bundle` ＝冻结基线 → **命令行工具 k3dit** 产包 → 消费侧验包+落补丁（ADR-0025 §2.9.6）。
+#     代价：要 k3dit 在场（`K3DIT_BIN` 或 PATH/兄弟仓），且真跑一次完整审计（分钟级、付费）。
+#   `oneshot`＝显式声明的外部 produce/verify 步（给真正的对等 harness），另在 `[checks.audit]`
+#     配 `stages_produce`/`stages_verify`。
+# `bind` 只声明"谁审"（工具名，和 `git` 同层）；本地命令行工具**不注册 peer、不声明 transport**
+# （`_validate_roles` 要求 bind 非空串，故保留；它本身不触发任何审计动作）。
+# 形状史见 ADR-0025（`ratchet` 已退役，声明它会被显式拒绝）。
+mode = ""
 # 工具运行参数（k3dit 的两个旋钮，走声明面、不在腿里写死）：
 #   k3dit_mode = "full"（判读+修+复核，待修=0 才算已审）| "audit-only"（只出证据、不构成封板依据）
 #   k3dit_pins = "inplace"（钉留树）| "artifact"（钉只随包）
@@ -155,7 +160,7 @@ satisfies = ["align_pass"]   # 本动作跑 align 并写 align-pass marker ⇒ �
                              # （清单里显示 ⚙️，不算"需你先办"）
 
 # ── bundle 审计腿（ADR-0025 §2.9.6 / k3dit 仓 0028 消费方）─────────────────────────
-# 形状切换＝改一行（role 的 mode）：`bundle`（本地命令行工具，推荐）/`oneshot`（显式声明的外部
+# 形状选择＝填一行（role 的 mode，模板出厂留空、由人二选一）：`bundle`（本地命令行工具）/`oneshot`（显式声明的外部
 # produce/verify 步，给真正的对等 harness）。`ratchet` 已退休（声明它会被显式拒绝）。
 #   活配置在本文件上面那节 `[roles.audit]`（**这里不再抄一遍**：抄了就成了"活配置 + 死副本"
 #   两种坐标，改一处必漏另一处）。语义：k3dge 冻结基线 → 调 k3dit 产包 → 验包 → 按 apply_order 落补丁。

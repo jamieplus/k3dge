@@ -671,9 +671,12 @@ def run_audit_flow(
         # 声明面留空 ⇒ **一次都没跑**（不是"无需审计"）：与 skip 同族，不得当已审——
         # 否则只要仓里有一份旧报告就能判闭环（本会话实测过这个配置层的洞）。
         msg = (
-            "审计未声明：`[checks.audit].stages_produce` 为空 ⇒ 没有可跑的审计步；"
+            "审计未声明：`[roles.audit].mode` 为空（模板不预选审计腿）且 "
+            "`[checks.audit].stages_produce` 为空 ⇒ 没有可跑的审计步；"
             "声明面没给 = 一次都没跑，不得当已审（ADR-0004 §2.1.9/§2.1.11）。"
-            "要么在 `.agent/pipeline.toml` 声明审计步，要么不要 seal。"
+            "请人显式二选一再封：`mode = \"bundle\"`（本地 k3dit，分钟级/付费）或 "
+            "`mode = \"oneshot\"`＋`[checks.audit]` 配 `stages_produce`/`stages_verify`"
+            "（外部 produce/verify 步）。"
         )
         return _reject_step(workspace, milestone_id, "audit_noop", msg)
 

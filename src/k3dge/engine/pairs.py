@@ -6,6 +6,11 @@ Tests and any templates-side consumer import from here.
 Not in PAIRS (intentional, do not "complete" the list):
 - architecture.md.template — downstream generic placeholder; never byte-compare
   against this repo's four-domain docs/architecture/overview.md (G-04 / P4-05).
+- pipeline.toml.template — the template ships `[roles.audit] mode` UNSET so a fresh
+  downstream repo cannot seal until a human explicitly picks `bundle` (local k3dit)
+  or `oneshot` (external produce/verify steps); this repo pins its own explicit
+  choice (`mode = "bundle"`), so the two must differ by design — byte-locking them
+  would either auto-select k3dit downstream or break this repo's seal.
 - reviews/LEFTOVERS.md — downstream empty table; this repo's leftovers are k3dge-specific.
 - mcp-bridge.md.template / gitignore.template / adr-readme.md.template — downstream-only init files
   （adr-readme 是下游的 ADR 索引样板：本仓 `docs/adr/README.md` 是 k3dge 专属主题表，字节不同是**有意**的）。
@@ -46,7 +51,6 @@ PAIRS: list[tuple[str, str]] = [
     ("rules/11-next-sidecar.md", ".agent/rules/11-next-sidecar.md"),
     ("rules/12-introduction-discipline.md", ".agent/rules/12-introduction-discipline.md"),
     ("docs.toml.template", ".agent/docs.toml"),
-    ("pipeline.toml.template", ".agent/pipeline.toml"),
     ("spec.md.template", "docs/specs/_template/spec.md"),
     ("tasks-readme.md", "docs/tasks/README.md"),
     ("reviews-readme.md", "docs/reviews/README.md"),

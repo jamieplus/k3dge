@@ -54,11 +54,15 @@ class TestTemplateSync(unittest.TestCase):
 
     # 渲染型模板：无主仓对件（占位由 scaffold 填写后下发）——新资产必须进 PAIRS 或这张表，
     # 手着"四件套"里登记一步（INC-20260827-AST-template-sync-protocols 的病根就是漏登记静默）。
+    # 例外：`pipeline.toml.template` 有主仓对件（`.agent/pipeline.toml`）但**故意不定对**——
+    # 模板出厂 `[roles.audit] mode` 留空（下游封版前必须由人显式选 bundle/oneshot），本仓钉死自己的
+    # 显式选择（`mode = "bundle"`）；字节锁会把两者之一逼错边，故只豁免不同、不豁免缺失。
     _RENDER_ONLY = {
         "adr-readme.md.template",
         "architecture.md.template",
         "gitignore.template",
         "mcp-bridge.md.template",
+        "pipeline.toml.template",
         "reviews-summary.md.template",
         "reviews/LEFTOVERS.md",
     }
